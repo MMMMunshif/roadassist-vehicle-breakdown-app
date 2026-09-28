@@ -1,0 +1,28 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "roadassist-lk-munshif",
+          "appId": "1:364238545986:android:c3263779769400c05b39db",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "roadassist-lk-munshif",
+          "configurations": {
+            "android": "1:364238545986:android:c3263779769400c05b39db",
+            "web": "1:364238545986:web:addf03955fc923065b39db"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

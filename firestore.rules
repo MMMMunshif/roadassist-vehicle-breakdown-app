@@ -1,0 +1,242 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isProvider() {
+      return signedIn() && userRole() == 'provider';
+    }
+
+    function isDriver() {
+      return signedIn() && userRole() == 'driver';
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role == resource.data.role;
+      allow delete: if signedIn() && request.auth.uid == userId;
+
+      match /devices/{deviceId} {
+        allow read, write: if signedIn() && request.auth.uid == userId;
+      }
+    }
+
+    match /providerDirectory/{providerId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && isProvider()
+        && request.auth.uid == providerId
+        && request.resource.data.keys().hasOnly([
+          'displayName', 'online', 'services', 'serviceRadius', 'latitude',
+          'longitude', 'locationUpdatedAt', 'updatedAt'
+        ]);
+      allow delete: if signedIn()
+        && isProvider()
+        && request.auth.uid == providerId;
+    }
+
+    match /requests/{requestId} {
+      allow create: if signedIn()
+        && isDriver()
+        && request.resource.data.driverId == request.auth.uid
+        && request.resource.data.providerId == null
+        && request.resource.data.status == 'searching'
+        && request.resource.data.issue in [
+          'Vehicle Towing', 'Battery Jumpstart', 'Flat Tyre',
+          'General Mechanic'
+        ]
+        && request.resource.data.vehicleType is string
+        && request.resource.data.modelYear is string
+        && request.resource.data.modelYear.size() <= 50
+        && request.resource.data.registration is string
+        && request.resource.data.registration.size() <= 16
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 15
+        && request.resource.data.description.size() <= 500
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 300
+        && request.resource.data.vehiclePhotoUrls is list
+        && request.resource.data.vehiclePhotoUrls.size() <= 3
+        && request.resource.data.latitude is number
+        && request.resource.data.latitude >= -90
+        && request.resource.data.latitude <= 90
+        && request.resource.data.longitude is number
+        && request.resource.data.longitude >= -180
+        && request.resource.data.longitude <= 180
+        && request.resource.data.serviceFee is int
+        && request.resource.data.serviceFee >= 0
+        && request.resource.data.dispatchFee is int
+        && request.resource.data.dispatchFee >= 0
+        && request.resource.data.estimatedCost is int
+        && request.resource.data.estimatedCost ==
+          request.resource.data.serviceFee + request.resource.data.dispatchFee
+        && request.resource.data.preferredProviderId is string
+        && request.resource.data.rejectedBy is list
+        && request.resource.data.rejectedBy.size() == 0
+        && request.resource.data.keys().hasOnly([
+          'driverId', 'driverName', 'driverPhone', 'providerId',
+          'preferredProviderId', 'preferredProviderName', 'rejectedBy',
+          'status', 'issue', 'vehicleType', 'modelYear', 'registration',
+          'description', 'notes', 'vehiclePhotoUrls', 'locationLabel',
+          'latitude', 'longitude', 'serviceFee', 'dispatchFee',
+          'estimatedCost', 'createdAt', 'updatedAt'
+        ]);
+
+      allow read: if signedIn() && (
+        resource.data.driverId == request.auth.uid
+        || resource.data.providerId == request.auth.uid
+        || (isProvider() && resource.data.status == 'searching')
+      );
+
+      allow update: if signedIn() && (
+        // A driver may only cancel their own active request.
+        (resource.data.driverId == request.auth.uid
+          && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'cancelledAt', 'updatedAt'
+          ]))
+        // A driver may rate only their own completed request.
+        || (resource.data.driverId == request.auth.uid
+          && resource.data.status == 'completed'
+          && request.resource.data.driverRating is int
+          && request.resource.data.driverRating >= 1
+          && request.resource.data.driverRating <= 5
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'driverRating', 'ratedAt', 'updatedAt'
+          ]))
+        // Chat read timestamp for the driver.
+        || (resource.data.driverId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'driverMessagesSeenAt'
+          ]))
+        // Driver can broaden an unanswered targeted request to all providers.
+        || (resource.data.driverId == request.auth.uid
+          && resource.data.status == 'searching'
+          && request.resource.data.status == 'searching'
+          && request.resource.data.preferredProviderId == ''
+          && request.resource.data.preferredProviderName == ''
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'preferredProviderId', 'preferredProviderName',
+            'fallbackStartedAt', 'updatedAt'
+          ]))
+        // Only one transaction can move a still-searching request to accepted.
+        || (isProvider()
+          && resource.data.status == 'searching'
+          && resource.data.providerId == null
+          && (!('preferredProviderId' in resource.data)
+            || resource.data.preferredProviderId == ''
+            || resource.data.preferredProviderId == request.auth.uid)
+          && request.resource.data.providerId == request.auth.uid
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.serviceFee is int
+          && request.resource.data.serviceFee >= 0
+          && request.resource.data.dispatchFee is int
+          && request.resource.data.dispatchFee >= 0
+          && request.resource.data.extraFee is int
+          && request.resource.data.extraFee >= 0
+          && request.resource.data.providerDistanceKm is number
+          && request.resource.data.providerDistanceKm >= 0
+          && request.resource.data.quoteNotes is string
+          && request.resource.data.quoteNotes.size() <= 200
+          && request.resource.data.estimatedCost ==
+            request.resource.data.serviceFee
+            + request.resource.data.dispatchFee
+            + request.resource.data.extraFee
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'providerId', 'providerName', 'providerPhone', 'status',
+            'serviceFee', 'dispatchFee', 'extraFee', 'estimatedCost',
+            'providerDistanceKm', 'quoteNotes', 'quotedAt',
+            'acceptedAt', 'updatedAt'
+          ]))
+        // A provider can dismiss an open request only for themselves.
+        || (isProvider()
+          && resource.data.status == 'searching'
+          && (!('preferredProviderId' in resource.data)
+            || resource.data.preferredProviderId == ''
+            || resource.data.preferredProviderId == request.auth.uid)
+          && request.resource.data.status == 'searching'
+          && request.resource.data.rejectedBy.hasAll(resource.data.rejectedBy)
+          && request.resource.data.rejectedBy.hasAll([request.auth.uid])
+          && (!('preferredProviderId' in request.resource.data)
+            || request.resource.data.preferredProviderId == '')
+          && (!('preferredProviderName' in request.resource.data)
+            || request.resource.data.preferredProviderName == '')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'rejectedBy', 'preferredProviderId', 'preferredProviderName',
+            'fallbackStartedAt', 'updatedAt'
+          ]))
+        // Assigned provider: strict job-status progression.
+        || (resource.data.providerId == request.auth.uid
+          && ((resource.data.status == 'accepted'
+                && request.resource.data.status == 'en_route')
+            || (resource.data.status == 'en_route'
+                && request.resource.data.status == 'arrived')
+            || (resource.data.status == 'arrived'
+                && request.resource.data.status == 'completed'))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'en_routeAt', 'arrivedAt', 'completedAt', 'finalCost',
+            'updatedAt'
+          ])
+          && (request.resource.data.status != 'completed'
+            || (request.resource.data.finalCost is int
+              && request.resource.data.finalCost >= 0)))
+        // Assigned provider live update their live coordinates.
+        || (resource.data.providerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'providerLatitude', 'providerLongitude',
+            'providerLocationUpdatedAt'
+          ]))
+        // Assigned provider can add service notes and compressed evidence photos.
+        || (resource.data.providerId == request.auth.uid
+          && resource.data.status in ['accepted', 'en_route', 'arrived']
+          && request.resource.data.serviceNotes is string
+          && request.resource.data.serviceNotes.size() <= 500
+          && request.resource.data.servicePhotoData is list
+          && request.resource.data.servicePhotoData.size() <= 3
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'serviceNotes', 'servicePhotoData',
+            'documentationUpdatedAt'
+          ]))
+        // Chat read timestamp for the assigned provider.
+        || (resource.data.providerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'providerMessagesSeenAt'
+          ]))
+      );
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function parentRequest() {
+          return get(/databases/$(database)/documents/requests/$(requestId)).data;
+        }
+        allow read: if signedIn() && (
+          parentRequest().driverId == request.auth.uid
+          || parentRequest().providerId == request.auth.uid
+        );
+        allow create: if signedIn()
+          && (parentRequest().driverId == request.auth.uid
+            || parentRequest().providerId == request.auth.uid)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && ((request.resource.data.text.size() > 0)
+            || (request.resource.data.imageData is string
+              && request.resource.data.imageData.size() > 0
+              && request.resource.data.imageData.size() <= 250000))
+          && request.resource.data.keys().hasOnly([
+            'senderId', 'text', 'imageData', 'createdAt'
+          ]);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
