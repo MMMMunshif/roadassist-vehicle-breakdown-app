@@ -13,10 +13,36 @@ void main() {
     await tester.tap(find.text('Confirm & Next'));
     await tester.pump();
 
-    expect(find.text('Required'), findsOneWidget);
-    expect(find.text('Enter a valid registration number'), findsOneWidget);
-    expect(find.text('Please add at least 10 characters'), findsOneWidget);
+    expect(find.text('Enter the vehicle model and year'), findsOneWidget);
+    expect(
+      find.text('Use a format such as WP CAB-1234 or CAA-1234'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Please describe the problem in at least 15 characters'),
+      findsOneWidget,
+    );
     expect(find.text('Location Confirmation'), findsNothing);
+  });
+
+  testWidgets('other vehicle type requires a custom value', (tester) async {
+    await tester.pumpWidget(
+      testApp(const BreakdownDetailsScreen(issue: 'General Mechanic')),
+    );
+
+    await tester.tap(find.text('Sedan / Hatchback'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Other').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(TextFormField, 'Other Vehicle Type'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Confirm & Next'));
+    await tester.pump();
+    expect(find.text('Enter your vehicle type'), findsOneWidget);
   });
 
   testWidgets('valid breakdown data continues to location', (tester) async {
@@ -40,7 +66,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Location Confirmation'), findsOneWidget);
-    expect(find.text('452 Galle Road, Colombo 03, Sri Lanka'), findsOneWidget);
+    expect(
+      find.text('Select current GPS or enter location manually'),
+      findsOneWidget,
+    );
+  });
+
+  test('vehicle registration is normalised before validation', () {
+    expect(normalizeVehicleRegistration(' wp cab - 1234 '), 'WP CAB-1234');
+    expect(validateVehicleRegistration('WP CAB-1234'), isNull);
+    expect(validateVehicleRegistration('123'), isNotNull);
+  });
+
+  test('vehicle model requires a realistic year', () {
+    expect(validateVehicleModelYear('Toyota Aqua 2018'), isNull);
+    expect(validateVehicleModelYear('Toyota Aqua'), isNotNull);
+    expect(validateVehicleModelYear('Toyota Aqua 1900'), isNotNull);
+  });
+
+  test('custom vehicle type must contain a meaningful name', () {
+    expect(validateCustomVehicleType('Three Wheeler'), isNull);
+    expect(validateCustomVehicleType(''), 'Enter your vehicle type');
+    expect(validateCustomVehicleType('12'), 'Enter a valid vehicle type');
+  });
+
+  test('breakdown description rejects incomplete details', () {
+    expect(
+      validateBreakdownDescription('Rear tyre has a deep puncture'),
+      isNull,
+    );
+    expect(
+      validateBreakdownDescription('abcdefghijklmnop'),
+      'Describe at least three words about the vehicle problem',
+    );
+    expect(
+      validateBreakdownDescription('Tyre flat'),
+      'Please describe the problem in at least 15 characters',
+    );
   });
 
   testWidgets('driver can edit profile and sign out', (tester) async {
