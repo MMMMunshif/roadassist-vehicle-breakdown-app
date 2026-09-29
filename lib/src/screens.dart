@@ -2460,19 +2460,42 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   Future<void> addVehiclePhotos() async {
     if (uploadingVehiclePhoto || vehiclePhotoUrls.length >= 3) return;
     final navigator = Navigator.of(context);
+    final remainingSlots = 3 - vehiclePhotoUrls.length;
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      builder: (context) => const SafeArea(
+      showDragHandle: true,
+      builder: (context) => SafeArea(
         child: Wrap(
           children: [
-            _PhotoSourceTile(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                RaSpace.xl,
+                RaSpace.sm,
+                RaSpace.xl,
+                RaSpace.md,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Add breakdown evidence', style: RaText.headline),
+                  const SizedBox(height: RaSpace.xs),
+                  Text(
+                    '$remainingSlots of 3 photo slots remaining',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const _PhotoSourceTile(
               icon: Icons.photo_library_outlined,
               label: 'Choose from gallery',
+              description: 'Select one or more existing photos',
               source: ImageSource.gallery,
             ),
-            _PhotoSourceTile(
+            const _PhotoSourceTile(
               icon: Icons.camera_alt_outlined,
               label: 'Take a photo',
+              description: 'Open the camera for a new photo',
               source: ImageSource.camera,
             ),
           ],
@@ -2483,20 +2506,42 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     setState(() => uploadingVehiclePhoto = true);
     try {
       final picker = ImagePicker();
-      final photos = source == ImageSource.gallery
+      final List<XFile> photos = source == ImageSource.gallery
           ? await picker.pickMultiImage(
               imageQuality: 75,
               maxWidth: 1600,
-              limit: 3 - vehiclePhotoUrls.length,
+              limit: remainingSlots,
             )
           : [
               ?await navigator.push<XFile>(
                 MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
               ),
             ];
+      if (photos.isEmpty) return;
+      final preparedPhotos = <String>[];
       for (final photo in photos) {
         final photoData = await PhotoUploadService().prepareVehiclePhoto(photo);
-        if (vehiclePhotoUrls.length < 3) vehiclePhotoUrls.add(photoData);
+        if (!vehiclePhotoUrls.contains(photoData) &&
+            !preparedPhotos.contains(photoData)) {
+          preparedPhotos.add(photoData);
+        }
+        if (preparedPhotos.length >= remainingSlots) break;
+      }
+      if (!mounted || preparedPhotos.isEmpty) return;
+      setState(() => vehiclePhotoUrls.addAll(preparedPhotos));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            preparedPhotos.length == 1
+                ? 'Breakdown photo added.'
+                : '${preparedPhotos.length} breakdown photos added.',
+          ),
+        ),
+      );
+      if (photos.length > preparedPhotos.length) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Duplicate photos were skipped.')),
+        );
       }
     } catch (error) {
       if (mounted)
@@ -2929,16 +2974,20 @@ class _PhotoSourceTile extends StatelessWidget {
   const _PhotoSourceTile({
     required this.icon,
     required this.label,
+    this.description = '',
     required this.source,
   });
   final IconData icon;
   final String label;
+  final String description;
   final ImageSource source;
 
   @override
   Widget build(BuildContext context) => ListTile(
     leading: IconBadge(icon),
     title: Text(label, style: RaText.title),
+    subtitle: description.isEmpty ? null : Text(description),
+    trailing: const Icon(Icons.chevron_right),
     onTap: () => Navigator.pop(context, source),
   );
 }
