@@ -35,7 +35,10 @@ void main() {
     await tester.tap(find.text('Other').last);
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(TextFormField, 'Other Vehicle Type'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextFormField, 'Other Vehicle Type'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Confirm & Next'));
     await tester.pump();
@@ -79,6 +82,27 @@ void main() {
     expect(validateVehicleModelYear('Toyota Aqua 2018'), isNull);
     expect(validateVehicleModelYear('Toyota Aqua'), isNotNull);
     expect(validateVehicleModelYear('Toyota Aqua 1900'), isNotNull);
+  });
+
+  test('custom vehicle type must contain a meaningful name', () {
+    expect(validateCustomVehicleType('Three Wheeler'), isNull);
+    expect(validateCustomVehicleType(''), 'Enter your vehicle type');
+    expect(validateCustomVehicleType('12'), 'Enter a valid vehicle type');
+  });
+
+  test('breakdown description rejects incomplete details', () {
+    expect(
+      validateBreakdownDescription('Rear tyre has a deep puncture'),
+      isNull,
+    );
+    expect(
+      validateBreakdownDescription('abcdefghijklmnop'),
+      'Describe at least three words about the vehicle problem',
+    );
+    expect(
+      validateBreakdownDescription('Tyre flat'),
+      'Please describe the problem in at least 15 characters',
+    );
   });
 
   testWidgets('driver can edit profile and sign out', (tester) async {

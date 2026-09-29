@@ -79,6 +79,27 @@ String? validateVehicleModelYear(String? value) {
   return null;
 }
 
+String? validateCustomVehicleType(String? value) {
+  final type = value?.trim() ?? '';
+  if (type.isEmpty) return 'Enter your vehicle type';
+  if (type.length < 2 || !RegExp(r'[A-Za-z]').hasMatch(type)) {
+    return 'Enter a valid vehicle type';
+  }
+  return null;
+}
+
+String? validateBreakdownDescription(String? value) {
+  final description = value?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+  if (description.length < 15) {
+    return 'Please describe the problem in at least 15 characters';
+  }
+  if (!RegExp(r'[A-Za-z]').hasMatch(description) ||
+      description.split(' ').length < 3) {
+    return 'Describe at least three words about the vehicle problem';
+  }
+  return null;
+}
+
 // ============================================================
 // SPLASH / ONBOARDING
 // ============================================================
@@ -2584,17 +2605,9 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                               hintText: 'e.g. Three Wheeler, Pickup Truck',
                               prefixIcon: Icon(Icons.directions_car_outlined),
                             ),
-                            validator: (value) {
-                              if (vehicle != 'Other') return null;
-                              final type = value?.trim() ?? '';
-                              if (type.isEmpty) {
-                                return 'Enter your vehicle type';
-                              }
-                              if (type.length < 2) {
-                                return 'Vehicle type is too short';
-                              }
-                              return null;
-                            },
+                            validator: (value) => vehicle == 'Other'
+                                ? validateCustomVehicleType(value)
+                                : null,
                           ),
                         ],
                         const SizedBox(height: RaSpace.md),
@@ -2632,13 +2645,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             labelText: 'Detailed description',
                             hintText: 'Describe the symptoms...',
                           ),
-                          validator: (value) {
-                            final description = value?.trim() ?? '';
-                            if (description.length < 15) {
-                              return 'Please describe the problem in at least 15 characters';
-                            }
-                            return null;
-                          },
+                          validator: validateBreakdownDescription,
                         ),
                         const SizedBox(height: RaSpace.xxl),
                         const FormSectionTitle(
@@ -3731,11 +3738,11 @@ class _SearchingScreenState extends State<SearchingScreen>
                 providerResponseTimer = null;
               }
               if (const [
-                'accepted',
-                'en_route',
-                'arrived',
-                'completed',
-              ].contains(status) &&
+                    'accepted',
+                    'en_route',
+                    'arrived',
+                    'completed',
+                  ].contains(status) &&
                   !navigatingToTracking) {
                 navigatingToTracking = true;
                 final latitude = (data['latitude'] as num?)?.toDouble();
@@ -4194,10 +4201,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
               data['registration'] as String? ?? 'Not provided',
             ),
             const Divider(),
-            SummaryRow(
-              'Service charge',
-              'Rs. ${data['serviceFee'] ?? 0}',
-            ),
+            SummaryRow('Service charge', 'Rs. ${data['serviceFee'] ?? 0}'),
             SummaryRow(
               'Travel / distance charge',
               'Rs. ${data['dispatchFee'] ?? 0}',
@@ -4357,10 +4361,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
                     'Travel / Distance Charge',
                     'Rs. ${data['dispatchFee'] ?? 0}',
                   ),
-                  SummaryRow(
-                    'Extra Charge',
-                    'Rs. ${data['extraFee'] ?? 0}',
-                  ),
+                  SummaryRow('Extra Charge', 'Rs. ${data['extraFee'] ?? 0}'),
                   if ((data['providerDistanceKm'] as num?) != null)
                     SummaryRow(
                       'Provider Distance',
@@ -7696,7 +7697,8 @@ Future<Map<String, dynamic>?> requestProviderQuote(
       if (permission != LocationPermission.denied &&
           permission != LocationPermission.deniedForever) {
         final providerPosition = await Geolocator.getCurrentPosition();
-        distanceKm = Geolocator.distanceBetween(
+        distanceKm =
+            Geolocator.distanceBetween(
               providerPosition.latitude,
               providerPosition.longitude,
               driverLatitude,
@@ -7737,10 +7739,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
               controller: controller,
               keyboardType: TextInputType.number,
               onChanged: (_) => setDialogState(() {}),
-              decoration: InputDecoration(
-                labelText: label,
-                prefixText: 'Rs. ',
-              ),
+              decoration: InputDecoration(labelText: label, prefixText: 'Rs. '),
             );
         return AlertDialog(
           icon: const Icon(Icons.request_quote_outlined, color: raBlue),
@@ -9696,10 +9695,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
                     'Travel / Distance Charge',
                     'Rs. ${data['dispatchFee'] ?? 0}',
                   ),
-                  SummaryRow(
-                    'Extra Charge',
-                    'Rs. ${data['extraFee'] ?? 0}',
-                  ),
+                  SummaryRow('Extra Charge', 'Rs. ${data['extraFee'] ?? 0}'),
                   if ((data['providerDistanceKm'] as num?) != null)
                     SummaryRow(
                       'Provider Distance',
