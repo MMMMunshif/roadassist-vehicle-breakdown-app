@@ -21,6 +21,8 @@ import 'services/request_service.dart';
 import 'services/photo_upload_service.dart';
 import 'services/route_service.dart';
 
+part 'features/request/assistance_type_screen.dart';
+
 bool get firebaseReady => Firebase.apps.isNotEmpty;
 bool get signedIn => firebaseReady && FirebaseAuth.instance.currentUser != null;
 
@@ -73,6 +75,27 @@ String? validateVehicleModelYear(String? value) {
   final year = int.tryParse(match?.group(0) ?? '');
   if (year == null || year < 1950 || year > DateTime.now().year + 1) {
     return 'Include a valid year, e.g. Toyota Aqua 2018';
+  }
+  return null;
+}
+
+String? validateCustomVehicleType(String? value) {
+  final type = value?.trim() ?? '';
+  if (type.isEmpty) return 'Enter your vehicle type';
+  if (type.length < 2 || !RegExp(r'[A-Za-z]').hasMatch(type)) {
+    return 'Enter a valid vehicle type';
+  }
+  return null;
+}
+
+String? validateBreakdownDescription(String? value) {
+  final description = value?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+  if (description.length < 15) {
+    return 'Please describe the problem in at least 15 characters';
+  }
+  if (!RegExp(r'[A-Za-z]').hasMatch(description) ||
+      description.split(' ').length < 3) {
+    return 'Describe at least three words about the vehicle problem';
   }
   return null;
 }
@@ -2416,130 +2439,6 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
         );
 }
 
-class AssistanceTypeScreen extends StatefulWidget {
-  const AssistanceTypeScreen({super.key});
-  @override
-  State<AssistanceTypeScreen> createState() => _AssistanceTypeScreenState();
-}
-
-class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
-  int selected = -1;
-  final items = const [
-    (
-      'General Mechanic',
-      'Engine sounds, brakes, or general mechanical failure.',
-      Icons.car_repair,
-    ),
-    (
-      'Vehicle Towing',
-      'Vehicle cannot be driven and needs recovery transport.',
-      Icons.fire_truck_outlined,
-    ),
-    (
-      'Flat Tyre',
-      'Puncture repair or spare tyre replacement service.',
-      Icons.tire_repair,
-    ),
-    (
-      'Battery Jumpstart',
-      'Dead battery or electrical starting issues.',
-      Icons.battery_charging_full,
-    ),
-  ];
-
-  String formatEstimate(String issue) {
-    final value = estimatedCostForIssue(issue).toString();
-    final formatted = value.length > 3
-        ? '${value.substring(0, value.length - 3)},${value.substring(value.length - 3)}'
-        : value;
-    return 'Estimated from Rs. $formatted';
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Assistance Type')),
-    body: SafeArea(
-      child: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(RaSpace.xl),
-              children: [
-                const StepEyebrow(step: 1, of: 4),
-                const SizedBox(height: RaSpace.xl),
-                const Text("What's the issue?", style: RaText.headline),
-                const SizedBox(height: RaSpace.xs),
-                const Text(
-                  "Select the type of help you need. We'll find the nearest certified specialist in your area.",
-                  style: RaText.bodyMuted,
-                ),
-                const SizedBox(height: RaSpace.lg),
-                const SafetyBox(),
-                const SizedBox(height: RaSpace.md),
-                for (var i = 0; i < items.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: RaSpace.sm),
-                    child: Card(
-                      color: selected == i ? raPale : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(RaRadius.md),
-                        side: BorderSide(
-                          color: selected == i ? raBlue : raLine,
-                          width: selected == i ? 1.6 : 1,
-                        ),
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: RaSpace.md,
-                          vertical: 4,
-                        ),
-                        onTap: () => setState(() => selected = i),
-                        leading: IconBadge(items[i].$3),
-                        title: Text(items[i].$1, style: RaText.title),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: RaSpace.xs),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(items[i].$2, style: RaText.caption),
-                              const SizedBox(height: RaSpace.xs),
-                              Text(
-                                formatEstimate(items[i].$1),
-                                style: const TextStyle(
-                                  color: raBlue,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        trailing: Icon(
-                          selected == i
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          color: selected == i ? raBlue : raFaint,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          BottomAction(
-            label: 'Continue',
-            enabled: selected >= 0,
-            onTap: () => push(
-              context,
-              BreakdownDetailsScreen(issue: items[selected].$1),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
 class BreakdownDetailsScreen extends StatefulWidget {
   const BreakdownDetailsScreen({super.key, required this.issue});
   final String issue;
@@ -2561,19 +2460,42 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   Future<void> addVehiclePhotos() async {
     if (uploadingVehiclePhoto || vehiclePhotoUrls.length >= 3) return;
     final navigator = Navigator.of(context);
+    final remainingSlots = 3 - vehiclePhotoUrls.length;
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      builder: (context) => const SafeArea(
+      showDragHandle: true,
+      builder: (context) => SafeArea(
         child: Wrap(
           children: [
-            _PhotoSourceTile(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                RaSpace.xl,
+                RaSpace.sm,
+                RaSpace.xl,
+                RaSpace.md,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Add breakdown evidence', style: RaText.headline),
+                  const SizedBox(height: RaSpace.xs),
+                  Text(
+                    '$remainingSlots of 3 photo slots remaining',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const _PhotoSourceTile(
               icon: Icons.photo_library_outlined,
               label: 'Choose from gallery',
+              description: 'Select one or more existing photos',
               source: ImageSource.gallery,
             ),
-            _PhotoSourceTile(
+            const _PhotoSourceTile(
               icon: Icons.camera_alt_outlined,
               label: 'Take a photo',
+              description: 'Open the camera for a new photo',
               source: ImageSource.camera,
             ),
           ],
@@ -2584,20 +2506,42 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     setState(() => uploadingVehiclePhoto = true);
     try {
       final picker = ImagePicker();
-      final photos = source == ImageSource.gallery
+      final List<XFile> photos = source == ImageSource.gallery
           ? await picker.pickMultiImage(
               imageQuality: 75,
               maxWidth: 1600,
-              limit: 3 - vehiclePhotoUrls.length,
+              limit: remainingSlots,
             )
           : [
               ?await navigator.push<XFile>(
                 MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
               ),
             ];
+      if (photos.isEmpty) return;
+      final preparedPhotos = <String>[];
       for (final photo in photos) {
         final photoData = await PhotoUploadService().prepareVehiclePhoto(photo);
-        if (vehiclePhotoUrls.length < 3) vehiclePhotoUrls.add(photoData);
+        if (!vehiclePhotoUrls.contains(photoData) &&
+            !preparedPhotos.contains(photoData)) {
+          preparedPhotos.add(photoData);
+        }
+        if (preparedPhotos.length >= remainingSlots) break;
+      }
+      if (!mounted || preparedPhotos.isEmpty) return;
+      setState(() => vehiclePhotoUrls.addAll(preparedPhotos));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            preparedPhotos.length == 1
+                ? 'Breakdown photo added.'
+                : '${preparedPhotos.length} breakdown photos added.',
+          ),
+        ),
+      );
+      if (photos.length > preparedPhotos.length) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Duplicate photos were skipped.')),
+        );
       }
     } catch (error) {
       if (mounted)
@@ -2706,17 +2650,9 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                               hintText: 'e.g. Three Wheeler, Pickup Truck',
                               prefixIcon: Icon(Icons.directions_car_outlined),
                             ),
-                            validator: (value) {
-                              if (vehicle != 'Other') return null;
-                              final type = value?.trim() ?? '';
-                              if (type.isEmpty) {
-                                return 'Enter your vehicle type';
-                              }
-                              if (type.length < 2) {
-                                return 'Vehicle type is too short';
-                              }
-                              return null;
-                            },
+                            validator: (value) => vehicle == 'Other'
+                                ? validateCustomVehicleType(value)
+                                : null,
                           ),
                         ],
                         const SizedBox(height: RaSpace.md),
@@ -2754,13 +2690,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             labelText: 'Detailed description',
                             hintText: 'Describe the symptoms...',
                           ),
-                          validator: (value) {
-                            final description = value?.trim() ?? '';
-                            if (description.length < 15) {
-                              return 'Please describe the problem in at least 15 characters';
-                            }
-                            return null;
-                          },
+                          validator: validateBreakdownDescription,
                         ),
                         const SizedBox(height: RaSpace.xxl),
                         const FormSectionTitle(
@@ -3044,16 +2974,20 @@ class _PhotoSourceTile extends StatelessWidget {
   const _PhotoSourceTile({
     required this.icon,
     required this.label,
+    this.description = '',
     required this.source,
   });
   final IconData icon;
   final String label;
+  final String description;
   final ImageSource source;
 
   @override
   Widget build(BuildContext context) => ListTile(
     leading: IconBadge(icon),
     title: Text(label, style: RaText.title),
+    subtitle: description.isEmpty ? null : Text(description),
+    trailing: const Icon(Icons.chevron_right),
     onTap: () => Navigator.pop(context, source),
   );
 }
@@ -3853,11 +3787,11 @@ class _SearchingScreenState extends State<SearchingScreen>
                 providerResponseTimer = null;
               }
               if (const [
-                'accepted',
-                'en_route',
-                'arrived',
-                'completed',
-              ].contains(status) &&
+                    'accepted',
+                    'en_route',
+                    'arrived',
+                    'completed',
+                  ].contains(status) &&
                   !navigatingToTracking) {
                 navigatingToTracking = true;
                 final latitude = (data['latitude'] as num?)?.toDouble();
@@ -4316,10 +4250,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
               data['registration'] as String? ?? 'Not provided',
             ),
             const Divider(),
-            SummaryRow(
-              'Service charge',
-              'Rs. ${data['serviceFee'] ?? 0}',
-            ),
+            SummaryRow('Service charge', 'Rs. ${data['serviceFee'] ?? 0}'),
             SummaryRow(
               'Travel / distance charge',
               'Rs. ${data['dispatchFee'] ?? 0}',
@@ -4479,10 +4410,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
                     'Travel / Distance Charge',
                     'Rs. ${data['dispatchFee'] ?? 0}',
                   ),
-                  SummaryRow(
-                    'Extra Charge',
-                    'Rs. ${data['extraFee'] ?? 0}',
-                  ),
+                  SummaryRow('Extra Charge', 'Rs. ${data['extraFee'] ?? 0}'),
                   if ((data['providerDistanceKm'] as num?) != null)
                     SummaryRow(
                       'Provider Distance',
@@ -7818,7 +7746,8 @@ Future<Map<String, dynamic>?> requestProviderQuote(
       if (permission != LocationPermission.denied &&
           permission != LocationPermission.deniedForever) {
         final providerPosition = await Geolocator.getCurrentPosition();
-        distanceKm = Geolocator.distanceBetween(
+        distanceKm =
+            Geolocator.distanceBetween(
               providerPosition.latitude,
               providerPosition.longitude,
               driverLatitude,
@@ -7859,10 +7788,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
               controller: controller,
               keyboardType: TextInputType.number,
               onChanged: (_) => setDialogState(() {}),
-              decoration: InputDecoration(
-                labelText: label,
-                prefixText: 'Rs. ',
-              ),
+              decoration: InputDecoration(labelText: label, prefixText: 'Rs. '),
             );
         return AlertDialog(
           icon: const Icon(Icons.request_quote_outlined, color: raBlue),
@@ -9818,10 +9744,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
                     'Travel / Distance Charge',
                     'Rs. ${data['dispatchFee'] ?? 0}',
                   ),
-                  SummaryRow(
-                    'Extra Charge',
-                    'Rs. ${data['extraFee'] ?? 0}',
-                  ),
+                  SummaryRow('Extra Charge', 'Rs. ${data['extraFee'] ?? 0}'),
                   if ((data['providerDistanceKm'] as num?) != null)
                     SummaryRow(
                       'Provider Distance',

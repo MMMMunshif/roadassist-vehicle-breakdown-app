@@ -19,25 +19,36 @@ class PhotoUploadService {
     required int quality,
     required int maxBytes,
   }) async {
-    final source = img.decodeImage(await photo.readAsBytes());
-    if (source == null) {
+    final decoded = img.decodeImage(await photo.readAsBytes());
+    if (decoded == null) {
       throw const FormatException('Unsupported image file.');
     }
-    final resized = source.width > source.height
-        ? img.copyResize(source, width: maxDimension)
-        : img.copyResize(source, height: maxDimension);
-    var encoded = img.encodeJpg(resized, quality: quality);
-    if (encoded.length > maxBytes) {
-      final smaller = source.width > source.height
-          ? img.copyResize(source, width: (maxDimension * .72).round())
-          : img.copyResize(source, height: (maxDimension * .72).round());
-      encoded = img.encodeJpg(smaller, quality: 45);
+
+    var prepared = img.bakeOrientation(decoded);
+    if (prepared.width > maxDimension || prepared.height > maxDimension) {
+      prepared = prepared.width >= prepared.height
+          ? img.copyResize(prepared, width: maxDimension)
+          : img.copyResize(prepared, height: maxDimension);
     }
-    if (encoded.length > maxBytes) {
-      throw StateError(
-        'Image is still too large. Please choose another photo.',
-      );
+
+    var currentQuality = quality;
+    for (var attempt = 0; attempt < 7; attempt++) {
+      final encoded = img.encodeJpg(prepared, quality: currentQuality);
+      if (encoded.length <= maxBytes) return base64Encode(encoded);
+
+      if (currentQuality > 35) {
+        currentQuality = (currentQuality - 10).clamp(30, 100).toInt();
+        continue;
+      }
+
+      final nextWidth = (prepared.width * .82).round();
+      final nextHeight = (prepared.height * .82).round();
+      if (nextWidth < 320 || nextHeight < 240) break;
+      prepared = img.copyResize(prepared, width: nextWidth, height: nextHeight);
     }
-    return base64Encode(encoded);
+
+    throw StateError(
+      'Image is still too large after optimisation. Choose another photo.',
+    );
   }
 }
