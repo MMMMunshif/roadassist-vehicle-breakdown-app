@@ -37,7 +37,8 @@ service cloud.firestore {
         && request.auth.uid == providerId
         && request.resource.data.keys().hasOnly([
           'displayName', 'online', 'services', 'serviceRadius', 'latitude',
-          'longitude', 'locationUpdatedAt', 'updatedAt'
+          'longitude', 'completedJobs', 'averageRating',
+          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt'
         ]);
       allow delete: if signedIn()
         && isProvider()
@@ -54,24 +55,40 @@ service cloud.firestore {
           'Vehicle Towing', 'Battery Jumpstart', 'Flat Tyre',
           'General Mechanic'
         ]
+        && request.resource.data.issues is list
+        && request.resource.data.issues.size() >= 1
+        && request.resource.data.issues.size() <= 4
+        && request.resource.data.issues.hasOnly([
+          'Vehicle Towing', 'Battery Jumpstart', 'Flat Tyre',
+          'General Mechanic'
+        ])
         && request.resource.data.vehicleType is string
         && request.resource.data.modelYear is string
         && request.resource.data.modelYear.size() <= 50
         && request.resource.data.registration is string
         && request.resource.data.registration.size() <= 16
         && request.resource.data.description is string
-        && request.resource.data.description.size() >= 15
+        && request.resource.data.description.size() >= 0
         && request.resource.data.description.size() <= 500
         && request.resource.data.notes is string
         && request.resource.data.notes.size() <= 300
+        && request.resource.data.priority in [
+          'normal', 'urgent', 'road_blocking', 'safety_risk'
+        ]
         && request.resource.data.vehiclePhotoUrls is list
         && request.resource.data.vehiclePhotoUrls.size() <= 3
+        && request.resource.data.photoAnnotations is list
+        && request.resource.data.photoAnnotations.size() <= 3
         && request.resource.data.latitude is number
         && request.resource.data.latitude >= -90
         && request.resource.data.latitude <= 90
         && request.resource.data.longitude is number
         && request.resource.data.longitude >= -180
         && request.resource.data.longitude <= 180
+        && request.resource.data.landmark is string
+        && request.resource.data.landmark.size() <= 120
+        && (request.resource.data.locationAccuracyMeters == null
+          || request.resource.data.locationAccuracyMeters is number)
         && request.resource.data.serviceFee is int
         && request.resource.data.serviceFee >= 0
         && request.resource.data.dispatchFee is int
@@ -85,9 +102,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'driverId', 'driverName', 'driverPhone', 'providerId',
           'preferredProviderId', 'preferredProviderName', 'rejectedBy',
-          'status', 'issue', 'vehicleType', 'modelYear', 'registration',
-          'description', 'notes', 'vehiclePhotoUrls', 'locationLabel',
-          'latitude', 'longitude', 'serviceFee', 'dispatchFee',
+          'status', 'issue', 'issues', 'vehicleType', 'modelYear', 'registration',
+          'description', 'notes', 'priority', 'vehiclePhotoUrls',
+          'photoAnnotations', 'locationLabel', 'landmark',
+          'locationAccuracyMeters', 'latitude', 'longitude', 'serviceFee', 'dispatchFee',
           'estimatedCost', 'createdAt', 'updatedAt'
         ]);
 
@@ -113,6 +131,27 @@ service cloud.firestore {
           && request.resource.data.driverRating <= 5
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'driverRating', 'ratedAt', 'updatedAt'
+          ]))
+        // A driver may correct request details until a provider accepts it.
+        || (resource.data.driverId == request.auth.uid
+          && resource.data.status == 'searching'
+          && resource.data.providerId == null
+          && request.resource.data.status == 'searching'
+          && request.resource.data.description is string
+          && request.resource.data.description.size() >= 0
+          && request.resource.data.description.size() <= 500
+          && request.resource.data.notes is string
+          && request.resource.data.notes.size() <= 300
+          && request.resource.data.landmark is string
+          && request.resource.data.landmark.size() <= 120
+          && request.resource.data.vehiclePhotoUrls is list
+          && request.resource.data.vehiclePhotoUrls.size() <= 3
+          && request.resource.data.latitude is number
+          && request.resource.data.longitude is number
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'description', 'notes', 'vehiclePhotoUrls', 'photoAnnotations',
+            'locationLabel', 'landmark', 'locationAccuracyMeters',
+            'latitude', 'longitude', 'updatedAt'
           ]))
         // Chat read timestamp for the driver.
         || (resource.data.driverId == request.auth.uid

@@ -8,7 +8,12 @@ class AssistanceTypeScreen extends StatefulWidget {
 }
 
 class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
-  int selected = -1;
+  final selected = <int>{};
+  final draftStore = RequestDraftStore();
+  RequestDraft? savedDraft;
+  DateTime? savedAt;
+  bool loadingDraft = true;
+
   final items = const [
     (
       'General Mechanic',
@@ -32,12 +37,63 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     ),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    loadSavedDraft();
+  }
+
+  Future<void> loadSavedDraft() async {
+    final draft = await draftStore.load();
+    final updatedAt = await draftStore.lastUpdated();
+    if (!mounted) return;
+    setState(() {
+      savedDraft = draft;
+      savedAt = updatedAt;
+      loadingDraft = false;
+    });
+  }
+
+  Future<void> discardSavedDraft() async {
+    await draftStore.clear();
+    if (!mounted) return;
+    setState(() {
+      savedDraft = null;
+      savedAt = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Saved request draft removed.')),
+    );
+  }
+
   String formatEstimate(String issue) {
     final value = estimatedCostForIssue(issue).toString();
     final formatted = value.length > 3
         ? '${value.substring(0, value.length - 3)},${value.substring(value.length - 3)}'
         : value;
     return 'Estimated from Rs. $formatted';
+  }
+
+  String formatSavedTime(DateTime? value) {
+    if (value == null) return 'Saved request available';
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return 'Saved ${value.day}/${value.month}/${value.year} at $hour:$minute';
+  }
+
+  void resumeSavedRequest() {
+    final draft = savedDraft;
+    if (draft == null) return;
+    if (draft.preferredProviderId.isNotEmpty) {
+      push(context, ReviewScreen(draft: draft));
+    } else if (!draft.location.startsWith('Select current GPS')) {
+      push(context, ProvidersScreen(draft: draft));
+    } else {
+      push(
+        context,
+        BreakdownDetailsScreen(issues: draft.issues, initialDraft: draft),
+      );
+    }
   }
 
   @override
@@ -55,9 +111,58 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                 const Text("What's the issue?", style: RaText.headline),
                 const SizedBox(height: RaSpace.xs),
                 const Text(
-                  "Select the type of help you need. We'll find the nearest certified specialist in your area.",
+                  'Select every problem that applies. We will match a provider who supports all selected services.',
                   style: RaText.bodyMuted,
                 ),
+                if (loadingDraft) ...[
+                  const SizedBox(height: RaSpace.lg),
+                  const LinearProgressIndicator(),
+                ] else if (savedDraft != null) ...[
+                  const SizedBox(height: RaSpace.lg),
+                  Card(
+                    color: raPale,
+                    child: Padding(
+                      padding: const EdgeInsets.all(RaSpace.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.drafts_outlined, color: raBlue),
+                              SizedBox(width: RaSpace.sm),
+                              Text(
+                                'Continue saved request',
+                                style: RaText.title,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: RaSpace.xs),
+                          Text(
+                            '${savedDraft!.issue}\n${formatSavedTime(savedAt)}',
+                            style: RaText.bodyMuted,
+                          ),
+                          const SizedBox(height: RaSpace.sm),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: resumeSavedRequest,
+                                  child: const Text('Resume Draft'),
+                                ),
+                              ),
+                              const SizedBox(width: RaSpace.sm),
+                              IconButton(
+                                tooltip: 'Discard draft',
+                                onPressed: discardSavedDraft,
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: RaSpace.lg),
                 const SafetyBox(),
                 const SizedBox(height: RaSpace.md),
@@ -65,21 +170,26 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: RaSpace.sm),
                     child: Card(
-                      color: selected == i ? raPale : Colors.white,
+                      color: selected.contains(i) ? raPale : Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(RaRadius.md),
                         side: BorderSide(
-                          color: selected == i ? raBlue : raLine,
-                          width: selected == i ? 1.6 : 1,
+                          color: selected.contains(i) ? raBlue : raLine,
+                          width: selected.contains(i) ? 1.6 : 1,
                         ),
                       ),
-                      child: ListTile(
+                      child: CheckboxListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: RaSpace.md,
                           vertical: 4,
                         ),
-                        onTap: () => setState(() => selected = i),
-                        leading: IconBadge(items[i].$3),
+                        value: selected.contains(i),
+                        onChanged: (checked) => setState(() {
+                          checked == true
+                              ? selected.add(i)
+                              : selected.remove(i);
+                        }),
+                        secondary: IconBadge(items[i].$3),
                         title: Text(items[i].$1, style: RaText.title),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: RaSpace.xs),
@@ -99,12 +209,6 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                             ],
                           ),
                         ),
-                        trailing: Icon(
-                          selected == i
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          color: selected == i ? raBlue : raFaint,
-                        ),
                       ),
                     ),
                   ),
@@ -112,12 +216,14 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
             ),
           ),
           BottomAction(
-            label: 'Continue',
-            enabled: selected >= 0,
-            onTap: () => push(
-              context,
-              BreakdownDetailsScreen(issue: items[selected].$1),
-            ),
+            label: selected.isEmpty
+                ? 'Select at least one issue'
+                : 'Continue with ${selected.length} issue${selected.length == 1 ? '' : 's'}',
+            enabled: selected.isNotEmpty,
+            onTap: () {
+              final issues = selected.map((index) => items[index].$1).toList();
+              push(context, BreakdownDetailsScreen(issues: issues));
+            },
           ),
         ],
       ),

@@ -7,7 +7,7 @@ Widget testApp(Widget home) => MaterialApp(home: home);
 void main() {
   testWidgets('breakdown form blocks incomplete requests', (tester) async {
     await tester.pumpWidget(
-      testApp(const BreakdownDetailsScreen(issue: 'Flat Tyre')),
+      testApp(const BreakdownDetailsScreen(issues: ['Flat Tyre'])),
     );
 
     await tester.tap(find.text('Confirm & Next'));
@@ -18,16 +18,12 @@ void main() {
       find.text('Use a format such as WP CAB-1234 or CAA-1234'),
       findsOneWidget,
     );
-    expect(
-      find.text('Please describe the problem in at least 15 characters'),
-      findsOneWidget,
-    );
     expect(find.text('Location Confirmation'), findsNothing);
   });
 
   testWidgets('other vehicle type requires a custom value', (tester) async {
     await tester.pumpWidget(
-      testApp(const BreakdownDetailsScreen(issue: 'General Mechanic')),
+      testApp(const BreakdownDetailsScreen(issues: ['General Mechanic'])),
     );
 
     await tester.tap(find.text('Sedan / Hatchback'));
@@ -47,7 +43,7 @@ void main() {
 
   testWidgets('valid breakdown data continues to location', (tester) async {
     await tester.pumpWidget(
-      testApp(const BreakdownDetailsScreen(issue: 'Flat Tyre')),
+      testApp(const BreakdownDetailsScreen(issues: ['Flat Tyre'])),
     );
 
     await tester.enterText(
@@ -90,19 +86,13 @@ void main() {
     expect(validateCustomVehicleType('12'), 'Enter a valid vehicle type');
   });
 
-  test('breakdown description rejects incomplete details', () {
+  test('breakdown description is optional', () {
+    expect(validateBreakdownDescription(''), isNull);
     expect(
       validateBreakdownDescription('Rear tyre has a deep puncture'),
       isNull,
     );
-    expect(
-      validateBreakdownDescription('abcdefghijklmnop'),
-      'Describe at least three words about the vehicle problem',
-    );
-    expect(
-      validateBreakdownDescription('Tyre flat'),
-      'Please describe the problem in at least 15 characters',
-    );
+    expect(validateBreakdownDescription('Tyre flat'), isNull);
   });
 
   testWidgets('driver can edit profile and sign out', (tester) async {

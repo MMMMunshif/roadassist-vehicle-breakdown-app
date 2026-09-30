@@ -8,6 +8,10 @@
 	<string>RoadAssist uses the camera to add profile and vehicle photos.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>RoadAssist lets you choose profile and vehicle photos from your library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>RoadAssist uses the microphone to record a spoken breakdown description.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>RoadAssist converts your spoken breakdown description into text.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
