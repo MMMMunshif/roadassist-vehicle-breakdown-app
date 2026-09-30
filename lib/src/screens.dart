@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:camera/camera.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -12,16 +14,76 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:speech_to_text/speech_to_text.dart';
 
 import 'app.dart';
 import 'models/request_draft.dart';
 import 'services/auth_service.dart';
 import 'services/device_service.dart';
 import 'services/request_service.dart';
+import 'services/request_draft_store.dart';
 import 'services/photo_upload_service.dart';
 import 'services/route_service.dart';
 
 part 'features/request/assistance_type_screen.dart';
+
+String requestIssueLabel(Map<String, dynamic> data) {
+  final issues = (data['issues'] as List<dynamic>? ?? const [])
+      .whereType<String>()
+      .where((issue) => issue.trim().isNotEmpty)
+      .toList();
+  return issues.isNotEmpty
+      ? issues.join(' + ')
+      : data['issue'] as String? ?? 'Roadside assistance';
+}
+
+String requestPriorityLabel(String priority) => switch (priority) {
+  'urgent' => 'Urgent',
+  'road_blocking' => 'Vehicle blocking road',
+  'safety_risk' => 'Passenger safety risk',
+  _ => 'Normal',
+};
+
+bool isHighPriority(String priority) => priority != 'normal';
+
+RequestDraft requestDraftFromData(Map<String, dynamic> data) {
+  final savedIssues = (data['issues'] as List<dynamic>? ?? const [])
+      .whereType<String>()
+      .toList();
+  return RequestDraft(
+    issues: savedIssues.isNotEmpty
+        ? savedIssues
+        : [data['issue'] as String? ?? 'Roadside assistance'],
+    vehicleType: data['vehicleType'] as String? ?? '',
+    modelYear: data['modelYear'] as String? ?? '',
+    registration: data['registration'] as String? ?? '',
+    description: data['description'] as String? ?? '',
+    notes: data['notes'] as String? ?? '',
+    priority: data['priority'] as String? ?? 'normal',
+    location: data['locationLabel'] as String? ?? 'Pinned location',
+    landmark: data['landmark'] as String? ?? '',
+    locationAccuracyMeters: (data['locationAccuracyMeters'] as num?)
+        ?.toDouble(),
+    latitude: (data['latitude'] as num?)?.toDouble() ?? 6.9034,
+    longitude: (data['longitude'] as num?)?.toDouble() ?? 79.8525,
+    provider:
+        data['providerName'] as String? ??
+        data['preferredProviderName'] as String? ??
+        '',
+    preferredProviderId: data['preferredProviderId'] as String? ?? '',
+    vehiclePhotoUrls: (data['vehiclePhotoUrls'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .toList(),
+    photoAnnotations: (data['photoAnnotations'] as List<dynamic>? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => BreakdownPhotoAnnotation.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
+        .toList(),
+  );
+}
 
 bool get firebaseReady => Firebase.apps.isNotEmpty;
 bool get signedIn => firebaseReady && FirebaseAuth.instance.currentUser != null;
@@ -89,14 +151,8 @@ String? validateCustomVehicleType(String? value) {
 }
 
 String? validateBreakdownDescription(String? value) {
-  final description = value?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
-  if (description.length < 15) {
-    return 'Please describe the problem in at least 15 characters';
-  }
-  if (!RegExp(r'[A-Za-z]').hasMatch(description) ||
-      description.split(' ').length < 3) {
-    return 'Describe at least three words about the vehicle problem';
-  }
+  // The selected assistance type already identifies the problem. Drivers can
+  // add extra context here when it is safe and convenient to type.
   return null;
 }
 
@@ -129,11 +185,7 @@ class _SplashScreenState extends State<SplashScreen> {
         final driverPhoto = profileData?['photoData'] as String?;
         final driverPhotoMissing =
             role == 'driver' && (driverPhoto == null || driverPhoto.isEmpty);
-        if (enforceEmailVerification &&
-            !user.emailVerified &&
-            (role == 'provider' || role == 'driver')) {
-          destination = EmailVerificationScreen(role: role!);
-        } else if (driverPhotoMissing) {
+        if (driverPhotoMissing) {
           await FirebaseAuth.instance.signOut();
           destination = const WelcomeScreen();
         } else if (role == 'provider') {
@@ -143,9 +195,7 @@ class _SplashScreenState extends State<SplashScreen> {
         } else {
           await FirebaseAuth.instance.signOut();
         }
-        if (!driverPhotoMissing &&
-            (!enforceEmailVerification || user.emailVerified) &&
-            (role == 'provider' || role == 'driver')) {
+        if (!driverPhotoMissing && (role == 'provider' || role == 'driver')) {
           unawaited(DeviceService().registerCurrentDevice());
         }
       }
@@ -522,7 +572,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> authenticate() async {
     FocusScope.of(context).unfocus();
     if (!(formKey.currentState?.validate() ?? false) || loading) return;
-    if (!widget.isProvider && registrationPhotoData == null) {
+    if (registerMode && !widget.isProvider && registrationPhotoData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('A profile photo is required to continue as a driver.'),
@@ -565,7 +615,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (!mounted) return;
       final user = FirebaseAuth.instance.currentUser;
-      if (enforceEmailVerification && user != null && !user.emailVerified) {
+      if (registerMode &&
+          enforceEmailVerification &&
+          user != null &&
+          !user.emailVerified) {
         replace(context, EmailVerificationScreen(role: role));
       } else {
         replace(
@@ -2171,25 +2224,7 @@ class _DriverRequestPreview extends StatelessWidget {
         : status == 'cancelled'
         ? RaTone.danger
         : RaTone.info;
-    final draft = RequestDraft(
-      issue: data['issue'] as String? ?? 'Roadside assistance',
-      vehicleType: data['vehicleType'] as String? ?? '',
-      modelYear: data['modelYear'] as String? ?? '',
-      registration: data['registration'] as String? ?? '',
-      description: data['description'] as String? ?? '',
-      notes: data['notes'] as String? ?? '',
-      location: data['locationLabel'] as String? ?? 'Pinned location',
-      latitude: (data['latitude'] as num?)?.toDouble() ?? 6.9034,
-      longitude: (data['longitude'] as num?)?.toDouble() ?? 79.8525,
-      provider:
-          data['providerName'] as String? ??
-          data['preferredProviderName'] as String? ??
-          '',
-      preferredProviderId: data['preferredProviderId'] as String? ?? '',
-      vehiclePhotoUrls: (data['vehiclePhotoUrls'] as List<dynamic>? ?? const [])
-          .whereType<String>()
-          .toList(),
-    );
+    final draft = requestDraftFromData(data);
     void resumeRequest() {
       if (status == 'searching') {
         push(context, SearchingScreen(draft: draft, requestId: request.id));
@@ -2217,10 +2252,7 @@ class _DriverRequestPreview extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      data['issue'] as String? ?? 'Roadside assistance',
-                      style: RaText.title,
-                    ),
+                    Text(requestIssueLabel(data), style: RaText.title),
                     const SizedBox(height: 6),
                     StatusPill(label: label, tone: tone),
                   ],
@@ -2440,8 +2472,13 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
 }
 
 class BreakdownDetailsScreen extends StatefulWidget {
-  const BreakdownDetailsScreen({super.key, required this.issue});
-  final String issue;
+  const BreakdownDetailsScreen({
+    super.key,
+    required this.issues,
+    this.initialDraft,
+  });
+  final List<String> issues;
+  final RequestDraft? initialDraft;
   @override
   State<BreakdownDetailsScreen> createState() => _BreakdownDetailsScreenState();
 }
@@ -2455,7 +2492,116 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   final customVehicleController = TextEditingController();
   String vehicle = 'Sedan / Hatchback';
   final List<String> vehiclePhotoUrls = [];
+  final List<BreakdownPhotoAnnotation> photoAnnotations = [];
   bool uploadingVehiclePhoto = false;
+  final SpeechToText speechToText = SpeechToText();
+  bool listeningForDescription = false;
+  String priority = 'normal';
+  Timer? draftSaveDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    final draft = widget.initialDraft;
+    if (draft == null) return;
+    const standardTypes = {'Sedan / Hatchback', 'SUV', 'Van', 'Motorcycle'};
+    if (standardTypes.contains(draft.vehicleType)) {
+      vehicle = draft.vehicleType;
+    } else {
+      vehicle = 'Other';
+      customVehicleController.text = draft.vehicleType;
+    }
+    modelController.text = draft.modelYear;
+    registrationController.text = draft.registration;
+    descriptionController.text = draft.description;
+    notesController.text = draft.notes;
+    priority = draft.priority;
+    vehiclePhotoUrls.addAll(draft.vehiclePhotoUrls);
+    photoAnnotations.addAll(draft.photoAnnotations);
+  }
+
+  RequestDraft buildDraft() => RequestDraft(
+    issues: widget.issues,
+    vehicleType: vehicle == 'Other'
+        ? customVehicleController.text.trim()
+        : vehicle,
+    modelYear: modelController.text.trim(),
+    registration: normalizeVehicleRegistration(registrationController.text),
+    description: descriptionController.text.trim(),
+    notes: notesController.text.trim(),
+    priority: priority,
+    location:
+        widget.initialDraft?.location ??
+        'Select current GPS or enter location manually',
+    landmark: widget.initialDraft?.landmark ?? '',
+    locationAccuracyMeters: widget.initialDraft?.locationAccuracyMeters,
+    latitude: widget.initialDraft?.latitude ?? 6.9271,
+    longitude: widget.initialDraft?.longitude ?? 79.8612,
+    provider: widget.initialDraft?.provider ?? '',
+    preferredProviderId: widget.initialDraft?.preferredProviderId ?? '',
+    vehiclePhotoUrls: List.unmodifiable(vehiclePhotoUrls),
+    photoAnnotations: List.unmodifiable(photoAnnotations),
+  );
+
+  Future<void> saveDraft({bool showConfirmation = true}) async {
+    await RequestDraftStore().save(buildDraft());
+    if (!mounted || !showConfirmation) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Request saved as a draft.')));
+  }
+
+  void scheduleDraftSave() {
+    draftSaveDebounce?.cancel();
+    draftSaveDebounce = Timer(
+      const Duration(milliseconds: 600),
+      () => RequestDraftStore().save(buildDraft()),
+    );
+  }
+
+  Future<void> toggleDescriptionDictation() async {
+    if (listeningForDescription) {
+      await speechToText.stop();
+      if (mounted) setState(() => listeningForDescription = false);
+      scheduleDraftSave();
+      return;
+    }
+    final available = await speechToText.initialize(
+      onStatus: (status) {
+        if (mounted && (status == 'done' || status == 'notListening')) {
+          setState(() => listeningForDescription = false);
+          scheduleDraftSave();
+        }
+      },
+      onError: (_) {
+        if (mounted) setState(() => listeningForDescription = false);
+      },
+    );
+    if (!available || !mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Voice input is unavailable. Check microphone permission.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    setState(() => listeningForDescription = true);
+    await speechToText.listen(
+      onResult: (result) {
+        if (!mounted || result.recognizedWords.trim().isEmpty) return;
+        setState(() => descriptionController.text = result.recognizedWords);
+      },
+      listenOptions: SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: true,
+        listenMode: ListenMode.dictation,
+      ),
+    );
+  }
 
   Future<void> addVehiclePhotos() async {
     if (uploadingVehiclePhoto || vehiclePhotoUrls.length >= 3) return;
@@ -2529,6 +2675,8 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
       }
       if (!mounted || preparedPhotos.isEmpty) return;
       setState(() => vehiclePhotoUrls.addAll(preparedPhotos));
+      await saveDraft(showConfirmation: false);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -2553,8 +2701,138 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     }
   }
 
+  Future<void> annotateVehiclePhoto(int index) async {
+    final existing = photoAnnotations
+        .where((annotation) => annotation.photoIndex == index)
+        .firstOrNull;
+    var markerX = existing?.markerX ?? .5;
+    var markerY = existing?.markerY ?? .5;
+    final noteController = TextEditingController(text: existing?.note ?? '');
+    final annotation = await showDialog<BreakdownPhotoAnnotation>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Mark the damaged area'),
+          content: SizedBox(
+            width: 360,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Tap the photo to move the damage marker, then add a short note.',
+                  ),
+                  const SizedBox(height: RaSpace.md),
+                  AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => GestureDetector(
+                        onTapDown: (details) => setDialogState(() {
+                          markerX =
+                              (details.localPosition.dx / constraints.maxWidth)
+                                  .clamp(0.0, 1.0);
+                          markerY =
+                              (details.localPosition.dy / constraints.maxHeight)
+                                  .clamp(0.0, 1.0);
+                        }),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(RaRadius.md),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.memory(
+                                base64Decode(vehiclePhotoUrls[index]),
+                                fit: BoxFit.cover,
+                              ),
+                              Positioned(
+                                left: markerX * constraints.maxWidth - 16,
+                                top: markerY * constraints.maxHeight - 16,
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: raDanger,
+                                  size: 32,
+                                  shadows: [
+                                    Shadow(color: Colors.white, blurRadius: 4),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: RaSpace.md),
+                  TextField(
+                    controller: noteController,
+                    maxLength: 120,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Damage note',
+                      hintText: 'e.g. Deep cut on rear-left tyre',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                BreakdownPhotoAnnotation(
+                  photoIndex: index,
+                  markerX: markerX,
+                  markerY: markerY,
+                  note: noteController.text.trim(),
+                ),
+              ),
+              child: const Text('Save Annotation'),
+            ),
+          ],
+        ),
+      ),
+    );
+    noteController.dispose();
+    if (annotation == null || !mounted) return;
+    setState(() {
+      photoAnnotations.removeWhere((item) => item.photoIndex == index);
+      photoAnnotations.add(annotation);
+    });
+    await saveDraft(showConfirmation: false);
+  }
+
+  void removeVehiclePhoto(int index) {
+    setState(() {
+      vehiclePhotoUrls.removeAt(index);
+      final remaining = photoAnnotations
+          .where((item) => item.photoIndex != index)
+          .map(
+            (item) => item.photoIndex > index
+                ? BreakdownPhotoAnnotation(
+                    photoIndex: item.photoIndex - 1,
+                    markerX: item.markerX,
+                    markerY: item.markerY,
+                    note: item.note,
+                  )
+                : item,
+          )
+          .toList();
+      photoAnnotations
+        ..clear()
+        ..addAll(remaining);
+    });
+    scheduleDraftSave();
+  }
+
   @override
   void dispose() {
+    draftSaveDebounce?.cancel();
+    speechToText.stop();
     modelController.dispose();
     registrationController.dispose();
     descriptionController.dispose();
@@ -2587,7 +2865,17 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const StepEyebrow(step: 2, of: 4),
+                        Row(
+                          children: [
+                            const Expanded(child: StepEyebrow(step: 2, of: 4)),
+                            const SizedBox(width: RaSpace.md),
+                            TextButton.icon(
+                              onPressed: saveDraft,
+                              icon: const Icon(Icons.save_outlined),
+                              label: const Text('Save Draft'),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: RaSpace.md),
                         const FormSectionTitle(
                           Icons.directions_car_outlined,
@@ -2619,7 +2907,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                                           ),
                                         )
                                         .toList(),
-                                onChanged: (v) => setState(() => vehicle = v!),
+                                onChanged: (v) {
+                                  setState(() => vehicle = v!);
+                                  scheduleDraftSave();
+                                },
                               ),
                             ),
                             const SizedBox(width: RaSpace.sm),
@@ -2634,6 +2925,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                                   hintText: 'Toyota Aqua 2018',
                                 ),
                                 validator: validateVehicleModelYear,
+                                onChanged: (_) => scheduleDraftSave(),
                               ),
                             ),
                           ],
@@ -2653,6 +2945,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             validator: (value) => vehicle == 'Other'
                                 ? validateCustomVehicleType(value)
                                 : null,
+                            onChanged: (_) => scheduleDraftSave(),
                           ),
                         ],
                         const SizedBox(height: RaSpace.md),
@@ -2666,6 +2959,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             hintText: 'WP CAB - 1234',
                           ),
                           validator: validateVehicleRegistration,
+                          onChanged: (_) => scheduleDraftSave(),
                         ),
                         const SizedBox(height: RaSpace.xxl),
                         const FormSectionTitle(
@@ -2675,10 +2969,40 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                         const SizedBox(height: RaSpace.md),
                         TextFormField(
                           readOnly: true,
-                          initialValue: widget.issue,
+                          initialValue: widget.issues.join(', '),
                           decoration: const InputDecoration(
                             labelText: 'Primary issue',
                           ),
+                        ),
+                        const SizedBox(height: RaSpace.md),
+                        DropdownButtonFormField<String>(
+                          initialValue: priority,
+                          decoration: const InputDecoration(
+                            labelText: 'Emergency Priority',
+                            prefixIcon: Icon(Icons.priority_high_rounded),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'normal',
+                              child: Text('Normal'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'urgent',
+                              child: Text('Urgent'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'road_blocking',
+                              child: Text('Vehicle blocking road'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'safety_risk',
+                              child: Text('Passenger safety risk'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setState(() => priority = value ?? 'normal');
+                            scheduleDraftSave();
+                          },
                         ),
                         const SizedBox(height: RaSpace.md),
                         TextFormField(
@@ -2686,11 +3010,26 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                           maxLines: 4,
                           maxLength: 500,
                           textInputAction: TextInputAction.newline,
-                          decoration: const InputDecoration(
-                            labelText: 'Detailed description',
+                          decoration: InputDecoration(
+                            labelText: 'Detailed description (Optional)',
                             hintText: 'Describe the symptoms...',
+                            suffixIcon: IconButton(
+                              tooltip: listeningForDescription
+                                  ? 'Stop voice description'
+                                  : 'Describe using microphone',
+                              onPressed: toggleDescriptionDictation,
+                              icon: Icon(
+                                listeningForDescription
+                                    ? Icons.stop_circle_outlined
+                                    : Icons.mic_none_rounded,
+                                color: listeningForDescription
+                                    ? raDanger
+                                    : raBlue,
+                              ),
+                            ),
                           ),
                           validator: validateBreakdownDescription,
+                          onChanged: (_) => scheduleDraftSave(),
                         ),
                         const SizedBox(height: RaSpace.xxl),
                         const FormSectionTitle(
@@ -2728,39 +3067,72 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                               itemCount: vehiclePhotoUrls.length,
                               separatorBuilder: (_, _) =>
                                   const SizedBox(width: RaSpace.sm),
-                              itemBuilder: (context, index) => Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(
-                                      RaRadius.sm,
-                                    ),
-                                    child: Image.memory(
-                                      base64Decode(vehiclePhotoUrls[index]),
-                                      width: 88,
-                                      height: 88,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 2,
-                                    top: 2,
-                                    child: InkWell(
-                                      onTap: () => setState(
-                                        () => vehiclePhotoUrls.removeAt(index),
-                                      ),
-                                      child: const CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor: Colors.black54,
-                                        child: Icon(
-                                          Icons.close,
-                                          size: 15,
-                                          color: Colors.white,
+                              itemBuilder: (context, index) {
+                                final annotation = photoAnnotations
+                                    .where((item) => item.photoIndex == index)
+                                    .firstOrNull;
+                                return GestureDetector(
+                                  onTap: () => annotateVehiclePhoto(index),
+                                  child: Stack(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(
+                                          RaRadius.sm,
+                                        ),
+                                        child: Image.memory(
+                                          base64Decode(vehiclePhotoUrls[index]),
+                                          width: 88,
+                                          height: 88,
+                                          fit: BoxFit.cover,
                                         ),
                                       ),
-                                    ),
+                                      if (annotation != null)
+                                        Positioned(
+                                          left: annotation.markerX * 88 - 10,
+                                          top: annotation.markerY * 88 - 10,
+                                          child: const Icon(
+                                            Icons.location_on,
+                                            color: raDanger,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      Positioned(
+                                        left: 2,
+                                        bottom: 2,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(3),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.edit_location_alt_outlined,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        right: 2,
+                                        top: 2,
+                                        child: InkWell(
+                                          onTap: () =>
+                                              removeVehiclePhoto(index),
+                                          child: const CircleAvatar(
+                                            radius: 12,
+                                            backgroundColor: Colors.black54,
+                                            child: Icon(
+                                              Icons.close,
+                                              size: 15,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -2772,6 +3144,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Additional Notes',
                           ),
+                          onChanged: (_) => scheduleDraftSave(),
                         ),
                         const SizedBox(height: RaSpace.lg),
                         const SafetyBox(),
@@ -2784,27 +3157,13 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
           ),
           BottomAction(
             label: 'Confirm & Next',
-            onTap: () {
+            onTap: () async {
               FocusScope.of(context).unfocus();
               if (formKey.currentState?.validate() ?? false) {
-                push(
-                  context,
-                  LocationScreen(
-                    draft: RequestDraft(
-                      issue: widget.issue,
-                      vehicleType: vehicle == 'Other'
-                          ? customVehicleController.text.trim()
-                          : vehicle,
-                      modelYear: modelController.text.trim(),
-                      registration: normalizeVehicleRegistration(
-                        registrationController.text,
-                      ),
-                      description: descriptionController.text.trim(),
-                      notes: notesController.text.trim(),
-                      vehiclePhotoUrls: List.unmodifiable(vehiclePhotoUrls),
-                    ),
-                  ),
-                );
+                final draft = buildDraft();
+                await RequestDraftStore().save(draft);
+                if (!context.mounted) return;
+                push(context, LocationScreen(draft: draft));
               }
             },
           ),
@@ -3003,6 +3362,7 @@ class LocationScreen extends StatefulWidget {
 class _LocationScreenState extends State<LocationScreen> {
   late RequestDraft draft;
   late LatLng selectedPoint;
+  late final TextEditingController landmarkController;
   bool locating = false;
 
   @override
@@ -3010,6 +3370,7 @@ class _LocationScreenState extends State<LocationScreen> {
     super.initState();
     draft = widget.draft;
     selectedPoint = LatLng(draft.latitude, draft.longitude);
+    landmarkController = TextEditingController(text: draft.landmark);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) useCurrentLocation();
     });
@@ -3074,8 +3435,11 @@ class _LocationScreenState extends State<LocationScreen> {
           location: locationLabel,
           latitude: point.latitude,
           longitude: point.longitude,
+          locationAccuracyMeters: position.accuracy,
         );
       });
+      await RequestDraftStore().save(draft);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -3098,7 +3462,7 @@ class _LocationScreenState extends State<LocationScreen> {
     }
   }
 
-  void selectMapPosition(LatLng point) {
+  Future<void> selectMapPosition(LatLng point) async {
     setState(() {
       selectedPoint = point;
       draft = draft.copyWith(
@@ -3106,8 +3470,11 @@ class _LocationScreenState extends State<LocationScreen> {
             'Pinned location (${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)})',
         latitude: point.latitude,
         longitude: point.longitude,
+        clearLocationAccuracy: true,
       );
     });
+    await RequestDraftStore().save(draft);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Breakdown pin moved on the map.')),
     );
@@ -3146,7 +3513,19 @@ class _LocationScreenState extends State<LocationScreen> {
     );
     if (result != null && mounted) {
       setState(() => draft = draft.copyWith(location: result));
+      await RequestDraftStore().save(draft);
     }
+  }
+
+  void updateLandmark(String value) {
+    draft = draft.copyWith(landmark: value.trim());
+    RequestDraftStore().save(draft);
+  }
+
+  @override
+  void dispose() {
+    landmarkController.dispose();
+    super.dispose();
   }
 
   @override
@@ -3196,6 +3575,24 @@ class _LocationScreenState extends State<LocationScreen> {
                             tone: RaTone.warning,
                             dot: false,
                           ),
+                          const SizedBox(height: RaSpace.sm),
+                          _LocationAccuracyIndicator(
+                            accuracyMeters: draft.locationAccuracyMeters,
+                            onRefresh: locating ? null : useCurrentLocation,
+                          ),
+                          const SizedBox(height: RaSpace.md),
+                          TextField(
+                            controller: landmarkController,
+                            maxLength: 120,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: const InputDecoration(
+                              labelText: 'Nearby Landmark (Optional)',
+                              hintText:
+                                  'e.g. Opposite Majestic City or near railway station',
+                              prefixIcon: Icon(Icons.signpost_outlined),
+                            ),
+                            onChanged: updateLandmark,
+                          ),
                           const SizedBox(height: RaSpace.lg),
                           Row(
                             children: [
@@ -3238,12 +3635,78 @@ class _LocationScreenState extends State<LocationScreen> {
           ),
           BottomAction(
             label: 'Confirm Location',
-            onTap: () => push(context, ProvidersScreen(draft: draft)),
+            onTap: () async {
+              await RequestDraftStore().save(draft);
+              if (!context.mounted) return;
+              push(context, ProvidersScreen(draft: draft));
+            },
           ),
         ],
       ),
     ),
   );
+}
+
+class _LocationAccuracyIndicator extends StatelessWidget {
+  const _LocationAccuracyIndicator({
+    required this.accuracyMeters,
+    required this.onRefresh,
+  });
+
+  final double? accuracyMeters;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final accuracy = accuracyMeters;
+    final (label, color, icon) = accuracy == null
+        ? ('Manual pin - refresh GPS', raMuted, Icons.gps_not_fixed)
+        : accuracy <= 8
+        ? (
+            'High accuracy - +/-${accuracy.ceil()} m',
+            raSuccess,
+            Icons.gps_fixed,
+          )
+        : accuracy <= 35
+        ? (
+            'Medium accuracy - +/-${accuracy.ceil()} m',
+            raGold,
+            Icons.gps_not_fixed,
+          )
+        : ('Low accuracy - refresh location', raDanger, Icons.gps_off_rounded);
+    return InkWell(
+      onTap: accuracy == null || accuracy > 35 ? onRefresh : null,
+      borderRadius: BorderRadius.circular(RaRadius.sm),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: RaSpace.sm,
+          vertical: RaSpace.sm,
+        ),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .1),
+          borderRadius: BorderRadius.circular(RaRadius.sm),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: RaSpace.sm),
+            Expanded(
+              child: Text(
+                label,
+                style: RaText.caption.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (accuracy == null || accuracy > 35)
+              Icon(Icons.refresh, color: color, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ProvidersScreen extends StatefulWidget {
@@ -3270,7 +3733,10 @@ bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
   final services = (data['services'] as List<dynamic>? ?? const [])
       .whereType<String>()
       .toList();
-  if (services.isNotEmpty && !services.contains(draft.issue)) return false;
+  if (services.isNotEmpty &&
+      !draft.issues.every((issue) => services.contains(issue))) {
+    return false;
+  }
   final distanceKm = _providerDistanceKm(data, draft);
   if (distanceKm == null) return true;
   final radiusText = data['serviceRadius'] as String? ?? '15 km';
@@ -3323,6 +3789,25 @@ class _NearbyProvidersMap extends StatelessWidget {
 class _ProvidersScreenState extends State<ProvidersScreen> {
   String? selectedId;
   String? selectedName;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedId = widget.draft.preferredProviderId.isEmpty
+        ? null
+        : widget.draft.preferredProviderId;
+    selectedName = widget.draft.provider.isEmpty ? null : widget.draft.provider;
+  }
+
+  Future<void> reviewRequest() async {
+    final selectedDraft = widget.draft.copyWith(
+      provider: selectedName ?? 'Available Provider',
+      preferredProviderId: selectedId,
+    );
+    await RequestDraftStore().save(selectedDraft);
+    if (!mounted) return;
+    push(context, ReviewScreen(draft: selectedDraft));
+  }
 
   void scheduleProviderSelection(String? id, String? name) {
     if (selectedId == id && selectedName == name) return;
@@ -3390,6 +3875,15 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                           ),
                         )
                         .toList();
+                    providers.sort((a, b) {
+                      final aDistance =
+                          _providerDistanceKm(a.data(), widget.draft) ??
+                          double.infinity;
+                      final bDistance =
+                          _providerDistanceKm(b.data(), widget.draft) ??
+                          double.infinity;
+                      return aDistance.compareTo(bDistance);
+                    });
                     if (providers.isEmpty) {
                       scheduleProviderSelection(null, null);
                       return const EmptyState(
@@ -3418,6 +3912,18 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                           data,
                           widget.draft,
                         );
+                        final rating =
+                            (data['averageRating'] as num?)?.toDouble() ?? 0;
+                        final completedJobs =
+                            (data['completedJobs'] as num?)?.toInt() ?? 0;
+                        final responseMinutes =
+                            (data['averageResponseMinutes'] as num?)
+                                ?.toDouble() ??
+                            0;
+                        final services =
+                            (data['services'] as List<dynamic>? ?? const [])
+                                .whereType<String>()
+                                .toList();
                         return Padding(
                           padding: const EdgeInsets.only(bottom: RaSpace.sm),
                           child: ProviderTile(
@@ -3426,8 +3932,14 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                             distance: distanceKm == null
                                 ? 'Location pending'
                                 : '${distanceKm.toStringAsFixed(1)} km away',
-                            eta: 'after acceptance',
-                            rating: 'New',
+                            eta: responseMinutes > 0
+                                ? '${responseMinutes.ceil()} min response'
+                                : 'response pending',
+                            rating: rating > 0
+                                ? rating.toStringAsFixed(1)
+                                : 'New',
+                            completedJobs: completedJobs,
+                            services: services,
                             selected: selectedId == provider.id,
                             onTap: () => setState(() {
                               selectedId = provider.id;
@@ -3445,15 +3957,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
           BottomAction(
             label: 'Review Request',
             enabled: selectedId != null,
-            onTap: () => push(
-              context,
-              ReviewScreen(
-                draft: widget.draft.copyWith(
-                  provider: selectedName ?? 'Available Provider',
-                  preferredProviderId: selectedId,
-                ),
-              ),
-            ),
+            onTap: reviewRequest,
           ),
         ],
       ),
@@ -3471,6 +3975,29 @@ class ReviewScreen extends StatefulWidget {
 
 class _ReviewScreenState extends State<ReviewScreen> {
   bool submitting = false;
+  StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) async {
+      if (!mounted ||
+          results.every((result) => result == ConnectivityResult.none)) {
+        return;
+      }
+      if (await RequestDraftStore().hasPendingSubmission() && mounted) {
+        await submitRequest(autoRetry: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    connectivitySubscription?.cancel();
+    super.dispose();
+  }
 
   String formatPrice(int value) {
     final digits = value.toString();
@@ -3478,8 +4005,24 @@ class _ReviewScreenState extends State<ReviewScreen> {
     return 'Rs. ${digits.substring(0, digits.length - 3)},${digits.substring(digits.length - 3)}';
   }
 
-  Future<void> submitRequest() async {
+  Future<void> submitRequest({bool autoRetry = false}) async {
     if (submitting) return;
+    final readyToSubmit =
+        widget.draft.modelYear.isNotEmpty &&
+        widget.draft.registration.isNotEmpty &&
+        !widget.draft.location.startsWith('Select current GPS') &&
+        widget.draft.preferredProviderId.isNotEmpty;
+    if (!readyToSubmit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Complete every required checklist item before submitting.',
+          ),
+          backgroundColor: raDanger,
+        ),
+      );
+      return;
+    }
     if (FirebaseAuth.instance.currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -3490,9 +4033,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
       );
       return;
     }
+    final connections = await Connectivity().checkConnectivity();
+    if (connections.every((result) => result == ConnectivityResult.none)) {
+      await RequestDraftStore().save(widget.draft);
+      await RequestDraftStore().setPendingSubmission(true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You are offline. Request saved and will retry when connected.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() => submitting = true);
     try {
       final requestId = await RequestService().createRequest(widget.draft);
+      await RequestDraftStore().clear();
+      if (!mounted) return;
+      await showSafetyChecklist();
       if (!mounted) return;
       replace(
         context,
@@ -3503,18 +4063,108 @@ class _ReviewScreenState extends State<ReviewScreen> {
       final activeRequestExists = error.toString().contains(
         'Complete or cancel your active request',
       );
+      final networkError =
+          error is FirebaseException &&
+          const [
+            'unavailable',
+            'deadline-exceeded',
+            'network-request-failed',
+          ].contains(error.code);
+      if (networkError) {
+        await RequestDraftStore().save(widget.draft);
+        await RequestDraftStore().setPendingSubmission(true);
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             activeRequestExists
                 ? 'Complete or cancel your current request before creating another.'
+                : networkError
+                ? 'Connection lost. Request saved and will retry automatically.'
                 : 'Unable to create the request. Please try again.',
           ),
           backgroundColor: raDanger,
+          action: activeRequestExists
+              ? SnackBarAction(
+                  label: 'OPEN REQUEST',
+                  textColor: Colors.white,
+                  onPressed: () => push(context, const HistoryScreen()),
+                )
+              : null,
         ),
       );
       setState(() => submitting = false);
     }
+  }
+
+  Future<void> showSafetyChecklist() async {
+    var vehicleSafe = false;
+    var hazardsOn = false;
+    var passengersSafe = false;
+    var emergencyRequired = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          icon: const Icon(Icons.health_and_safety_outlined, color: raBlue),
+          title: const Text('Safety confirmation'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CheckboxListTile(
+                  value: vehicleSafe,
+                  onChanged: (value) =>
+                      setDialogState(() => vehicleSafe = value ?? false),
+                  title: const Text('Vehicle moved to a safe place'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                CheckboxListTile(
+                  value: hazardsOn,
+                  onChanged: (value) =>
+                      setDialogState(() => hazardsOn = value ?? false),
+                  title: const Text('Hazard lights are on'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                CheckboxListTile(
+                  value: passengersSafe,
+                  onChanged: (value) =>
+                      setDialogState(() => passengersSafe = value ?? false),
+                  title: const Text('Passengers are safe'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                CheckboxListTile(
+                  value: emergencyRequired,
+                  onChanged: (value) =>
+                      setDialogState(() => emergencyRequired = value ?? false),
+                  title: const Text('Emergency service is required'),
+                  subtitle: const Text('Call 119 for immediate danger'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            if (emergencyRequired)
+              TextButton.icon(
+                onPressed: () => showCallPrompt(
+                  dialogContext,
+                  name: 'Emergency Services',
+                  number: '119',
+                ),
+                icon: const Icon(Icons.call, color: raDanger),
+                label: const Text('Call 119'),
+              ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Continue Tracking'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -3600,6 +4250,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         SummaryRow('Assistance Type', widget.draft.issue),
                         const Divider(),
                         SummaryRow(
+                          'Priority',
+                          requestPriorityLabel(widget.draft.priority),
+                        ),
+                        const Divider(),
+                        SummaryRow(
                           'Vehicle',
                           '${widget.draft.modelYear} (${widget.draft.vehicleType})',
                         ),
@@ -3610,10 +4265,83 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         ),
                         const Divider(),
                         SummaryRow('Pickup Location', widget.draft.location),
+                        if (widget.draft.landmark.isNotEmpty) ...[
+                          const Divider(),
+                          SummaryRow('Nearby Landmark', widget.draft.landmark),
+                        ],
                       ],
                     ),
                   ),
                 ),
+                const SizedBox(height: RaSpace.xl),
+                const Text('READY TO SUBMIT', style: RaText.eyebrow),
+                const SizedBox(height: RaSpace.sm),
+                _RequestValidationChecklist(draft: widget.draft),
+                if (widget.draft.vehiclePhotoUrls.isNotEmpty) ...[
+                  const SizedBox(height: RaSpace.xl),
+                  const Text('PHOTO EVIDENCE', style: RaText.eyebrow),
+                  const SizedBox(height: RaSpace.sm),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(RaSpace.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            height: 92,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: widget.draft.vehiclePhotoUrls.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: RaSpace.sm),
+                              itemBuilder: (context, index) {
+                                final annotation = widget.draft.photoAnnotations
+                                    .where((item) => item.photoIndex == index)
+                                    .firstOrNull;
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(
+                                    RaRadius.sm,
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Image.memory(
+                                        base64Decode(
+                                          widget.draft.vehiclePhotoUrls[index],
+                                        ),
+                                        width: 92,
+                                        height: 92,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      if (annotation != null)
+                                        Positioned(
+                                          left: annotation.markerX * 76,
+                                          top: annotation.markerY * 70,
+                                          child: const Icon(
+                                            Icons.location_on,
+                                            color: raDanger,
+                                            size: 22,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          for (final annotation
+                              in widget.draft.photoAnnotations)
+                            if (annotation.note.isNotEmpty) ...[
+                              const SizedBox(height: RaSpace.sm),
+                              Text(
+                                'Photo ${annotation.photoIndex + 1}: ${annotation.note}',
+                                style: RaText.bodyMuted,
+                              ),
+                            ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: RaSpace.xl),
                 const Text('PAYMENT SUMMARY', style: RaText.eyebrow),
                 const SizedBox(height: RaSpace.sm),
@@ -3692,6 +4420,64 @@ class _ReviewScreenState extends State<ReviewScreen> {
   );
 }
 
+class _RequestValidationChecklist extends StatelessWidget {
+  const _RequestValidationChecklist({required this.draft});
+
+  final RequestDraft draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final checks = <(String, bool, bool)>[
+      (
+        'Vehicle details added',
+        draft.modelYear.isNotEmpty && draft.registration.isNotEmpty,
+        true,
+      ),
+      ('Breakdown description added', draft.description.isNotEmpty, false),
+      (
+        'Location confirmed',
+        !draft.location.startsWith('Select current GPS'),
+        true,
+      ),
+      ('Provider selected', draft.preferredProviderId.isNotEmpty, true),
+      ('Photo evidence added', draft.vehiclePhotoUrls.isNotEmpty, false),
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(RaSpace.lg),
+        child: Column(
+          children: checks.map((check) {
+            final (label, complete, required) = check;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  Icon(
+                    complete
+                        ? Icons.check_circle_rounded
+                        : required
+                        ? Icons.error_outline_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: complete
+                        ? raSuccess
+                        : required
+                        ? raDanger
+                        : raMuted,
+                    size: 20,
+                  ),
+                  const SizedBox(width: RaSpace.sm),
+                  Expanded(child: Text(label, style: RaText.body)),
+                  if (!required) const Text('Optional', style: RaText.caption),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
 class SearchingScreen extends StatefulWidget {
   const SearchingScreen({super.key, required this.draft, this.requestId});
   final RequestDraft draft;
@@ -3710,6 +4496,213 @@ class _SearchingScreenState extends State<SearchingScreen>
   bool searchingAllProviders = false;
   bool navigatingToTracking = false;
   late String currentLocationLabel;
+  late RequestDraft editableDraft;
+
+  Future<void> editPendingRequest() async {
+    if (widget.requestId == null || requestStatus != 'searching') return;
+    final descriptionController = TextEditingController(
+      text: editableDraft.description,
+    );
+    final notesController = TextEditingController(text: editableDraft.notes);
+    final locationController = TextEditingController(
+      text: editableDraft.location,
+    );
+    final landmarkController = TextEditingController(
+      text: editableDraft.landmark,
+    );
+    final photos = List<String>.from(editableDraft.vehiclePhotoUrls);
+    var latitude = editableDraft.latitude;
+    var longitude = editableDraft.longitude;
+    var accuracy = editableDraft.locationAccuracyMeters;
+    var locating = false;
+    final updatedDraft = await showDialog<RequestDraft>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit pending request'),
+          content: SizedBox(
+            width: 390,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: descriptionController,
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 500,
+                    decoration: const InputDecoration(
+                      labelText: 'Breakdown description',
+                    ),
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                  TextField(
+                    controller: notesController,
+                    maxLines: 2,
+                    maxLength: 300,
+                    decoration: const InputDecoration(
+                      labelText: 'Additional notes',
+                    ),
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                  TextField(
+                    controller: locationController,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Location',
+                      suffixIcon: IconButton(
+                        tooltip: 'Refresh current GPS',
+                        onPressed: locating
+                            ? null
+                            : () async {
+                                setDialogState(() => locating = true);
+                                try {
+                                  final position =
+                                      await Geolocator.getCurrentPosition(
+                                        locationSettings:
+                                            const LocationSettings(
+                                              accuracy: LocationAccuracy.high,
+                                            ),
+                                      );
+                                  latitude = position.latitude;
+                                  longitude = position.longitude;
+                                  accuracy = position.accuracy;
+                                  locationController.text =
+                                      'Current GPS (${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)})';
+                                } finally {
+                                  setDialogState(() => locating = false);
+                                }
+                              },
+                        icon: locating
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.my_location),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                  TextField(
+                    controller: landmarkController,
+                    maxLength: 120,
+                    decoration: const InputDecoration(
+                      labelText: 'Nearby landmark',
+                    ),
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: photos.length >= 3
+                              ? null
+                              : () async {
+                                  final picked = await ImagePicker()
+                                      .pickMultiImage(
+                                        imageQuality: 75,
+                                        maxWidth: 1600,
+                                        limit: 3 - photos.length,
+                                      );
+                                  for (final photo in picked) {
+                                    if (photos.length >= 3) break;
+                                    final encoded = await PhotoUploadService()
+                                        .prepareVehiclePhoto(photo);
+                                    if (!photos.contains(encoded)) {
+                                      photos.add(encoded);
+                                    }
+                                  }
+                                  setDialogState(() {});
+                                },
+                          icon: const Icon(Icons.add_a_photo_outlined),
+                          label: Text('Photos (${photos.length}/3)'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (photos.isNotEmpty)
+                    Wrap(
+                      spacing: RaSpace.sm,
+                      children: List.generate(
+                        photos.length,
+                        (index) => InputChip(
+                          label: Text('Photo ${index + 1}'),
+                          onDeleted: () =>
+                              setDialogState(() => photos.removeAt(index)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final description = descriptionController.text.trim();
+                final location = locationController.text.trim();
+                if (location.isEmpty) return;
+                Navigator.pop(
+                  dialogContext,
+                  editableDraft.copyWith(
+                    description: description,
+                    notes: notesController.text.trim(),
+                    location: location,
+                    landmark: landmarkController.text.trim(),
+                    latitude: latitude,
+                    longitude: longitude,
+                    locationAccuracyMeters: accuracy,
+                    vehiclePhotoUrls: photos,
+                    photoAnnotations:
+                        listEquals(photos, editableDraft.vehiclePhotoUrls)
+                        ? editableDraft.photoAnnotations
+                        : const [],
+                  ),
+                );
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+    descriptionController.dispose();
+    notesController.dispose();
+    locationController.dispose();
+    landmarkController.dispose();
+    if (updatedDraft == null || !mounted) return;
+    try {
+      await RequestService().updateSearchingRequest(
+        widget.requestId!,
+        updatedDraft,
+      );
+      await RequestDraftStore().save(updatedDraft);
+      if (!mounted) return;
+      setState(() {
+        editableDraft = updatedDraft;
+        currentLocationLabel = updatedDraft.location;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pending request updated.')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to edit. The provider may have already accepted.',
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> cancelRequest() async {
     final confirmed = await showDialog<bool>(
@@ -3757,6 +4750,7 @@ class _SearchingScreenState extends State<SearchingScreen>
   void initState() {
     super.initState();
     currentLocationLabel = widget.draft.location;
+    editableDraft = widget.draft;
     pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -3799,10 +4793,14 @@ class _SearchingScreenState extends State<SearchingScreen>
                 replace(
                   context,
                   TrackingScreen(
-                    draft: widget.draft.copyWith(
+                    draft: editableDraft.copyWith(
                       location: locationLabel,
                       latitude: latitude,
                       longitude: longitude,
+                      landmark:
+                          data['landmark'] as String? ?? editableDraft.landmark,
+                      locationAccuracyMeters:
+                          (data['locationAccuracyMeters'] as num?)?.toDouble(),
                     ),
                     requestId: widget.requestId,
                   ),
@@ -3811,6 +4809,19 @@ class _SearchingScreenState extends State<SearchingScreen>
                 setState(() {
                   requestStatus = status;
                   currentLocationLabel = locationLabel;
+                  editableDraft = editableDraft.copyWith(
+                    description:
+                        data['description'] as String? ??
+                        editableDraft.description,
+                    notes: data['notes'] as String? ?? editableDraft.notes,
+                    location: locationLabel,
+                    landmark:
+                        data['landmark'] as String? ?? editableDraft.landmark,
+                    vehiclePhotoUrls:
+                        (data['vehiclePhotoUrls'] as List<dynamic>? ?? const [])
+                            .whereType<String>()
+                            .toList(),
+                  );
                   requestError = null;
                   searchingAllProviders =
                       widget.draft.preferredProviderId.isNotEmpty &&
@@ -4020,14 +5031,27 @@ class _SearchingScreenState extends State<SearchingScreen>
               RaSpace.lg,
             ),
             child: requestStatus == 'searching'
-                ? SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: cancelRequest,
-                      style: TextButton.styleFrom(foregroundColor: raDanger),
-                      icon: const Icon(Icons.close),
-                      label: const Text('Cancel Request'),
-                    ),
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: editPendingRequest,
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Edit'),
+                        ),
+                      ),
+                      const SizedBox(width: RaSpace.sm),
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: cancelRequest,
+                          style: TextButton.styleFrom(
+                            foregroundColor: raDanger,
+                          ),
+                          icon: const Icon(Icons.close),
+                          label: const Text('Cancel'),
+                        ),
+                      ),
+                    ],
                   )
                 : FilledButton.icon(
                     onPressed: () => replace(context, const DriverShell()),
@@ -4135,6 +5159,59 @@ class _DriverHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = data['status'] as String? ?? 'searching';
+    final active = const [
+      'searching',
+      'accepted',
+      'en_route',
+      'arrived',
+    ].contains(status);
+    final draft = requestDraftFromData(data);
+
+    void continueRequest() {
+      if (status == 'searching') {
+        push(context, SearchingScreen(draft: draft, requestId: requestId));
+      } else {
+        push(context, TrackingScreen(draft: draft, requestId: requestId));
+      }
+    }
+
+    Future<void> cancelActiveRequest() async {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, color: raDanger),
+          title: const Text('Cancel current request?'),
+          content: const Text(
+            'The active assistance request will be stopped and moved to Cancelled history.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep Request'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: raDanger),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Cancel Request'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      try {
+        await RequestService().cancelRequest(requestId);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Assistance request cancelled.')),
+        );
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to cancel this request.')),
+        );
+      }
+    }
+
     final statusLabel = switch (status) {
       'searching' => 'Searching',
       'accepted' => 'Accepted',
@@ -4198,6 +5275,32 @@ class _DriverHistoryCard extends StatelessWidget {
             if (data['driverRating'] != null)
               SummaryRow('Your Rating', '${data['driverRating']} / 5 stars'),
             const SizedBox(height: RaSpace.sm),
+            if (active) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: continueRequest,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('Continue'),
+                    ),
+                  ),
+                  const SizedBox(width: RaSpace.sm),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: cancelActiveRequest,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: raDanger,
+                        side: const BorderSide(color: raDanger),
+                      ),
+                      icon: const Icon(Icons.close_rounded, size: 17),
+                      label: const Text('Cancel'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: RaSpace.sm),
+            ],
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -6317,12 +7420,51 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   Widget requestCard({required Map<String, dynamic> data, String? requestId}) {
     final latitude = (data['latitude'] as num?)?.toDouble() ?? 6.9034;
     final longitude = (data['longitude'] as num?)?.toDouble() ?? 79.8525;
+    final priority = data['priority'] as String? ?? 'normal';
+    final highlighted = isHighPriority(priority);
     return Card(
+      color: highlighted
+          ? (Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF3A2422)
+                : const Color(0xFFFFF1EE))
+          : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(RaRadius.lg),
+        side: BorderSide(
+          color: highlighted ? raDanger : raLine,
+          width: highlighted ? 1.7 : 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(RaSpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (highlighted) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: RaSpace.md,
+                  vertical: RaSpace.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: raDangerPale,
+                  borderRadius: BorderRadius.circular(RaRadius.sm),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: raDanger),
+                    const SizedBox(width: RaSpace.sm),
+                    Expanded(
+                      child: Text(
+                        requestPriorityLabel(priority).toUpperCase(),
+                        style: RaText.label.copyWith(color: raDanger),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: RaSpace.md),
+            ],
             ClipRRect(
               borderRadius: BorderRadius.circular(RaRadius.sm),
               child: SizedBox(
@@ -6339,7 +7481,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
               'Vehicle',
               data['modelYear'] as String? ?? 'Vehicle details unavailable',
             ),
-            SummaryRow('Issue', data['issue'] as String? ?? 'Roadside help'),
+            SummaryRow('Issue', requestIssueLabel(data)),
             SummaryRow(
               'Location',
               data['locationLabel'] as String? ?? 'Pinned location',
@@ -6622,6 +7764,16 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                   services: providerServices,
                 );
               }).toList();
+              requests.sort((a, b) {
+                final aPriority = isHighPriority(
+                  a.data()['priority'] as String? ?? 'normal',
+                );
+                final bPriority = isHighPriority(
+                  b.data()['priority'] as String? ?? 'normal',
+                );
+                if (aPriority == bPriority) return 0;
+                return aPriority ? -1 : 1;
+              });
               if (requests.isEmpty) {
                 return const EmptyState(
                   icon: Icons.inbox_outlined,
@@ -9885,7 +11037,7 @@ class CustomerContactScreen extends StatelessWidget {
       requestData['modelYear'],
       requestData['registration'],
     ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' - ');
-    final issue = requestData['issue'] as String? ?? 'Roadside assistance';
+    final issue = requestIssueLabel(requestData);
 
     return Scaffold(
       appBar: AppBar(
@@ -10804,11 +11956,15 @@ class ProviderTile extends StatelessWidget {
     required this.distance,
     required this.eta,
     required this.rating,
+    this.completedJobs = 0,
+    this.services = const [],
     this.assetPath,
     required this.selected,
     required this.onTap,
   });
   final String name, company, distance, eta, rating;
+  final int completedJobs;
+  final List<String> services;
   final String? assetPath;
   final bool selected;
   final VoidCallback onTap;
@@ -10831,80 +11987,136 @@ class ProviderTile extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(RaSpace.md),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            assetPath == null
-                ? ProfileInitials(name: name)
-                : AssetAvatar(label: 'Provider', assetPath: assetPath),
-            const SizedBox(width: RaSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: RaText.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    company,
-                    style: RaText.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: RaSpace.sm),
-                  Row(
+            Row(
+              children: [
+                assetPath == null
+                    ? ProfileInitials(name: name)
+                    : AssetAvatar(label: 'Provider', assetPath: assetPath),
+                const SizedBox(width: RaSpace.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.directions_car_filled,
-                        size: 13,
-                        color: raBlue,
+                      Text(
+                        name,
+                        style: RaText.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          '$distance · ETA $eta',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
+                      Text(
+                        company,
+                        style: RaText.caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: RaSpace.sm),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.directions_car_filled,
+                            size: 13,
                             color: raBlue,
-                            fontWeight: FontWeight.w700,
                           ),
-                        ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              '$distance · ETA $eta',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: raBlue,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            Column(
-              children: [
-                Row(
+                ),
+                Column(
                   children: [
-                    const Icon(Icons.star, size: 14, color: raGold),
-                    const SizedBox(width: 2),
-                    Text(
-                      rating,
-                      style: const TextStyle(
-                        color: raGold,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
-                      ),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, size: 14, color: raGold),
+                        const SizedBox(width: 2),
+                        Text(
+                          rating,
+                          style: const TextStyle(
+                            color: raGold,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: RaSpace.md),
+                    Icon(
+                      selected ? Icons.check_circle : Icons.circle_outlined,
+                      color: selected ? raBlue : raFaint,
                     ),
                   ],
                 ),
-                const SizedBox(height: RaSpace.md),
-                Icon(
-                  selected ? Icons.check_circle : Icons.circle_outlined,
-                  color: selected ? raBlue : raFaint,
+              ],
+            ),
+            const SizedBox(height: RaSpace.sm),
+            Wrap(
+              spacing: RaSpace.sm,
+              runSpacing: RaSpace.xs,
+              children: [
+                _ProviderMetricChip(
+                  icon: Icons.task_alt_rounded,
+                  label: completedJobs == 0
+                      ? 'No completed jobs yet'
+                      : '$completedJobs completed',
+                ),
+                _ProviderMetricChip(
+                  icon: Icons.build_outlined,
+                  label: services.isEmpty
+                      ? 'Services pending'
+                      : services.join(', '),
                 ),
               ],
             ),
           ],
         ),
       ),
+    ),
+  );
+}
+
+class _ProviderMetricChip extends StatelessWidget {
+  const _ProviderMetricChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(maxWidth: 250),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(RaRadius.pill),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: raBlue),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: RaText.caption,
+          ),
+        ),
+      ],
     ),
   );
 }

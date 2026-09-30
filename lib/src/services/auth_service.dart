@@ -107,9 +107,7 @@ class AuthService {
     final profile = await getCurrentProfile();
     final role = profile.data()?['role'] as String?;
     if (role == null) return;
-    if (user.emailVerified) {
-      _startBackgroundSetup(role);
-    }
+    _startBackgroundSetup(role);
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchOnlineProviders() =>
@@ -124,12 +122,40 @@ class AuthService {
     final profile = await _firestore.collection('users').doc(user.uid).get();
     final data = profile.data();
     if (data?['role'] != 'provider') return;
+    final jobs = await _firestore
+        .collection('requests')
+        .where('providerId', isEqualTo: user.uid)
+        .get();
+    final completed = jobs.docs
+        .where((job) => job.data()['status'] == 'completed')
+        .toList();
+    final ratings = completed
+        .map((job) => job.data()['driverRating'])
+        .whereType<num>()
+        .map((rating) => rating.toDouble())
+        .toList();
+    final responseMinutes = jobs.docs
+        .map((job) {
+          final created = job.data()['createdAt'] as Timestamp?;
+          final accepted = job.data()['acceptedAt'] as Timestamp?;
+          if (created == null || accepted == null) return null;
+          return accepted.toDate().difference(created.toDate()).inSeconds / 60;
+        })
+        .whereType<double>()
+        .toList();
     await _firestore.collection('providerDirectory').doc(user.uid).set({
       'displayName':
           data?['displayName'] ?? user.displayName ?? 'Service Provider',
       'online': data?['online'] ?? true,
       'services': data?['services'] ?? const <String>[],
       'serviceRadius': data?['serviceRadius'] ?? '15 km from current location',
+      'completedJobs': completed.length,
+      'averageRating': ratings.isEmpty
+          ? 0.0
+          : ratings.reduce((a, b) => a + b) / ratings.length,
+      'averageResponseMinutes': responseMinutes.isEmpty
+          ? 0.0
+          : responseMinutes.reduce((a, b) => a + b) / responseMinutes.length,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -200,9 +226,7 @@ class AuthService {
         message: 'This account is not registered as a $role.',
       );
     }
-    if (credential.user?.emailVerified ?? false) {
-      _startBackgroundSetup(role);
-    }
+    _startBackgroundSetup(role);
     return credential;
   }
 

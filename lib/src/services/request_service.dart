@@ -36,33 +36,90 @@ class RequestService {
       throw StateError('Complete or cancel your active request first.');
     }
     final document = _requests.doc();
-    final profile = await _firestore.collection('users').doc(_userId).get();
-    await document.set({
-      'driverId': _userId,
-      'driverName': _auth.currentUser?.displayName ?? 'Driver',
-      'driverPhone': profile.data()?['phone'] ?? '',
-      'providerId': null,
-      'preferredProviderId': draft.preferredProviderId,
-      'preferredProviderName': draft.provider,
-      'rejectedBy': <String>[],
-      'status': 'searching',
-      'issue': draft.issue,
-      'vehicleType': draft.vehicleType,
-      'modelYear': draft.modelYear,
-      'registration': draft.registration,
-      'description': draft.description,
-      'notes': draft.notes,
-      'vehiclePhotoUrls': draft.vehiclePhotoUrls,
-      'locationLabel': draft.location,
-      'latitude': draft.latitude,
-      'longitude': draft.longitude,
-      'serviceFee': draft.serviceFee,
-      'dispatchFee': draft.dispatchFee,
-      'estimatedCost': draft.estimatedCost,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
+    final profileReference = _firestore.collection('users').doc(_userId);
+    await _firestore.runTransaction((transaction) async {
+      final profile = await transaction.get(profileReference);
+      final activeRequestId = profile.data()?['activeRequestId'] as String?;
+      if (activeRequestId != null && activeRequestId.isNotEmpty) {
+        final activeRequest = await transaction.get(
+          _requests.doc(activeRequestId),
+        );
+        if (activeRequest.exists &&
+            const [
+              'searching',
+              'accepted',
+              'en_route',
+              'arrived',
+            ].contains(activeRequest.data()?['status'])) {
+          throw StateError('Complete or cancel your active request first.');
+        }
+      }
+      transaction.set(document, {
+        'driverId': _userId,
+        'driverName': _auth.currentUser?.displayName ?? 'Driver',
+        'driverPhone': profile.data()?['phone'] ?? '',
+        'providerId': null,
+        'preferredProviderId': draft.preferredProviderId,
+        'preferredProviderName': draft.provider,
+        'rejectedBy': <String>[],
+        'status': 'searching',
+        'issue': draft.primaryIssue,
+        'issues': draft.issues,
+        'vehicleType': draft.vehicleType,
+        'modelYear': draft.modelYear,
+        'registration': draft.registration,
+        'description': draft.description,
+        'notes': draft.notes,
+        'priority': draft.priority,
+        'vehiclePhotoUrls': draft.vehiclePhotoUrls,
+        'photoAnnotations': draft.photoAnnotations
+            .map((annotation) => annotation.toJson())
+            .toList(),
+        'locationLabel': draft.location,
+        'landmark': draft.landmark,
+        'locationAccuracyMeters': draft.locationAccuracyMeters,
+        'latitude': draft.latitude,
+        'longitude': draft.longitude,
+        'serviceFee': draft.serviceFee,
+        'dispatchFee': draft.dispatchFee,
+        'estimatedCost': draft.estimatedCost,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.set(profileReference, {
+        'activeRequestId': document.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     });
     return document.id;
+  }
+
+  Future<void> updateSearchingRequest(String id, RequestDraft draft) async {
+    await _firestore.runTransaction((transaction) async {
+      final reference = _requests.doc(id);
+      final request = await transaction.get(reference);
+      final data = request.data();
+      if (!request.exists || data?['driverId'] != _userId) {
+        throw StateError('Only the request driver can edit this request.');
+      }
+      if (data?['status'] != 'searching' || data?['providerId'] != null) {
+        throw StateError('The provider has already accepted this request.');
+      }
+      transaction.update(reference, {
+        'description': draft.description,
+        'notes': draft.notes,
+        'vehiclePhotoUrls': draft.vehiclePhotoUrls,
+        'photoAnnotations': draft.photoAnnotations
+            .map((annotation) => annotation.toJson())
+            .toList(),
+        'locationLabel': draft.location,
+        'landmark': draft.landmark,
+        'locationAccuracyMeters': draft.locationAccuracyMeters,
+        'latitude': draft.latitude,
+        'longitude': draft.longitude,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchRequest(String id) =>
@@ -270,7 +327,9 @@ class RequestService {
   Future<void> cancelRequest(String id) async {
     await _firestore.runTransaction((transaction) async {
       final reference = _requests.doc(id);
+      final profileReference = _firestore.collection('users').doc(_userId);
       final request = await transaction.get(reference);
+      final profile = await transaction.get(profileReference);
       final data = request.data();
       if (!request.exists || data?['driverId'] != _userId) {
         throw StateError('Only the request driver can cancel this request.');
@@ -284,6 +343,12 @@ class RequestService {
         'cancelledAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      if (profile.data()?['activeRequestId'] == id) {
+        transaction.update(profileReference, {
+          'activeRequestId': FieldValue.delete(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
     });
   }
 
