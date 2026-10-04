@@ -112,9 +112,124 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 child: const Text('Confirm Payment Received'),
               ),
             if (saving) const LinearProgressIndicator(),
+            if (data['workflowVersion'] == 2)
+              _InvoiceApprovalHistory(
+                requestId: widget.requestId,
+                selectedQuoteId: data['selectedQuoteId'] as String?,
+              ),
           ],
         );
       },
     ),
+  );
+}
+
+class _InvoiceApprovalHistory extends StatefulWidget {
+  const _InvoiceApprovalHistory({
+    required this.requestId,
+    this.selectedQuoteId,
+  });
+  final String requestId;
+  final String? selectedQuoteId;
+  @override
+  State<_InvoiceApprovalHistory> createState() =>
+      _InvoiceApprovalHistoryState();
+}
+
+class _InvoiceApprovalHistoryState extends State<_InvoiceApprovalHistory> {
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> revisions;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> decisions;
+  late final Stream<DocumentSnapshot<Map<String, dynamic>>>? initialQuote;
+  @override
+  void initState() {
+    super.initState();
+    final ref = FirebaseFirestore.instance
+        .collection('requests')
+        .doc(widget.requestId);
+    revisions = ref.collection('repairQuotes').snapshots();
+    decisions = ref.collection('repairDecisions').snapshots();
+    initialQuote = widget.selectedQuoteId == null
+        ? null
+        : ref.collection('quotes').doc(widget.selectedQuoteId).snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Divider(),
+      const Text('Quote and approval history', style: RaText.title),
+      const Text('Rejected or unapproved proposals are not added to the bill.'),
+      if (initialQuote != null)
+        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: initialQuote,
+          builder: (context, snapshot) {
+            if (snapshot.hasError)
+              return const Text('Could not load the original quote.');
+            final quote = snapshot.data?.data();
+            if (quote == null) return const LinearProgressIndicator();
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'Original approved ${quote['quoteType'] == 'inspection' ? 'inspection' : 'service'} offer: Rs. ${quote['total']}',
+              ),
+              subtitle: Text('Included work / exclusions: ${quote['notes']}'),
+            );
+          },
+        ),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: decisions,
+        builder: (context, decisionSnapshot) =>
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: revisions,
+              builder: (context, revisionSnapshot) {
+                if (revisionSnapshot.hasError || decisionSnapshot.hasError)
+                  return const Text('Could not load approval history.');
+                if (!revisionSnapshot.hasData || !decisionSnapshot.hasData)
+                  return const LinearProgressIndicator();
+                final outcomes = {
+                  for (final d in decisionSnapshot.data!.docs) d.id: d.data(),
+                };
+                final entries = revisionSnapshot.data!.docs.toList()
+                  ..sort(
+                    (a, b) => (a.data()['createdAt'] as Timestamp).compareTo(
+                      b.data()['createdAt'] as Timestamp,
+                    ),
+                  );
+                if (entries.isEmpty)
+                  return const Text('No repair revisions were proposed.');
+                return Column(
+                  children: entries.map((entry) {
+                    final revision = entry.data();
+                    final decision = outcomes[entry.id];
+                    final outcome =
+                        decision?['decision'] as String? ?? 'not approved';
+                    final date =
+                        (decision?['createdAt'] as Timestamp? ??
+                                revision['createdAt'] as Timestamp)
+                            .toDate()
+                            .toLocal();
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        outcome == 'approved'
+                            ? Icons.check_circle_outline
+                            : outcome == 'rejected'
+                            ? Icons.cancel_outlined
+                            : Icons.hourglass_empty,
+                      ),
+                      title: Text(
+                        '${outcome.toUpperCase()}: Rs. ${revision['previousTotal']} to Rs. ${revision['total']}',
+                      ),
+                      subtitle: Text(
+                        '${revision['diagnosisAndWork']}\n${date.toString().split('.').first}',
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+      ),
+    ],
   );
 }

@@ -39,12 +39,14 @@ bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
 }
 
 class _ProvidersScreenState extends State<ProvidersScreen> {
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> onlineProviders;
   String? selectedId;
   String? selectedName;
 
   @override
   void initState() {
     super.initState();
+    onlineProviders = AuthService().watchOnlineProviders();
     selectedId = widget.draft.preferredProviderId.isEmpty
         ? null
         : widget.draft.preferredProviderId;
@@ -95,6 +97,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                   child: SizedBox(
                     height: 185,
                     child: _NearbyProvidersMap(
+                      providers: onlineProviders,
                       draft: widget.draft,
                       selectedId: selectedId,
                     ),
@@ -107,7 +110,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                 ),
                 const SizedBox(height: RaSpace.md),
                 StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: AuthService().watchOnlineProviders(),
+                  stream: onlineProviders,
                   builder: (context, snapshot) {
                     if (snapshot.hasError) {
                       return const EmptyState(

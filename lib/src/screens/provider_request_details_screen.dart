@@ -31,7 +31,18 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
             .whereType<String>()
             .toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('Case Details')),
+      appBar: AppBar(
+        title: const Text('Case Details'),
+        actions: [
+          if (rawStatus == 'completed')
+            TextButton.icon(
+              onPressed: () =>
+                  push(context, InvoiceScreen(requestId: requestId)),
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('Invoice'),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(RaSpace.xl),
         children: [
