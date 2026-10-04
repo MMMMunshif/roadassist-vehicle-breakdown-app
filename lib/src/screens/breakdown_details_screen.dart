@@ -20,19 +20,61 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   final notesController = TextEditingController();
   final customVehicleController = TextEditingController();
   String vehicle = 'Sedan / Hatchback';
+  String? vehicleId;
+  Map<String, dynamic>? vehicleSnapshot;
+
+  Future<void> selectSavedVehicle() async {
+    final selected = await Navigator.of(context).push<Vehicle>(
+      MaterialPageRoute(builder: (_) => const VehiclesScreen(selecting: true)),
+    );
+    if (selected == null || !mounted) return;
+    applyVehicle(selected);
+  }
+
+  void applyVehicle(Vehicle selected) {
+    setState(() {
+      vehicleId = selected.id;
+      vehicleSnapshot = selected.toJson();
+      vehicle = selected.vehicleType;
+      if (vehicle == 'Other') customVehicleController.text = 'Other';
+      modelController.text = selected.label;
+      registrationController.text = selected.registration;
+    });
+  }
+
+  Future<void> loadDefaultVehicle() async {
+    try {
+      final selected = await VehicleService().loadDefault();
+      if (selected != null &&
+          mounted &&
+          modelController.text.isEmpty &&
+          registrationController.text.isEmpty) {
+        applyVehicle(selected);
+      }
+    } catch (_) {
+      // Vehicle lookup is optional; manual entry stays available offline.
+    }
+  }
+
   final List<String> vehiclePhotoUrls = [];
   final List<BreakdownPhotoAnnotation> photoAnnotations = [];
   bool uploadingVehiclePhoto = false;
   final SpeechToText speechToText = SpeechToText();
   bool listeningForDescription = false;
   String priority = 'normal';
+  String partsPreference = 'discuss';
   Timer? draftSaveDebounce;
 
   @override
   void initState() {
     super.initState();
     final draft = widget.initialDraft;
-    if (draft == null) return;
+    if (draft == null) {
+      if (signedIn) loadDefaultVehicle();
+      return;
+    }
+    vehicleId = draft.vehicleId;
+    vehicleSnapshot = draft.vehicleSnapshot;
     const standardTypes = {'Sedan / Hatchback', 'SUV', 'Van', 'Motorcycle'};
     if (standardTypes.contains(draft.vehicleType)) {
       vehicle = draft.vehicleType;
@@ -45,11 +87,25 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     descriptionController.text = draft.description;
     notesController.text = draft.notes;
     priority = draft.priority;
+    partsPreference = draft.partsPreference;
     vehiclePhotoUrls.addAll(draft.vehiclePhotoUrls);
     photoAnnotations.addAll(draft.photoAnnotations);
   }
 
   RequestDraft buildDraft() => RequestDraft(
+    vehicleId: vehicleId,
+    vehicleSnapshot: vehicleSnapshot == null
+        ? null
+        : {
+            ...vehicleSnapshot!,
+            'vehicleType': vehicle == 'Other'
+                ? customVehicleController.text.trim()
+                : vehicle,
+            'modelYear': modelController.text.trim(),
+            'registration': normalizeVehicleRegistration(
+              registrationController.text,
+            ),
+          },
     issues: widget.issues,
     vehicleType: vehicle == 'Other'
         ? customVehicleController.text.trim()
@@ -59,6 +115,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     description: descriptionController.text.trim(),
     notes: notesController.text.trim(),
     priority: priority,
+    partsPreference: partsPreference,
     location:
         widget.initialDraft?.location ??
         'Select current GPS or enter location manually',
@@ -372,7 +429,16 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Breakdown Details')),
+    appBar: AppBar(
+      title: const Text('Breakdown Details'),
+      actions: [
+        TextButton.icon(
+          onPressed: selectSavedVehicle,
+          icon: const Icon(Icons.directions_car),
+          label: const Text('Saved vehicles'),
+        ),
+      ],
+    ),
     body: SafeArea(
       child: Column(
         children: [
@@ -416,6 +482,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             Expanded(
                               child: DropdownButtonFormField<String>(
                                 initialValue: vehicle,
+                                key: ValueKey(vehicle),
                                 isExpanded: true,
                                 items:
                                     [
@@ -559,6 +626,38 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                           ),
                           validator: validateBreakdownDescription,
                           onChanged: (_) => scheduleDraftSave(),
+                        ),
+                        const SizedBox(height: RaSpace.md),
+                        DropdownButtonFormField<String>(
+                          initialValue: partsPreference,
+                          decoration: const InputDecoration(
+                            labelText: 'Replacement parts preference',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'discuss',
+                              child: Text('Discuss options with provider'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'budget',
+                              child: Text('Budget compatible'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'branded',
+                              child: Text('Branded aftermarket'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'genuine',
+                              child: Text('Genuine manufacturer parts'),
+                            ),
+                          ],
+                          onChanged: (v) {
+                            setState(() => partsPreference = v ?? 'discuss');
+                            scheduleDraftSave();
+                          },
+                        ),
+                        const Text(
+                          'Preference only. Compatibility, availability, price and warranty must be confirmed in the provider offer.',
                         ),
                         const SizedBox(height: RaSpace.xxl),
                         const FormSectionTitle(

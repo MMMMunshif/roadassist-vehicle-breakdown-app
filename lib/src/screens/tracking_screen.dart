@@ -124,6 +124,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     appBar: AppBar(
       title: const Text('Track Assistance'),
       actions: [
+        if (widget.requestId != null)
+          IconButton(
+            tooltip: 'Invoice',
+            icon: const Icon(Icons.receipt_long),
+            onPressed: () =>
+                push(context, InvoiceScreen(requestId: widget.requestId!)),
+          ),
         IconButton(
           onPressed: () => push(context, const EmergencyScreen()),
           tooltip: 'Emergency contact',
@@ -143,6 +150,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
             child: ListView(
               padding: const EdgeInsets.all(RaSpace.xl),
               children: [
+                if (widget.requestId != null)
+                  RepairQuotePanel(requestId: widget.requestId!),
                 Stack(
                   children: [
                     ClipRRect(

@@ -18,6 +18,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'app.dart';
 import 'models/request_draft.dart';
+import 'models/vehicle.dart';
+import 'services/vehicle_service.dart';
 import 'services/auth_service.dart';
 import 'services/device_service.dart';
 import 'services/request_service.dart';
@@ -28,7 +30,11 @@ import 'services/route_service.dart';
 // Screen files share this library's imports and private helpers.
 part 'features/request/assistance_type_screen.dart';
 part 'screens/screen_helpers.dart';
+part 'screens/vehicles_screen.dart';
+part 'screens/invoice_screen.dart';
 part 'widgets/shared_widgets.dart';
+part 'widgets/quote_offers.dart';
+part 'widgets/repair_quote_panel.dart';
 part 'screens/splash_screen.dart';
 part 'screens/legacy_welcome_screen.dart';
 part 'screens/welcome_screen.dart';

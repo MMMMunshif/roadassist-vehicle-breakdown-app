@@ -397,6 +397,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(RaSpace.xl),
                 children: [
+                  if (widget.requestId != null)
+                    RepairQuotePanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
+                    ),
                   Container(
                     padding: const EdgeInsets.all(RaSpace.lg),
                     decoration: BoxDecoration(
@@ -715,7 +720,15 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                   : status == 3
                   ? 'Finish Job'
                   : 'Mark as ${statuses[status + 1]}',
-              enabled: !updatingStatus && widget.requestId != null,
+              enabled:
+                  !updatingStatus &&
+                  widget.requestId != null &&
+                  (requestCancelled ||
+                      status != 2 ||
+                      data['workflowVersion'] != 2 ||
+                      (data['pendingRepairId'] == null &&
+                          (data['approvedQuoteType'] != 'inspection' ||
+                              data['approvedRepairId'] != null))),
               onTap: requestCancelled
                   ? () => replace(context, const ProviderShell())
                   : advanceStatus,

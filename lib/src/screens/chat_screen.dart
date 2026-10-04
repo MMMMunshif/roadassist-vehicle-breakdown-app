@@ -48,12 +48,10 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   final serviceController = TextEditingController(
     text: '${(requestData['serviceFee'] as num?)?.toInt() ?? 0}',
   );
-  final suggestedTravel = distanceKm > 0
-      ? (distanceKm * 100).ceil()
-      : (requestData['dispatchFee'] as num?)?.toInt() ?? 0;
-  final travelController = TextEditingController(text: '$suggestedTravel');
+  final travelController = TextEditingController(text: '0');
   final extraController = TextEditingController(text: '0');
   final notesController = TextEditingController();
+  bool inspectionOnly = false;
 
   int amount(TextEditingController controller) =>
       int.tryParse(controller.text.replaceAll(',', '').trim()) ?? 0;
@@ -71,6 +69,10 @@ Future<Map<String, dynamic>?> requestProviderQuote(
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(7),
+              ],
               onChanged: (_) => setDialogState(() {}),
               decoration: InputDecoration(labelText: label, prefixText: 'Rs. '),
             );
@@ -87,7 +89,28 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: RaSpace.md),
-                moneyField('Service charge', serviceController),
+                Text('Vehicle: ${requestData['modelYear'] ?? ''}'),
+                Text('Driver symptoms: ${requestData['description'] ?? ''}'),
+                Text(
+                  'Parts preference: ${requestData['partsPreference'] ?? 'discuss'}',
+                ),
+                if (requestData['workflowVersion'] == 2 &&
+                    requestData['repairRevision'] != true)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Inspection required'),
+                    subtitle: const Text(
+                      'Quote covers the visit and inspection only. Repair needs a separate approved quote.',
+                    ),
+                    value: inspectionOnly,
+                    onChanged: (v) => setDialogState(() => inspectionOnly = v),
+                  ),
+                moneyField(
+                  inspectionOnly
+                      ? 'Visit / inspection charge'
+                      : 'Service / labour charge',
+                  serviceController,
+                ),
                 const SizedBox(height: RaSpace.sm),
                 moneyField('Travel / distance charge', travelController),
                 const SizedBox(height: RaSpace.sm),
@@ -95,10 +118,11 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                 const SizedBox(height: RaSpace.sm),
                 TextField(
                   controller: notesController,
+                  onChanged: (_) => setDialogState(() {}),
                   maxLength: 200,
                   maxLines: 2,
                   decoration: const InputDecoration(
-                    labelText: 'Quote notes (optional)',
+                    labelText: 'Included work, parts and exclusions',
                     hintText: 'Parts, after-hours fee, or other details',
                   ),
                 ),
@@ -125,7 +149,11 @@ Future<Map<String, dynamic>?> requestProviderQuote(
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: total <= 0
+              onPressed:
+                  total <= 0 ||
+                      total > 10000000 ||
+                      (requestData['workflowVersion'] == 2 &&
+                          notesController.text.trim().isEmpty)
                   ? null
                   : () => Navigator.pop(dialogContext, {
                       'serviceFee': amount(serviceController),
@@ -133,8 +161,13 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                       'extraFee': amount(extraController),
                       'providerDistanceKm': distanceKm,
                       'quoteNotes': notesController.text.trim(),
+                      'quoteType': inspectionOnly ? 'inspection' : 'direct',
                     }),
-              child: const Text('Accept with Quote'),
+              child: Text(
+                requestData['workflowVersion'] == 2
+                    ? 'Send Offer'
+                    : 'Accept with Quote',
+              ),
             ),
           ],
         );

@@ -1,17 +1,28 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../models/request_draft.dart';
 
 class RequestDraftStore {
-  RequestDraftStore({SharedPreferences? preferences})
-    : _preferences = preferences;
+  RequestDraftStore({SharedPreferences? preferences, String? ownerId})
+    : _preferences = preferences,
+      _ownerId =
+          ownerId ??
+          (Firebase.apps.isEmpty
+              ? null
+              : FirebaseAuth.instance.currentUser?.uid) ??
+          'guest';
 
-  static const _draftKey = 'roadassist_driver_request_draft_v1';
-  static const _updatedAtKey = 'roadassist_driver_request_draft_updated_at_v1';
-  static const _pendingSubmissionKey =
-      'roadassist_driver_request_pending_submission_v1';
+  final String _ownerId;
+
+  String get _draftKey => 'roadassist_driver_request_draft_v2_$_ownerId';
+  String get _updatedAtKey =>
+      'roadassist_driver_request_draft_updated_at_v2_$_ownerId';
+  String get _pendingSubmissionKey =>
+      'roadassist_driver_request_pending_submission_v2_$_ownerId';
 
   SharedPreferences? _preferences;
 
