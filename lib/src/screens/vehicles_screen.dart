@@ -9,7 +9,7 @@ class VehiclesScreen extends StatefulWidget {
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
   late final VehicleService service;
-  late final Stream<List<Vehicle>> vehicles;
+  late Stream<List<Vehicle>> vehicles;
   bool busy = false;
   @override
   void initState() {
@@ -50,12 +50,37 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             builder: (context, profile) => StreamBuilder<List<Vehicle>>(
               stream: vehicles,
               builder: (context, snapshot) {
-                if (snapshot.hasError)
+                if (snapshot.hasError) {
+                  final error = snapshot.error;
+                  final permissionDenied =
+                      error is FirebaseException &&
+                      error.code == 'permission-denied';
                   return Center(
-                    child: Text(
-                      'Could not load vehicles. Check your connection and try again.\n${snapshot.error}',
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline, size: 40),
+                          const SizedBox(height: 16),
+                          Text(
+                            permissionDenied
+                                ? 'Vehicle access was denied. Your driver account needs access to saved vehicles. Please contact support if this continues.'
+                                : 'Could not load vehicles. Check your connection and try again.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: () => setState(() {
+                              vehicles = service.watchVehicles();
+                            }),
+                            child: const Text('Try again'),
+                          ),
+                        ],
+                      ),
                     ),
                   );
+                }
                 if (!snapshot.hasData)
                   return const Center(child: CircularProgressIndicator());
                 final items = snapshot.data!;
