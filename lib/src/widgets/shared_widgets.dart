@@ -367,15 +367,20 @@ class _LocationAccuracyIndicator extends StatelessWidget {
 }
 
 class _NearbyProvidersMap extends StatelessWidget {
-  const _NearbyProvidersMap({required this.draft, required this.selectedId});
+  const _NearbyProvidersMap({
+    required this.draft,
+    required this.selectedId,
+    required this.providers,
+  });
 
+  final Stream<QuerySnapshot<Map<String, dynamic>>> providers;
   final RequestDraft draft;
   final String? selectedId;
 
   @override
   Widget build(BuildContext context) =>
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: AuthService().watchOnlineProviders(),
+        stream: providers,
         builder: (context, snapshot) {
           final providerDocuments = snapshot.data?.docs;
           final providers = providerDocuments == null

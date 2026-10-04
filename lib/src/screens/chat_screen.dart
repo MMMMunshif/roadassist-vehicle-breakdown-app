@@ -48,8 +48,16 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   final serviceController = TextEditingController(
     text: '${(requestData['serviceFee'] as num?)?.toInt() ?? 0}',
   );
-  final travelController = TextEditingController(text: '0');
-  final extraController = TextEditingController(text: '0');
+  final travelController = TextEditingController(
+    text: requestData['repairRevision'] == true
+        ? '${requestData['dispatchFee'] ?? 0}'
+        : '0',
+  );
+  final extraController = TextEditingController(
+    text: requestData['repairRevision'] == true
+        ? '${requestData['extraFee'] ?? 0}'
+        : '0',
+  );
   final notesController = TextEditingController();
   bool inspectionOnly = false;
 
@@ -105,6 +113,14 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                     value: inspectionOnly,
                     onChanged: (v) => setDialogState(() => inspectionOnly = v),
                   ),
+                if (requestData['repairRevision'] == true) ...[
+                  Text(
+                    'Previously approved: Rs. ${requestData['estimatedCost'] ?? 0}',
+                  ),
+                  const Text(
+                    'Enter the full replacement bill, including previously approved work. Explain the new problem, added work and parts. Wait for driver approval before starting it.',
+                  ),
+                ],
                 moneyField(
                   inspectionOnly
                       ? 'Visit / inspection charge'
@@ -135,7 +151,12 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Quoted total', style: RaText.label),
+                      Text(
+                        requestData['repairRevision'] == true
+                            ? 'New full total'
+                            : 'Quoted total',
+                        style: RaText.label,
+                      ),
                       Text('Rs. $total', style: RaText.title),
                     ],
                   ),
@@ -181,7 +202,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   return result;
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final controller = TextEditingController();
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? messageListener;
   final messages = <String>[];
@@ -192,8 +213,13 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.requestId != null) {
-      unawaited(RequestService().markChatSeen(widget.requestId!));
+      unawaited(
+        RequestService()
+            .markChatSeen(widget.requestId!)
+            .catchError((Object error) {}),
+      );
       messageListener = RequestService()
           .watchMessages(widget.requestId!)
           .listen((snapshot) {
@@ -221,13 +247,36 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 );
             });
-            unawaited(RequestService().markChatSeen(widget.requestId!));
+            if (ModalRoute.of(context)?.isCurrent == true &&
+                WidgetsBinding.instance.lifecycleState ==
+                    AppLifecycleState.resumed) {
+              unawaited(
+                RequestService()
+                    .markChatSeen(widget.requestId!)
+                    .catchError((Object error) {}),
+              );
+            }
           });
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        mounted &&
+        widget.requestId != null &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      unawaited(
+        RequestService()
+            .markChatSeen(widget.requestId!)
+            .catchError((Object error) {}),
+      );
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     messageListener?.cancel();
     controller.dispose();
     super.dispose();

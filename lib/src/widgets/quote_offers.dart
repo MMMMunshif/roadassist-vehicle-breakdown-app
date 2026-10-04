@@ -22,7 +22,7 @@ class _QuoteOffersState extends State<QuoteOffers> {
       builder: (c) => AlertDialog(
         title: const Text('Approve this offer?'),
         content: Text(
-          '${offer['providerName']}\n${offer['quoteType'] == 'inspection' ? 'Inspection and visit only. Repair is not included.\n' : ''}Total: Rs. ${offer['total']}\n${offer['notes']}\n\nOnly the listed work is included. Additional work requires an approved revision.',
+          '${offer['providerName']}\n${offer['quoteType'] == 'inspection' ? 'Inspection and visit only. Repair is not included.\n' : ''}Total: Rs. ${offer['total']}\nIncluded work / exclusions: ${offer['notes']}\n\nOnly the listed work is included. Additional work requires an approved revision.',
         ),
         actions: [
           TextButton(
@@ -83,47 +83,77 @@ class _QuoteOffersState extends State<QuoteOffers> {
                 ? 'Providers are reviewing your vehicle and request. No price has been agreed yet.'
                 : 'Direct service and inspection offers are grouped separately, then sorted by price. Compare what each offer includes.',
           ),
-          for (final quote in quotes)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      quote.data()['providerName'] as String,
-                      style: RaText.title,
-                    ),
-                    Text(
-                      quote.data()['quoteType'] == 'inspection'
-                          ? 'Inspection only — repair is not included'
-                          : 'Direct service offer',
-                    ),
-                    SummaryRow(
-                      'Service / labour',
-                      'Rs. ${quote.data()['serviceFee']}',
-                    ),
-                    SummaryRow('Travel', 'Rs. ${quote.data()['travelFee']}'),
-                    SummaryRow(
-                      'Other stated charges',
-                      'Rs. ${quote.data()['extraFee']}',
-                    ),
-                    SummaryRow(
-                      'Quoted total',
-                      'Rs. ${quote.data()['total']}',
-                      strong: true,
-                    ),
-                    Text(quote.data()['notes'] as String),
-                    FilledButton(
-                      onPressed: selecting
-                          ? null
-                          : () => choose(quote.id, quote.data()),
-                      child: Text(selecting ? 'Selecting…' : 'Review & Select'),
-                    ),
-                  ],
+          for (final type in ['direct', 'inspection']) ...[
+            if (quotes.any((q) => (q.data()['quoteType'] ?? 'direct') == type))
+              Padding(
+                padding: const EdgeInsets.only(top: 16, bottom: 8),
+                child: Text(
+                  type == 'direct'
+                      ? 'Repair / service offers - lowest total first'
+                      : 'Visit / inspection offers - repair costs extra',
+                  style: RaText.title,
                 ),
               ),
-            ),
+            for (final quote in quotes.where(
+              (q) => (q.data()['quoteType'] ?? 'direct') == type,
+            ))
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        quote.data()['providerName'] as String,
+                        style: RaText.title,
+                      ),
+                      Text(
+                        quote.data()['quoteType'] == 'inspection'
+                            ? 'Inspection only — repair is not included'
+                            : 'Direct service offer',
+                      ),
+                      SummaryRow(
+                        'Service / labour',
+                        'Rs. ${quote.data()['serviceFee']}',
+                      ),
+                      SummaryRow('Travel', 'Rs. ${quote.data()['travelFee']}'),
+                      SummaryRow(
+                        'Other stated charges',
+                        'Rs. ${quote.data()['extraFee']}',
+                      ),
+                      SummaryRow(
+                        'Quoted total',
+                        'Rs. ${quote.data()['total']}',
+                        strong: true,
+                      ),
+                      if (quote.id ==
+                          quotes
+                              .firstWhere(
+                                (q) =>
+                                    (q.data()['quoteType'] ?? 'direct') == type,
+                              )
+                              .id)
+                        const Text('Lowest quoted price in this category'),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Included work, parts and exclusions',
+                        style: RaText.label,
+                      ),
+                      Text(quote.data()['notes'] as String),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        onPressed: selecting
+                            ? null
+                            : () => choose(quote.id, quote.data()),
+                        child: Text(
+                          selecting ? 'Selecting…' : 'Review & Select',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
           const SizedBox(height: 24),
         ],
       );
