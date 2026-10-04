@@ -28,6 +28,32 @@ service cloud.firestore {
       match /devices/{deviceId} {
         allow read, write: if signedIn() && request.auth.uid == userId;
       }
+      match /vehicles/{vehicleId} {
+        function ownsVehicle() {
+          return signedIn() && request.auth.uid == userId && isDriver();
+        }
+        function validVehicle() {
+          let v = request.resource.data;
+          return v.keys().hasAll(['make', 'model', 'year', 'vehicleType',
+              'registration', 'fuelType', 'transmission', 'archived', 'createdAt', 'updatedAt'])
+            && v.keys().hasOnly(['make', 'model', 'year', 'vehicleType',
+              'registration', 'fuelType', 'transmission', 'archived', 'createdAt', 'updatedAt'])
+            && v.make is string && v.make.size() > 0 && v.make.size() <= 40
+            && v.model is string && v.model.size() > 0 && v.model.size() <= 40
+            && v.year is int && v.year >= 1950 && v.year <= request.time.year() + 1
+            && v.vehicleType in ['Sedan / Hatchback', 'SUV', 'Van', 'Motorcycle', 'Other']
+            && v.registration is string && v.registration.size() > 0 && v.registration.size() <= 16
+            && v.fuelType in ['Petrol', 'Diesel', 'Hybrid', 'Electric', 'Other']
+            && v.transmission in ['Automatic', 'Manual', 'Other']
+            && v.archived is bool && v.createdAt is timestamp
+            && v.updatedAt == request.time;
+        }
+        allow read: if ownsVehicle();
+        allow create: if ownsVehicle() && validVehicle() && request.resource.data.createdAt == request.time;
+        allow update: if ownsVehicle() && validVehicle()
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if false;
+      }
     }
 
     match /providerDirectory/{providerId} {
@@ -38,11 +64,38 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'displayName', 'online', 'services', 'serviceRadius', 'latitude',
           'longitude', 'completedJobs', 'averageRating',
-          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt'
-        ]);
+          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt', 'activeRequestId'
+        ])
+        && (resource == null
+          ? !('activeRequestId' in request.resource.data)
+          : (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeRequestId'])
+            || (request.resource.data.activeRequestId is string
+              && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null)
+              && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.providerId == providerId
+              && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.status in ['accepted', 'en_route', 'arrived'])
+            || (request.resource.data.activeRequestId == null
+              && resource.data.activeRequestId is string
+              && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.providerId == providerId
+              && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.status in ['completed', 'cancelled'])));
+      // A driver may atomically reserve the provider only with an approved quote.
+      allow update: if isDriver()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeRequestId'])
+        && ((request.resource.data.activeRequestId is string
+          && request.resource.data.activeRequestId.size() > 0
+          && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null || resource.data.activeRequestId == '')
+          && resource.data.online == true
+          && get(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.status == 'searching'
+          && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.driverId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.providerId == providerId
+          && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.status == 'accepted')
+          || (request.resource.data.activeRequestId == null
+            && resource.data.activeRequestId is string
+            && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.driverId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.status == 'cancelled'));
       allow delete: if signedIn()
         && isProvider()
-        && request.auth.uid == providerId;
+        && request.auth.uid == providerId
+        && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null);
     }
 
     match /requests/{requestId} {
@@ -51,6 +104,14 @@ service cloud.firestore {
         && request.resource.data.driverId == request.auth.uid
         && request.resource.data.providerId == null
         && request.resource.data.status == 'searching'
+        && (!('workflowVersion' in request.resource.data) || request.resource.data.workflowVersion == 2)
+        && (!('vehicleId' in request.resource.data)
+          || (request.resource.data.vehicleId is string
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId))))
+        && (!('vehicleSnapshot' in request.resource.data)
+          || (request.resource.data.vehicleSnapshot is map
+            && request.resource.data.vehicleSnapshot.keys().hasOnly(['make','model','year','vehicleType','registration','fuelType','transmission','modelYear'])))
+        && (!('partsPreference' in request.resource.data) || request.resource.data.partsPreference in ['discuss','budget','branded','genuine'])
         && request.resource.data.issue in [
           'Vehicle Towing', 'Battery Jumpstart', 'Flat Tyre',
           'General Mechanic'
@@ -96,6 +157,8 @@ service cloud.firestore {
         && request.resource.data.estimatedCost is int
         && request.resource.data.estimatedCost ==
           request.resource.data.serviceFee + request.resource.data.dispatchFee
+        && (!('workflowVersion' in request.resource.data)
+          || request.resource.data.estimatedCost == 0)
         && request.resource.data.preferredProviderId is string
         && request.resource.data.rejectedBy is list
         && request.resource.data.rejectedBy.size() == 0
@@ -103,6 +166,7 @@ service cloud.firestore {
           'driverId', 'driverName', 'driverPhone', 'providerId',
           'preferredProviderId', 'preferredProviderName', 'rejectedBy',
           'status', 'issue', 'issues', 'vehicleType', 'modelYear', 'registration',
+          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'partsPreference',
           'description', 'notes', 'priority', 'vehiclePhotoUrls',
           'photoAnnotations', 'locationLabel', 'landmark',
           'locationAccuracyMeters', 'latitude', 'longitude', 'serviceFee', 'dispatchFee',
@@ -116,6 +180,70 @@ service cloud.firestore {
       );
 
       allow update: if signedIn() && (
+        (resource.data.status == 'completed'
+          && resource.data.driverId == request.auth.uid
+          && (!('driverReportedPayment' in resource.data) || resource.data.driverReportedPayment != true)
+          && request.resource.data.driverReportedPayment == true
+          && request.resource.data.paymentMethod in ['cash','external']
+          && request.resource.data.paymentReportedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['driverReportedPayment','paymentMethod','paymentReportedAt']))
+        || (resource.data.status == 'completed' && resource.data.providerId == request.auth.uid
+          && resource.data.driverReportedPayment == true
+          && (!('providerConfirmedPayment' in resource.data) || resource.data.providerConfirmedPayment != true)
+          && request.resource.data.providerConfirmedPayment == true
+          && request.resource.data.paymentConfirmedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['providerConfirmedPayment','paymentConfirmedAt']))
+        ||
+        (resource.data.driverId == request.auth.uid
+          && resource.data.status == 'searching'
+          && resource.data.workflowVersion == 2
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.providerId == request.resource.data.selectedQuoteId
+          && (resource.data.preferredProviderId == '' || resource.data.preferredProviderId == request.resource.data.providerId)
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.providerId == request.resource.data.providerId
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.providerName == request.resource.data.providerName
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.providerPhone == request.resource.data.providerPhone
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.notes == request.resource.data.quoteNotes
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.providerDistanceKm == request.resource.data.providerDistanceKm
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.total == request.resource.data.estimatedCost
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.serviceFee == request.resource.data.serviceFee
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.travelFee == request.resource.data.dispatchFee
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.extraFee == request.resource.data.extraFee
+          && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.quoteType == request.resource.data.approvedQuoteType
+          && getAfter(/databases/$(database)/documents/providerDirectory/$(request.resource.data.providerId)).data.activeRequestId == requestId
+          && request.resource.data.quoteApprovedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'providerId', 'providerName', 'providerPhone', 'status', 'selectedQuoteId', 'serviceFee',
+            'dispatchFee', 'extraFee', 'estimatedCost', 'quoteNotes', 'providerDistanceKm',
+            'quoteApprovedAt', 'acceptedAt', 'updatedAt', 'approvedQuoteType'
+          ]))
+        || (resource.data.providerId == request.auth.uid
+          && resource.data.workflowVersion == 2 && resource.data.status == 'arrived'
+          && request.resource.data.pendingRepairId is string
+          && getAfter(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(request.resource.data.pendingRepairId)).data.providerId == request.auth.uid
+          && getAfter(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(request.resource.data.pendingRepairId)).data.createdAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingRepairId', 'updatedAt']))
+        || (resource.data.driverId == request.auth.uid
+          && resource.data.workflowVersion == 2 && resource.data.status == 'arrived'
+          && resource.data.pendingRepairId is string
+          && request.resource.data.pendingRepairId == null
+          && request.resource.data.lastRepairDecisionId == resource.data.pendingRepairId
+          && request.resource.data.repairDecisionAt == request.time
+          && ((request.resource.data.lastRepairDecision == 'rejected'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'pendingRepairId', 'lastRepairDecisionId', 'lastRepairDecision', 'repairDecisionAt', 'updatedAt']))
+            || (request.resource.data.lastRepairDecision == 'approved'
+              && request.resource.data.approvedRepairId == resource.data.pendingRepairId
+              && get(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(resource.data.pendingRepairId)).data.previousTotal == resource.data.estimatedCost
+              && get(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(resource.data.pendingRepairId)).data.total == request.resource.data.estimatedCost
+              && get(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(resource.data.pendingRepairId)).data.serviceFee == request.resource.data.serviceFee
+              && get(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(resource.data.pendingRepairId)).data.travelFee == request.resource.data.dispatchFee
+              && get(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(resource.data.pendingRepairId)).data.extraFee == request.resource.data.extraFee
+              && get(/databases/$(database)/documents/requests/$(requestId)/repairQuotes/$(resource.data.pendingRepairId)).data.diagnosisAndWork == request.resource.data.providerDiagnosis
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'pendingRepairId', 'lastRepairDecisionId', 'lastRepairDecision', 'repairDecisionAt', 'updatedAt',
+                'approvedRepairId', 'estimatedCost', 'serviceFee', 'dispatchFee', 'extraFee', 'providerDiagnosis']))))
+        ||
         // A driver may only cancel their own active request.
         (resource.data.driverId == request.auth.uid
           && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
@@ -170,6 +298,7 @@ service cloud.firestore {
           ]))
         // Only one transaction can move a still-searching request to accepted.
         || (isProvider()
+          && (!('workflowVersion' in resource.data) || resource.data.workflowVersion != 2)
           && resource.data.status == 'searching'
           && resource.data.providerId == null
           && (!('preferredProviderId' in resource.data)
@@ -228,7 +357,11 @@ service cloud.firestore {
           ])
           && (request.resource.data.status != 'completed'
             || (request.resource.data.finalCost is int
-              && request.resource.data.finalCost >= 0)))
+              && request.resource.data.finalCost >= 0
+              && (!('workflowVersion' in resource.data) || resource.data.workflowVersion != 2
+                || (request.resource.data.finalCost <= resource.data.estimatedCost
+                  && (!('pendingRepairId' in resource.data) || resource.data.pendingRepairId == null)
+                  && (resource.data.approvedQuoteType != 'inspection' || resource.data.approvedRepairId is string))))))
         // Assigned provider live update their live coordinates.
         || (resource.data.providerId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -253,6 +386,64 @@ service cloud.firestore {
           ]))
       );
       allow delete: if false;
+
+      match /quotes/{providerId} {
+        function parent() {
+          return get(/databases/$(database)/documents/requests/$(requestId)).data;
+        }
+        allow read: if signedIn() && (parent().driverId == request.auth.uid || request.auth.uid == providerId);
+        allow create, update: if isProvider() && providerId == request.auth.uid
+          && parent().status == 'searching' && parent().workflowVersion == 2
+          && (parent().preferredProviderId == '' || parent().preferredProviderId == providerId)
+          && !parent().rejectedBy.hasAny([providerId])
+          && request.resource.data.keys().hasOnly(['providerId', 'providerName', 'providerPhone',
+            'serviceFee', 'travelFee', 'extraFee', 'total', 'notes', 'providerDistanceKm', 'createdAt', 'quoteType'])
+          && request.resource.data.quoteType in ['direct', 'inspection']
+          && request.resource.data.providerId == providerId
+          && request.resource.data.providerName is string
+          && request.resource.data.providerPhone is string
+          && request.resource.data.serviceFee is int && request.resource.data.serviceFee >= 0
+          && request.resource.data.travelFee is int && request.resource.data.travelFee >= 0
+          && request.resource.data.extraFee is int && request.resource.data.extraFee >= 0
+          && request.resource.data.total == request.resource.data.serviceFee + request.resource.data.travelFee + request.resource.data.extraFee
+          && request.resource.data.total <= 10000000
+          && request.resource.data.notes is string && request.resource.data.notes.size() <= 200
+          && request.resource.data.providerDistanceKm is number && request.resource.data.providerDistanceKm >= 0
+          && request.resource.data.createdAt == request.time;
+        allow delete: if false;
+      }
+      match /repairQuotes/{revisionId} {
+        function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
+        allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
+        allow create: if isProvider() && job().providerId == request.auth.uid
+          && job().workflowVersion == 2 && job().status == 'arrived'
+          && request.resource.data.keys().hasOnly(['providerId', 'previousTotal', 'serviceFee', 'travelFee', 'extraFee', 'total', 'diagnosisAndWork', 'createdAt'])
+          && request.resource.data.providerId == request.auth.uid
+          && request.resource.data.previousTotal == job().estimatedCost
+          && request.resource.data.serviceFee is int && request.resource.data.serviceFee >= 0
+          && request.resource.data.travelFee is int && request.resource.data.travelFee >= 0
+          && request.resource.data.extraFee is int && request.resource.data.extraFee >= 0
+          && request.resource.data.total == request.resource.data.serviceFee + request.resource.data.travelFee + request.resource.data.extraFee
+          && request.resource.data.total <= 10000000
+          && request.resource.data.diagnosisAndWork is string
+          && request.resource.data.diagnosisAndWork.size() > 0 && request.resource.data.diagnosisAndWork.size() <= 200
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/requests/$(requestId)).data.pendingRepairId == revisionId;
+        allow update, delete: if false;
+      }
+      match /repairDecisions/{revisionId} {
+        function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
+        allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
+        allow create: if signedIn() && job().driverId == request.auth.uid
+          && job().pendingRepairId == revisionId
+          && request.resource.data.keys().hasOnly(['driverId','decision','createdAt'])
+          && request.resource.data.driverId == request.auth.uid
+          && request.resource.data.decision in ['approved','rejected']
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/requests/$(requestId)).data.lastRepairDecisionId == revisionId
+          && getAfter(/databases/$(database)/documents/requests/$(requestId)).data.lastRepairDecision == request.resource.data.decision;
+        allow update,delete: if false;
+      }
 
       match /messages/{messageId} {
         function parentRequest() {

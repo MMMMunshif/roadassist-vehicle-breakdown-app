@@ -45,8 +45,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final readyToSubmit =
         widget.draft.modelYear.isNotEmpty &&
         widget.draft.registration.isNotEmpty &&
-        !widget.draft.location.startsWith('Select current GPS') &&
-        widget.draft.preferredProviderId.isNotEmpty;
+        !widget.draft.location.startsWith('Select current GPS');
     if (!readyToSubmit) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -214,7 +213,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               children: [
                 const StepEyebrow(step: 4, of: 4),
                 const SizedBox(height: RaSpace.lg),
-                const Text('ASSIGNED PROVIDER', style: RaText.eyebrow),
+                const Text('SEARCH PREFERENCE', style: RaText.eyebrow),
                 const SizedBox(height: RaSpace.sm),
                 Card(
                   color: Colors.white,
@@ -388,16 +387,16 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       children: [
                         SummaryRow(
                           'Initial Service Estimate',
-                          formatPrice(widget.draft.serviceFee),
+                          'Provider quote required',
                         ),
                         SummaryRow(
                           'Initial Dispatch Estimate',
-                          formatPrice(widget.draft.dispatchFee),
+                          'Included in provider offer',
                         ),
                         const Divider(),
                         SummaryRow(
                           'Estimated Total',
-                          formatPrice(widget.draft.estimatedCost),
+                          'Not agreed yet',
                           strong: true,
                         ),
                         const SizedBox(height: RaSpace.sm),
@@ -418,7 +417,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                               SizedBox(width: RaSpace.sm),
                               Expanded(
                                 child: Text(
-                                  'This is a system estimate. The provider reviews the issue and distance, then submits an itemised quote before accepting.',
+                                  'Providers review your vehicle and symptoms before quoting. Compare offers and approve one before a provider is assigned.',
                                   style: TextStyle(
                                     color: raSuccess,
                                     fontSize: 11.5,
@@ -437,7 +436,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 const InlineMessage(
                   icon: Icons.verified_user_outlined,
                   text:
-                      'Secure chat and calling become available after a provider accepts with a quote. Service, travel and extra charges will be shown separately.',
+                      'Secure chat and calling become available after you select an offer. Service, travel and other stated charges are shown separately.',
                 ),
               ],
             ),

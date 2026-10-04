@@ -24,6 +24,8 @@ RequestDraft requestDraftFromData(Map<String, dynamic> data) {
       .whereType<String>()
       .toList();
   return RequestDraft(
+    vehicleId: data['vehicleId'] as String?,
+    vehicleSnapshot: (data['vehicleSnapshot'] as Map?)?.cast<String, dynamic>(),
     issues: savedIssues.isNotEmpty
         ? savedIssues
         : [data['issue'] as String? ?? 'Roadside assistance'],
@@ -33,6 +35,7 @@ RequestDraft requestDraftFromData(Map<String, dynamic> data) {
     description: data['description'] as String? ?? '',
     notes: data['notes'] as String? ?? '',
     priority: data['priority'] as String? ?? 'normal',
+    partsPreference: data['partsPreference'] as String? ?? 'discuss',
     location: data['locationLabel'] as String? ?? 'Pinned location',
     landmark: data['landmark'] as String? ?? '',
     locationAccuracyMeters: (data['locationAccuracyMeters'] as num?)

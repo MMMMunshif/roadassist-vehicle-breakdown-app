@@ -32,15 +32,16 @@ RequestDraft sampleDraft() => RequestDraft(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('multiple issues produce an itemised combined estimate', () {
-    final draft = sampleDraft();
+  test(
+    'multiple issues preserve the driver report without inventing prices',
+    () {
+      final draft = sampleDraft();
 
-    expect(draft.serviceFee, 2900);
-    expect(draft.dispatchFee, 400);
-    expect(draft.estimatedCost, 3300);
-    expect(draft.primaryIssue, 'Flat Tyre');
-    expect(draft.issue, 'Flat Tyre + Battery Jumpstart');
-  });
+      expect(draft.toJson().containsKey('estimatedCost'), isFalse);
+      expect(draft.primaryIssue, 'Flat Tyre');
+      expect(draft.issue, 'Flat Tyre + Battery Jumpstart');
+    },
+  );
 
   test('draft JSON preserves workflow and photo annotation data', () {
     final restored = RequestDraft.fromJson(sampleDraft().toJson());

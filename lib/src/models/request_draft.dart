@@ -1,20 +1,3 @@
-int serviceFeeForIssue(String issue) => switch (issue) {
-  'Vehicle Towing' => 3500,
-  'General Mechanic' => 2200,
-  'Flat Tyre' => 1500,
-  'Battery Jumpstart' => 1400,
-  _ => 1800,
-};
-
-int dispatchFeeForIssue(String issue) => switch (issue) {
-  'Vehicle Towing' => 750,
-  'General Mechanic' => 500,
-  _ => 400,
-};
-
-int estimatedCostForIssue(String issue) =>
-    serviceFeeForIssue(issue) + dispatchFeeForIssue(issue);
-
 class BreakdownPhotoAnnotation {
   const BreakdownPhotoAnnotation({
     required this.photoIndex,
@@ -51,6 +34,9 @@ class RequestDraft {
     required this.modelYear,
     required this.registration,
     required this.description,
+    this.vehicleId,
+    this.vehicleSnapshot,
+    this.partsPreference = 'discuss',
     this.notes = '',
     this.priority = 'normal',
     this.location = 'Select current GPS or enter location manually',
@@ -65,6 +51,9 @@ class RequestDraft {
   }) : assert(issues.length > 0);
 
   final List<String> issues;
+  final String? vehicleId;
+  final Map<String, dynamic>? vehicleSnapshot;
+  final String partsPreference;
   final String vehicleType;
   final String modelYear;
   final String registration;
@@ -84,18 +73,10 @@ class RequestDraft {
   String get primaryIssue => issues.first;
   String get issue => issues.join(' + ');
 
-  int get serviceFee => issues.toSet().fold(
-    0,
-    (total, currentIssue) => total + serviceFeeForIssue(currentIssue),
-  );
-
-  int get dispatchFee => issues
-      .map(dispatchFeeForIssue)
-      .fold(0, (highest, fee) => fee > highest ? fee : highest);
-
-  int get estimatedCost => serviceFee + dispatchFee;
-
   RequestDraft copyWith({
+    String? vehicleId,
+    Map<String, dynamic>? vehicleSnapshot,
+    String? partsPreference,
     List<String>? issues,
     String? vehicleType,
     String? modelYear,
@@ -114,6 +95,9 @@ class RequestDraft {
     List<String>? vehiclePhotoUrls,
     List<BreakdownPhotoAnnotation>? photoAnnotations,
   }) => RequestDraft(
+    vehicleId: vehicleId ?? this.vehicleId,
+    vehicleSnapshot: vehicleSnapshot ?? this.vehicleSnapshot,
+    partsPreference: partsPreference ?? this.partsPreference,
     issues: issues ?? this.issues,
     vehicleType: vehicleType ?? this.vehicleType,
     modelYear: modelYear ?? this.modelYear,
@@ -135,6 +119,9 @@ class RequestDraft {
   );
 
   Map<String, dynamic> toJson() => {
+    if (vehicleId != null) 'vehicleId': vehicleId,
+    if (vehicleSnapshot != null) 'vehicleSnapshot': vehicleSnapshot,
+    'partsPreference': partsPreference,
     'issues': issues,
     'vehicleType': vehicleType,
     'modelYear': modelYear,
@@ -160,6 +147,10 @@ class RequestDraft {
         .toList();
     final legacyIssue = json['issue'] as String?;
     return RequestDraft(
+      vehicleId: json['vehicleId'] as String?,
+      partsPreference: json['partsPreference'] as String? ?? 'discuss',
+      vehicleSnapshot: (json['vehicleSnapshot'] as Map?)
+          ?.cast<String, dynamic>(),
       issues: savedIssues.isNotEmpty
           ? savedIssues
           : [
