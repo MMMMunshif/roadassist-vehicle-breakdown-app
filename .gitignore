@@ -54,3 +54,6 @@ app.*.map.json
 .task-appdata/
 hs_err_pid*
 replay_pid*
+node_modules/
+firestore-debug.log
+firebase-debug.log

@@ -230,13 +230,20 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
               data['modelYear'] as String? ?? 'Vehicle details unavailable',
             ),
             SummaryRow('Issue', requestIssueLabel(data)),
+            if (data['vehicleSnapshot'] is Map)
+              SummaryRow(
+                'Fuel / transmission',
+                '${(data['vehicleSnapshot'] as Map)['fuelType'] ?? 'Not provided'} / ${(data['vehicleSnapshot'] as Map)['transmission'] ?? 'Not provided'}',
+              ),
             SummaryRow(
               'Location',
               data['locationLabel'] as String? ?? 'Pinned location',
             ),
             SummaryRow(
-              'Initial System Estimate',
-              'Rs. ${data['estimatedCost'] ?? 2850}',
+              'Pricing',
+              data['workflowVersion'] == 2
+                  ? 'Driver approval required'
+                  : 'Rs. ${data['estimatedCost'] ?? 0}',
               strong: true,
             ),
             const SizedBox(height: RaSpace.sm),
@@ -275,7 +282,19 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                             providerDistanceKm:
                                 quote['providerDistanceKm'] as double,
                             quoteNotes: quote['quoteNotes'] as String,
+                            quoteType: quote['quoteType'] as String,
                           );
+                          if (data['workflowVersion'] == 2) {
+                            if (mounted)
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Offer sent. The driver will choose a provider.',
+                                  ),
+                                ),
+                              );
+                            return;
+                          }
                           data = Map<String, dynamic>.from(data)
                             ..addAll(quote)
                             ..['dispatchFee'] = quote['travelFee']

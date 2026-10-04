@@ -425,7 +425,11 @@ class _RequestValidationChecklist extends StatelessWidget {
         !draft.location.startsWith('Select current GPS'),
         true,
       ),
-      ('Provider selected', draft.preferredProviderId.isNotEmpty, true),
+      (
+        'Preferred provider (optional)',
+        draft.preferredProviderId.isNotEmpty,
+        false,
+      ),
       ('Photo evidence added', draft.vehiclePhotoUrls.isNotEmpty, false),
     ];
     return Card(

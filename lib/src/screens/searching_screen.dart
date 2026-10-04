@@ -410,6 +410,8 @@ class _SearchingScreenState extends State<SearchingScreen>
                 RaSpace.lg,
               ),
               children: [
+                if (widget.requestId != null)
+                  QuoteOffers(requestId: widget.requestId!),
                 Align(
                   alignment: Alignment.centerRight,
                   child: StatusPill(
