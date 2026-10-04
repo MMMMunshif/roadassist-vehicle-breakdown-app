@@ -10,6 +10,16 @@ class ProviderCompletedScreen extends StatelessWidget {
   final Map<String, dynamic> requestData;
   @override
   Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Completed'),
+      actions: [
+        IconButton(
+          tooltip: 'Invoice',
+          icon: const Icon(Icons.receipt_long),
+          onPressed: () => push(context, InvoiceScreen(requestId: requestId)),
+        ),
+      ],
+    ),
     body: SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(RaSpace.xxl),

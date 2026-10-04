@@ -127,8 +127,21 @@ class ProviderNotificationsScreen extends StatelessWidget {
                                       providerDistanceKm:
                                           quote['providerDistanceKm'] as double,
                                       quoteNotes: quote['quoteNotes'] as String,
+                                      quoteType: quote['quoteType'] as String,
                                     );
                                     if (!context.mounted) return;
+                                    if (data['workflowVersion'] == 2) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Offer sent. Waiting for driver selection.',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
                                     final acceptedData =
                                         Map<String, dynamic>.from(data)
                                           ..addAll(quote)

@@ -9,58 +9,8 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
   final String requestId;
   final Map<String, dynamic> data;
 
-  void showReceipt(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.receipt_long_outlined, color: raBlue),
-        title: Text('Receipt $requestId'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SummaryRow(
-              'Service',
-              data['issue'] as String? ?? 'Roadside assistance',
-            ),
-            SummaryRow(
-              'Provider',
-              data['providerName'] as String? ?? 'Service Provider',
-            ),
-            SummaryRow(
-              'Vehicle',
-              data['registration'] as String? ?? 'Not provided',
-            ),
-            const Divider(),
-            SummaryRow('Service charge', 'Rs. ${data['serviceFee'] ?? 0}'),
-            SummaryRow(
-              'Travel / distance charge',
-              'Rs. ${data['dispatchFee'] ?? 0}',
-            ),
-            SummaryRow('Extra charge', 'Rs. ${data['extraFee'] ?? 0}'),
-            if ((data['providerDistanceKm'] as num?) != null)
-              SummaryRow(
-                'Provider distance',
-                '${(data['providerDistanceKm'] as num).toStringAsFixed(1)} km',
-              ),
-            if ((data['quoteNotes'] as String? ?? '').isNotEmpty)
-              SummaryRow('Quote notes', data['quoteNotes'] as String),
-            const Divider(),
-            SummaryRow(
-              'Total',
-              'Rs. ${data['finalCost'] ?? data['estimatedCost'] ?? 0}',
-              strong: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  void showReceipt(BuildContext context) =>
+      push(context, InvoiceScreen(requestId: requestId));
 
   Future<void> rateService(BuildContext context) async {
     var selectedRating = (data['driverRating'] as num?)?.toInt() ?? 0;

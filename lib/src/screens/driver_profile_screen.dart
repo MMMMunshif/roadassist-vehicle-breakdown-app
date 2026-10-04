@@ -423,6 +423,19 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               ),
               const Divider(height: 1, indent: 58),
               ListTile(
+                leading: const IconBadge(
+                  Icons.directions_car_outlined,
+                  size: 36,
+                ),
+                title: const Text('My Vehicles', style: RaText.title),
+                subtitle: const Text(
+                  'Save, edit and choose your default vehicle',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => push(context, const VehiclesScreen()),
+              ),
+              const Divider(height: 1, indent: 58),
+              ListTile(
                 leading: const IconBadge(Icons.palette_outlined, size: 36),
                 title: const Text('Appearance', style: RaText.title),
                 subtitle: const Text('Light, dark or system theme'),

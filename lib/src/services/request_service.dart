@@ -63,14 +63,19 @@ class RequestService {
         'preferredProviderName': draft.provider,
         'rejectedBy': <String>[],
         'status': 'searching',
+        'workflowVersion': 2,
         'issue': draft.primaryIssue,
         'issues': draft.issues,
         'vehicleType': draft.vehicleType,
+        if (draft.vehicleId != null) 'vehicleId': draft.vehicleId,
+        if (draft.vehicleSnapshot != null)
+          'vehicleSnapshot': draft.vehicleSnapshot,
         'modelYear': draft.modelYear,
         'registration': draft.registration,
         'description': draft.description,
         'notes': draft.notes,
         'priority': draft.priority,
+        'partsPreference': draft.partsPreference,
         'vehiclePhotoUrls': draft.vehiclePhotoUrls,
         'photoAnnotations': draft.photoAnnotations
             .map((annotation) => annotation.toJson())
@@ -80,9 +85,9 @@ class RequestService {
         'locationAccuracyMeters': draft.locationAccuracyMeters,
         'latitude': draft.latitude,
         'longitude': draft.longitude,
-        'serviceFee': draft.serviceFee,
-        'dispatchFee': draft.dispatchFee,
-        'estimatedCost': draft.estimatedCost,
+        'serviceFee': 0,
+        'dispatchFee': 0,
+        'estimatedCost': 0,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -148,11 +153,30 @@ class RequestService {
     required int extraFee,
     required double providerDistanceKm,
     required String quoteNotes,
+    String quoteType = 'direct',
   }) async {
     if (serviceFee < 0 || travelFee < 0 || extraFee < 0) {
       throw ArgumentError('Quote amounts must not be negative.');
     }
     final quotedTotal = serviceFee + travelFee + extraFee;
+    final current = await _requests.doc(id).get();
+    if (current.data()?['workflowVersion'] == 2) {
+      final profile = await _firestore.collection('users').doc(_userId).get();
+      await _requests.doc(id).collection('quotes').doc(_userId).set({
+        'providerId': _userId,
+        'quoteType': quoteType,
+        'providerName': profile.data()?['displayName'] ?? 'Service Provider',
+        'providerPhone': profile.data()?['phone'] ?? '',
+        'serviceFee': serviceFee,
+        'travelFee': travelFee,
+        'extraFee': extraFee,
+        'total': quotedTotal,
+        'notes': quoteNotes.trim(),
+        'providerDistanceKm': providerDistanceKm,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      return;
+    }
     final assignedRequests = await _requests
         .where('providerId', isEqualTo: _userId)
         .get();
@@ -173,6 +197,13 @@ class RequestService {
       final profile = await transaction.get(profileReference);
       if (!request.exists || request.data()?['status'] != 'searching') {
         throw StateError('This request is no longer available.');
+      }
+      final directoryReference = _firestore
+          .collection('providerDirectory')
+          .doc(_userId);
+      final directory = await transaction.get(directoryReference);
+      if ((directory.data()?['activeRequestId'] as String? ?? '').isNotEmpty) {
+        throw StateError('Complete your active job before accepting another.');
       }
       final preferredProviderId =
           request.data()?['preferredProviderId'] as String? ?? '';
@@ -216,6 +247,130 @@ class RequestService {
         'activeRequestId': id,
         'activeJobStartedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (directory.exists)
+        transaction.update(directoryReference, {'activeRequestId': id});
+    });
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchQuotes(String id) =>
+      _requests.doc(id).collection('quotes').snapshots();
+
+  Future<void> selectQuote(String id, String quoteId) async {
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(id);
+      final request = await tx.get(ref);
+      final quote = await tx.get(ref.collection('quotes').doc(quoteId));
+      final data = request.data();
+      if (data?['driverId'] != _userId ||
+          data?['status'] != 'searching' ||
+          !quote.exists) {
+        throw StateError('This request or offer is no longer available.');
+      }
+      final offer = quote.data()!;
+      final providerRef = _firestore
+          .collection('providerDirectory')
+          .doc(quoteId);
+      final provider = await tx.get(providerRef);
+      if (!provider.exists ||
+          provider.data()?['online'] != true ||
+          (provider.data()?['activeRequestId'] as String? ?? '').isNotEmpty) {
+        throw StateError('This provider is unavailable. Choose another offer.');
+      }
+      tx.update(ref, {
+        'providerId': quoteId,
+        'providerName': offer['providerName'],
+        'providerPhone': offer['providerPhone'],
+        'status': 'accepted',
+        'selectedQuoteId': quoteId,
+        'approvedQuoteType': offer['quoteType'] ?? 'direct',
+        'serviceFee': offer['serviceFee'],
+        'dispatchFee': offer['travelFee'],
+        'extraFee': offer['extraFee'],
+        'estimatedCost': offer['total'],
+        'quoteNotes': offer['notes'],
+        'providerDistanceKm': offer['providerDistanceKm'],
+        'quoteApprovedAt': FieldValue.serverTimestamp(),
+        'acceptedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(providerRef, {'activeRequestId': id});
+    });
+  }
+
+  Future<void> proposeRepair(String id, Map<String, dynamic> quote) async {
+    final ref = _requests.doc(id);
+    final revision = ref.collection('repairQuotes').doc();
+    final service = quote['serviceFee'] as int;
+    final travel = quote['travelFee'] as int;
+    final extra = quote['extraFee'] as int;
+    if (service < 0 ||
+        travel < 0 ||
+        extra < 0 ||
+        (quote['quoteNotes'] as String).trim().isEmpty) {
+      throw ArgumentError(
+        'Enter non-negative fees and explain the diagnosis and work.',
+      );
+    }
+    await _firestore.runTransaction((tx) async {
+      final request = await tx.get(ref);
+      final data = request.data();
+      if (data?['providerId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['workflowVersion'] != 2) {
+        throw StateError('Arrive before submitting a repair quote.');
+      }
+      tx.set(revision, {
+        'providerId': _userId,
+        'previousTotal': data!['estimatedCost'],
+        'serviceFee': service,
+        'travelFee': travel,
+        'extraFee': extra,
+        'total': service + travel + extra,
+        'diagnosisAndWork': quote['quoteNotes'],
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(ref, {
+        'pendingRepairId': revision.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> decideRepair(String id, String revisionId, bool approve) async {
+    final ref = _requests.doc(id);
+    await _firestore.runTransaction((tx) async {
+      final request = await tx.get(ref);
+      final revision = await tx.get(
+        ref.collection('repairQuotes').doc(revisionId),
+      );
+      final data = request.data();
+      if (data?['driverId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['pendingRepairId'] != revisionId ||
+          !revision.exists) {
+        throw StateError('This repair quote is no longer available.');
+      }
+      final quote = revision.data()!;
+      tx.set(ref.collection('repairDecisions').doc(revisionId), {
+        'driverId': _userId,
+        'decision': approve ? 'approved' : 'rejected',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(ref, {
+        'pendingRepairId': null,
+        'lastRepairDecisionId': revisionId,
+        'lastRepairDecision': approve ? 'approved' : 'rejected',
+        'repairDecisionAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (approve) ...{
+          'approvedRepairId': revisionId,
+          'estimatedCost': quote['total'],
+          'serviceFee': quote['serviceFee'],
+          'dispatchFee': quote['travelFee'],
+          'extraFee': quote['extraFee'],
+          'providerDiagnosis': quote['diagnosisAndWork'],
+        },
       });
     });
   }
@@ -308,12 +463,33 @@ class RequestService {
       if (data?['status'] != 'arrived') {
         throw StateError('The provider must arrive before completing the job.');
       }
+      final directoryReference = _firestore
+          .collection('providerDirectory')
+          .doc(_userId);
+      final directory = await transaction.get(directoryReference);
+      if (data?['workflowVersion'] == 2 &&
+          (data?['pendingRepairId'] != null ||
+              (data?['approvedQuoteType'] == 'inspection' &&
+                  data?['approvedRepairId'] == null))) {
+        throw StateError(
+          'The driver must approve the repair before completion.',
+        );
+      }
+      if (data?['workflowVersion'] == 2 &&
+          finalCost > (data?['estimatedCost'] as num).toInt()) {
+        throw StateError(
+          'The final charge cannot exceed the driver-approved offer.',
+        );
+      }
       transaction.update(reference, {
         'status': 'completed',
         'finalCost': finalCost,
         'completedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      if (directory.data()?['activeRequestId'] == id) {
+        transaction.update(directoryReference, {'activeRequestId': null});
+      }
       if (profile.data()?['activeRequestId'] == id) {
         transaction.update(profileReference, {
           'activeRequestId': FieldValue.delete(),
@@ -338,16 +514,56 @@ class RequestService {
       if (status == 'completed' || status == 'cancelled') {
         throw StateError('This request can no longer be cancelled.');
       }
+      final providerId = data?['providerId'] as String?;
+      final directoryReference = providerId == null
+          ? null
+          : _firestore.collection('providerDirectory').doc(providerId);
+      final directory = directoryReference == null
+          ? null
+          : await transaction.get(directoryReference);
       transaction.update(reference, {
         'status': 'cancelled',
         'cancelledAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      if (directoryReference != null &&
+          directory?.data()?['activeRequestId'] == id) {
+        transaction.update(directoryReference, {'activeRequestId': null});
+      }
       if (profile.data()?['activeRequestId'] == id) {
         transaction.update(profileReference, {
           'activeRequestId': FieldValue.delete(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
+      }
+    });
+  }
+
+  Future<void> recordPayment(String id, String method) async {
+    if (!const ['cash', 'external'].contains(method))
+      throw ArgumentError('Unsupported payment method.');
+    final ref = _requests.doc(id);
+    await _firestore.runTransaction((tx) async {
+      final snapshot = await tx.get(ref);
+      final data = snapshot.data();
+      if (data?['status'] != 'completed')
+        throw StateError('Complete service before recording payment.');
+      if (data?['driverId'] == _userId &&
+          data?['driverReportedPayment'] != true) {
+        tx.update(ref, {
+          'driverReportedPayment': true,
+          'paymentMethod': method,
+          'paymentReportedAt': FieldValue.serverTimestamp(),
+        });
+      } else if (data?['providerId'] == _userId &&
+          data?['driverReportedPayment'] == true &&
+          data?['paymentMethod'] == method) {
+        tx.update(ref, {
+          'providerConfirmedPayment': true,
+          'paymentConfirmedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        throw StateError('This payment cannot be changed.');
       }
     });
   }

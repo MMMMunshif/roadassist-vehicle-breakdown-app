@@ -21,6 +21,7 @@ double? _providerDistanceKm(Map<String, dynamic> data, RequestDraft draft) {
 }
 
 bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
+  if ((data['activeRequestId'] as String? ?? '').isNotEmpty) return false;
   final services = (data['services'] as List<dynamic>? ?? const [])
       .whereType<String>()
       .toList();
@@ -144,61 +145,77 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                             'A provider must be online, support this service and be within range.',
                       );
                     }
-                    if (!providers.any(
-                      (provider) => provider.id == selectedId,
-                    )) {
-                      scheduleProviderSelection(
-                        providers.first.id,
-                        providers.first.data()['displayName'] as String? ??
-                            'Service Provider',
-                      );
+                    if (selectedId != null &&
+                        !providers.any(
+                          (provider) => provider.id == selectedId,
+                        )) {
+                      scheduleProviderSelection(null, null);
                     }
                     return Column(
-                      children: providers.map((provider) {
-                        final data = provider.data();
-                        final name =
-                            data['displayName'] as String? ??
-                            'Service Provider';
-                        final distanceKm = _providerDistanceKm(
-                          data,
-                          widget.draft,
-                        );
-                        final rating =
-                            (data['averageRating'] as num?)?.toDouble() ?? 0;
-                        final completedJobs =
-                            (data['completedJobs'] as num?)?.toInt() ?? 0;
-                        final responseMinutes =
-                            (data['averageResponseMinutes'] as num?)
-                                ?.toDouble() ??
-                            0;
-                        final services =
-                            (data['services'] as List<dynamic>? ?? const [])
-                                .whereType<String>()
-                                .toList();
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: RaSpace.sm),
-                          child: ProviderTile(
-                            name: name,
-                            company: 'RoadAssist Service Provider',
-                            distance: distanceKm == null
-                                ? 'Location pending'
-                                : '${distanceKm.toStringAsFixed(1)} km away',
-                            eta: responseMinutes > 0
-                                ? '${responseMinutes.ceil()} min response'
-                                : 'response pending',
-                            rating: rating > 0
-                                ? rating.toStringAsFixed(1)
-                                : 'New',
-                            completedJobs: completedJobs,
-                            services: services,
-                            selected: selectedId == provider.id,
-                            onTap: () => setState(() {
-                              selectedId = provider.id;
-                              selectedName = name;
-                            }),
+                      children: [
+                        ListTile(
+                          title: const Text(
+                            'Receive offers from all suitable providers',
                           ),
-                        );
-                      }).toList(),
+                          subtitle: const Text(
+                            'Compare prices before choosing',
+                          ),
+                          trailing: Icon(
+                            selectedId == null
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_off,
+                          ),
+                          onTap: () => setState(() {
+                            selectedId = null;
+                            selectedName = null;
+                          }),
+                        ),
+                        ...providers.map((provider) {
+                          final data = provider.data();
+                          final name =
+                              data['displayName'] as String? ??
+                              'Service Provider';
+                          final distanceKm = _providerDistanceKm(
+                            data,
+                            widget.draft,
+                          );
+                          final rating =
+                              (data['averageRating'] as num?)?.toDouble() ?? 0;
+                          final completedJobs =
+                              (data['completedJobs'] as num?)?.toInt() ?? 0;
+                          final responseMinutes =
+                              (data['averageResponseMinutes'] as num?)
+                                  ?.toDouble() ??
+                              0;
+                          final services =
+                              (data['services'] as List<dynamic>? ?? const [])
+                                  .whereType<String>()
+                                  .toList();
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: RaSpace.sm),
+                            child: ProviderTile(
+                              name: name,
+                              company: 'RoadAssist Service Provider',
+                              distance: distanceKm == null
+                                  ? 'Location pending'
+                                  : '${distanceKm.toStringAsFixed(1)} km away',
+                              eta: responseMinutes > 0
+                                  ? '${responseMinutes.ceil()} min response'
+                                  : 'response pending',
+                              rating: rating > 0
+                                  ? rating.toStringAsFixed(1)
+                                  : 'New',
+                              completedJobs: completedJobs,
+                              services: services,
+                              selected: selectedId == provider.id,
+                              onTap: () => setState(() {
+                                selectedId = provider.id;
+                                selectedName = name;
+                              }),
+                            ),
+                          );
+                        }),
+                      ],
                     );
                   },
                 ),
@@ -207,7 +224,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
           ),
           BottomAction(
             label: 'Review Request',
-            enabled: selectedId != null,
+            enabled: true,
             onTap: reviewRequest,
           ),
         ],

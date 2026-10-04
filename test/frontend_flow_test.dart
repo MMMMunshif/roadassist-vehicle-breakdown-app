@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:road_assist/src/screens.dart';
 
 Widget testApp(Widget home) => MaterialApp(home: home);
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets('breakdown form blocks incomplete requests', (tester) async {
     await tester.pumpWidget(
       testApp(const BreakdownDetailsScreen(issues: ['Flat Tyre'])),
@@ -55,11 +57,14 @@ void main() {
       'WP CAB 1234',
     );
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Detailed description'),
+      find.widgetWithText(TextFormField, 'Detailed description (Optional)'),
       'Rear tyre is punctured near the kerb.',
     );
     await tester.tap(find.text('Confirm & Next'));
-    await tester.pumpAndSettle();
+    // The destination contains a live map/loading animation; do not wait for
+    // every animation to stop to verify that navigation completed.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Location Confirmation'), findsOneWidget);
     expect(
