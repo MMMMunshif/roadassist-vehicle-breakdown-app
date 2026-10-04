@@ -247,6 +247,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           },
                         ),
                   ),
+                  const _ChatInbox(isProvider: false, buttonOnly: true),
                   StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: signedIn
                         ? RequestService().watchDriverRequests()

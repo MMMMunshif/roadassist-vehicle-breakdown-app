@@ -9,7 +9,6 @@ class ProviderHomeScreen extends StatefulWidget {
 class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     with WidgetsBindingObserver {
   bool online = true;
-  bool wantsToBeOnline = true;
   String serviceRadius = '15 km from current location';
   List<String> providerServices = const [
     'Vehicle Towing',
@@ -70,23 +69,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!signedIn) return;
-    if (state == AppLifecycleState.resumed) {
-      if (wantsToBeOnline) {
-        setState(() => online = true);
-        unawaited(AuthService().setProviderOnline(true));
-        unawaited(_publishProviderLocation());
-      }
-      return;
-    }
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.hidden) {
-      if (online) {
-        setState(() => online = false);
-        unawaited(AuthService().setProviderOnline(false));
-      }
+    // Availability is the provider's choice, independent of window focus.
+    if (state == AppLifecycleState.resumed && signedIn && online) {
+      unawaited(_publishProviderLocation());
     }
   }
 
@@ -157,9 +142,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (signedIn && online) {
-      unawaited(AuthService().setProviderOnline(false));
-    }
     profileSubscription?.cancel();
     openRequestsSubscription?.cancel();
     super.dispose();
@@ -344,6 +326,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     appBar: AppBar(
       title: Text(dashboardTitle),
       actions: [
+        const _ChatInbox(isProvider: true, buttonOnly: true),
         _ProviderRequestBadge(services: providerServices),
         IconButton(
           onPressed: () async {
@@ -436,7 +419,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                         onChanged: (value) async {
                           setState(() {
                             online = value;
-                            wantsToBeOnline = value;
                           });
                           await AuthService().setProviderOnline(value);
                           if (value) unawaited(_publishProviderLocation());

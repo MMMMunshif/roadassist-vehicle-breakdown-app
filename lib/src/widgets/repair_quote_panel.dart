@@ -80,7 +80,22 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Text(
+                          'Reason, proposed work and parts',
+                          style: RaText.label,
+                        ),
                         Text(offer['diagnosisAndWork'] as String),
+                        SummaryRow(
+                          'Previously approved',
+                          'Rs. ${offer['previousTotal']}',
+                        ),
+                        SummaryRow(
+                          (offer['total'] as num) >=
+                                  (offer['previousTotal'] as num)
+                              ? 'Additional amount requested'
+                              : 'Reduction requested',
+                          'Rs. ${((offer['total'] as num) - (offer['previousTotal'] as num)).abs()}',
+                        ),
                         SummaryRow(
                           'Service / labour',
                           'Rs. ${offer['serviceFee']}',
@@ -114,7 +129,7 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                                           'Approve repair and revised total?',
                                         ),
                                         content: Text(
-                                          'Authorize the described work for Rs. ${offer['total']} in total.',
+                                          'Previous total: Rs. ${offer['previousTotal']}. New total: Rs. ${offer['total']}.\n\nWork: ${offer['diagnosisAndWork']}\n\nApprove only if you agree to this work and the new full bill.',
                                         ),
                                         actions: [
                                           TextButton(
@@ -152,6 +167,21 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                                     ),
                                   ),
                             child: const Text('Reject Proposed Work'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () => push(
+                              context,
+                              ChatScreen(
+                                requestId: widget.requestId,
+                                peerName:
+                                    data['providerName'] as String? ??
+                                    'Provider',
+                                peerPhone:
+                                    data['providerPhone'] as String? ?? '',
+                              ),
+                            ),
+                            icon: const Icon(Icons.chat_outlined),
+                            label: const Text('Discuss with provider'),
                           ),
                         ],
                       ],
