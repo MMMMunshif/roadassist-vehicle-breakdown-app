@@ -1,0 +1,18 @@
+// Run only in a trusted owner-controlled environment with Application Default Credentials.
+import {initializeApp, applicationDefault} from 'firebase-admin/app';
+import {getAuth} from 'firebase-admin/auth';
+import {getFirestore, FieldValue} from 'firebase-admin/firestore';
+const email=process.argv[2];
+const action=process.argv[3] ?? 'grant';
+if (!email || !['grant','revoke'].includes(action)) throw new Error('Usage: node functions/provision-admin.mjs EMAIL [grant|revoke]');
+initializeApp({credential:applicationDefault(),projectId:'roadassist-lk-munshif'});
+const auth=getAuth();
+const user=await auth.getUserByEmail(email.trim().toLowerCase());
+if (action==='grant' && (!user.emailVerified || user.disabled)) throw new Error('The existing account must verify its email and be enabled before admin access can be granted.');
+const claims={...(user.customClaims ?? {})};
+if (action==='grant') claims.admin=true; else delete claims.admin;
+await getFirestore().collection('adminAccess').doc(user.uid).set({enabled:action==='grant',email:user.email,updatedAt:FieldValue.serverTimestamp()});
+await auth.setCustomUserClaims(user.uid,claims);
+if (action==='revoke') await auth.revokeRefreshTokens(user.uid);
+await getFirestore().collection('adminProvisioning').add({uid:user.uid,email:user.email,action,createdAt:FieldValue.serverTimestamp()});
+console.log(`Admin permission ${action} completed for ${user.email}. Existing driver/provider profile was not changed. Sign out and sign in again.`);

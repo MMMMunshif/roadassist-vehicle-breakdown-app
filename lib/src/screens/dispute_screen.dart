@@ -288,6 +288,32 @@ class _DisputeScreenState extends State<DisputeScreen> {
                 child: const Text('View invoice and approval history'),
               ),
             ],
+            if (report != null)
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('complaintReviews')
+                    .doc(widget.requestId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError)
+                    return const Text('Could not load admin review.');
+                  final review = snapshot.data?.data();
+                  if (review == null) return const SizedBox.shrink();
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Admin review', style: RaText.title),
+                          Text('Status: ${review['status']}'),
+                          Text(review['decision'] as String? ?? ''),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             if (report == null && !canReport)
               const Text(
                 'No driver problem report has been submitted for this job.',
