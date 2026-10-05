@@ -19,7 +19,15 @@ class PhotoUploadService {
     required int quality,
     required int maxBytes,
   }) async {
-    final decoded = img.decodeImage(await photo.readAsBytes());
+    final bytes = await photo.readAsBytes();
+    img.Image? decoded;
+    try {
+      decoded = img.decodeImage(bytes);
+    } on RangeError {
+      throw const FormatException('Unsupported or corrupted image file.');
+    } on FormatException {
+      throw const FormatException('Unsupported or corrupted image file.');
+    }
     if (decoded == null) {
       throw const FormatException('Unsupported image file.');
     }

@@ -158,6 +158,18 @@ class AuthService {
           : responseMinutes.reduce((a, b) => a + b) / responseMinutes.length,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    final activeJobs = jobs.docs.where(
+      (job) => const [
+        'accepted',
+        'en_route',
+        'arrived',
+      ].contains(job.data()['status']),
+    );
+    if (activeJobs.isNotEmpty) {
+      await _firestore.collection('providerDirectory').doc(user.uid).update({
+        'activeRequestId': activeJobs.first.id,
+      });
+    }
   }
 
   Future<void> updateProviderDirectoryLocation({
@@ -318,6 +330,9 @@ class AuthService {
         // Signing out must still work when Firestore is temporarily offline.
       }
     }
+    try {
+      await DeviceService().unregisterCurrentDevice();
+    } catch (_) {}
     await _auth.signOut();
   }
 }
