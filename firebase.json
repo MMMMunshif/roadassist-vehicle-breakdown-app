@@ -19,6 +19,7 @@
       }
     }
   },
+  "functions": [{"source":"functions","codebase":"notifications","runtime":"nodejs22"}],
   "firestore": {
     "database": "(default)",
     "location": "asia-south1",

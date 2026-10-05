@@ -62,3 +62,11 @@ Structured multiple compatible parts options with brand/part-number/warranty fie
 Before a production release, exercise both accounts on real devices and confirm rules deployment. The existing profile widget tests need a Firebase fixture; this release does not pretend those guest tests validate authenticated profile persistence.
 
 Final local verification: static analysis had zero errors/warnings (informational brace style findings remain); all 11 rules tests passed, including chat markers/location/documentation regression checks; the Flutter suite had 17 passes and two existing profile-test failures. Photo decoding and draft-to-location navigation tests now pass. The profile tests still expect authenticated persistence without a Firebase fixture or an outdated guest success message.
+
+Price changes with evidence
+
+Before a job is marked completed, a changed final amount opens the full replacement quote form. All new revisions require a 10-300 character reason and an included-work description. An increase requires one or two compressed evidence photos (at most 210,000 base64 characters each); decreases do not require a photo. These fields are stored immutably on repairQuotes as changeReason and evidencePhotoData. Driver approval remains separate and immutable on repairDecisions. A pending revision cannot be overwritten. Final completion remains capped at the driver-approved total; completed invoices cannot be revised through this flow.
+
+Driver tracking and invoice history show the reason and evidence, with photo enlargement. Legacy revisions without these fields remain readable. Updated Firestore rules must be deployed before this build sends revisions. Older app builds that omit the new required fields must be updated before submitting revisions.
+
+Verification: 27 Flutter tests and 13 Firestore emulator tests passed. Both previously failing profile tests now pass. New checks cover reason/evidence requirements, oversized photos, pending revision protection, completed invoice immutability, form validation and dark-theme invoice values. Code analysis has no errors or warnings; informational brace-style findings remain.

@@ -111,12 +111,23 @@ void main() {
       find.widgetWithText(TextFormField, 'Full Name'),
       'Kamal Perera',
     );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Phone Number'),
+      '0771234567',
+    );
     await tester.tap(find.text('Save Changes'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Kamal Perera'), findsOneWidget);
+    expect(find.text('Kamal Perera'), findsNWidgets(2));
     expect(find.text('Profile updated successfully.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Sign Out'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Sign Out'));
     await tester.pumpAndSettle();
     expect(find.text('Sign out of RoadAssist?'), findsOneWidget);
@@ -138,6 +149,11 @@ void main() {
     await tester.tap(find.text('Save Settings'));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('24 hours, 7 days a week'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('24 hours, 7 days a week'), findsOneWidget);
     expect(find.text('Availability settings updated.'), findsOneWidget);
   });

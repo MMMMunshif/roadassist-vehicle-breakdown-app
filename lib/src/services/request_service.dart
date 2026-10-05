@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/request_draft.dart';
+import '../models/repair_revision.dart';
 
 class RequestService {
   RequestService({FirebaseFirestore? firestore, FirebaseAuth? auth})
@@ -320,9 +321,27 @@ class RequestService {
           data?['workflowVersion'] != 2) {
         throw StateError('Arrive before submitting a repair quote.');
       }
+      if (data!['pendingRepairId'] != null) {
+        throw StateError(
+          'Wait for the driver to approve or reject the pending change.',
+        );
+      }
+      final photos = List<String>.from(
+        quote['evidencePhotoData'] as List? ?? [],
+      );
+      final reason = (quote['changeReason'] as String? ?? '').trim();
+      final invalid = validateRepairRevision(
+        previousTotal: (data['estimatedCost'] as num).toInt(),
+        total: service + travel + extra,
+        reason: reason,
+        photos: photos,
+      );
+      if (invalid != null) throw ArgumentError(invalid);
       tx.set(revision, {
+        'changeReason': reason,
+        'evidencePhotoData': photos,
         'providerId': _userId,
-        'previousTotal': data!['estimatedCost'],
+        'previousTotal': data['estimatedCost'],
         'serviceFee': service,
         'travelFee': travel,
         'extraFee': extra,
