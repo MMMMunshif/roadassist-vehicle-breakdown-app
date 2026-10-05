@@ -260,11 +260,13 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       ),
     );
     if (saved == true && mounted) {
-      await AuthService().updateCurrentProfile({
-        'workingHours': hours,
-        'serviceRadius': radius,
-      });
-      await AuthService().syncProviderDirectory();
+      if (signedIn) {
+        await AuthService().updateCurrentProfile({
+          'workingHours': hours,
+          'serviceRadius': radius,
+        });
+        await AuthService().syncProviderDirectory();
+      }
       if (!mounted) return;
       setState(() {
         workingHours = hours;

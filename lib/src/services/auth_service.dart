@@ -330,6 +330,9 @@ class AuthService {
         // Signing out must still work when Firestore is temporarily offline.
       }
     }
+    try {
+      await DeviceService().unregisterCurrentDevice();
+    } catch (_) {}
     await _auth.signOut();
   }
 }
