@@ -1,0 +1,17 @@
+{
+    "name":  "roadassist-notifications",
+    "private":  true,
+    "type":  "module",
+    "main":  "index.mjs",
+    "engines":  {
+                    "node":  "22"
+                },
+    "scripts":  {
+                    "test":  "node --test test/notifications.test.mjs",
+                    "check":  "node --check index.mjs \u0026\u0026 node --check notification_events.mjs"
+                },
+    "dependencies":  {
+                         "firebase-admin":  "13.4.0",
+                         "firebase-functions":  "7.4.0"
+                     }
+}

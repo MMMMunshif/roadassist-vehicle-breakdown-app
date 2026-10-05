@@ -66,7 +66,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
           const SectionTitle('Customer Information'),
           const SizedBox(height: RaSpace.sm),
           Card(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(RaSpace.lg),
               child: Column(
@@ -123,7 +123,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
           const SectionTitle('Vehicle Details'),
           const SizedBox(height: RaSpace.sm),
           Card(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(RaSpace.lg),
               child: Column(
@@ -145,7 +145,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
           const SectionTitle('Incident Details'),
           const SizedBox(height: RaSpace.sm),
           Card(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(RaSpace.lg),
               child: Column(
@@ -245,7 +245,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
                       .whereType<String>()
                       .join(', ');
               return Card(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 child: ListTile(
                   leading: ProfileInitials(name: providerName, radius: 22),
                   title: Text(providerName, style: RaText.title),
@@ -289,7 +289,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
                 );
               }
               return Card(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 child: Column(
                   children: previous.map((request) {
                     final history = request.data();

@@ -111,6 +111,18 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     : () => record(data['paymentMethod'] as String),
                 child: const Text('Confirm Payment Received'),
               ),
+            const SizedBox(height: 16),
+            if (driver || provider)
+              OutlinedButton.icon(
+                onPressed: () =>
+                    push(context, DisputeScreen(requestId: widget.requestId)),
+                icon: const Icon(Icons.report_problem_outlined),
+                label: Text(
+                  driver
+                      ? 'Report a problem / View report'
+                      : 'View service problem report',
+                ),
+              ),
             if (saving) const LinearProgressIndicator(),
             if (data['workflowVersion'] == 2)
               _InvoiceApprovalHistory(
@@ -209,21 +221,31 @@ class _InvoiceApprovalHistoryState extends State<_InvoiceApprovalHistory> {
                                 revision['createdAt'] as Timestamp)
                             .toDate()
                             .toLocal();
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        outcome == 'approved'
-                            ? Icons.check_circle_outline
-                            : outcome == 'rejected'
-                            ? Icons.cancel_outlined
-                            : Icons.hourglass_empty,
-                      ),
-                      title: Text(
-                        '${outcome.toUpperCase()}: Rs. ${revision['previousTotal']} to Rs. ${revision['total']}',
-                      ),
-                      subtitle: Text(
-                        '${revision['diagnosisAndWork']}\n${date.toString().split('.').first}',
-                      ),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(
+                            outcome == 'approved'
+                                ? Icons.check_circle_outline
+                                : outcome == 'rejected'
+                                ? Icons.cancel_outlined
+                                : Icons.hourglass_empty,
+                          ),
+                          title: Text(
+                            '${outcome.toUpperCase()}: Rs. ${revision['previousTotal']} to Rs. ${revision['total']}',
+                          ),
+                          subtitle: Text(
+                            '${revision['diagnosisAndWork']}\nReason: ${revision['changeReason'] ?? 'Not recorded for this older revision'}\n${date.toString().split('.').first}',
+                          ),
+                        ),
+                        RevisionEvidencePhotos(
+                          photos: List<String>.from(
+                            revision['evidencePhotoData'] as List? ?? [],
+                          ),
+                        ),
+                      ],
                     );
                   }).toList(),
                 );

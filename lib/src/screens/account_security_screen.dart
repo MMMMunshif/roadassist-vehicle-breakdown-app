@@ -138,6 +138,15 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
             ),
           ),
           const SizedBox(height: RaSpace.xxl),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.notifications_outlined),
+              title: const Text('Push notifications'),
+              subtitle: const Text('Background alerts and device permissions'),
+              onTap: () => push(context, const NotificationSettingsScreen()),
+            ),
+          ),
+          const SizedBox(height: RaSpace.md),
           const SectionTitle('Danger Zone'),
           const SizedBox(height: RaSpace.md),
           OutlinedButton.icon(

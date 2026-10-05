@@ -561,7 +561,7 @@ class _DriverHistoryCard extends StatelessWidget {
         ? 'Date unavailable'
         : '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year}  ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}';
     return Card(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(RaSpace.md),
         child: Column(
@@ -950,7 +950,7 @@ class _ProviderServicesOverview extends StatelessWidget {
       const SizedBox(height: RaSpace.md),
       if (services.isEmpty)
         Card(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           child: ListTile(
             leading: const IconBadge(Icons.add_business_outlined),
             title: const Text('Add your services', style: RaText.title),
@@ -976,7 +976,7 @@ class _ProviderServicesOverview extends StatelessWidget {
           itemBuilder: (context, index) {
             final service = services[index];
             return Card(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               child: InkWell(
                 borderRadius: BorderRadius.circular(RaRadius.lg),
                 onTap: onManage,
@@ -1250,7 +1250,9 @@ class StatusTimeline extends StatelessWidget {
                 fontWeight: index == current
                     ? FontWeight.w800
                     : FontWeight.w600,
-                color: index <= current ? raInk : raFaint,
+                color: index <= current
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -1937,8 +1939,8 @@ class BottomAction extends StatelessWidget {
       RaSpace.xl,
       RaSpace.xl,
     ),
-    decoration: const BoxDecoration(
-      color: raCard,
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
       border: Border(top: BorderSide(color: raLine)),
     ),
     child: FilledButton(onPressed: enabled ? onTap : null, child: Text(label)),
@@ -2378,7 +2380,9 @@ class SummaryRow extends StatelessWidget {
             value,
             textAlign: TextAlign.right,
             style: TextStyle(
-              color: strong ? raBlue : raInk,
+              color: strong
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w800,
               fontSize: strong ? 17 : 13,
             ),

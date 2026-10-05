@@ -417,8 +417,15 @@ service cloud.firestore {
         allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
         allow create: if isProvider() && job().providerId == request.auth.uid
           && job().workflowVersion == 2 && job().status == 'arrived'
-          && request.resource.data.keys().hasOnly(['providerId', 'previousTotal', 'serviceFee', 'travelFee', 'extraFee', 'total', 'diagnosisAndWork', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['providerId', 'previousTotal', 'serviceFee', 'travelFee', 'extraFee', 'total', 'diagnosisAndWork', 'changeReason', 'evidencePhotoData', 'createdAt'])
           && request.resource.data.providerId == request.auth.uid
+          && (!('pendingRepairId' in job()) || job().pendingRepairId == null)
+          && request.resource.data.changeReason is string
+          && request.resource.data.changeReason.size() >= 10 && request.resource.data.changeReason.size() <= 300
+          && request.resource.data.evidencePhotoData is list && request.resource.data.evidencePhotoData.size() <= 2
+          && (request.resource.data.total <= job().estimatedCost || request.resource.data.evidencePhotoData.size() > 0)
+          && (request.resource.data.evidencePhotoData.size() < 1 || (request.resource.data.evidencePhotoData[0] is string && request.resource.data.evidencePhotoData[0].size() > 0 && request.resource.data.evidencePhotoData[0].size() <= 210000))
+          && (request.resource.data.evidencePhotoData.size() < 2 || (request.resource.data.evidencePhotoData[1] is string && request.resource.data.evidencePhotoData[1].size() > 0 && request.resource.data.evidencePhotoData[1].size() <= 210000))
           && request.resource.data.previousTotal == job().estimatedCost
           && request.resource.data.serviceFee is int && request.resource.data.serviceFee >= 0
           && request.resource.data.travelFee is int && request.resource.data.travelFee >= 0
@@ -445,6 +452,38 @@ service cloud.firestore {
         allow update,delete: if false;
       }
 
+      match /disputes/{caseId} {
+        function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
+        function participant() { return signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid); }
+        function validPhotos(p) {
+          return p is list && p.size() <= 2
+            && (p.size() < 1 || (p[0] is string && p[0].size() > 0 && p[0].size() <= 210000))
+            && (p.size() < 2 || (p[1] is string && p[1].size() > 0 && p[1].size() <= 210000));
+        }
+        allow read: if participant();
+        allow create: if participant() && caseId == 'case' && job().status == 'completed'
+          && job().driverId == request.auth.uid && job().providerId is string
+          && request.resource.data.keys().hasAll(['driverId','providerId','reason','description','photos','status','providerResponse','resolution','approvedTotal','finalTotal','createdAt','updatedAt'])
+          && request.resource.data.keys().hasOnly(['driverId','providerId','reason','description','photos','status','providerResponse','resolution','approvedTotal','finalTotal','createdAt','updatedAt'])
+          && request.resource.data.driverId == job().driverId && request.resource.data.providerId == job().providerId
+          && request.resource.data.reason in ['extra_charge','repair_quality','incomplete_service','other']
+          && request.resource.data.description is string && request.resource.data.description.size() >= 10 && request.resource.data.description.size() <= 1000
+          && validPhotos(request.resource.data.photos)
+          && request.resource.data.status == 'open' && request.resource.data.providerResponse == '' && request.resource.data.resolution == ''
+          && request.resource.data.approvedTotal == job().get('estimatedCost', 0)
+          && request.resource.data.finalTotal == job().get('finalCost', job().get('estimatedCost', 0))
+          && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
+        allow update: if participant() && resource.data.status != 'resolved' && request.resource.data.updatedAt == request.time && (
+          (job().providerId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['providerResponse','status','updatedAt'])
+            && request.resource.data.providerResponse is string && request.resource.data.providerResponse.size() >= 10 && request.resource.data.providerResponse.size() <= 1000
+            && request.resource.data.status == 'under_review')
+          || (job().driverId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','resolution','updatedAt'])
+            && request.resource.data.status == 'resolved' && request.resource.data.resolution == 'Driver confirmed the problem is resolved.')
+        );
+        allow delete: if false;
+      }
       match /messages/{messageId} {
         function parentRequest() {
           return get(/databases/$(database)/documents/requests/$(requestId)).data;

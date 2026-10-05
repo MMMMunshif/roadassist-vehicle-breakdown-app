@@ -9,6 +9,9 @@
 # packages, and plugins designed to encourage good coding practices.
 analyzer:
   exclude:
+    - functions/**
+    - tools/**
+    - node_modules/**
     - build/**
     - android/**
     - ios/**
