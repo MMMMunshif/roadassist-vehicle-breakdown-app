@@ -180,7 +180,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           vertical: RaSpace.sm + 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.surface,
                           borderRadius: BorderRadius.circular(RaRadius.sm),
                           boxShadow: const [
                             BoxShadow(

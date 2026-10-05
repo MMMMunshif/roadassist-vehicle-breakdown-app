@@ -18,10 +18,13 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   BuildContext context,
   Map<String, dynamic> requestData,
 ) async {
-  var distanceKm = 0.0;
+  var distanceKm =
+      (requestData['providerDistanceKm'] as num?)?.toDouble() ?? 0.0;
   final driverLatitude = (requestData['latitude'] as num?)?.toDouble();
   final driverLongitude = (requestData['longitude'] as num?)?.toDouble();
-  if (driverLatitude != null && driverLongitude != null) {
+  if (requestData['repairRevision'] != true &&
+      driverLatitude != null &&
+      driverLongitude != null) {
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
@@ -45,26 +48,34 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   }
   if (!context.mounted) return null;
 
+  final revision = requestData['repairRevision'] == true;
+  final desired = requestData['proposedTotal'] as int?;
+  final travel = revision
+      ? (requestData['dispatchFee'] as num?)?.toInt() ?? 0
+      : 0;
+  final extra = revision ? (requestData['extraFee'] as num?)?.toInt() ?? 0 : 0;
+  final keepFees = desired == null || desired >= travel + extra;
   final serviceController = TextEditingController(
-    text: '${(requestData['serviceFee'] as num?)?.toInt() ?? 0}',
+    text:
+        '${desired == null ? (requestData['serviceFee'] as num?)?.toInt() ?? 0 : desired - (keepFees ? travel + extra : 0)}',
   );
   final travelController = TextEditingController(
-    text: requestData['repairRevision'] == true
-        ? '${requestData['dispatchFee'] ?? 0}'
-        : '0',
+    text: '${keepFees ? travel : 0}',
   );
   final extraController = TextEditingController(
-    text: requestData['repairRevision'] == true
-        ? '${requestData['extraFee'] ?? 0}'
-        : '0',
+    text: '${keepFees ? extra : 0}',
   );
   final notesController = TextEditingController();
+  final reasonController = TextEditingController();
+  final evidence = <String>[];
+  bool preparingPhoto = false;
+  String? evidenceError;
   bool inspectionOnly = false;
 
   int amount(TextEditingController controller) =>
       int.tryParse(controller.text.replaceAll(',', '').trim()) ?? 0;
 
-  final result = await showDialog<Map<String, dynamic>>(
+  final quoteRoute = DialogRoute<Map<String, dynamic>>(
     context: context,
     barrierDismissible: false,
     builder: (dialogContext) => StatefulBuilder(
@@ -73,6 +84,51 @@ Future<Map<String, dynamic>?> requestProviderQuote(
             amount(serviceController) +
             amount(travelController) +
             amount(extraController);
+        final revisionError = revision
+            ? validateRepairRevision(
+                previousTotal:
+                    (requestData['estimatedCost'] as num?)?.toInt() ?? 0,
+                total: total,
+                reason: reasonController.text,
+                photos: evidence,
+              )
+            : null;
+        Future<void> attachEvidence(ImageSource source) async {
+          if (preparingPhoto || evidence.length >= 2) return;
+          setDialogState(() {
+            preparingPhoto = true;
+            evidenceError = null;
+          });
+          try {
+            final photo = source == ImageSource.camera
+                ? await Navigator.of(dialogContext).push<XFile>(
+                    MaterialPageRoute(
+                      builder: (_) => const CameraCaptureScreen(),
+                    ),
+                  )
+                : await ImagePicker().pickImage(
+                    source: source,
+                    imageQuality: 70,
+                    maxWidth: 1200,
+                  );
+            if (photo == null) return;
+            final encoded = await PhotoUploadService().prepareVehiclePhoto(
+              photo,
+            );
+            if (dialogContext.mounted)
+              setDialogState(() => evidence.add(encoded));
+          } catch (_) {
+            if (dialogContext.mounted)
+              setDialogState(
+                () => evidenceError =
+                    'Could not prepare the photo. Choose a supported image and try again.',
+              );
+          } finally {
+            if (dialogContext.mounted)
+              setDialogState(() => preparingPhoto = false);
+          }
+        }
+
         Widget moneyField(String label, TextEditingController controller) =>
             TextField(
               controller: controller,
@@ -142,6 +198,64 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                     hintText: 'Parts, after-hours fee, or other details',
                   ),
                 ),
+                if (revision) ...[
+                  TextField(
+                    controller: reasonController,
+                    maxLength: 300,
+                    maxLines: 3,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Reason for price / work change',
+                      hintText:
+                          'Explain what was discovered and why this change is needed.',
+                    ),
+                  ),
+                  const Text(
+                    'Photo evidence: required for a price increase. Show the damaged part, repair or parts receipt.',
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: preparingPhoto || evidence.length >= 2
+                            ? null
+                            : () => attachEvidence(ImageSource.gallery),
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: const Text('Add photo'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: preparingPhoto || evidence.length >= 2
+                            ? null
+                            : () => attachEvidence(ImageSource.camera),
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        label: const Text('Take photo'),
+                      ),
+                    ],
+                  ),
+                  for (var i = 0; i < evidence.length; i++)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Image.memory(
+                            base64Decode(evidence[i]),
+                            height: 100,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: preparingPhoto
+                              ? null
+                              : () =>
+                                    setDialogState(() => evidence.removeAt(i)),
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Remove evidence photo',
+                        ),
+                      ],
+                    ),
+                  if (preparingPhoto) const LinearProgressIndicator(),
+                  if (evidenceError != null) Text(evidenceError!),
+                  if (revisionError != null) Text(revisionError),
+                ],
                 Container(
                   padding: const EdgeInsets.all(RaSpace.md),
                   decoration: BoxDecoration(
@@ -171,7 +285,9 @@ Future<Map<String, dynamic>?> requestProviderQuote(
             ),
             FilledButton(
               onPressed:
-                  total <= 0 ||
+                  (revision ? total < 0 : total <= 0) ||
+                      preparingPhoto ||
+                      revisionError != null ||
                       total > 10000000 ||
                       (requestData['workflowVersion'] == 2 &&
                           notesController.text.trim().isEmpty)
@@ -183,6 +299,10 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                       'providerDistanceKm': distanceKm,
                       'quoteNotes': notesController.text.trim(),
                       'quoteType': inspectionOnly ? 'inspection' : 'direct',
+                      if (revision)
+                        'changeReason': reasonController.text.trim(),
+                      if (revision)
+                        'evidencePhotoData': List<String>.from(evidence),
                     }),
               child: Text(
                 requestData['workflowVersion'] == 2
@@ -195,10 +315,16 @@ Future<Map<String, dynamic>?> requestProviderQuote(
       },
     ),
   );
+  final result = await Navigator.of(
+    context,
+    rootNavigator: true,
+  ).push(quoteRoute);
+  await quoteRoute.completed;
   serviceController.dispose();
   travelController.dispose();
   extraController.dispose();
   notesController.dispose();
+  reasonController.dispose();
   return result;
 }
 

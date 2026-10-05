@@ -85,6 +85,13 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                           style: RaText.label,
                         ),
                         Text(offer['diagnosisAndWork'] as String),
+                        if (offer['changeReason'] is String)
+                          Text('Reason: ${offer['changeReason']}'),
+                        RevisionEvidencePhotos(
+                          photos: List<String>.from(
+                            offer['evidencePhotoData'] as List? ?? [],
+                          ),
+                        ),
                         SummaryRow(
                           'Previously approved',
                           'Rs. ${offer['previousTotal']}',
@@ -206,9 +213,10 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                             );
                         },
                   child: Text(
-                    data['approvedRepairId'] == null
+                    data['approvedQuoteType'] == 'inspection' &&
+                            data['approvedRepairId'] == null
                         ? 'Submit Repair Quote'
-                        : 'Propose Additional Work',
+                        : 'Request Price / Work Change',
                   ),
                 ),
               if (busy) const LinearProgressIndicator(),
@@ -217,5 +225,51 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
         ),
       );
     },
+  );
+}
+
+class RevisionEvidencePhotos extends StatelessWidget {
+  const RevisionEvidencePhotos({super.key, required this.photos});
+  final List<String> photos;
+  Widget image(String photo, {bool thumbnail = false}) {
+    try {
+      return Image.memory(
+        base64Decode(photo),
+        width: thumbnail ? 110 : null,
+        height: thumbnail ? 90 : null,
+        fit: thumbnail ? BoxFit.cover : BoxFit.contain,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
+      );
+    } on FormatException {
+      return const Icon(Icons.broken_image_outlined);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: photos
+        .map(
+          (photo) => InkWell(
+            onTap: () => showDialog<void>(
+              context: context,
+              builder: (context) => Dialog(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: InteractiveViewer(child: image(photo))),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            child: image(photo, thumbnail: true),
+          ),
+        )
+        .toList(),
   );
 }

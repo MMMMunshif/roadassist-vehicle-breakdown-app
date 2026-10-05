@@ -5,7 +5,7 @@ import { doc, setDoc, updateDoc, getDoc, writeBatch, serverTimestamp } from 'fir
 
 let env;
 before(async () => {
-  env = await initializeTestEnvironment({projectId: 'demo-roadassist', firestore: {host: '127.0.0.1', port: 8089,
+  env = await initializeTestEnvironment({projectId: 'demo-roadassist', firestore: {host: '127.0.0.1', port: Number(process.env.FIRESTORE_TEST_PORT ?? 8089),
     rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8')}});
 });
 after(async () => { await env?.cleanup(); });
@@ -93,7 +93,7 @@ test('inspection-only job requires repair approval and revisions are immutable',
   await assertFails(updateDoc(doc(provider,'requests/r1'),{status:'completed',finalCost:1500}));
   const proposal = writeBatch(provider);
   proposal.set(doc(provider,'requests/r1/repairQuotes/change-1'),{providerId:'provider',previousTotal:1500,
-    serviceFee:1800,travelFee:500,extraFee:200,total:2500,diagnosisAndWork:'Replace damaged valve; includes inspection',createdAt:serverTimestamp()});
+    serviceFee:1800,travelFee:500,extraFee:200,total:2500,changeReason:'Damaged valve discovered during inspection',evidencePhotoData:['test-photo'],diagnosisAndWork:'Replace damaged valve; includes inspection',createdAt:serverTimestamp()});
   proposal.update(doc(provider,'requests/r1'),{pendingRepairId:'change-1',updatedAt:serverTimestamp()});
   await assertSucceeds(proposal.commit());
   await assertFails(updateDoc(doc(provider,'requests/r1'),{status:'completed',finalCost:1500}));
@@ -132,4 +132,59 @@ test('payment declarations are participant-only and do not alter invoice amounts
   await assertFails(updateDoc(doc(driver,'requests/r1'),{providerConfirmedPayment:true,paymentConfirmedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{providerConfirmedPayment:true,paymentConfirmedAt:serverTimestamp()}));
   await assertFails(updateDoc(doc(driver,'requests/r1'),{driverReportedPayment:true,paymentMethod:'external',paymentReportedAt:serverTimestamp()}));
+});
+
+test('price increases require reason and evidence and cannot replace a pending revision', async () => {
+  await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'arrived',estimatedCost:1500}));
+  const provider = env.authenticatedContext('provider').firestore();
+  const revision = {providerId:'provider',previousTotal:1500,serviceFee:1500,travelFee:500,extraFee:0,total:2000,
+    diagnosisAndWork:'Replace damaged valve',changeReason:'Valve damaged and requires replacement',evidencePhotoData:['photo'],createdAt:serverTimestamp()};
+  const propose = (id, changes = {}) => {
+    const batch = writeBatch(provider);
+    batch.set(doc(provider,`requests/r1/repairQuotes/${id}`),{...revision,...changes});
+    batch.update(doc(provider,'requests/r1'),{pendingRepairId:id,updatedAt:serverTimestamp()});
+    return batch.commit();
+  };
+  await assertFails(propose('no-reason',{changeReason:''}));
+  await assertFails(propose('no-photo',{evidencePhotoData:[]}));
+  await assertFails(propose('too-many',{evidencePhotoData:['a','b','c']}));
+  await assertFails(propose('too-large',{evidencePhotoData:['x'.repeat(210001)]}));
+  await assertSucceeds(propose('valid'));
+  await assertFails(propose('overwrite-pending'));
+  await assertFails(updateDoc(doc(provider,'requests/r1/repairQuotes/valid'),{changeReason:'Different reason'}));
+});
+test('completed invoices cannot receive a new repair price proposal', async () => {
+  await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed',finalCost:1500}));
+  const provider = env.authenticatedContext('provider').firestore();
+  const batch = writeBatch(provider);
+  batch.set(doc(provider,'requests/r1/repairQuotes/late'),{providerId:'provider',previousTotal:1500,serviceFee:2000,travelFee:0,extraFee:0,total:2000,
+    diagnosisAndWork:'Extra work',changeReason:'Additional work claimed after completion',evidencePhotoData:['photo'],createdAt:serverTimestamp()});
+  batch.update(doc(provider,'requests/r1'),{pendingRepairId:'late',updatedAt:serverTimestamp()});
+  await assertFails(batch.commit());
+});
+test('dispute evidence, participant access and resolution are protected', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed',estimatedCost:1500,finalCost:1500});
+  });
+  const driver = env.authenticatedContext('driver').firestore();
+  const provider = env.authenticatedContext('provider').firestore();
+  const other = env.authenticatedContext('other').firestore();
+  const path='requests/r1/disputes/case';
+  const report={driverId:'driver',providerId:'provider',reason:'extra_charge',description:'Requested an unapproved extra fee.',photos:['evidence'],status:'open',providerResponse:'',resolution:'',approvedTotal:1500,finalTotal:1500,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(setDoc(doc(provider,path), report));
+  await assertFails(setDoc(doc(driver,path), {...report,photos:['x'.repeat(210001)]}));
+  await assertFails(setDoc(doc(driver,path), {...report,finalTotal:9999}));
+  await assertSucceeds(setDoc(doc(driver,path), report));
+  await assertSucceeds(getDoc(doc(provider,path)));
+  await assertFails(getDoc(doc(other,path)));
+  await assertFails(updateDoc(doc(provider,path), {status:'resolved',resolution:'Driver confirmed the problem is resolved.',updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(provider,path), {description:'Changed evidence',updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(provider,path), {providerResponse:'We will correct the issue tomorrow.',status:'under_review',updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(driver,path), {status:'resolved',resolution:'Driver confirmed the problem is resolved.',updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(provider,path), {providerResponse:'A changed response after closing',status:'under_review',updatedAt:serverTimestamp()}));
+});
+
+test('disputes cannot be opened for unfinished jobs', async () => {
+  const db=env.authenticatedContext('driver').firestore();
+  await assertFails(setDoc(doc(db,'requests/r1/disputes/case'), {driverId:'driver',providerId:'provider',status:'open'}));
 });

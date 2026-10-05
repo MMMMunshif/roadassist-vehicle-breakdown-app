@@ -334,46 +334,98 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   }
 
   Future<int?> requestFinalCost() async {
-    final estimate = (requestData['estimatedCost'] as num?)?.toInt() ?? 0;
-    final controller = TextEditingController(text: '$estimate');
-    final value = await showDialog<String>(
+    final approved = (requestData['estimatedCost'] as num?)?.toInt() ?? 0;
+    final protected = requestData['workflowVersion'] == 2;
+    final controller = TextEditingController(text: '$approved');
+    final costRoute = DialogRoute<int>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        icon: const Icon(Icons.receipt_long_outlined, color: raBlue),
-        title: const Text('Confirm final charge'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Final amount (Rs.)',
-            prefixIcon: Icon(Icons.payments_outlined),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Complete Job'),
-          ),
-        ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, refresh) {
+          final amount = int.tryParse(controller.text);
+          final changed = protected && amount != approved;
+          return AlertDialog(
+            icon: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Confirm final charge'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Driver-approved total: Rs. $approved'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(8),
+                  ],
+                  onChanged: (_) => refresh(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Final amount (Rs.)',
+                  ),
+                ),
+                if (changed)
+                  const Text(
+                    'A changed price needs a reason and driver approval. An increase also needs photo evidence. The job will remain open while approval is pending.',
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: amount == null || amount < 0 || amount > 10000000
+                    ? null
+                    : () => Navigator.pop(dialogContext, amount),
+                child: Text(
+                  changed ? 'Request price approval' : 'Complete Job',
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
+    final value = await Navigator.of(
+      context,
+      rootNavigator: true,
+    ).push(costRoute);
+    await costRoute.completed;
     controller.dispose();
-    if (value == null) return null;
-    final amount = int.tryParse(value.replaceAll(',', '').trim());
-    if (amount == null || amount < 0) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid final amount.')),
-        );
+    if (value == null || !mounted) return null;
+    if (protected && value != approved) {
+      final quote = await requestProviderQuote(context, {
+        ...requestData,
+        'repairRevision': true,
+        'proposedTotal': value,
+      });
+      if (quote == null || !mounted) return null;
+      try {
+        await RequestService().proposeRepair(widget.requestId!, quote);
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Price change sent. Wait for driver approval, then complete the job at the approved total.',
+              ),
+            ),
+          );
+      } catch (_) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Could not send the price change. Check access, connection and whether another change is pending.',
+              ),
+            ),
+          );
       }
       return null;
     }
-    return amount;
+    return value;
   }
 
   @override
@@ -459,7 +511,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                         Container(
                           padding: const EdgeInsets.all(RaSpace.sm),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(RaRadius.sm),
                           ),
                           child: StatusTimeline(
