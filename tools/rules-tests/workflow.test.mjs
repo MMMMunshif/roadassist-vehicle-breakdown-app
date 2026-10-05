@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, writeBatch, serverTimestamp } from 'firebase/firestore';
 
 let env;
 before(async () => {
@@ -13,6 +13,7 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async c => {
     const db = c.firestore();
+    await setDoc(doc(db,'adminAccess/admin'),{enabled:true});
     await setDoc(doc(db,'users/driver'),{role:'driver'});
     await setDoc(doc(db,'users/other'),{role:'driver'});
     await setDoc(doc(db,'users/provider'),{role:'provider'});
@@ -187,4 +188,90 @@ test('dispute evidence, participant access and resolution are protected', async 
 test('disputes cannot be opened for unfinished jobs', async () => {
   const db=env.authenticatedContext('driver').firestore();
   await assertFails(setDoc(doc(db,'requests/r1/disputes/case'), {driverId:'driver',providerId:'provider',status:'open'}));
+});
+function administrator(verified=true) { return env.authenticatedContext('admin',{admin:true,email_verified:verified}).firestore(); }
+async function accountAction(db, target, changes={}, auditId='a1') {
+  const before=(await getDoc(doc(db,`accountModeration/${target}`))).data() ?? {};
+  const after={status:'active',verification:'pending',flagged:false,...before,...changes,reason:'Reviewed by the project administrator.',updatedBy:'admin',updatedAt:serverTimestamp(),lastAuditId:auditId};
+  const batch=writeBatch(db);
+  batch.set(doc(db,`accountModeration/${target}`),after);
+  batch.set(doc(db,`adminAudit/${auditId}`),{kind:'account',target,actor:'admin',reason:after.reason,before,after,createdAt:serverTimestamp()});
+  return batch.commit();
+}
+test('verified admin claims allow management reads, profile fields cannot grant access',async()=>{
+  await assertSucceeds(getDoc(doc(administrator(),'users/driver')));
+  await assertSucceeds(getDoc(doc(administrator(),'requests/r2')));
+  await assertFails(getDoc(doc(administrator(false),'users/driver')));
+  await env.withSecurityRulesDisabled(async c=>setDoc(doc(c.firestore(),'users/driver'),{role:'driver',admin:true}));
+  await assertFails(getDoc(doc(env.authenticatedContext('driver').firestore(),'users/other')));
+});
+test('moderation needs an atomic immutable audit and blocks suspended accounts',async()=>{
+  const admin=administrator();
+  await assertFails(setDoc(doc(admin,'accountModeration/driver'),{status:'suspended'}));
+  await assertSucceeds(accountAction(admin,'driver',{status:'suspended'}));
+  const driver=env.authenticatedContext('driver').firestore();
+  await assertSucceeds(getDoc(doc(driver,'accountModeration/driver')));
+  await assertFails(getDoc(doc(driver,'requests/r1')));
+  await assertFails(updateDoc(doc(driver,'accountModeration/driver'),{status:'active'}));
+  await assertFails(updateDoc(doc(admin,'adminAudit/a1'),{reason:'Changed history'}));
+  await assertSucceeds(accountAction(admin,'driver',{status:'active'},'a2'));
+  await assertSucceeds(getDoc(doc(driver,'requests/r1')));
+});
+test('admin cannot fabricate actor or suspend self',async()=>{
+  await env.withSecurityRulesDisabled(async c=>setDoc(doc(c.firestore(),'users/admin'),{role:'driver'}));
+  await assertFails(accountAction(administrator(),'admin',{status:'suspended'}));
+  await assertFails(setDoc(doc(administrator(),'adminAudit/fake'),{kind:'account',target:'driver',actor:'other',reason:'Forged record',before:{},after:{},createdAt:serverTimestamp()}));
+});
+test('complaint decisions require audit and are visible only to participants and admins',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed'});
+    await setDoc(doc(c.firestore(),'requests/r1/disputes/case'),{status:'open'});
+  });
+  const admin=administrator();
+  const after={status:'under_review',priority:'high',assignedTo:'admin',decision:'Reviewing both participants evidence.',updatedAt:serverTimestamp(),lastAuditId:'case-audit'};
+  await assertFails(setDoc(doc(admin,'complaintReviews/r1'),after));
+  const batch=writeBatch(admin);
+  batch.set(doc(admin,'complaintReviews/r1'),after);
+  batch.set(doc(admin,'adminAudit/case-audit'),{kind:'complaint',target:'r1',actor:'admin',reason:after.decision,before:{},after,createdAt:serverTimestamp()});
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDoc(doc(env.authenticatedContext('driver').firestore(),'complaintReviews/r1')));
+  await assertFails(getDoc(doc(env.authenticatedContext('other').firestore(),'complaintReviews/r1')));
+  await assertFails(updateDoc(doc(env.authenticatedContext('provider').firestore(),'complaintReviews/r1'),{status:'resolved'}));
+});
+test('admin can list complaints but cannot forge evidence or self-promote through signup',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed'});
+    await setDoc(doc(c.firestore(),'requests/r1/disputes/case'),{status:'open'});
+  });
+  await assertSucceeds(getDocs(collectionGroup(administrator(),'disputes')));
+  await assertFails(updateDoc(doc(administrator(),'requests/r1/disputes/case'),{description:'Admin rewrote evidence'}));
+  await assertFails(setDoc(doc(env.authenticatedContext('new').firestore(),'users/new'),{role:'admin'}));
+});
+test('suspended providers cannot be selected or operate their directory',async()=>{
+  await accountAction(administrator(),'provider',{status:'suspended'});
+  await assertFails(approval(env.authenticatedContext('driver').firestore(),'r1'));
+  await assertFails(updateDoc(doc(env.authenticatedContext('provider').firestore(),'providerDirectory/provider'),{online:true}));
+});
+test('admin registry cannot be edited by clients and revocation immediately blocks admin reads',async()=>{
+  const admin=administrator();
+  await assertFails(setDoc(doc(admin,'adminAccess/admin'),{enabled:true}));
+  await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'adminAccess/admin'),{enabled:false}));
+  await assertFails(getDoc(doc(admin,'users/driver')));
+});
+test('private notes are append-only, authored and hidden from normal users',async()=>{
+  const admin=administrator();
+  await assertSucceeds(setDoc(doc(admin,'adminNotes/n1'),{kind:'account',target:'driver',text:'Private follow-up note for account review.',actor:'admin',createdAt:serverTimestamp()}));
+  await assertFails(getDoc(doc(env.authenticatedContext('driver').firestore(),'adminNotes/n1')));
+  await assertFails(updateDoc(doc(admin,'adminNotes/n1'),{text:'Rewritten note'}));
+});
+test('provider suspension and directory deactivation commit with the matching audit',async()=>{
+  const admin=administrator();
+  const after={status:'suspended',verification:'rejected',flagged:true,reason:'Profile verification rejected after review.',updatedBy:'admin',updatedAt:serverTimestamp(),lastAuditId:'disable-provider'};
+  const batch=writeBatch(admin);
+  batch.set(doc(admin,'accountModeration/provider'),after);
+  batch.update(doc(admin,'providerDirectory/provider'),{online:false,updatedAt:serverTimestamp()});
+  batch.set(doc(admin,'adminAudit/disable-provider'),{kind:'account',target:'provider',actor:'admin',reason:after.reason,before:{},after,createdAt:serverTimestamp()});
+  await assertSucceeds(batch.commit());
+  const directory=await assertSucceeds(getDoc(doc(admin,'providerDirectory/provider')));
+  if (directory.data().online!==false) throw new Error('Provider still online');
 });
