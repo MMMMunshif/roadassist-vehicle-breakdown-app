@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'screens.dart';
+
+part 'screens/appearance_screen.dart';
 
 // ============================================================
 // COLOR TOKENS
@@ -128,12 +132,113 @@ class AppThemeController {
 
 class _RoadAssistAppState extends State<RoadAssistApp> {
   final messengerKey = GlobalKey<ScaffoldMessengerState>();
+  final navigationKey = GlobalKey<NavigatorState>();
+  StreamSubscription<RemoteMessage>? openedMessageSubscription;
+  Map<String, dynamic>? pendingNotification;
+  bool navigationReady = false;
+  bool openingNotification = false;
+
+  void queueNotification(Map<String, dynamic> data) {
+    if (data['requestId'] == null) return;
+    pendingNotification = data;
+    unawaited(openPendingNotification());
+  }
+
+  Future<void> openPendingNotification() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final data = pendingNotification;
+    if (!mounted ||
+        !navigationReady ||
+        openingNotification ||
+        user == null ||
+        data == null)
+      return;
+    pendingNotification = null;
+    if (data['recipientUid'] != null && data['recipientUid'] != user.uid)
+      return;
+    openingNotification = true;
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('requests')
+          .doc(data['requestId'].toString())
+          .get();
+      final request = snapshot.data();
+      if (!mounted ||
+          FirebaseAuth.instance.currentUser?.uid != user.uid ||
+          request == null)
+        return;
+      final isDriver = request['driverId'] == user.uid;
+      final isProvider = request['providerId'] == user.uid;
+      Widget page;
+      if (data['type'] == 'chat' && (isDriver || isProvider)) {
+        page = ChatScreen(
+          requestId: snapshot.id,
+          peerName:
+              (request[isDriver ? 'providerName' : 'driverName'] as String?) ??
+              'RoadAssist user',
+          peerPhone:
+              (request[isDriver ? 'providerPhone' : 'driverPhone']
+                  as String?) ??
+              '',
+        );
+      } else if (isDriver) {
+        page = RealtimeDriverRequestDetailsScreen(
+          requestId: snapshot.id,
+          data: request,
+        );
+      } else if (isProvider ||
+          (request['status'] == 'searching' && data['type'] == 'request')) {
+        // Firestore rules independently check whether this provider can read the request.
+        page = ProviderRequestDetailsScreen(
+          requestId: snapshot.id,
+          data: request,
+        );
+      } else {
+        return;
+      }
+      navigationKey.currentState?.push(
+        MaterialPageRoute<void>(builder: (_) => page),
+      );
+    } catch (_) {
+      if (mounted)
+        messengerKey.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'This update is no longer available for your account.',
+            ),
+          ),
+        );
+    } finally {
+      openingNotification = false;
+      if (pendingNotification != null) unawaited(openPendingNotification());
+    }
+  }
+
   StreamSubscription<RemoteMessage>? foregroundMessageSubscription;
 
   @override
   void initState() {
     super.initState();
     AppThemeController.initialize();
+    if (const bool.fromEnvironment('ADMIN_PORTAL')) return;
+    openedMessageSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+      (message) => queueNotification(message.data),
+    );
+    unawaited(
+      FirebaseMessaging.instance
+          .getInitialMessage()
+          .then((message) {
+            if (mounted && message != null) queueNotification(message.data);
+          })
+          .catchError((Object error) {}),
+    );
+    final query = Uri.base.queryParameters;
+    if (query['pushRequest'] != null)
+      queueNotification({
+        'requestId': query['pushRequest'],
+        'type': query['pushType'],
+        'recipientUid': query['pushRecipient'],
+      });
     foregroundMessageSubscription = FirebaseMessaging.onMessage.listen((
       message,
     ) {
@@ -144,13 +249,24 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
               'You have a new notification.');
       messengerKey.currentState
         ?..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('$title\n$body')));
+        ..showSnackBar(
+          SnackBar(
+            content: Text('$title\n$body'),
+            action: message.data['requestId'] == null
+                ? null
+                : SnackBarAction(
+                    label: 'View',
+                    onPressed: () => queueNotification(message.data),
+                  ),
+          ),
+        );
     });
   }
 
   @override
   void dispose() {
     foregroundMessageSubscription?.cancel();
+    openedMessageSubscription?.cancel();
     super.dispose();
   }
 
@@ -159,6 +275,15 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
     valueListenable: AppThemeController.mode,
     builder: (context, themeMode, _) => MaterialApp(
       title: 'RoadAssist',
+      navigatorKey: navigationKey,
+      navigatorObservers: [
+        _NotificationNavigationObserver(() {
+          navigationReady = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) unawaited(openPendingNotification());
+          });
+        }),
+      ],
       scaffoldMessengerKey: messengerKey,
       debugShowCheckedModeBanner: false,
       builder: (context, child) => ColoredBox(
@@ -167,8 +292,12 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
             : const Color(0xFFEAF4FB),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: ClipRect(child: child ?? const SizedBox.shrink()),
+            constraints: const BoxConstraints(
+              maxWidth: bool.fromEnvironment('ADMIN_PORTAL') ? 1200 : 430,
+            ),
+            child: ClipRect(
+              child: AccountAccessGate(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         ),
       ),
@@ -448,72 +577,9 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
           ),
         ),
       ),
-      home: const SplashScreen(),
-    ),
-  );
-}
-
-class AppearanceScreen extends StatelessWidget {
-  const AppearanceScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Appearance')),
-    body: ValueListenableBuilder<ThemeMode>(
-      valueListenable: AppThemeController.mode,
-      builder: (context, selectedMode, _) => ListView(
-        padding: const EdgeInsets.all(RaSpace.xl),
-        children: [
-          Text(
-            'Choose theme',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: RaSpace.xs),
-          Text(
-            'Use your device setting or choose a theme for RoadAssist.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: RaSpace.xl),
-          Card(
-            child: Column(
-              children: ThemeMode.values.map((mode) {
-                final (icon, label, description) = switch (mode) {
-                  ThemeMode.system => (
-                    Icons.settings_suggest_outlined,
-                    'System default',
-                    'Match your phone appearance',
-                  ),
-                  ThemeMode.light => (
-                    Icons.light_mode_outlined,
-                    'Light',
-                    'Always use the light theme',
-                  ),
-                  ThemeMode.dark => (
-                    Icons.dark_mode_outlined,
-                    'Dark',
-                    'Comfortable viewing at night',
-                  ),
-                };
-                final selected = mode == selectedMode;
-                return ListTile(
-                  onTap: () => AppThemeController.setMode(mode),
-                  leading: Icon(icon),
-                  title: Text(label),
-                  subtitle: Text(description),
-                  trailing: Icon(
-                    selected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_off,
-                    color: selected
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
+      home: const bool.fromEnvironment('ADMIN_PORTAL')
+          ? const AdminPortalScreen()
+          : const SplashScreen(),
     ),
   );
 }
@@ -584,5 +650,15 @@ Future<void> openMapNavigation(
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Unable to open a navigation app.')),
     );
+  }
+}
+
+class _NotificationNavigationObserver extends NavigatorObserver {
+  _NotificationNavigationObserver(this.ready);
+  final VoidCallback ready;
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    ready();
   }
 }

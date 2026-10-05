@@ -66,14 +66,6 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     );
   }
 
-  String formatEstimate(String issue) {
-    final value = estimatedCostForIssue(issue).toString();
-    final formatted = value.length > 3
-        ? '${value.substring(0, value.length - 3)},${value.substring(value.length - 3)}'
-        : value;
-    return 'Estimated from Rs. $formatted';
-  }
-
   String formatSavedTime(DateTime? value) {
     if (value == null) return 'Saved request available';
     final hour = value.hour.toString().padLeft(2, '0');
@@ -170,7 +162,9 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: RaSpace.sm),
                     child: Card(
-                      color: selected.contains(i) ? raPale : Colors.white,
+                      color: selected.contains(i)
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(RaRadius.md),
                         side: BorderSide(
@@ -199,7 +193,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                               Text(items[i].$2, style: RaText.caption),
                               const SizedBox(height: RaSpace.xs),
                               Text(
-                                formatEstimate(items[i].$1),
+                                'Provider quote required',
                                 style: const TextStyle(
                                   color: raBlue,
                                   fontSize: 12,
@@ -216,6 +210,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
             ),
           ),
           BottomAction(
+            // Service categories describe provider capabilities, not a diagnosis.
             label: selected.isEmpty
                 ? 'Select at least one issue'
                 : 'Continue with ${selected.length} issue${selected.length == 1 ? '' : 's'}',
@@ -224,6 +219,23 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
               final issues = selected.map((index) => items[index].$1).toList();
               push(context, BreakdownDetailsScreen(issues: issues));
             },
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.help_outline),
+            label: const Text("I don't know the problem"),
+            onPressed: () => push(
+              context,
+              BreakdownDetailsScreen(
+                issues: const ['General Mechanic'],
+                initialDraft: RequestDraft(
+                  issues: ['General Mechanic'],
+                  vehicleType: 'Sedan / Hatchback',
+                  modelYear: '',
+                  registration: '',
+                  description: 'I am not sure what the problem is. ',
+                ),
+              ),
+            ),
           ),
         ],
       ),
