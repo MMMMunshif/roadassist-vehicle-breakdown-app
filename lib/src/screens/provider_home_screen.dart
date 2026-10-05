@@ -8,7 +8,10 @@ class ProviderHomeScreen extends StatefulWidget {
 
 class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     with WidgetsBindingObserver {
-  bool online = true;
+  bool online = false;
+  bool savingPresence = false;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  directorySubscription;
   String serviceRadius = '15 km from current location';
   List<String> providerServices = const [
     'Vehicle Towing',
@@ -27,7 +30,16 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(AuthService().setProviderOnline(true));
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null)
+      directorySubscription = FirebaseFirestore.instance
+          .collection('providerDirectory')
+          .doc(uid)
+          .snapshots()
+          .listen((snapshot) {
+            if (mounted && !savingPresence)
+              setState(() => online = snapshot.data()?['online'] == true);
+          }, onError: (Object error) {});
     unawaited(_publishProviderLocation());
     profileSubscription = AuthService().watchCurrentProfile().listen((
       snapshot,
@@ -44,9 +56,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
           }
         });
       }
-    });
+    }, onError: (Object error) {});
     openRequestsSubscription = RequestService().watchOpenRequests().listen(
       _handleOpenRequestUpdates,
+      onError: (Object error) {},
     );
   }
 
@@ -143,6 +156,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     profileSubscription?.cancel();
+    directorySubscription?.cancel();
     openRequestsSubscription?.cancel();
     super.dispose();
   }
@@ -416,13 +430,34 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                       ),
                       Switch(
                         value: online,
-                        onChanged: (value) async {
-                          setState(() {
-                            online = value;
-                          });
-                          await AuthService().setProviderOnline(value);
-                          if (value) unawaited(_publishProviderLocation());
-                        },
+                        onChanged: savingPresence
+                            ? null
+                            : (value) async {
+                                final previous = online;
+                                setState(() {
+                                  online = value;
+                                  savingPresence = true;
+                                });
+                                try {
+                                  await AuthService().setProviderOnline(value);
+                                  if (value)
+                                    unawaited(_publishProviderLocation());
+                                } catch (_) {
+                                  if (mounted) {
+                                    setState(() => online = previous);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Could not change availability. Try again.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted)
+                                    setState(() => savingPresence = false);
+                                }
+                              },
                       ),
                     ],
                   ),
@@ -471,6 +506,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
         _ProviderNewRequestsBanner(services: providerServices),
         const SizedBox(height: RaSpace.xxl),
         const _ProviderActiveJobsSection(),
+        const _ProviderEarningsPanel(),
         _ProviderServicesOverview(
           services: providerServices,
           serviceRadius: serviceRadius,

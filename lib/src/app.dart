@@ -220,6 +220,7 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
   void initState() {
     super.initState();
     AppThemeController.initialize();
+    if (const bool.fromEnvironment('ADMIN_PORTAL')) return;
     openedMessageSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
       (message) => queueNotification(message.data),
     );
@@ -291,8 +292,12 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
             : const Color(0xFFEAF4FB),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: ClipRect(child: child ?? const SizedBox.shrink()),
+            constraints: const BoxConstraints(
+              maxWidth: bool.fromEnvironment('ADMIN_PORTAL') ? 1200 : 430,
+            ),
+            child: ClipRect(
+              child: AccountAccessGate(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         ),
       ),
@@ -572,7 +577,9 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
           ),
         ),
       ),
-      home: const SplashScreen(),
+      home: const bool.fromEnvironment('ADMIN_PORTAL')
+          ? const AdminPortalScreen()
+          : const SplashScreen(),
     ),
   );
 }

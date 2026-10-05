@@ -2,9 +2,96 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return request.auth != null;
+      return authenticated() && !accountBlocked(request.auth.uid);
     }
 
+    function authenticated() { return request.auth != null; }
+    function accountBlocked(uid) {
+      let path = /databases/$(database)/documents/accountModeration/$(uid);
+      return exists(path) && (get(path).data.status == 'suspended' || get(path).data.verification == 'rejected');
+    }
+    function isAdmin() {
+      return signedIn() && request.auth.token.get('admin', false) == true
+        && request.auth.token.get('email_verified', false) == true
+        && exists(/databases/$(database)/documents/adminAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/adminAccess/$(request.auth.uid)).data.enabled == true;
+    }
+    function validAudit(id, kind, target) {
+      let a = getAfter(/databases/$(database)/documents/adminAudit/$(id)).data;
+      return a.actor == request.auth.uid && a.kind == kind && a.target == target && a.createdAt == request.time;
+    }
+
+    match /accountModeration/{uid} {
+      allow read: if (authenticated() && request.auth.uid == uid) || isAdmin();
+      allow create, update: if isAdmin()
+        && exists(/databases/$(database)/documents/users/$(uid))
+        && request.resource.data.keys().hasAll(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
+        && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
+        && request.resource.data.status in ['active','suspended']
+        && request.resource.data.verification in ['pending','verified','rejected']
+        && request.resource.data.flagged is bool
+        && request.resource.data.reason is string && request.resource.data.reason.size() >= 10 && request.resource.data.reason.size() <= 500
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastAuditId is string
+        && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
+        && (uid != request.auth.uid || (request.resource.data.status == 'active' && request.resource.data.verification != 'rejected'))
+        && (get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider' || request.resource.data.verification == 'pending')
+        && validAudit(request.resource.data.lastAuditId, 'account', uid);
+      allow delete: if false;
+    }
+    match /complaintReviews/{id} {
+      function job() { return get(/databases/$(database)/documents/requests/$(id)).data; }
+      allow read: if isAdmin() || (signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid));
+      allow create, update: if isAdmin()
+        && exists(/databases/$(database)/documents/requests/$(id)/disputes/case)
+        && request.resource.data.keys().hasAll(['status','priority','assignedTo','decision','updatedAt','lastAuditId'])
+        && request.resource.data.keys().hasOnly(['status','priority','assignedTo','decision','updatedAt','lastAuditId'])
+        && request.resource.data.status in ['under_review','resolved','dismissed']
+        && request.resource.data.priority in ['low','normal','high','urgent']
+        && request.resource.data.assignedTo == request.auth.uid
+        && request.resource.data.decision is string && request.resource.data.decision.size() >= 10 && request.resource.data.decision.size() <= 500
+        && request.resource.data.updatedAt == request.time && request.resource.data.lastAuditId is string
+        && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
+        && validAudit(request.resource.data.lastAuditId, 'complaint', id);
+      allow delete: if false;
+    }
+    match /adminAudit/{id} {
+      function paired(collection) {
+        let path = /databases/$(database)/documents/$(collection)/$(request.resource.data.target);
+        let after = getAfter(path).data;
+        return after.lastAuditId == id && request.resource.data.after == after
+          && request.resource.data.before == (exists(path) ? get(path).data : {})
+          && request.resource.data.reason == (collection == 'accountModeration' ? after.reason : after.decision);
+      }
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasAll(['kind','target','actor','reason','before','after','createdAt'])
+        && request.resource.data.keys().hasOnly(['kind','target','actor','reason','before','after','createdAt'])
+        && request.resource.data.actor == request.auth.uid && request.resource.data.createdAt == request.time
+        && request.resource.data.target is string
+        && ((request.resource.data.kind == 'account' && paired('accountModeration'))
+          || (request.resource.data.kind == 'complaint' && paired('complaintReviews')));
+      allow update, delete: if false;
+    }
+    match /adminAccess/{uid} {
+      allow read: if (authenticated() && request.auth.uid == uid) || isAdmin();
+      allow write: if false;
+    }
+    match /adminNotes/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasAll(['kind','target','text','actor','createdAt'])
+        && request.resource.data.keys().hasOnly(['kind','target','text','actor','createdAt'])
+        && request.resource.data.kind in ['account','complaint']
+        && request.resource.data.target is string
+        && request.resource.data.text is string && request.resource.data.text.size() >= 10 && request.resource.data.text.size() <= 500
+        && request.resource.data.actor == request.auth.uid && request.resource.data.createdAt == request.time
+        && ((request.resource.data.kind == 'account' && exists(/databases/$(database)/documents/users/$(request.resource.data.target)))
+          || (request.resource.data.kind == 'complaint' && exists(/databases/$(database)/documents/requests/$(request.resource.data.target)/disputes/case)));
+      allow update,delete: if false;
+    }
+    match /adminProvisioning/{id} { allow read: if isAdmin(); allow write: if false; }
+    match /{path=**}/disputes/{id} { allow read: if isAdmin(); }
     function userRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
@@ -18,8 +105,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId;
-      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role in ['driver','provider'];
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
       allow update: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.role == resource.data.role;
@@ -57,6 +144,14 @@ service cloud.firestore {
     }
 
     match /providerDirectory/{providerId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin() && accountBlockedAfter(providerId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['online','updatedAt'])
+        && request.resource.data.online == false && request.resource.data.updatedAt == request.time;
+      function accountBlockedAfter(uid) {
+        let data = getAfter(/databases/$(database)/documents/accountModeration/$(uid)).data;
+        return data.status == 'suspended' || data.verification == 'rejected';
+      }
       allow read: if signedIn();
       allow create, update: if signedIn()
         && isProvider()
@@ -81,6 +176,7 @@ service cloud.firestore {
       allow update: if isDriver()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeRequestId'])
         && ((request.resource.data.activeRequestId is string
+          && !accountBlocked(providerId)
           && request.resource.data.activeRequestId.size() > 0
           && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null || resource.data.activeRequestId == '')
           && resource.data.online == true
@@ -99,6 +195,7 @@ service cloud.firestore {
     }
 
     match /requests/{requestId} {
+      allow read: if isAdmin();
       allow create: if signedIn()
         && isDriver()
         && request.resource.data.driverId == request.auth.uid
@@ -388,6 +485,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /quotes/{providerId} {
+        allow read: if isAdmin();
         function parent() {
           return get(/databases/$(database)/documents/requests/$(requestId)).data;
         }
@@ -413,6 +511,7 @@ service cloud.firestore {
         allow delete: if false;
       }
       match /repairQuotes/{revisionId} {
+        allow read: if isAdmin();
         function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
         allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
         allow create: if isProvider() && job().providerId == request.auth.uid
@@ -439,6 +538,7 @@ service cloud.firestore {
         allow update, delete: if false;
       }
       match /repairDecisions/{revisionId} {
+        allow read: if isAdmin();
         function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
         allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
         allow create: if signedIn() && job().driverId == request.auth.uid
