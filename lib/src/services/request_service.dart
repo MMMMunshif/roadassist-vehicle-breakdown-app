@@ -1,3 +1,4 @@
+import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -78,6 +79,7 @@ class RequestService {
         'rejectedBy': <String>[],
         'status': 'searching',
         'workflowVersion': 2,
+        'arrivalVerificationRequired': true,
         'issue': draft.primaryIssue,
         'issues': draft.issues,
         'vehicleType': draft.vehicleType,
@@ -475,60 +477,116 @@ class RequestService {
     });
   }
 
+  Future<void> confirmProviderArrival(String id, String reason) async {
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(id);
+      final data = (await tx.get(ref)).data();
+      if (data?['driverId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['arrivalConfirmedBy'] != null)
+        throw StateError('Arrival confirmation is not available.');
+      final lat = data?['providerLatitude'] as num?,
+          lng = data?['providerLongitude'] as num?;
+      final updated = (data?['providerLocationUpdatedAt'] as Timestamp?)
+          ?.toDate();
+      final fresh =
+          updated != null &&
+          DateTime.now().difference(updated) < const Duration(minutes: 2);
+      final distance =
+          lat != null &&
+              lng != null &&
+              data?['latitude'] is num &&
+              data?['longitude'] is num
+          ? Geolocator.distanceBetween(
+              lat.toDouble(),
+              lng.toDouble(),
+              (data!['latitude'] as num).toDouble(),
+              (data['longitude'] as num).toDouble(),
+            )
+          : null;
+      final nearby = fresh && distance != null && distance <= 300;
+      if (!nearby && reason.trim().length < 10)
+        throw StateError(
+          'GPS is unavailable, stale or outside 300 metres. Explain why you are confirming arrival manually (at least 10 characters).',
+        );
+      tx.update(ref, {
+        'arrivalConfirmedBy': _userId,
+        'arrivalConfirmedAt': FieldValue.serverTimestamp(),
+        'arrivalConfirmationMethod': nearby
+            ? 'gps_nearby_driver'
+            : 'manual_driver',
+        'arrivalConfirmationReason': reason.trim(),
+        'arrivalDistanceMeters': distance,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   Future<void> completeProviderJob(String id, int finalCost) async {
-    if (finalCost < 0) {
-      throw ArgumentError.value(
-        finalCost,
-        'finalCost',
-        'Must not be negative.',
-      );
-    }
-    await _firestore.runTransaction((transaction) async {
-      final reference = _requests.doc(id);
-      final profileReference = _firestore.collection('users').doc(_userId);
-      final request = await transaction.get(reference);
-      final profile = await transaction.get(profileReference);
-      final data = request.data();
-      if (!request.exists || data?['providerId'] != _userId) {
-        throw StateError('This job is not assigned to this provider.');
-      }
-      if (data?['status'] != 'arrived') {
-        throw StateError('The provider must arrive before completing the job.');
-      }
-      final directoryReference = _firestore
-          .collection('providerDirectory')
-          .doc(_userId);
-      final directory = await transaction.get(directoryReference);
-      if (data?['workflowVersion'] == 2 &&
-          (data?['pendingRepairId'] != null ||
-              (data?['approvedQuoteType'] == 'inspection' &&
-                  data?['approvedRepairId'] == null))) {
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(id);
+      final data = (await tx.get(ref)).data();
+      if (data?['providerId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['completionState'] == 'pending')
+        throw StateError('Completion is not available.');
+      if (data?['arrivalVerificationRequired'] == true &&
+          data?['arrivalConfirmedBy'] != data?['driverId'])
         throw StateError(
-          'The driver must approve the repair before completion.',
+          'The driver must confirm your arrival before work can be completed.',
         );
-      }
-      if (data?['workflowVersion'] == 2 &&
-          finalCost > (data?['estimatedCost'] as num).toInt()) {
+      if ((data?['serviceNotes'] as String? ?? '').trim().length < 10 ||
+          (data?['servicePhotoData'] as List? ?? []).isEmpty)
         throw StateError(
-          'The final charge cannot exceed the driver-approved offer.',
+          'Add work notes (at least 10 characters) and a completion photo first.',
         );
-      }
-      transaction.update(reference, {
-        'status': 'completed',
+      if (finalCost < 0 ||
+          finalCost > (data?['estimatedCost'] as num).toInt() ||
+          data?['pendingRepairId'] != null ||
+          (data?['approvedQuoteType'] == 'inspection' &&
+              data?['approvedRepairId'] == null))
+        throw StateError(
+          'Use the driver-approved charge and finish repair approval first.',
+        );
+      tx.update(ref, {
+        'completionState': 'pending',
+        'completionSubmittedAt': FieldValue.serverTimestamp(),
         'finalCost': finalCost,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> confirmJobCompletion(String id) async {
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(id);
+      final data = (await tx.get(ref)).data();
+      final dispute = await tx.get(ref.collection('disputes').doc('case'));
+      if (data?['driverId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['completionState'] != 'pending')
+        throw StateError('No completion is awaiting your confirmation.');
+      final review = await tx.get(
+        _firestore.collection('complaintReviews').doc(id),
+      );
+      if (dispute.exists &&
+          !['resolved', 'dismissed'].contains(review.data()?['status']))
+        throw StateError(
+          'An existing complaint must be reviewed by support before this job can be closed.',
+        );
+      final directoryRef = _firestore
+          .collection('providerDirectory')
+          .doc(data!['providerId'] as String);
+      final directory = await tx.get(directoryRef);
+      tx.update(ref, {
+        'status': 'completed',
+        'completionState': 'confirmed',
+        'driverCompletedAt': FieldValue.serverTimestamp(),
         'completedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      if (directory.data()?['activeRequestId'] == id) {
-        transaction.update(directoryReference, {'activeRequestId': null});
-      }
-      if (profile.data()?['activeRequestId'] == id) {
-        transaction.update(profileReference, {
-          'activeRequestId': FieldValue.delete(),
-          'activeJobStartedAt': FieldValue.delete(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      }
+      if (directory.data()?['activeRequestId'] == id)
+        tx.update(directoryRef, {'activeRequestId': null});
     });
   }
 

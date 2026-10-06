@@ -15,6 +15,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
   String providerPhone = '';
   int estimatedCost = 0;
   bool cancelled = false;
+  bool arrivalNeedsConfirmation = false;
+  String arrivalLocationHint = '';
+  bool completionPending = false;
+  String completionNotes = '';
+  List<String> completionPhotos = [];
   String? recoveryReason;
   bool hasProviderLocation = false;
   String? requestError;
@@ -23,6 +28,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
   int routeRequestVersion = 0;
   final statuses = const ['Accepted', 'En Route', 'Arrived', 'Completed'];
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? requestListener;
+
+  Future<void> confirmArrival() async {
+    final reason = await _adminReason(
+      context,
+      'Confirm you met the provider. Explain any missing or inaccurate GPS.',
+    );
+    if (reason == null || !mounted || widget.requestId == null) return;
+    try {
+      await RequestService().confirmProviderArrival(widget.requestId!, reason);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
 
   Future<void> replaceDelayedProvider() async {
     final reason = await _adminReason(
@@ -99,6 +120,17 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 setState(() {
                   status = next;
                   cancelled = value == 'cancelled';
+                  arrivalNeedsConfirmation =
+                      data?['arrivalVerificationRequired'] == true &&
+                      data?['arrivalConfirmedBy'] == null;
+                  arrivalLocationHint = updatedPosition == null
+                      ? 'Provider GPS is unavailable. Confirm only if you have met the provider.'
+                      : 'Provider GPS is informational. Confirm only if the provider is physically with you.';
+                  completionPending = data?['completionState'] == 'pending';
+                  completionNotes = data?['serviceNotes'] as String? ?? '';
+                  completionPhotos = (data?['servicePhotoData'] as List? ?? [])
+                      .whereType<String>()
+                      .toList();
                   recoveryReason = data?['cancellationReason'] as String?;
                   requestError = null;
                   providerName =
@@ -358,6 +390,55 @@ class _TrackingScreenState extends State<TrackingScreen> {
               onPressed: replaceDelayedProvider,
               child: const Text(
                 'Provider has not departed? Replace after 10 minutes',
+              ),
+            ),
+          if (!cancelled && status == 2 && arrivalNeedsConfirmation)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(arrivalLocationHint),
+                  FilledButton(
+                    onPressed: confirmArrival,
+                    child: const Text('Confirm provider has arrived'),
+                  ),
+                ],
+              ),
+            ),
+          if (completionPending && widget.requestId != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  const Text(
+                    'Provider submitted completed work. Please review and confirm.',
+                    style: RaText.title,
+                  ),
+                  Text(completionNotes),
+                  RevisionEvidencePhotos(photos: completionPhotos),
+                  FilledButton(
+                    onPressed: () async {
+                      try {
+                        await RequestService().confirmJobCompletion(
+                          widget.requestId!,
+                        );
+                      } catch (error) {
+                        if (context.mounted)
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('$error')));
+                      }
+                    },
+                    child: const Text('Confirm work completed'),
+                  ),
+                  TextButton(
+                    onPressed: () => push(
+                      context,
+                      DisputeScreen(requestId: widget.requestId!),
+                    ),
+                    child: const Text('Problem remains - report to admin'),
+                  ),
+                ],
               ),
             ),
           BottomAction(
