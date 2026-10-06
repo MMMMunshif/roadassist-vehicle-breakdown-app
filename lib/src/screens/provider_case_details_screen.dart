@@ -4,7 +4,7 @@ class ProviderCaseDetailsScreen extends StatelessWidget {
   const ProviderCaseDetailsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ProviderScaffold(
     appBar: AppBar(title: const Text('Case Details')),
     body: ListView(
       padding: const EdgeInsets.all(RaSpace.xl),

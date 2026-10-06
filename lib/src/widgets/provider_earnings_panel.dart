@@ -392,7 +392,7 @@ class _RevenueGraph extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: entry.value == 0
                                           ? Theme.of(context).dividerColor
-                                          : raBlue,
+                                          : providerAction,
                                       borderRadius: const BorderRadius.vertical(
                                         top: Radius.circular(5),
                                       ),
