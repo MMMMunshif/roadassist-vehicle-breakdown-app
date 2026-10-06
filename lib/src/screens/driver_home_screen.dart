@@ -167,6 +167,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     child: ListView(
       padding: EdgeInsets.zero,
       children: [
+        const ServiceNotice(),
         DashboardHeader(
           child: Column(
             children: [

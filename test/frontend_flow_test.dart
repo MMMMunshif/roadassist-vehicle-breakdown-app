@@ -6,6 +6,20 @@ import 'package:road_assist/src/screens.dart';
 Widget testApp(Widget home) => MaterialApp(home: home);
 
 void main() {
+  testWidgets(
+    'driver photo upload is shown for signup and hidden for sign in',
+    (tester) async {
+      await tester.pumpWidget(testApp(const LoginScreen(isProvider: false)));
+      expect(find.text('Add profile photo (required)'), findsNothing);
+      await tester.tap(find.text('Create Account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add profile photo (required)'), findsOneWidget);
+      await tester.tap(find.text('Sign In').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Add profile photo (required)'), findsNothing);
+      expect(find.byTooltip('Add profile photo'), findsNothing);
+    },
+  );
   setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets('breakdown form blocks incomplete requests', (tester) async {
     await tester.pumpWidget(

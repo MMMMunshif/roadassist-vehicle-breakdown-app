@@ -1,12 +1,12 @@
 part of '../screens.dart';
 
-class ProviderShell extends StatefulWidget {
-  const ProviderShell({super.key});
+class ApprovedProviderShell extends StatefulWidget {
+  const ApprovedProviderShell({super.key});
   @override
-  State<ProviderShell> createState() => _ProviderShellState();
+  State<ApprovedProviderShell> createState() => _ApprovedProviderShellState();
 }
 
-class _ProviderShellState extends State<ProviderShell> {
+class _ApprovedProviderShellState extends State<ApprovedProviderShell> {
   int index = 0;
 
   @override

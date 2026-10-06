@@ -119,55 +119,240 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int tab = 0;
-  final tabs = [
+  String accessRole = 'support';
+  List<int> get visibleTabs => accessRole == 'reviewer'
+      ? [0, 1, 4, 5, 6]
+      : accessRole == 'support'
+      ? [0, 2, 3, 4, 5, 6, 7, 8]
+      : List.generate(tabs.length, (i) => i);
+  @override
+  void initState() {
+    super.initState();
+    unawaited(loadAccessRole());
+  }
+
+  Future<void> loadAccessRole() async {
+    try {
+      final access = await FirebaseFirestore.instance
+          .collection('adminAccess')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .get();
+      if (mounted)
+        setState(
+          () => accessRole = access.data()?['role'] as String? ?? 'super_admin',
+        );
+    } catch (_) {}
+  }
+
+  static const tabs = [
     'Overview',
     'Providers',
     'Users',
     'Complaints',
     'Jobs',
     'Audit',
+    'Operations',
+    'Payments',
+    'Reports',
+    'Settings',
+    'Admin team',
   ];
+  static const icons = [
+    Icons.dashboard_outlined,
+    Icons.handyman_outlined,
+    Icons.people_outline,
+    Icons.support_agent,
+    Icons.route_outlined,
+    Icons.history,
+    Icons.monitor_heart_outlined,
+    Icons.payments_outlined,
+    Icons.bar_chart,
+    Icons.settings_outlined,
+    Icons.admin_panel_settings_outlined,
+  ];
+  static const descriptions = [
+    'Your live operations at a glance',
+    'Review provider accounts and verification',
+    'Find and manage RoadAssist accounts',
+    'Review reports, evidence and decisions',
+    'Monitor assistance and service progress',
+    'Trace administrative decisions',
+    'Review waiting requests and delayed updates',
+    'Reconcile manually reported payments',
+    'Explore and export loaded job metrics',
+    'Manage notices and service availability',
+    'Review private administrative access',
+  ];
+
+  Widget content() => switch (tab) {
+    0 => const _AdminOverview(),
+    1 => const _AdminRecords(key: ValueKey('providers'), kind: 'providers'),
+    2 => const _AdminRecords(key: ValueKey('users'), kind: 'users'),
+    3 => const _AdminRecords(key: ValueKey('complaints'), kind: 'complaints'),
+    4 => const _AdminRecords(key: ValueKey('jobs'), kind: 'jobs'),
+    5 => const _AdminRecords(key: ValueKey('audit'), kind: 'audit'),
+    6 => const _AdminOperationsPanel(
+      key: ValueKey('operations'),
+      mode: 'operations',
+    ),
+    7 => const _AdminOperationsPanel(
+      key: ValueKey('payments'),
+      mode: 'payments',
+    ),
+    8 => const _AdminOperationsPanel(key: ValueKey('reports'), mode: 'reports'),
+    9 => const _AdminSettingsPanel(),
+    _ => const _AdminTeamPanel(),
+  };
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Admin dashboard'),
-      actions: [
-        IconButton(
-          onPressed: widget.onSignOut,
-          tooltip: 'Sign out',
-          icon: const Icon(Icons.logout),
-        ),
-      ],
-    ),
-    body: Column(
-      children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
+    body: SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 850;
+          final colors = Theme.of(context).colorScheme;
+          return Row(
             children: [
-              for (var i = 0; i < tabs.length; i++)
-                Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: ChoiceChip(
-                    label: Text(tabs[i]),
-                    selected: tab == i,
-                    onSelected: (_) => setState(() => tab = i),
+              if (wide)
+                Container(
+                  width: 210,
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerLow,
+                    border: Border(
+                      right: BorderSide(color: colors.outlineVariant),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(24, 30, 24, 4),
+                        child: Text(
+                          'RoadAssist',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                        child: Text(
+                          'ADMIN WORKSPACE',
+                          style: TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 1.5,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          children: [
+                            for (final i in visibleTabs)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                child: ListTile(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  selected: tab == i,
+                                  selectedTileColor: colors.primaryContainer,
+                                  selectedColor: colors.onPrimaryContainer,
+                                  leading: Icon(icons[i]),
+                                  title: Text(tabs[i]),
+                                  onTap: () => setState(() => tab = i),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Private access\nAll moderation actions are audited.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(wide ? 28 : 16, 24, 16, 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tabs[tab],
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  descriptions[tab],
+                                  style: TextStyle(
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: widget.onSignOut,
+                            tooltip: 'Sign out',
+                            icon: const Icon(Icons.logout),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!wide)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            for (final i in visibleTabs)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  right: 8,
+                                  bottom: 12,
+                                ),
+                                child: ChoiceChip(
+                                  avatar: Icon(icons[i], size: 18),
+                                  label: Text(tabs[i]),
+                                  selected: tab == i,
+                                  onSelected: (_) => setState(() => tab = i),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.all(wide ? 20 : 12),
+                        child: content(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
-          ),
-        ),
-        Expanded(
-          child: switch (tab) {
-            0 => const _AdminOverview(),
-            1 => const _AdminRecords(kind: 'providers'),
-            2 => const _AdminRecords(kind: 'users'),
-            3 => const _AdminRecords(kind: 'complaints'),
-            4 => const _AdminRecords(kind: 'jobs'),
-            _ => const _AdminRecords(kind: 'audit'),
-          },
-        ),
-      ],
+          );
+        },
+      ),
     ),
   );
 }
@@ -199,7 +384,13 @@ class _AdminOverview extends StatelessWidget {
             if (!snapshot.hasData) return const LinearProgressIndicator();
             final records = snapshot.data!.docs;
             final count = section == 'providerDirectory'
-                ? records.where((d) => d.data()['online'] == true).length
+                ? records
+                      .where(
+                        (d) =>
+                            d.data()['online'] == true &&
+                            _providerHasCurrentVerification(d.data()),
+                      )
+                      .length
                 : section == 'requests'
                 ? records
                       .where(
@@ -233,7 +424,7 @@ class _AdminOverview extends StatelessWidget {
 }
 
 class _AdminRecords extends StatefulWidget {
-  const _AdminRecords({required this.kind});
+  const _AdminRecords({super.key, required this.kind});
   final String kind;
   @override
   State<_AdminRecords> createState() => _AdminRecordsState();
@@ -357,35 +548,71 @@ class _AdminRecordsState extends State<_AdminRecords> {
                       pendingOnly: widget.kind == 'providers' && onlyAttention,
                     )
                   else
-                    ListTile(
-                      title: Text(
-                        (doc.data()['displayName'] ??
-                                doc.data()['driverName'] ??
-                                doc.data()['kind'] ??
-                                doc.id)
-                            .toString(),
-                      ),
-                      subtitle: Text(
-                        widget.kind == 'users' || widget.kind == 'providers'
-                            ? '${doc.data()['email'] ?? ''}\n${doc.data()['role']}'
-                            : widget.kind == 'audit'
-                            ? '${doc.data()['actor']}\n${doc.data()['reason']}'
-                            : '${doc.data()['status']}\n${doc.data()['description'] ?? doc.data()['issue'] ?? ''}',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => push(
-                        context,
-                        widget.kind == 'users' || widget.kind == 'providers'
-                            ? _AdminAccountScreen(uid: doc.id)
-                            : widget.kind == 'complaints'
-                            ? _AdminComplaintScreen(
-                                requestId: doc.reference.parent.parent!.id,
-                              )
-                            : widget.kind == 'jobs'
-                            ? AdminJobMonitorScreen(requestId: doc.id)
-                            : _AdminAuditScreen(data: doc.data()),
+                    Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        leading: CircleAvatar(
+                          child: Icon(
+                            widget.kind == 'jobs'
+                                ? Icons.route_outlined
+                                : widget.kind == 'complaints'
+                                ? Icons.support_agent
+                                : Icons.history,
+                          ),
+                        ),
+                        title: Text(
+                          (doc.data()['displayName'] ??
+                                  doc.data()['driverName'] ??
+                                  doc.data()['kind'] ??
+                                  doc.id)
+                              .toString(),
+                        ),
+                        subtitle: Text(
+                          widget.kind == 'users' || widget.kind == 'providers'
+                              ? '${doc.data()['email'] ?? ''}\n${doc.data()['role']}'
+                              : widget.kind == 'audit'
+                              ? '${doc.data()['actor']}\n${doc.data()['reason']}'
+                              : '${doc.data()['status']}\n${doc.data()['description'] ?? doc.data()['issue'] ?? ''}',
+                        ),
+                        trailing: Wrap(
+                          spacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (widget.kind != 'audit')
+                              _AdminStatusBadge(
+                                status: (doc.data()['status'] ?? 'open')
+                                    .toString(),
+                              ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () => push(
+                          context,
+                          widget.kind == 'users' || widget.kind == 'providers'
+                              ? _AdminAccountScreen(uid: doc.id)
+                              : widget.kind == 'complaints'
+                              ? _AdminComplaintScreen(
+                                  requestId: doc.reference.parent.parent!.id,
+                                )
+                              : widget.kind == 'jobs'
+                              ? AdminJobMonitorScreen(requestId: doc.id)
+                              : _AdminAuditScreen(data: doc.data()),
+                        ),
                       ),
                     ),
+                if (docs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        'No matching records. Try another search or filter.',
+                      ),
+                    ),
+                  ),
                 if (snapshot.data!.docs.length == limit)
                   OutlinedButton(
                     onPressed: () => setState(() {
@@ -403,19 +630,53 @@ class _AdminRecordsState extends State<_AdminRecords> {
   );
 }
 
-Future<String?> _adminReason(BuildContext context, String title) async {
+Future<String?> _adminReason(
+  BuildContext context,
+  String title, {
+  String? expectedId,
+}) async {
   final controller = TextEditingController();
+  final formKey = GlobalKey<FormState>();
   final result = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
       title: Text(title),
-      content: TextField(
-        controller: controller,
-        maxLength: 500,
-        minLines: 2,
-        maxLines: 5,
-        decoration: const InputDecoration(
-          labelText: 'Reason (at least 10 characters)',
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (expectedId != null) ...[
+              const Text(
+                'Copy this account ID and paste it below to confirm deletion:',
+              ),
+              SelectableText(expectedId),
+              const SizedBox(height: 12),
+            ],
+            TextFormField(
+              controller: controller,
+              maxLength: expectedId == null ? 500 : 128,
+              minLines: expectedId == null ? 2 : 1,
+              maxLines: expectedId == null ? 5 : 1,
+              decoration: InputDecoration(
+                labelText: expectedId == null
+                    ? 'Reason (at least 10 characters)'
+                    : 'Account ID',
+                errorMaxLines: 3,
+              ),
+              validator: (value) {
+                final text = (value ?? '').trim();
+                if (expectedId != null)
+                  return text == expectedId
+                      ? null
+                      : 'Paste the exact account ID shown above.';
+                return text.length >= 10
+                    ? null
+                    : 'Enter a reason with at least 10 characters.';
+              },
+            ),
+          ],
         ),
       ),
       actions: [
@@ -425,7 +686,7 @@ Future<String?> _adminReason(BuildContext context, String title) async {
         ),
         FilledButton(
           onPressed: () {
-            if (controller.text.trim().length >= 10)
+            if (formKey.currentState!.validate())
               Navigator.pop(context, controller.text.trim());
           },
           child: const Text('Confirm'),
@@ -433,7 +694,6 @@ Future<String?> _adminReason(BuildContext context, String title) async {
       ],
     ),
   );
-  // Dialog closing animation may still read the controller.
   Future<void>.delayed(const Duration(milliseconds: 400), controller.dispose);
   return result;
 }
@@ -493,86 +753,127 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
     }
   }
 
+  Future<void> deleteAccount() async {
+    final reason = await _adminReason(
+      context,
+      'Deletion reason (job, payment and complaint records are retained)',
+    );
+    if (reason == null || !mounted) return;
+    final confirmation = await _adminReason(
+      context,
+      'Confirm permanent deletion',
+      expectedId: widget.uid,
+    );
+    if (confirmation != widget.uid || !mounted) return;
+    setState(() => busy = true);
+    try {
+      await AdminService().deleteAccount(widget.uid, reason, confirmation!);
+      if (mounted) Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Account review')),
     body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: user,
-      builder: (context, snapshot) =>
-          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: moderation,
-            builder: (context, review) {
-              if (snapshot.hasError || review.hasError)
-                return const Center(child: Text('Could not load account.'));
-              if (!snapshot.hasData || !review.hasData)
-                return const Center(child: CircularProgressIndicator());
-              final data = snapshot.data!.data();
-              if (data == null)
-                return const Center(child: Text('Profile no longer exists.'));
-              final decision = review.data!.data() ?? {};
-              final own = FirebaseAuth.instance.currentUser?.uid == widget.uid;
-              return ListView(
-                padding: const EdgeInsets.all(24),
+      builder: (context, snapshot) => StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: moderation,
+        builder: (context, review) {
+          if (snapshot.hasError || review.hasError)
+            return const Center(child: Text('Could not load account.'));
+          if (!snapshot.hasData || !review.hasData)
+            return const Center(child: CircularProgressIndicator());
+          final data = snapshot.data!.data();
+          if (data == null)
+            return const Center(child: Text('Profile no longer exists.'));
+          final decision = review.data!.data() ?? {};
+          final own = FirebaseAuth.instance.currentUser?.uid == widget.uid;
+          return ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                data['displayName'] as String? ?? widget.uid,
+                style: RaText.headline,
+              ),
+              SummaryRow('Email', data['email'] as String? ?? ''),
+              SummaryRow('Phone', data['phone'] as String? ?? ''),
+              SummaryRow('Role', data['role'] as String? ?? ''),
+              SummaryRow('Access', decision['status'] as String? ?? 'active'),
+              SummaryRow(
+                'Verification',
+                decision['verification'] as String? ?? 'pending',
+              ),
+              SummaryRow('Flagged', '${decision['flagged'] ?? false}'),
+              if (decision['reason'] != null)
+                Text('Last reason: ${decision['reason']}'),
+              const Text(
+                'Suspension blocks app database operations. It does not disable Firebase login. Check active jobs before suspending a participant.',
+              ),
+              if (data['role'] == 'provider') ...[
+                Text(
+                  'Services: ${(data['services'] as List? ?? []).join(', ')}',
+                ),
+                if (data['photoData'] is String)
+                  RevisionEvidencePhotos(photos: [data['photoData'] as String]),
+                const Text(
+                  'Review the private application and complete the checklist before approving.',
+                ),
+              ],
+              Wrap(
+                spacing: 8,
                 children: [
-                  Text(
-                    data['displayName'] as String? ?? widget.uid,
-                    style: RaText.headline,
-                  ),
-                  SummaryRow('Email', data['email'] as String? ?? ''),
-                  SummaryRow('Role', data['role'] as String? ?? ''),
-                  SummaryRow(
-                    'Access',
-                    decision['status'] as String? ?? 'active',
-                  ),
-                  SummaryRow(
-                    'Verification',
-                    decision['verification'] as String? ?? 'pending',
-                  ),
-                  SummaryRow('Flagged', '${decision['flagged'] ?? false}'),
-                  if (decision['reason'] != null)
-                    Text('Last reason: ${decision['reason']}'),
-                  const Text(
-                    'Suspension blocks app database operations. It does not disable Firebase login. Check active jobs before suspending a participant.',
-                  ),
-                  if (data['role'] == 'provider') ...[
-                    Text(
-                      'Services: ${(data['services'] as List? ?? []).join(', ')}',
+                  for (final action in [
+                    'Suspend',
+                    'Restore',
+                    'Flag',
+                    'Clear flag',
+                  ])
+                    OutlinedButton(
+                      onPressed:
+                          busy ||
+                              (own && ['Suspend', 'Reject'].contains(action))
+                          ? null
+                          : () => change(action),
+                      child: Text(action),
                     ),
-                    if (data['photoData'] is String)
-                      RevisionEvidencePhotos(
-                        photos: [data['photoData'] as String],
-                      ),
-                    const Text(
-                      'Verification is a manual review of the available profile. A document submission workflow is not yet available.',
-                    ),
-                  ],
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      for (final action in [
-                        if (data['role'] == 'provider') ...['Verify', 'Reject'],
-                        'Suspend',
-                        'Restore',
-                        'Flag',
-                        'Clear flag',
-                      ])
-                        OutlinedButton(
-                          onPressed:
-                              busy ||
-                                  (own &&
-                                      ['Suspend', 'Reject'].contains(action))
-                              ? null
-                              : () => change(action),
-                          child: Text(action),
-                        ),
-                    ],
-                  ),
-                  _AdminPrivateNotes(kind: 'account', target: widget.uid),
-                  if (busy) const LinearProgressIndicator(),
                 ],
-              );
-            },
-          ),
+              ),
+              if (data['role'] == 'provider')
+                _AdminVerificationPanel(uid: widget.uid),
+              _AdminUserActivity(uid: widget.uid),
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('adminAccess')
+                    .doc(FirebaseAuth.instance.currentUser!.uid)
+                    .snapshots(),
+                builder: (context, access) {
+                  final role = access.data?.data()?['role'] ?? 'super_admin';
+                  if (!access.hasData || role != 'super_admin')
+                    return const SizedBox.shrink();
+                  return OutlinedButton.icon(
+                    onPressed: busy || own ? null : deleteAccount,
+                    icon: const Icon(Icons.person_remove),
+                    label: const Text('Delete account permanently'),
+                  );
+                },
+              ),
+              const Text(
+                'Deletion removes login, profile, vehicles, device tokens and verification documents. Job, payment, complaint and audit records remain. Active jobs, unconfirmed payments and unresolved complaints block deletion.',
+              ),
+              _AdminPrivateNotes(kind: 'account', target: widget.uid),
+              if (busy) const LinearProgressIndicator(),
+            ],
+          );
+        },
+      ),
     ),
   );
 }
@@ -586,6 +887,7 @@ class _AdminComplaintScreen extends StatefulWidget {
 
 class _AdminComplaintScreenState extends State<_AdminComplaintScreen> {
   String priority = 'normal';
+  DateTime dueAt = DateTime.now().add(const Duration(days: 2));
   bool busy = false;
   late final review = FirebaseFirestore.instance
       .collection('complaintReviews')
@@ -600,6 +902,7 @@ class _AdminComplaintScreenState extends State<_AdminComplaintScreen> {
         widget.requestId,
         status: status,
         priority: priority,
+        dueAt: dueAt,
         decision: reason,
       );
     } catch (_) {
@@ -651,6 +954,10 @@ class _AdminComplaintScreenState extends State<_AdminComplaintScreen> {
                   'Priority',
                   data?['priority'] as String? ?? 'normal',
                 ),
+                if (data?['dueAt'] is Timestamp)
+                  Text(
+                    'Follow-up deadline: ${(data!['dueAt'] as Timestamp).toDate().toLocal()}',
+                  ),
                 if (data?['decision'] is String)
                   Text(data!['decision'] as String),
               ],
@@ -667,6 +974,30 @@ class _AdminComplaintScreenState extends State<_AdminComplaintScreen> {
               DropdownMenuItem(value: value, child: Text(value)),
           ],
           onChanged: busy ? null : (value) => setState(() => priority = value!),
+        ),
+        OutlinedButton(
+          onPressed: busy
+              ? null
+              : () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: dueAt,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 30)),
+                  );
+                  if (picked != null && mounted)
+                    setState(
+                      () => dueAt = picked.add(
+                        const Duration(hours: 23, minutes: 59),
+                      ),
+                    );
+                },
+          child: Text(
+            'Follow-up deadline: ${dueAt.toLocal().toString().split(' ').first}',
+          ),
+        ),
+        const Text(
+          'Start review also reopens an existing resolved review; give a reason.',
         ),
         for (final status in ['under_review', 'resolved', 'dismissed'])
           OutlinedButton(
@@ -790,8 +1121,15 @@ class _AdminUserRowState extends State<_AdminUserRow> {
         return const ListTile(title: Text('Could not load account review.'));
       if (!snapshot.hasData) return const LinearProgressIndicator();
       final data = snapshot.data!.data() ?? {};
-      final status = data['verification'] ?? 'pending';
-      if (widget.pendingOnly && status != 'pending')
+      final status =
+          data['verification'] == 'verified' &&
+              !((data['validUntil'] as Timestamp?)?.toDate().isAfter(
+                    DateTime.now(),
+                  ) ??
+                  false)
+          ? 'pending renewal'
+          : data['verification'] ?? 'pending';
+      if (widget.pendingOnly && !status.toString().startsWith('pending'))
         return const SizedBox.shrink();
       return ListTile(
         title: Text(widget.data['displayName'] as String? ?? widget.uid),
@@ -840,6 +1178,47 @@ class _AdminJobMonitorScreenState extends State<AdminJobMonitorScreen> {
           children: [
             Text(widget.requestId, style: RaText.title),
             SummaryRow('Status', data['status'] as String? ?? ''),
+            Wrap(
+              spacing: 8,
+              children: [
+                if ((data['driverPhone'] as String? ?? '').isNotEmpty)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.call_outlined),
+                    label: const Text('Call driver'),
+                    onPressed: () => showCallPrompt(
+                      context,
+                      name: 'driver',
+                      number: data['driverPhone'] as String,
+                    ),
+                  ),
+                if ((data['providerPhone'] as String? ?? '').isNotEmpty)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.call_outlined),
+                    label: const Text('Call provider'),
+                    onPressed: () => showCallPrompt(
+                      context,
+                      name: 'provider',
+                      number: data['providerPhone'] as String,
+                    ),
+                  ),
+              ],
+            ),
+            if (active && data['providerId'] is String)
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('providerDirectory')
+                    .doc(data['providerId'] as String)
+                    .snapshots(),
+                builder: (context, presence) {
+                  if (presence.hasError || !presence.hasData)
+                    return const SizedBox.shrink();
+                  return Text(
+                    presence.data?.data()?['online'] == true
+                        ? 'Assigned provider availability: online'
+                        : 'Assigned provider availability: offline. Contact the provider if a job update is overdue.',
+                  );
+                },
+              ),
             SummaryRow('Driver', data['driverName'] as String? ?? ''),
             SummaryRow(
               'Provider',
@@ -948,4 +1327,32 @@ class _AdminPrivateNotesState extends State<_AdminPrivateNotes> {
       ),
     ],
   );
+}
+
+class _AdminStatusBadge extends StatelessWidget {
+  const _AdminStatusBadge({required this.status});
+  final String status;
+  @override
+  Widget build(BuildContext context) {
+    final color = status == 'completed' || status == 'resolved'
+        ? Colors.teal
+        : status == 'cancelled' || status == 'rejected'
+        ? Colors.redAccent
+        : Colors.blue;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        status.replaceAll('_', ' '),
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 }
