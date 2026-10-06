@@ -61,7 +61,10 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                     'en_route' => 'Your provider is on the way',
                     'arrived' => 'Your provider has arrived',
                     'completed' => 'Your assistance request is complete',
-                    'cancelled' => 'This request was cancelled',
+                    'cancelled' =>
+                      data['cancellationReason'] == null
+                          ? 'This request was cancelled'
+                          : 'Provider unavailable: ${data['cancellationReason']}. Open the request to find another provider',
                     _ => 'Request status updated',
                   };
                   return Card(
