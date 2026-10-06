@@ -68,6 +68,7 @@ part 'screens/driver_profile_screen.dart';
 part 'screens/support_screen.dart';
 part 'screens/privacy_safety_screen.dart';
 part 'screens/emergency_screen.dart';
+part 'screens/provider_theme.dart';
 part 'screens/provider_shell.dart';
 part 'screens/provider_home_screen.dart';
 part 'screens/provider_notifications_screen.dart';
