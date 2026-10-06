@@ -304,7 +304,7 @@ service cloud.firestore {
           || (request.resource.data.activeRequestId == null
             && resource.data.activeRequestId is string
             && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.driverId == request.auth.uid
-            && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.status == 'cancelled'));
+            && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.status in ['cancelled','completed']));
       allow delete: if signedIn()
         && isProvider()
         && request.auth.uid == providerId
@@ -317,6 +317,8 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
         && isDriver()
         && request.resource.data.driverId == request.auth.uid
+        && request.resource.data.arrivalVerificationRequired == true
+        && !request.resource.data.keys().hasAny(['arrivalConfirmedBy','arrivalConfirmedAt','arrivalConfirmationMethod','arrivalConfirmationReason','arrivalDistanceMeters'])
         && request.resource.data.providerId == null
         && request.resource.data.status == 'searching'
         && (!('workflowVersion' in request.resource.data) || request.resource.data.workflowVersion == 2)
@@ -381,7 +383,7 @@ service cloud.firestore {
           'driverId', 'driverName', 'driverPhone', 'providerId',
           'preferredProviderId', 'preferredProviderName', 'rejectedBy',
           'status', 'issue', 'issues', 'vehicleType', 'modelYear', 'registration',
-          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'partsPreference',
+          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'partsPreference', 'arrivalVerificationRequired',
           'description', 'notes', 'priority', 'vehiclePhotoUrls',
           'photoAnnotations', 'locationLabel', 'landmark',
           'locationAccuracyMeters', 'latitude', 'longitude', 'serviceFee', 'dispatchFee',
@@ -573,14 +575,40 @@ service cloud.firestore {
             'rejectedBy', 'preferredProviderId', 'preferredProviderName',
             'fallbackStartedAt', 'updatedAt'
           ]))
+        || (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('arrivalConfirmedBy',null) == null
+          && request.resource.data.arrivalConfirmedBy == request.auth.uid
+          && request.resource.data.arrivalConfirmedAt == request.time && request.resource.data.updatedAt == request.time
+          && request.resource.data.arrivalConfirmationMethod in ['gps_nearby_driver','manual_driver']
+          && request.resource.data.arrivalConfirmationReason is string && request.resource.data.arrivalConfirmationReason.size() <= 500
+          && (request.resource.data.arrivalConfirmationMethod != 'manual_driver' || request.resource.data.arrivalConfirmationReason.size() >= 10)
+          && (request.resource.data.arrivalDistanceMeters == null || (request.resource.data.arrivalDistanceMeters is number && request.resource.data.arrivalDistanceMeters >= 0 && request.resource.data.arrivalDistanceMeters <= 21000000))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['arrivalConfirmedBy','arrivalConfirmedAt','arrivalConfirmationMethod','arrivalConfirmationReason','arrivalDistanceMeters','updatedAt']))
+        || (resource.data.providerId == request.auth.uid && resource.data.status == 'arrived'
+          && (!resource.data.get('arrivalVerificationRequired',false) || resource.data.get('arrivalConfirmedBy','') == resource.data.driverId)
+          && resource.data.get('completionState','') != 'pending'
+          && request.resource.data.completionState == 'pending'
+          && request.resource.data.completionSubmittedAt == request.time && request.resource.data.updatedAt == request.time
+          && resource.data.serviceNotes is string && resource.data.serviceNotes.size() >= 10
+          && resource.data.servicePhotoData is list && resource.data.servicePhotoData.size() > 0
+          && request.resource.data.finalCost is int && request.resource.data.finalCost >= 0 && request.resource.data.finalCost <= resource.data.estimatedCost
+          && resource.data.get('pendingRepairId',null) == null
+          && (resource.data.get('approvedQuoteType','direct') != 'inspection' || resource.data.get('approvedRepairId',null) is string)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completionState','completionSubmittedAt','finalCost','updatedAt']))
+        || (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('completionState','') == 'pending'
+          && (!exists(/databases/$(database)/documents/requests/$(requestId)/disputes/case) || (exists(/databases/$(database)/documents/complaintReviews/$(requestId)) && get(/databases/$(database)/documents/complaintReviews/$(requestId)).data.status in ['resolved','dismissed']))
+          && request.resource.data.status == 'completed' && request.resource.data.completionState == 'confirmed'
+          && request.resource.data.driverCompletedAt == request.time && request.resource.data.completedAt == request.time && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completionState','driverCompletedAt','completedAt','updatedAt']))
         // Assigned provider: strict job-status progression.
         || (resource.data.providerId == request.auth.uid
           && ((resource.data.status == 'accepted'
                 && request.resource.data.status == 'en_route')
             || (resource.data.status == 'en_route'
                 && request.resource.data.status == 'arrived')
-            || (resource.data.status == 'arrived'
-                && request.resource.data.status == 'completed'))
+)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'en_routeAt', 'arrivedAt', 'completedAt', 'finalCost',
             'updatedAt'
@@ -601,6 +629,8 @@ service cloud.firestore {
         // Assigned provider can add service notes and compressed evidence photos.
         || (resource.data.providerId == request.auth.uid
           && resource.data.status in ['accepted', 'en_route', 'arrived']
+          && (!resource.data.get('arrivalVerificationRequired',false) || resource.data.get('arrivalConfirmedBy','') == resource.data.driverId)
+          && resource.data.get('completionState','') != 'pending'
           && request.resource.data.serviceNotes is string
           && request.resource.data.serviceNotes.size() <= 500
           && request.resource.data.servicePhotoData is list
@@ -648,7 +678,7 @@ service cloud.firestore {
         function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
         allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
         allow create: if isProvider() && job().providerId == request.auth.uid
-          && job().workflowVersion == 2 && job().status == 'arrived'
+          && job().workflowVersion == 2 && job().status == 'arrived' && (!job().get('arrivalVerificationRequired',false) || job().get('arrivalConfirmedBy','') == job().driverId) && job().get('completionState','') != 'pending'
           && request.resource.data.keys().hasOnly(['providerId', 'previousTotal', 'serviceFee', 'travelFee', 'extraFee', 'total', 'diagnosisAndWork', 'changeReason', 'evidencePhotoData', 'createdAt'])
           && request.resource.data.providerId == request.auth.uid
           && (!('pendingRepairId' in job()) || job().pendingRepairId == null)
@@ -694,7 +724,7 @@ service cloud.firestore {
             && (p.size() < 2 || (p[1] is string && p[1].size() > 0 && p[1].size() <= 210000));
         }
         allow read: if participant();
-        allow create: if participant() && caseId == 'case' && job().status == 'completed'
+        allow create: if participant() && caseId == 'case' && (job().status == 'completed' || (job().status == 'arrived' && job().get('completionState','') == 'pending'))
           && job().driverId == request.auth.uid && job().providerId is string
           && request.resource.data.keys().hasAll(['driverId','providerId','reason','description','photos','status','providerResponse','resolution','approvedTotal','finalTotal','createdAt','updatedAt'])
           && request.resource.data.keys().hasOnly(['driverId','providerId','reason','description','photos','status','providerResponse','resolution','approvedTotal','finalTotal','createdAt','updatedAt'])

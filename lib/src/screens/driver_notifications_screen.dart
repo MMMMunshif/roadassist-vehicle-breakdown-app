@@ -59,7 +59,10 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                     'accepted' =>
                       '${data['providerName'] ?? 'A provider'} accepted your request',
                     'en_route' => 'Your provider is on the way',
-                    'arrived' => 'Your provider has arrived',
+                    'arrived' =>
+                      data['completionState'] == 'pending'
+                          ? 'Work submitted - confirm completion or report a problem'
+                          : 'Your provider has arrived',
                     'completed' => 'Your assistance request is complete',
                     'cancelled' =>
                       data['cancellationReason'] == null
