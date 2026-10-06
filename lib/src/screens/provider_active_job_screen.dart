@@ -30,6 +30,26 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   List<String> servicePhotos = <String>[];
   bool savingDocumentation = false;
 
+  Future<void> withdraw() async {
+    final reason = await _adminReason(
+      context,
+      'Why can you no longer attend this job?',
+    );
+    if (reason == null || !mounted || widget.requestId == null) return;
+    setState(() => updatingStatus = true);
+    try {
+      await RequestService().withdrawProvider(widget.requestId!, reason);
+      if (mounted) replace(context, const ProviderShell());
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => updatingStatus = false);
+    }
+  }
+
   static const backendStatuses = [
     'accepted',
     'en_route',
@@ -764,6 +784,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                 ],
               ),
             ),
+            if (!requestCancelled && status < 2)
+              TextButton(
+                onPressed: updatingStatus ? null : withdraw,
+                child: const Text('Cancel attendance - give reason'),
+              ),
             BottomAction(
               label: updatingStatus
                   ? 'Updating status...'

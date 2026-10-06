@@ -418,3 +418,39 @@ test('simplified provider application accepts omitted optional answers without i
   const basic={...professionalDetails(),workHistory:'',qualification:'',trainingInstitute:'',qualificationYear:0,specializations:'',coverageAreas:'',startTime:'',endTime:'',languages:[],workDays:[],tools:[]};
   await assertSucceeds(setDoc(doc(db,'providerApplications/simple-provider'),{...application(),businessName:'',emergencyPhone:'',professionalDetails:basic}));
 });
+test('provider withdrawal requires reason and atomic release and preserves charges', async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'provider',acceptedAt:Timestamp.now(),estimatedCost:1800});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const change={status:'cancelled',cancelledBy:'provider',cancellationType:'provider_withdrawal',cancellationReason:'Vehicle equipment broke down.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(db,'requests/r1'),change));
+  const batch=writeBatch(db); batch.update(doc(db,'requests/r1'),change); batch.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});
+  await assertSucceeds(batch.commit());
+  const saved=(await getDoc(doc(db,'requests/r1'))).data();
+  if(saved.estimatedCost!==1800) throw new Error('Approved price was changed');
+});
+test('departure timeout rejects premature cancellation and allows driver recovery after ten minutes', async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'provider',acceptedAt:Timestamp.now()});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('driver').firestore();
+  const change={status:'cancelled',cancelledBy:'driver',cancellationType:'departure_timeout',cancellationReason:'Provider has not departed or replied.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  function cancel(){ const b=writeBatch(db);b.update(doc(db,'requests/r1'),change);b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});return b.commit(); }
+  await assertFails(cancel());
+  await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'requests/r1'),{acceptedAt:Timestamp.fromMillis(Date.now()-11*60000)}));
+  await assertSucceeds(cancel());
+});
+test('providers cannot abandon arrived jobs or cancel another provider assignment',async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider'});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const change={status:'cancelled',cancelledBy:'provider',cancellationType:'provider_withdrawal',cancellationReason:'Cannot attend this job anymore.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const b=writeBatch(db);b.update(doc(db,'requests/r1'),change);b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});await assertFails(b.commit());
+  await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'someone-else'}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),change));
+});
