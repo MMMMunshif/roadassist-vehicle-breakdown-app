@@ -9,7 +9,7 @@ class ProviderCompletedScreen extends StatelessWidget {
   final String requestId;
   final Map<String, dynamic> requestData;
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ProviderScaffold(
     appBar: AppBar(
       title: const Text('Completed'),
       actions: [

@@ -440,7 +440,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
       data['modelYear'] as String? ?? '',
       data['registration'] as String? ?? '',
     ].where((value) => value.isNotEmpty).join(' - ');
-    return Scaffold(
+    return ProviderScaffold(
       appBar: AppBar(title: const Text('Active Assistance')),
       body: SafeArea(
         child: Column(
@@ -458,7 +458,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                     padding: const EdgeInsets.all(RaSpace.lg),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF397DBD), Color(0xFF2F6FAE)],
+                        colors: [providerSurfaceStrong, providerRoyalBlue],
                       ),
                       borderRadius: BorderRadius.circular(RaRadius.lg),
                     ),
@@ -673,7 +673,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                                   RaRadius.md,
                                 ),
                                 border: Border.all(
-                                  color: raBlue,
+                                  color: providerAction,
                                   style: BorderStyle.solid,
                                 ),
                               ),
@@ -689,7 +689,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                                         )
                                       : const Icon(
                                           Icons.add_a_photo_outlined,
-                                          color: raBlue,
+                                          color: providerAction,
                                         ),
                                   const SizedBox(height: 6),
                                   const Text('Add Photo', style: RaText.label),

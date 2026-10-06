@@ -30,7 +30,7 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
         (data['vehiclePhotoUrls'] as List<dynamic>? ?? const [])
             .whereType<String>()
             .toList();
-    return Scaffold(
+    return ProviderScaffold(
       appBar: AppBar(
         title: const Text('Case Details'),
         actions: [
