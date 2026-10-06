@@ -310,16 +310,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
           finalCost!,
         );
         if (mounted) {
-          final completedData = Map<String, dynamic>.from(requestData)
-            ..['finalCost'] = finalCost
-            ..['status'] = 'completed'
-            ..['serviceNotes'] = serviceNotesController.text.trim()
-            ..['servicePhotoData'] = servicePhotos;
-          replace(
-            context,
-            ProviderCompletedScreen(
-              requestId: widget.requestId!,
-              requestData: completedData,
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Completion submitted. Waiting for driver confirmation.',
+              ),
             ),
           );
         }
@@ -469,7 +464,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(RaSpace.xl),
                 children: [
-                  if (widget.requestId != null)
+                  if (widget.requestId != null &&
+                      (data['arrivalVerificationRequired'] != true ||
+                          data['arrivalConfirmedBy'] == data['driverId']))
                     RepairQuotePanel(
                       requestId: widget.requestId!,
                       isProvider: true,
@@ -775,7 +772,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      onPressed: savingDocumentation ? null : saveDocumentation,
+                      onPressed:
+                          savingDocumentation ||
+                              data['completionState'] == 'pending'
+                          ? null
+                          : saveDocumentation,
                       icon: const Icon(Icons.save_outlined),
                       label: const Text('Save Notes'),
                     ),
@@ -789,9 +790,20 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                 onPressed: updatingStatus ? null : withdraw,
                 child: const Text('Cancel attendance - give reason'),
               ),
+            if (status == 2 &&
+                data['arrivalVerificationRequired'] == true &&
+                data['arrivalConfirmedBy'] == null)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Waiting for driver arrival confirmation. Do not begin repair work until the driver confirms.',
+                ),
+              ),
             BottomAction(
               label: updatingStatus
                   ? 'Updating status...'
+                  : data['completionState'] == 'pending'
+                  ? 'Waiting for driver confirmation'
                   : requestCancelled
                   ? 'Back to Dashboard'
                   : status == 3
@@ -799,6 +811,10 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                   : 'Mark as ${statuses[status + 1]}',
               enabled:
                   !updatingStatus &&
+                  data['completionState'] != 'pending' &&
+                  (status != 2 ||
+                      data['arrivalVerificationRequired'] != true ||
+                      data['arrivalConfirmedBy'] == data['driverId']) &&
                   widget.requestId != null &&
                   (requestCancelled ||
                       status != 2 ||

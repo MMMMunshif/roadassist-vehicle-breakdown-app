@@ -79,12 +79,16 @@ test('approved direct-service job progresses and releases its provider', async (
   const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{providerMessagesSeenAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{providerLatitude:6.9,providerLongitude:79.9,providerLocationUpdatedAt:serverTimestamp()}));
-  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{serviceNotes:'Tyre repair',servicePhotoData:[],documentationUpdatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{serviceNotes:'Tyre repair complete',servicePhotoData:['photo'],documentationUpdatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{status:'en_route',en_routeAt:serverTimestamp(),updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{status:'arrived',arrivedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  const batch = writeBatch(db);
-  batch.update(doc(db,'requests/r1'),{status:'completed',finalCost:1500,completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
-  batch.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});
+  await assertFails(updateDoc(doc(db,'requests/r1'),{status:'completed',finalCost:1500,completedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{completionState:'pending',finalCost:1500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),{serviceNotes:'Changed evidence after submission',documentationUpdatedAt:serverTimestamp()}));
+  const driver = env.authenticatedContext('driver').firestore();
+  const batch = writeBatch(driver);
+  batch.update(doc(driver,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  batch.update(doc(driver,'providerDirectory/provider'),{activeRequestId:null});
   await assertSucceeds(batch.commit());
 });
 test('inspection-only job requires repair approval and revisions are immutable', async () => {
@@ -109,7 +113,8 @@ test('inspection-only job requires repair approval and revisions are immutable',
   await assertSucceeds(decision.commit());
   await assertFails(updateDoc(doc(driver,'requests/r1/repairDecisions/change-1'),{decision:'rejected'}));
   await assertFails(updateDoc(doc(provider,'requests/r1/repairQuotes/change-1'),{total:3500}));
-  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{status:'completed',finalCost:2500,completedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{serviceNotes:'Valve replaced and tested',servicePhotoData:['photo'],documentationUpdatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{completionState:'pending',finalCost:2500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
 });
 test('new requests support saved vehicle snapshots without a synthetic price', async () => {
   const db = env.authenticatedContext('driver').firestore();
@@ -117,7 +122,7 @@ test('new requests support saved vehicle snapshots without a synthetic price', a
     vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',archived:false,
     createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   await assertSucceeds(setDoc(doc(db,'requests/new'),{driverId:'driver',driverName:'Driver',driverPhone:'',providerId:null,
-    preferredProviderId:'',preferredProviderName:'',rejectedBy:[],status:'searching',workflowVersion:2,
+    preferredProviderId:'',preferredProviderName:'',rejectedBy:[],status:'searching',workflowVersion:2,arrivalVerificationRequired:true,
     issue:'Flat Tyre',issues:['Flat Tyre'],vehicleType:'Sedan / Hatchback',modelYear:'Toyota Aqua 2017',registration:'CAB-1234',
     vehicleId:'v1',vehicleSnapshot:{make:'Toyota',model:'Aqua',year:2017},partsPreference:'genuine',description:'',notes:'',priority:'normal',
     vehiclePhotoUrls:[],photoAnnotations:[],locationLabel:'Colombo',landmark:'',locationAccuracyMeters:null,
@@ -359,7 +364,7 @@ test('approved directory publication binds expiry and services to reviewed docum
 test('maintenance and disabled services reject new requests while existing jobs remain readable', async () => {
   const db = env.authenticatedContext('driver').firestore();
   const request = {driverId: 'driver', driverName: 'Driver', driverPhone: '+94771234567', providerId: null, preferredProviderId: '', preferredProviderName: '', rejectedBy: [],
-    status: 'searching', workflowVersion: 2, issue: 'Flat Tyre', issues: ['Flat Tyre'], vehicleType: 'Sedan / Hatchback', modelYear: 'Toyota Aqua 2018', registration: 'WP-1234',
+    status: 'searching', workflowVersion: 2, arrivalVerificationRequired:true, issue: 'Flat Tyre', issues: ['Flat Tyre'], vehicleType: 'Sedan / Hatchback', modelYear: 'Toyota Aqua 2018', registration: 'WP-1234',
     description: '', notes: '', priority: 'normal', vehiclePhotoUrls: [], photoAnnotations: [], locationLabel: 'Test location', landmark: '', locationAccuracyMeters: null,
     latitude: 6.9, longitude: 79.9, serviceFee: 0, dispatchFee: 0, estimatedCost: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp()};
   await assertSucceeds(setDoc(doc(db, 'requests/new-a'), request));
@@ -453,4 +458,46 @@ test('providers cannot abandon arrived jobs or cancel another provider assignmen
   const b=writeBatch(db);b.update(doc(db,'requests/r1'),change);b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});await assertFails(b.commit());
   await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'someone-else'}));
   await assertFails(updateDoc(doc(db,'requests/r1'),change));
+});
+test('completion requires evidence and drivers cannot confirm without a submission', async()=> {
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'arrived',estimatedCost:1500,serviceNotes:'',servicePhotoData:[]});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore(),driver=env.authenticatedContext('driver').firestore();
+  await assertFails(updateDoc(doc(provider,'requests/r1'),{completionState:'pending',finalCost:1500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(driver,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+test('completion complaint evidence blocks closure until admin review is resolved',async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider',completionState:'pending',estimatedCost:1500,finalCost:1500});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('driver').firestore();
+  await assertSucceeds(setDoc(doc(db,'requests/r1/disputes/case'),{driverId:'driver',providerId:'provider',reason:'incomplete_service',description:'The vehicle still cannot start after repair.',photos:['evidence'],status:'open',providerResponse:'',resolution:'',approvedTotal:1500,finalTotal:1500,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  function confirm(){ const b=writeBatch(db);b.update(doc(db,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});return b.commit(); }
+  await assertFails(confirm());
+  await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'complaintReviews/r1'),{status:'resolved'}));
+  await assertSucceeds(confirm());
+});
+test('new arrival verification is driver-only and blocks repair completion until confirmed',async()=> {
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider',arrivalVerificationRequired:true,estimatedCost:1500,serviceNotes:'Work complete and tested',servicePhotoData:['photo']});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const driver=env.authenticatedContext('driver').firestore(),provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const completion={completionState:'pending',completionSubmittedAt:serverTimestamp(),finalCost:1500,updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(provider,'requests/r1'),completion));
+  const confirmation={arrivalConfirmedBy:'driver',arrivalConfirmedAt:serverTimestamp(),arrivalConfirmationMethod:'manual_driver',arrivalConfirmationReason:'GPS unavailable but provider met me.',arrivalDistanceMeters:null,updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(provider,'requests/r1'),confirmation));
+  await assertFails(updateDoc(doc(env.authenticatedContext('other').firestore(),'requests/r1'),confirmation));
+  await assertFails(updateDoc(doc(driver,'requests/r1'),{...confirmation,arrivalConfirmationReason:''}));
+  await assertSucceeds(updateDoc(doc(driver,'requests/r1'),confirmation));
+  await assertFails(updateDoc(doc(driver,'requests/r1'),{...confirmation,arrivalConfirmationReason:'Rewrite existing confirmation'}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),completion));
+});
+test('driver cannot confirm arrival before provider reports arrival',async()=> {
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'en_route',providerId:'provider',arrivalVerificationRequired:true}));
+  const db=env.authenticatedContext('driver').firestore();
+  await assertFails(updateDoc(doc(db,'requests/r1'),{arrivalConfirmedBy:'driver',arrivalConfirmedAt:serverTimestamp(),arrivalConfirmationMethod:'gps_nearby_driver',arrivalConfirmationReason:'',arrivalDistanceMeters:10,updatedAt:serverTimestamp()}));
 });
