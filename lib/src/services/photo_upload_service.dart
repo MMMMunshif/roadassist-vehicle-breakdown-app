@@ -4,6 +4,17 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 class PhotoUploadService {
+  Future<String> prepareIdentityPhoto(XFile photo) async {
+    if (await photo.length() > 8 * 1024 * 1024)
+      throw const FormatException('Photo exceeds 8 MB.');
+    return _compress(
+      photo,
+      maxDimension: 1200,
+      quality: 75,
+      maxBytes: 110 * 1024,
+    );
+  }
+
   Future<String> prepareProfilePhoto(XFile photo) =>
       _compress(photo, maxDimension: 512, quality: 65, maxBytes: 180 * 1024);
 

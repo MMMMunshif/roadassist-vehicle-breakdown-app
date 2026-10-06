@@ -2,7 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
-      return authenticated() && !accountBlocked(request.auth.uid);
+      return authenticated() && !accountBlocked(request.auth.uid)
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'provider'
+          || (request.auth.token.get('email_verified', false) == true && providerApproved(request.auth.uid)));
     }
 
     function authenticated() { return request.auth != null; }
@@ -16,6 +19,105 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/adminAccess/$(request.auth.uid))
         && get(/databases/$(database)/documents/adminAccess/$(request.auth.uid)).data.enabled == true;
     }
+    function providerApproved(uid) {
+      let m = /databases/$(database)/documents/accountModeration/$(uid);
+      let a = /databases/$(database)/documents/providerApplications/$(uid);
+      return exists(m) && exists(a) && get(m).data.verification == 'verified'
+        && get(m).data.status == 'active'
+        && get(m).data.get('verificationRevision', 0) == get(a).data.revision
+        && get(m).data.get('validUntil', request.time) > request.time
+        && get(a).data.get('professionalDetails', {}).keys().hasAll(['workHistory','qualification','tools','businessPhone']);
+    }
+    function adminRole() {
+      return get(/databases/$(database)/documents/adminAccess/$(request.auth.uid)).data.get('role', 'super_admin');
+    }
+    function canReviewProviders() { return isAdmin() && adminRole() in ['super_admin','reviewer']; }
+    function canSupport() { return isAdmin() && adminRole() in ['super_admin','support']; }
+    function superAdmin() { return isAdmin() && adminRole() == 'super_admin'; }
+    function newRequestsAllowed(issues) {
+      let p = /databases/$(database)/documents/appSettings/operations;
+      return !exists(p) || (get(p).data.maintenance == false && issues.hasOnly(get(p).data.enabledServices));
+    }
+    function validProfessional(p, services) {
+      return p is map
+        && p.keys().hasAll(['providerType','businessPhone','businessRegistration','workHistory','qualification','trainingInstitute','qualificationYear','specializations','coverageAreas','radiusKm','startTime','endTime','towRegistration','towCapacityKg','insuranceDetails','available24Hours','languages','workDays','tools'])
+        && p.keys().hasOnly(['providerType','businessPhone','businessRegistration','workHistory','qualification','trainingInstitute','qualificationYear','specializations','coverageAreas','radiusKm','startTime','endTime','towRegistration','towCapacityKg','insuranceDetails','available24Hours','languages','workDays','tools'])
+        && p.providerType in ['independent','business']
+        && p.businessPhone is string && p.businessPhone.matches('[+]947[0-9]{8}')
+        && p.businessRegistration is string && p.businessRegistration.size() <= 60 && (p.providerType != 'business' || p.businessRegistration.size() >= 3)
+        && p.workHistory is string && (p.workHistory.size() == 0 || p.workHistory.size() >= 10) && p.workHistory.size() <= 1000
+        && p.qualification is string && p.qualification.size() <= 150
+        && p.trainingInstitute is string && p.trainingInstitute.size() <= 150
+        && p.qualificationYear is int && (p.qualificationYear == 0 || (p.qualificationYear >= 1950 && p.qualificationYear <= request.time.year()))
+        && p.specializations is string && p.specializations.size() <= 300
+        && p.coverageAreas is string && p.coverageAreas.size() <= 300
+        && p.radiusKm is int && p.radiusKm >= 1 && p.radiusKm <= 100
+        && p.available24Hours is bool && p.startTime is string && p.endTime is string
+        && ((p.startTime == '' && p.endTime == '') || (p.startTime.matches('([01][0-9]|2[0-3]):[0-5][0-9]') && p.endTime.matches('([01][0-9]|2[0-3]):[0-5][0-9]')))
+        && p.languages is list && p.languages.size() <= 3 && p.languages.hasOnly(['English','Sinhala','Tamil'])
+        && p.workDays is list && p.workDays.size() <= 7 && p.workDays.hasOnly(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])
+        && p.tools is list && p.tools.size() <= 8 && p.tools.hasOnly(['Hand tools','Jack and stands','Tyre repair kit','Jump starter','Diagnostic scanner','Recovery truck','Winch','Safety equipment'])
+        && p.insuranceDetails is string && p.insuranceDetails.size() <= 300
+        && p.towRegistration is string && p.towRegistration.size() <= 20 && p.towCapacityKg is int && p.towCapacityKg >= 0 && p.towCapacityKg <= 30000
+        && (!services.hasAny(['Vehicle Towing']) || (p.towRegistration.size() >= 3 && p.towCapacityKg >= 500));
+    }
+
+    match /providerApplications/{uid} {
+      function owner() { return authenticated() && request.auth.uid == uid && !accountBlocked(uid)
+        && get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider'; }
+      function valid() {
+        let d = request.resource.data;
+        return request.auth.token.get('email_verified', false) == true
+          && d.keys().hasAll(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails'])
+          && d.keys().hasOnly(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails'])
+          && validProfessional(d.professionalDetails, d.services)
+          && d.legalName is string && d.legalName.size() >= 2 && d.legalName.size() <= 100
+          && d.nicNumber is string && d.nicNumber.matches('([0-9]{9}[VX]|[0-9]{12})')
+          && d.address is string && d.address.size() >= 5 && d.address.size() <= 300
+          && d.businessName is string && d.businessName.size() <= 100
+          && d.emergencyPhone is string && (d.emergencyPhone == '' || d.emergencyPhone.matches('[+]947[0-9]{8}'))
+          && d.experienceYears is int && d.experienceYears >= 0 && d.experienceYears <= 60
+          && d.services is list && d.services.size() > 0 && d.services.size() <= 4 && d.services.hasOnly(['General Mechanic','Vehicle Towing','Flat Tyre','Battery Jumpstart'])
+          && d.vehicleTypes is list && d.vehicleTypes.size() > 0 && d.vehicleTypes.size() <= 5 && d.vehicleTypes.hasOnly(['Sedan / Hatchback','SUV','Van','Motorcycle','Other'])
+          && d.documents is map && d.documents.keys().hasAll(['nicFront','nicBack','selfie','serviceProof'])
+          && d.documents.keys().hasOnly(['nicFront','nicBack','selfie','serviceProof','recoveryProof','businessProof'])
+          && validDocument(d.documents.nicFront) && validDocument(d.documents.nicBack)
+          && validDocument(d.documents.selfie) && validDocument(d.documents.serviceProof)
+          && (!('recoveryProof' in d.documents) || validDocument(d.documents.recoveryProof))
+          && (!d.services.hasAny(['Vehicle Towing']) || 'recoveryProof' in d.documents)
+          && (!('businessProof' in d.documents) || validDocument(d.documents.businessProof))
+          && (d.professionalDetails.providerType != 'business' || 'businessProof' in d.documents)
+          && d.revision is int && d.submittedAt == request.time && d.termsAccepted == true && d.consentVersion == 1;
+      }
+      allow read: if (authenticated() && request.auth.uid == uid) || canReviewProviders();
+      allow create: if owner() && valid() && request.resource.data.revision == 1;
+      allow update: if owner() && valid() && request.resource.data.revision == resource.data.revision + 1
+        && (!('professionalDetails' in resource.data) || (
+          exists(/databases/$(database)/documents/accountModeration/$(uid))
+          && get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending'
+          && get(/databases/$(database)/documents/accountModeration/$(uid)).data.updatedAt > resource.data.submittedAt));
+      allow delete: if false;
+    }
+    function validDocument(value) { return value is string && value.size() > 20 && value.size() <= 160000; }
+    match /providerApprovalEmails/{id} { allow read: if canReviewProviders(); allow write: if false; }
+    match /appSettings/{id} {
+      allow read: if authenticated();
+      allow create, update: if id == 'operations' && superAdmin()
+        && request.resource.data.keys().hasAll(['maintenance','notice','coverage','enabledServices','reason','updatedAt','updatedBy','lastAuditId'])
+        && request.resource.data.keys().hasOnly(['maintenance','notice','coverage','enabledServices','reason','updatedAt','updatedBy','lastAuditId'])
+        && request.resource.data.maintenance is bool
+        && request.resource.data.notice is string && request.resource.data.notice.size() <= 300
+        && request.resource.data.coverage is string && request.resource.data.coverage.size() <= 300
+        && request.resource.data.enabledServices is list && request.resource.data.enabledServices.size() <= 4
+        && request.resource.data.enabledServices.hasOnly(['General Mechanic','Vehicle Towing','Flat Tyre','Battery Jumpstart'])
+        && request.resource.data.reason is string && request.resource.data.reason.size() >= 10 && request.resource.data.reason.size() <= 500
+        && request.resource.data.updatedAt == request.time && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.lastAuditId is string
+        && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
+        && validAudit(request.resource.data.lastAuditId, 'settings', id);
+      allow delete: if false;
+    }
+
     function validAudit(id, kind, target) {
       let a = getAfter(/databases/$(database)/documents/adminAudit/$(id)).data;
       return a.actor == request.auth.uid && a.kind == kind && a.target == target && a.createdAt == request.time;
@@ -24,9 +126,10 @@ service cloud.firestore {
     match /accountModeration/{uid} {
       allow read: if (authenticated() && request.auth.uid == uid) || isAdmin();
       allow create, update: if isAdmin()
+        && (superAdmin() || (canReviewProviders() && get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider'))
         && exists(/databases/$(database)/documents/users/$(uid))
         && request.resource.data.keys().hasAll(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
-        && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
+        && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId','verificationRevision','validUntil','verificationChecks'])
         && request.resource.data.status in ['active','suspended']
         && request.resource.data.verification in ['pending','verified','rejected']
         && request.resource.data.flagged is bool
@@ -36,6 +139,12 @@ service cloud.firestore {
         && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
         && (uid != request.auth.uid || (request.resource.data.status == 'active' && request.resource.data.verification != 'rejected'))
         && (get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider' || request.resource.data.verification == 'pending')
+        && (request.resource.data.verification != 'verified' || (
+          exists(/databases/$(database)/documents/providerApplications/$(uid))
+          && validProfessional(get(/databases/$(database)/documents/providerApplications/$(uid)).data.professionalDetails, get(/databases/$(database)/documents/providerApplications/$(uid)).data.services)
+          && request.resource.data.verificationRevision == get(/databases/$(database)/documents/providerApplications/$(uid)).data.revision
+          && request.resource.data.validUntil is timestamp && request.resource.data.validUntil > request.time && request.resource.data.validUntil <= request.time + duration.value(366, 'd')
+          && request.resource.data.verificationChecks is list && request.resource.data.verificationChecks.size() == 4 && request.resource.data.verificationChecks.hasAll(['identity','face','capability','contact'])))
         && validAudit(request.resource.data.lastAuditId, 'account', uid);
       allow delete: if false;
     }
@@ -45,13 +154,15 @@ service cloud.firestore {
       allow create, update: if isAdmin()
         && exists(/databases/$(database)/documents/requests/$(id)/disputes/case)
         && request.resource.data.keys().hasAll(['status','priority','assignedTo','decision','updatedAt','lastAuditId'])
-        && request.resource.data.keys().hasOnly(['status','priority','assignedTo','decision','updatedAt','lastAuditId'])
+        && request.resource.data.keys().hasOnly(['status','priority','assignedTo','decision','updatedAt','lastAuditId','dueAt'])
         && request.resource.data.status in ['under_review','resolved','dismissed']
         && request.resource.data.priority in ['low','normal','high','urgent']
         && request.resource.data.assignedTo == request.auth.uid
         && request.resource.data.decision is string && request.resource.data.decision.size() >= 10 && request.resource.data.decision.size() <= 500
         && request.resource.data.updatedAt == request.time && request.resource.data.lastAuditId is string
         && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
+        && canSupport()
+        && (!('dueAt' in request.resource.data) || (request.resource.data.dueAt is timestamp && request.resource.data.dueAt > request.time && request.resource.data.dueAt <= request.time + duration.value(31, 'd')))
         && validAudit(request.resource.data.lastAuditId, 'complaint', id);
       allow delete: if false;
     }
@@ -61,7 +172,7 @@ service cloud.firestore {
         let after = getAfter(path).data;
         return after.lastAuditId == id && request.resource.data.after == after
           && request.resource.data.before == (exists(path) ? get(path).data : {})
-          && request.resource.data.reason == (collection == 'accountModeration' ? after.reason : after.decision);
+          && request.resource.data.reason == (collection == 'complaintReviews' ? after.decision : after.reason);
       }
       allow read: if isAdmin();
       allow create: if isAdmin()
@@ -69,8 +180,9 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['kind','target','actor','reason','before','after','createdAt'])
         && request.resource.data.actor == request.auth.uid && request.resource.data.createdAt == request.time
         && request.resource.data.target is string
-        && ((request.resource.data.kind == 'account' && paired('accountModeration'))
-          || (request.resource.data.kind == 'complaint' && paired('complaintReviews')));
+        && ((request.resource.data.kind == 'account' && (superAdmin() || canReviewProviders()) && paired('accountModeration'))
+          || (request.resource.data.kind == 'complaint' && canSupport() && paired('complaintReviews'))
+          || (request.resource.data.kind == 'settings' && superAdmin() && paired('appSettings')));
       allow update, delete: if false;
     }
     match /adminAccess/{uid} {
@@ -105,11 +217,12 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId && request.resource.data.role in ['driver','provider'];
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow update: if signedIn()
+      allow create: if authenticated() && !accountBlocked(userId) && request.auth.uid == userId && request.resource.data.role in ['driver','provider'];
+      allow read: if isAdmin() || (authenticated() && request.auth.uid == userId);
+      allow update: if authenticated() && !accountBlocked(userId)
         && request.auth.uid == userId
-        && request.resource.data.role == resource.data.role;
+        && request.resource.data.role == resource.data.role
+        && (request.resource.data.get('online', false) == false || resource.data.role != 'provider' || providerApproved(userId));
       allow delete: if signedIn() && request.auth.uid == userId;
 
       match /devices/{deviceId} {
@@ -150,7 +263,7 @@ service cloud.firestore {
         && request.resource.data.online == false && request.resource.data.updatedAt == request.time;
       function accountBlockedAfter(uid) {
         let data = getAfter(/databases/$(database)/documents/accountModeration/$(uid)).data;
-        return data.status == 'suspended' || data.verification == 'rejected';
+        return data.status == 'suspended' || data.verification != 'verified';
       }
       allow read: if signedIn();
       allow create, update: if signedIn()
@@ -159,8 +272,12 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'displayName', 'online', 'services', 'serviceRadius', 'latitude',
           'longitude', 'completedJobs', 'averageRating',
-          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt', 'activeRequestId'
+          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt', 'activeRequestId', 'verified', 'verificationExpiresAt', 'vehicleTypes'
         ])
+        && request.resource.data.verified == true
+        && request.resource.data.verificationExpiresAt == get(/databases/$(database)/documents/accountModeration/$(providerId)).data.validUntil
+        && request.resource.data.services is list && request.resource.data.services.size() > 0 && request.resource.data.services.hasOnly(get(/databases/$(database)/documents/providerApplications/$(providerId)).data.services)
+        && request.resource.data.vehicleTypes is list && request.resource.data.vehicleTypes.size() > 0 && request.resource.data.vehicleTypes.hasOnly(get(/databases/$(database)/documents/providerApplications/$(providerId)).data.vehicleTypes)
         && (resource == null
           ? !('activeRequestId' in request.resource.data)
           : (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['activeRequestId'])
@@ -176,7 +293,7 @@ service cloud.firestore {
       allow update: if isDriver()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeRequestId'])
         && ((request.resource.data.activeRequestId is string
-          && !accountBlocked(providerId)
+          && !accountBlocked(providerId) && providerApproved(providerId)
           && request.resource.data.activeRequestId.size() > 0
           && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null || resource.data.activeRequestId == '')
           && resource.data.online == true
@@ -196,7 +313,8 @@ service cloud.firestore {
 
     match /requests/{requestId} {
       allow read: if isAdmin();
-      allow create: if signedIn()
+      allow create: if signedIn() && newRequestsAllowed(request.resource.data.issues)
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
         && isDriver()
         && request.resource.data.driverId == request.auth.uid
         && request.resource.data.providerId == null

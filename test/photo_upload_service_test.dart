@@ -9,6 +9,30 @@ import 'package:road_assist/src/services/photo_upload_service.dart';
 
 void main() {
   test(
+    'identity photos fit private document limits and retain readable dimensions',
+    () async {
+      final source = img.Image(width: 1600, height: 1000);
+      img.fill(source, color: img.ColorRgb8(240, 240, 240));
+      final photo = XFile.fromData(
+        Uint8List.fromList(img.encodeJpg(source)),
+        name: 'identity.jpg',
+      );
+      final result = await PhotoUploadService().prepareIdentityPhoto(photo);
+      expect(result.length, lessThanOrEqualTo(160000));
+      expect(img.decodeJpg(base64Decode(result))!.width, 1200);
+    },
+  );
+  test('oversized identity inputs are rejected before decoding', () async {
+    final photo = XFile.fromData(
+      Uint8List(8 * 1024 * 1024 + 1),
+      name: 'oversized.jpg',
+    );
+    await expectLater(
+      PhotoUploadService().prepareIdentityPhoto(photo),
+      throwsA(isA<FormatException>()),
+    );
+  });
+  test(
     'vehicle photos are resized and kept below the request size limit',
     () async {
       final random = Random(42);

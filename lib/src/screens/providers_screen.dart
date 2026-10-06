@@ -21,6 +21,9 @@ double? _providerDistanceKm(Map<String, dynamic> data, RequestDraft draft) {
 }
 
 bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
+  if (!_providerHasCurrentVerification(data)) return false;
+  final vehicles = data['vehicleTypes'] as List? ?? [];
+  if (!vehicles.contains(draft.vehicleType)) return false;
   if ((data['activeRequestId'] as String? ?? '').isNotEmpty) return false;
   final services = (data['services'] as List<dynamic>? ?? const [])
       .whereType<String>()

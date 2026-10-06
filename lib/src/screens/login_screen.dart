@@ -16,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
-  final authService = AuthService();
+  AuthService get authService => AuthService();
 
   @override
   void dispose() {
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
             )
             .timeout(const Duration(seconds: 30));
       }
-      if (registrationPhotoData != null) {
+      if (registerMode && registrationPhotoData != null) {
         try {
           await authService
               .updateCurrentProfile({'photoData': registrationPhotoData})
@@ -287,7 +287,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: RaSpace.xs),
                     Text(
                       widget.isProvider
-                          ? 'Manage roadside requests and active jobs'
+                          ? registerMode
+                                ? 'Create account, verify email, then submit NIC and service documents. Admin approval is required before jobs unlock.'
+                                : 'Sign in to view verification status or manage approved services'
                           : 'Access emergency assistance and live tracking',
                       textAlign: TextAlign.center,
                       style: RaText.bodyMuted,
@@ -313,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: RaSpace.xl),
-                    if (registerMode || !widget.isProvider) ...[
+                    if (registerMode) ...[
                       Center(
                         child: Column(
                           children: [
@@ -377,7 +379,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (!widget.isProvider &&
                                 registrationPhotoData == null)
                               Text(
-                                'Required before driver login',
+                                'Required when creating a driver account',
                                 style: RaText.caption.copyWith(
                                   color: raDanger,
                                   fontWeight: FontWeight.w700,
