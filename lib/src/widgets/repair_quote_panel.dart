@@ -85,6 +85,7 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                           style: RaText.label,
                         ),
                         Text(offer['diagnosisAndWork'] as String),
+                        Text(_warrantyLabel(offer)),
                         if (offer['changeReason'] is String)
                           Text('Reason: ${offer['changeReason']}'),
                         RevisionEvidencePhotos(
@@ -136,7 +137,7 @@ class _RepairQuotePanelState extends State<RepairQuotePanel> {
                                           'Approve repair and revised total?',
                                         ),
                                         content: Text(
-                                          'Previous total: Rs. ${offer['previousTotal']}. New total: Rs. ${offer['total']}.\n\nWork: ${offer['diagnosisAndWork']}\n\nApprove only if you agree to this work and the new full bill.',
+                                          'Previous total: Rs. ${offer['previousTotal']}. New total: Rs. ${offer['total']}.\n\nWork: ${offer['diagnosisAndWork']}\n${_warrantyLabel(offer)}\n\nApprove only if you agree to this work and the new full bill.',
                                         ),
                                         actions: [
                                           TextButton(

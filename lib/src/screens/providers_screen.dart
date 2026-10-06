@@ -20,8 +20,22 @@ double? _providerDistanceKm(Map<String, dynamic> data, RequestDraft draft) {
       1000;
 }
 
+String _providerAvailabilityStatus(Map<String, dynamic> data) =>
+    ProviderAvailability.status(
+      data,
+      DateTime.now(),
+      overrideUntil: (data['hoursOverrideUntil'] as Timestamp?)?.toDate(),
+    );
+bool _providerLocationOutdated(Map<String, dynamic> data) {
+  final updated = (data['locationUpdatedAt'] as Timestamp?)?.toDate();
+  return updated == null ||
+      DateTime.now().difference(updated) > const Duration(minutes: 10);
+}
+
 bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
-  if (!_providerHasCurrentVerification(data)) return false;
+  if (!_providerHasCurrentVerification(data) ||
+      _providerAvailabilityStatus(data) != 'Online')
+    return false;
   final vehicles = data['vehicleTypes'] as List? ?? [];
   if (!vehicles.contains(draft.vehicleType)) return false;
   if ((data['activeRequestId'] as String? ?? '').isNotEmpty) return false;
@@ -42,6 +56,7 @@ bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
 }
 
 class _ProvidersScreenState extends State<ProvidersScreen> {
+  Timer? availabilityClock;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> onlineProviders;
   String? selectedId;
   String? selectedName;
@@ -49,6 +64,9 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
   @override
   void initState() {
     super.initState();
+    availabilityClock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
     onlineProviders = AuthService().watchOnlineProviders();
     selectedId = widget.draft.preferredProviderId.isEmpty
         ? null
@@ -75,6 +93,12 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
         selectedName = name;
       });
     });
+  }
+
+  @override
+  void dispose() {
+    availabilityClock?.cancel();
+    super.dispose();
   }
 
   @override
@@ -202,7 +226,9 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                             child: ProviderTile(
                               name: name,
                               company: 'RoadAssist Service Provider',
-                              distance: distanceKm == null
+                              distance: _providerLocationOutdated(data)
+                                  ? 'Location outdated - confirm with provider'
+                                  : distanceKm == null
                                   ? 'Location pending'
                                   : '${distanceKm.toStringAsFixed(1)} km away',
                               eta: responseMinutes > 0

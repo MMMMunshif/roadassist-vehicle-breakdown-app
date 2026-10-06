@@ -9,6 +9,8 @@ class ProviderHomeScreen extends StatefulWidget {
 class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     with WidgetsBindingObserver {
   bool online = false;
+  Map<String, dynamic> availability = {};
+  Timer? availabilityClock;
   bool savingPresence = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   directorySubscription;
@@ -29,6 +31,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   @override
   void initState() {
     super.initState();
+    availabilityClock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addObserver(this);
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid != null)
@@ -38,7 +43,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
           .snapshots()
           .listen((snapshot) {
             if (mounted && !savingPresence)
-              setState(() => online = snapshot.data()?['online'] == true);
+              setState(() {
+                online = snapshot.data()?['online'] == true;
+                availability = snapshot.data() ?? {};
+              });
           }, onError: (Object error) {});
     unawaited(_publishProviderLocation());
     profileSubscription = AuthService().watchCurrentProfile().listen((
@@ -134,7 +142,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
         .where((request) => !knownOpenRequestIds.contains(request.id))
         .toList();
     knownOpenRequestIds = currentIds;
-    if (!mounted || !online || newRequests.isEmpty) return;
+    if (!mounted ||
+        _providerAvailabilityStatus(availability) != 'Online' ||
+        newRequests.isEmpty)
+      return;
 
     final latest = newRequests.first.data();
     final driverName = latest['driverName'] as String? ?? 'A driver';
@@ -159,6 +170,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     profileSubscription?.cancel();
     directorySubscription?.cancel();
     openRequestsSubscription?.cancel();
+    availabilityClock?.cancel();
     super.dispose();
   }
 
@@ -280,6 +292,8 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                                 quote['providerDistanceKm'] as double,
                             quoteNotes: quote['quoteNotes'] as String,
                             quoteType: quote['quoteType'] as String,
+                            warrantyDays: quote['warrantyDays'] as int,
+                            warrantyTerms: quote['warrantyTerms'] as String,
                           );
                           if (data['workflowVersion'] == 2) {
                             if (mounted)
@@ -398,7 +412,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                                 ),
                               ),
                               child: Text(
-                                online ? 'ACTIVE' : 'OFFLINE',
+                                _providerAvailabilityStatus(availability),
                                 style: TextStyle(
                                   color: online
                                       ? const Color(0xFF087A46)
@@ -516,6 +530,47 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
         const SizedBox(height: RaSpace.xxl),
         const SectionTitle('Incoming Request'),
         const SizedBox(height: RaSpace.md),
+        if (online) ...[
+          SwitchListTile(
+            title: const Text('Pause new requests'),
+            subtitle: const Text('Your active job continues.'),
+            value: availability['requestsPaused'] == true,
+            onChanged: (paused) async {
+              try {
+                await AuthService().setProviderAvailability(paused: paused);
+              } catch (_) {
+                if (context.mounted)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not update availability.'),
+                    ),
+                  );
+              }
+            },
+          ),
+          if (!ProviderAvailability.withinHours(availability, DateTime.now()))
+            TextButton(
+              onPressed: () async {
+                try {
+                  await AuthService().setProviderAvailability(
+                    overrideHours: true,
+                  );
+                } catch (_) {
+                  if (context.mounted)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Could not enable outside-hours availability.',
+                        ),
+                      ),
+                    );
+                }
+              },
+              child: const Text(
+                'Accept requests outside working hours for 2 hours',
+              ),
+            ),
+        ],
         if (!online)
           const EmptyState(
             icon: Icons.cloud_off_outlined,

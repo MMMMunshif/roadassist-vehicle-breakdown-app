@@ -446,11 +446,11 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                const AssetSlot(
-                  height: 185,
-                  label: 'VEHICLE HERO IMAGE\nPremium dark sedan by roadside',
-                  icon: Icons.directions_car,
-                  assetPath: 'assets/images/vehicle_sedan.jpg',
+                VehiclePhotoPreview(
+                  model: modelController.text,
+                  photoData: vehiclePhotoUrls.isNotEmpty
+                      ? vehiclePhotoUrls.first
+                      : vehicleSnapshot?['photoData'] as String? ?? '',
                 ),
                 Padding(
                   padding: const EdgeInsets.all(RaSpace.xl),
@@ -521,7 +521,13 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                                   hintText: 'Toyota Aqua 2018',
                                 ),
                                 validator: validateVehicleModelYear,
-                                onChanged: (_) => scheduleDraftSave(),
+                                onChanged: (_) {
+                                  setState(() {
+                                    vehicleSnapshot = null;
+                                    vehicleId = null;
+                                  });
+                                  scheduleDraftSave();
+                                },
                               ),
                             ),
                           ],
@@ -541,7 +547,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             validator: (value) => vehicle == 'Other'
                                 ? validateCustomVehicleType(value)
                                 : null,
-                            onChanged: (_) => scheduleDraftSave(),
+                            onChanged: (_) {
+                              setState(() {});
+                              scheduleDraftSave();
+                            },
                           ),
                         ],
                         const SizedBox(height: RaSpace.md),
@@ -555,7 +564,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             hintText: 'WP CAB - 1234',
                           ),
                           validator: validateVehicleRegistration,
-                          onChanged: (_) => scheduleDraftSave(),
+                          onChanged: (_) {
+                            setState(() {});
+                            scheduleDraftSave();
+                          },
                         ),
                         const SizedBox(height: RaSpace.xxl),
                         const FormSectionTitle(
@@ -625,7 +637,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                             ),
                           ),
                           validator: validateBreakdownDescription,
-                          onChanged: (_) => scheduleDraftSave(),
+                          onChanged: (_) {
+                            setState(() {});
+                            scheduleDraftSave();
+                          },
                         ),
                         const SizedBox(height: RaSpace.md),
                         DropdownButtonFormField<String>(
@@ -772,7 +787,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Additional Notes',
                           ),
-                          onChanged: (_) => scheduleDraftSave(),
+                          onChanged: (_) {
+                            setState(() {});
+                            scheduleDraftSave();
+                          },
                         ),
                         const SizedBox(height: RaSpace.lg),
                         const SafetyBox(),

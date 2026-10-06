@@ -112,6 +112,17 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 child: const Text('Confirm Payment Received'),
               ),
             const SizedBox(height: 16),
+            ServiceWarranty(requestId: widget.requestId, job: data),
+            if (driver)
+              OutlinedButton(
+                onPressed: () => push(
+                  context,
+                  DisputeScreen(requestId: widget.requestId, sameProblem: true),
+                ),
+                child: const Text(
+                  'Same problem again / Request warranty review',
+                ),
+              ),
             if (driver || provider)
               OutlinedButton.icon(
                 onPressed: () =>

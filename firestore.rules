@@ -38,6 +38,16 @@ service cloud.firestore {
       let p = /databases/$(database)/documents/appSettings/operations;
       return !exists(p) || (get(p).data.maintenance == false && issues.hasOnly(get(p).data.enabledServices));
     }
+    function availableForRequests(d) {
+      let minute = (request.time.hours() * 60 + request.time.minutes() + 330) % 1440;
+      let start = d.get('workStartMinute',0);
+      let end = d.get('workEndMinute',0);
+      return d.online == true && d.get('requestsPaused',false) == false
+        && d.get('activeRequestId',null) == null
+        && (d.get('available24Hours',false) || !d.get('scheduleConfigured',false)
+          || d.get('hoursOverrideUntil',request.time) > request.time
+          || (start < end ? minute >= start && minute < end : start > end && (minute >= start || minute < end)));
+    }
     function validProfessional(p, services) {
       return p is map
         && p.keys().hasAll(['providerType','businessPhone','businessRegistration','workHistory','qualification','trainingInstitute','qualificationYear','specializations','coverageAreas','radiusKm','startTime','endTime','towRegistration','towCapacityKg','insuranceDetails','available24Hours','languages','workDays','tools'])
@@ -237,7 +247,7 @@ service cloud.firestore {
           return v.keys().hasAll(['make', 'model', 'year', 'vehicleType',
               'registration', 'fuelType', 'transmission', 'archived', 'createdAt', 'updatedAt'])
             && v.keys().hasOnly(['make', 'model', 'year', 'vehicleType',
-              'registration', 'fuelType', 'transmission', 'archived', 'createdAt', 'updatedAt'])
+              'registration', 'fuelType', 'transmission', 'photoData', 'archived', 'createdAt', 'updatedAt'])
             && v.make is string && v.make.size() > 0 && v.make.size() <= 40
             && v.model is string && v.model.size() > 0 && v.model.size() <= 40
             && v.year is int && v.year >= 1950 && v.year <= request.time.year() + 1
@@ -245,6 +255,7 @@ service cloud.firestore {
             && v.registration is string && v.registration.size() > 0 && v.registration.size() <= 16
             && v.fuelType in ['Petrol', 'Diesel', 'Hybrid', 'Electric', 'Other']
             && v.transmission in ['Automatic', 'Manual', 'Other']
+            && (!('photoData' in v) || (v.photoData is string && v.photoData.size() <= 210000))
             && v.archived is bool && v.createdAt is timestamp
             && v.updatedAt == request.time;
         }
@@ -272,8 +283,14 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'displayName', 'online', 'services', 'serviceRadius', 'latitude',
           'longitude', 'completedJobs', 'averageRating',
-          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt', 'activeRequestId', 'verified', 'verificationExpiresAt', 'vehicleTypes'
+          'averageResponseMinutes', 'locationUpdatedAt', 'updatedAt', 'activeRequestId', 'verified', 'verificationExpiresAt', 'vehicleTypes', 'available24Hours', 'scheduleConfigured', 'workStartMinute', 'workEndMinute', 'requestsPaused', 'hoursOverrideUntil'
         ])
+        && request.resource.data.get('requestsPaused',false) is bool
+        && request.resource.data.get('available24Hours',false) is bool
+        && request.resource.data.get('scheduleConfigured',false) is bool
+        && request.resource.data.get('workStartMinute',0) is int && request.resource.data.get('workStartMinute',0) >= 0 && request.resource.data.get('workStartMinute',0) < 1440
+        && request.resource.data.get('workEndMinute',0) is int && request.resource.data.get('workEndMinute',0) >= 0 && request.resource.data.get('workEndMinute',0) < 1440
+        && request.resource.data.get('hoursOverrideUntil',request.time) is timestamp && request.resource.data.get('hoursOverrideUntil',request.time) <= request.time + duration.value(125,'m')
         && request.resource.data.verified == true
         && request.resource.data.verificationExpiresAt == get(/databases/$(database)/documents/accountModeration/$(providerId)).data.validUntil
         && request.resource.data.services is list && request.resource.data.services.size() > 0 && request.resource.data.services.hasOnly(get(/databases/$(database)/documents/providerApplications/$(providerId)).data.services)
@@ -296,7 +313,7 @@ service cloud.firestore {
           && !accountBlocked(providerId) && providerApproved(providerId)
           && request.resource.data.activeRequestId.size() > 0
           && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null || resource.data.activeRequestId == '')
-          && resource.data.online == true
+          && availableForRequests(resource.data)
           && get(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.status == 'searching'
           && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.driverId == request.auth.uid
           && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.providerId == providerId
@@ -327,7 +344,8 @@ service cloud.firestore {
             && exists(/databases/$(database)/documents/users/$(request.auth.uid)/vehicles/$(request.resource.data.vehicleId))))
         && (!('vehicleSnapshot' in request.resource.data)
           || (request.resource.data.vehicleSnapshot is map
-            && request.resource.data.vehicleSnapshot.keys().hasOnly(['make','model','year','vehicleType','registration','fuelType','transmission','modelYear'])))
+            && request.resource.data.vehicleSnapshot.keys().hasOnly(['make','model','year','vehicleType','registration','fuelType','transmission','modelYear','photoData'])
+            && (!('photoData' in request.resource.data.vehicleSnapshot) || (request.resource.data.vehicleSnapshot.photoData is string && request.resource.data.vehicleSnapshot.photoData.size() <= 210000))))
         && (!('partsPreference' in request.resource.data) || request.resource.data.partsPreference in ['discuss','budget','branded','genuine'])
         && request.resource.data.issue in [
           'Vehicle Towing', 'Battery Jumpstart', 'Flat Tyre',
@@ -647,6 +665,12 @@ service cloud.firestore {
       );
       allow delete: if false;
 
+      function validWarranty(d) {
+        return (!('warrantyDays' in d) && !('warrantyTerms' in d)) ||
+          (d.get('warrantyDays', -1) is int && d.warrantyDays >= 0 && d.warrantyDays <= 365
+           && d.get('warrantyTerms', null) is string && d.warrantyTerms.size() <= 500
+           && (d.warrantyDays == 0 ? d.warrantyTerms == '' : d.warrantyTerms.size() >= 10));
+      }
       match /quotes/{providerId} {
         allow read: if isAdmin();
         function parent() {
@@ -654,11 +678,14 @@ service cloud.firestore {
         }
         allow read: if signedIn() && (parent().driverId == request.auth.uid || request.auth.uid == providerId);
         allow create, update: if isProvider() && providerId == request.auth.uid
+          && availableForRequests(get(/databases/$(database)/documents/providerDirectory/$(providerId)).data)
           && parent().status == 'searching' && parent().workflowVersion == 2
           && (parent().preferredProviderId == '' || parent().preferredProviderId == providerId)
           && !parent().rejectedBy.hasAny([providerId])
           && request.resource.data.keys().hasOnly(['providerId', 'providerName', 'providerPhone',
-            'serviceFee', 'travelFee', 'extraFee', 'total', 'notes', 'providerDistanceKm', 'createdAt', 'quoteType'])
+            'serviceFee', 'travelFee', 'extraFee', 'total', 'notes', 'providerDistanceKm', 'createdAt', 'quoteType', 'warrantyDays', 'warrantyTerms'])
+          && validWarranty(request.resource.data)
+          && (request.resource.data.quoteType != 'inspection' || request.resource.data.get('warrantyDays',0) == 0)
           && request.resource.data.quoteType in ['direct', 'inspection']
           && request.resource.data.providerId == providerId
           && request.resource.data.providerName is string
@@ -679,7 +706,8 @@ service cloud.firestore {
         allow read: if signedIn() && (job().driverId == request.auth.uid || job().providerId == request.auth.uid);
         allow create: if isProvider() && job().providerId == request.auth.uid
           && job().workflowVersion == 2 && job().status == 'arrived' && (!job().get('arrivalVerificationRequired',false) || job().get('arrivalConfirmedBy','') == job().driverId) && job().get('completionState','') != 'pending'
-          && request.resource.data.keys().hasOnly(['providerId', 'previousTotal', 'serviceFee', 'travelFee', 'extraFee', 'total', 'diagnosisAndWork', 'changeReason', 'evidencePhotoData', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['providerId', 'previousTotal', 'serviceFee', 'travelFee', 'extraFee', 'total', 'diagnosisAndWork', 'changeReason', 'evidencePhotoData', 'createdAt', 'warrantyDays', 'warrantyTerms'])
+          && validWarranty(request.resource.data)
           && request.resource.data.providerId == request.auth.uid
           && (!('pendingRepairId' in job()) || job().pendingRepairId == null)
           && request.resource.data.changeReason is string
@@ -729,7 +757,8 @@ service cloud.firestore {
           && request.resource.data.keys().hasAll(['driverId','providerId','reason','description','photos','status','providerResponse','resolution','approvedTotal','finalTotal','createdAt','updatedAt'])
           && request.resource.data.keys().hasOnly(['driverId','providerId','reason','description','photos','status','providerResponse','resolution','approvedTotal','finalTotal','createdAt','updatedAt'])
           && request.resource.data.driverId == job().driverId && request.resource.data.providerId == job().providerId
-          && request.resource.data.reason in ['extra_charge','repair_quality','incomplete_service','other']
+          && request.resource.data.reason in ['extra_charge','repair_quality','incomplete_service','other','same_problem']
+          && (request.resource.data.reason != 'same_problem' || (job().status == 'completed' && request.resource.data.photos.size() > 0))
           && request.resource.data.description is string && request.resource.data.description.size() >= 10 && request.resource.data.description.size() <= 1000
           && validPhotos(request.resource.data.photos)
           && request.resource.data.status == 'open' && request.resource.data.providerResponse == '' && request.resource.data.resolution == ''

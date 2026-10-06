@@ -144,6 +144,11 @@ class ProviderNotificationsScreen extends StatelessWidget {
                                                     as double,
                                             quoteNotes:
                                                 quote['quoteNotes'] as String,
+                                            warrantyDays:
+                                                quote['warrantyDays'] as int,
+                                            warrantyTerms:
+                                                quote['warrantyTerms']
+                                                    as String,
                                             quoteType:
                                                 quote['quoteType'] as String,
                                           );

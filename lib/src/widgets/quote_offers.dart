@@ -22,7 +22,7 @@ class _QuoteOffersState extends State<QuoteOffers> {
       builder: (c) => AlertDialog(
         title: const Text('Approve this offer?'),
         content: Text(
-          '${offer['providerName']}\n${offer['quoteType'] == 'inspection' ? 'Inspection and visit only. Repair is not included.\n' : ''}Total: Rs. ${offer['total']}\nIncluded work / exclusions: ${offer['notes']}\n\nOnly the listed work is included. Additional work requires an approved revision.',
+          '${offer['providerName']}\n${offer['quoteType'] == 'inspection' ? 'Inspection and visit only. Repair is not included.\n' : ''}Total: Rs. ${offer['total']}\nIncluded work / exclusions: ${offer['notes']}\n${_warrantyLabel(offer)}\n\nOnly the listed work is included. Additional work requires an approved revision.',
         ),
         actions: [
           TextButton(
@@ -39,7 +39,11 @@ class _QuoteOffersState extends State<QuoteOffers> {
     if (confirmed != true || !mounted) return;
     setState(() => selecting = true);
     try {
-      await RequestService().selectQuote(widget.requestId, id);
+      await RequestService().selectQuote(
+        widget.requestId,
+        id,
+        expectedOffer: offer,
+      );
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
@@ -140,6 +144,7 @@ class _QuoteOffersState extends State<QuoteOffers> {
                         style: RaText.label,
                       ),
                       Text(quote.data()['notes'] as String),
+                      Text(_warrantyLabel(quote.data())),
                       const SizedBox(height: 8),
                       FilledButton(
                         onPressed: selecting

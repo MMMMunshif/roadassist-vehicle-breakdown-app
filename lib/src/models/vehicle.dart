@@ -8,6 +8,7 @@ class Vehicle {
     required this.registration,
     required this.fuelType,
     required this.transmission,
+    this.photoData = '',
   });
   final String id,
       make,
@@ -17,6 +18,7 @@ class Vehicle {
       fuelType,
       transmission;
   final int year;
+  final String photoData;
   String get label => '$make $model $year';
   Map<String, dynamic> toJson() => {
     'make': make,
@@ -26,6 +28,7 @@ class Vehicle {
     'registration': registration,
     'fuelType': fuelType,
     'transmission': transmission,
+    'photoData': photoData,
   };
   factory Vehicle.fromJson(String id, Map<String, dynamic> data) => Vehicle(
     id: id,
@@ -36,5 +39,6 @@ class Vehicle {
     registration: data['registration'] as String,
     fuelType: data['fuelType'] as String,
     transmission: data['transmission'] as String,
+    photoData: data['photoData'] as String? ?? '',
   );
 }

@@ -1,7 +1,12 @@
 part of '../screens.dart';
 
 class DisputeScreen extends StatefulWidget {
-  const DisputeScreen({super.key, required this.requestId});
+  const DisputeScreen({
+    super.key,
+    required this.requestId,
+    this.sameProblem = false,
+  });
+  final bool sameProblem;
   final String requestId;
   @override
   State<DisputeScreen> createState() => _DisputeScreenState();
@@ -12,6 +17,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
   final response = TextEditingController();
   final photos = <String>[];
   String reason = 'extra_charge';
+  String responseType = 'review';
   bool busy = false;
   bool canReport = false;
   late final job = FirebaseFirestore.instance
@@ -20,6 +26,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
   late final caseRef = job.collection('disputes').doc('case');
   late final caseStream = caseRef.snapshots();
   static const reasons = {
+    'same_problem': 'Same problem again / Warranty review',
     'extra_charge': 'Extra money requested',
     'repair_quality': 'Repair problem',
     'incomplete_service': 'Service incomplete',
@@ -29,6 +36,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.sameProblem) reason = 'same_problem';
     unawaited(
       job
           .get()
@@ -80,6 +88,14 @@ class _DisputeScreenState extends State<DisputeScreen> {
   });
 
   Future<void> submit() async {
+    if (reason == 'same_problem' && photos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add a photo showing the repeated problem.'),
+        ),
+      );
+      return;
+    }
     if (description.text.trim().length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -127,7 +143,12 @@ class _DisputeScreenState extends State<DisputeScreen> {
     }
     await perform(
       () => caseRef.update({
-        'providerResponse': response.text.trim(),
+        'providerResponse':
+            '${responseType == 'free_recheck'
+                ? 'Free recheck offered'
+                : responseType == 'not_covered'
+                ? 'Coverage declined'
+                : 'Review response'}: ${response.text.trim()}',
         'status': 'under_review',
         'updatedAt': FieldValue.serverTimestamp(),
       }),
@@ -187,6 +208,15 @@ class _DisputeScreenState extends State<DisputeScreen> {
               'Reports are shared with the assigned provider. Avoid including unrelated personal information. No automatic refund is issued.',
             ),
             const SizedBox(height: 16),
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: job.snapshots(),
+              builder: (context, snapshot) => snapshot.data?.data() == null
+                  ? const SizedBox.shrink()
+                  : ServiceWarranty(
+                      requestId: widget.requestId,
+                      job: snapshot.data!.data()!,
+                    ),
+            ),
             if (report == null && canReport) ...[
               const Text(
                 'Drivers can report a problem after service completion.',
@@ -262,10 +292,36 @@ class _DisputeScreenState extends State<DisputeScreen> {
               if (report['status'] != 'resolved' &&
                   uid == report['providerId']) ...[
                 const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: responseType,
+                  decoration: const InputDecoration(
+                    labelText: 'Proposed resolution',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'review',
+                      child: Text('Review / discuss'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'free_recheck',
+                      child: Text('Offer free recheck'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'not_covered',
+                      child: Text('Not covered - explain why'),
+                    ),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (v) => setState(() => responseType = v!),
+                ),
+                const Text(
+                  'Do not add charges to the completed invoice. Any paid follow-up requires a separate request and driver-approved quote.',
+                ),
                 TextField(
                   controller: response,
                   enabled: !busy,
-                  maxLength: 1000,
+                  maxLength: 900,
                   minLines: 2,
                   maxLines: 5,
                   decoration: const InputDecoration(

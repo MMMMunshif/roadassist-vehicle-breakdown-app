@@ -124,7 +124,7 @@ test('new requests support saved vehicle snapshots without a synthetic price', a
   await assertSucceeds(setDoc(doc(db,'requests/new'),{driverId:'driver',driverName:'Driver',driverPhone:'',providerId:null,
     preferredProviderId:'',preferredProviderName:'',rejectedBy:[],status:'searching',workflowVersion:2,arrivalVerificationRequired:true,
     issue:'Flat Tyre',issues:['Flat Tyre'],vehicleType:'Sedan / Hatchback',modelYear:'Toyota Aqua 2017',registration:'CAB-1234',
-    vehicleId:'v1',vehicleSnapshot:{make:'Toyota',model:'Aqua',year:2017},partsPreference:'genuine',description:'',notes:'',priority:'normal',
+    vehicleId:'v1',vehicleSnapshot:{make:'Toyota',model:'Aqua',year:2017,photoData:'saved-photo'},partsPreference:'genuine',description:'',notes:'',priority:'normal',
     vehiclePhotoUrls:[],photoAnnotations:[],locationLabel:'Colombo',landmark:'',locationAccuracyMeters:null,
     latitude:6.9,longitude:79.9,serviceFee:0,dispatchFee:0,estimatedCost:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
 });
@@ -500,4 +500,52 @@ test('driver cannot confirm arrival before provider reports arrival',async()=> {
   await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'en_route',providerId:'provider',arrivalVerificationRequired:true}));
   const db=env.authenticatedContext('driver').firestore();
   await assertFails(updateDoc(doc(db,'requests/r1'),{arrivalConfirmedBy:'driver',arrivalConfirmedAt:serverTimestamp(),arrivalConfirmationMethod:'gps_nearby_driver',arrivalConfirmationReason:'',arrivalDistanceMeters:10,updatedAt:serverTimestamp()}));
+});
+test('pause and closed working hours prevent quotes and driver reservation',async()=> {
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'providerDirectory/provider'),{requestsPaused:true}));
+  await assertFails(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+  await assertFails(approval(env.authenticatedContext('driver').firestore(),'r1'));
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'providerDirectory/provider'),{requestsPaused:false,scheduleConfigured:true,available24Hours:false,workStartMinute:0,workEndMinute:0}));
+  await assertFails(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+  await assertFails(approval(env.authenticatedContext('driver').firestore(),'r1'));
+  await assertSucceeds(updateDoc(doc(provider,'providerDirectory/provider'),{hoursOverrideUntil:Timestamp.fromMillis(Date.now()+2*3600000),updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+  await assertSucceeds(approval(env.authenticatedContext('driver').firestore(),'r1'));
+});
+test('availability override is bounded and 24-hour providers can quote with a closed schedule',async()=> {
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(provider,'providerDirectory/provider'),{hoursOverrideUntil:Timestamp.fromMillis(Date.now()+4*3600000)}));
+  await assertSucceeds(updateDoc(doc(provider,'providerDirectory/provider'),{scheduleConfigured:true,workStartMinute:0,workEndMinute:0,available24Hours:true}));
+  await assertSucceeds(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+});
+test('warranty offers are validated and immutable after acceptance', async () => {
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  const ref = doc(db,'requests/r1/quotes/provider');
+  const warranty = {...offer(),warrantyDays:30,warrantyTerms:'Repaired puncture only; new tyre damage excluded.'};
+  await assertFails(setDoc(ref,{...warranty,warrantyDays:366}));
+  await assertFails(setDoc(ref,{...warranty,warrantyTerms:''}));
+  await assertFails(setDoc(ref,{...warranty,quoteType:'inspection'}));
+  await assertSucceeds(setDoc(ref,warranty));
+  await assertSucceeds(approval(env.authenticatedContext('driver').firestore(),'r1'));
+  await assertFails(updateDoc(ref,{warrantyDays:0,warrantyTerms:''}));
+});
+test('repeated problem reports require completed service and photo evidence',async()=> {
+  await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed',estimatedCost:1500,finalCost:1500}));
+  const db=env.authenticatedContext('driver').firestore();
+  const ref=doc(db,'requests/r1/disputes/case');
+  const report={driverId:'driver',providerId:'provider',reason:'same_problem',description:'The same repaired puncture is leaking again.',photos:[],status:'open',providerResponse:'',resolution:'',approvedTotal:1500,finalTotal:1500,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(setDoc(ref,report));
+  await assertSucceeds(setDoc(ref,{...report,photos:['photo']}));
+  await assertFails(updateDoc(doc(env.authenticatedContext('provider',{email_verified:true}).firestore(),'requests/r1'),{finalCost:2000}));
+});
+
+test('saved vehicle photos are bounded and stay owner-only',async()=> {
+  const db=env.authenticatedContext('driver').firestore();
+  const vehicle={make:'Toyota',model:'Aqua',year:2018,vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',photoData:'photo',archived:false,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const ref=doc(db,'users/driver/vehicles/photo');
+  await assertSucceeds(setDoc(ref,vehicle));
+  await assertFails(getDoc(doc(env.authenticatedContext('provider',{email_verified:true}).firestore(),'users/driver/vehicles/photo')));
+  await assertFails(updateDoc(ref,{photoData:'x'.repeat(210001),updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{photoData:'',updatedAt:serverTimestamp()}));
 });
