@@ -15,7 +15,7 @@ class _ProviderShellState extends State<ProviderShell> {
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop && index != 0) setState(() => index = 0);
     },
-    child: Scaffold(
+    child: ProviderScaffold(
       body: IndexedStack(
         index: index,
         children: const [

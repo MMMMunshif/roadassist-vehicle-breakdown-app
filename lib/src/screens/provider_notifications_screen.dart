@@ -4,7 +4,7 @@ class ProviderNotificationsScreen extends StatelessWidget {
   const ProviderNotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ProviderScaffold(
     appBar: AppBar(title: const Text('New Assistance Requests')),
     body: Column(
       children: [
