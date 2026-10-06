@@ -356,7 +356,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   };
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ProviderScaffold(
     appBar: AppBar(
       title: const Text('Provider Profile'),
       actions: [

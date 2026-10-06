@@ -10,7 +10,7 @@ class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
   int filter = 0;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ProviderScaffold(
     appBar: AppBar(title: const Text('Provider Request History')),
     body: Column(
       children: [

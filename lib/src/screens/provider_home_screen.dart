@@ -336,7 +336,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => ProviderScaffold(
     appBar: AppBar(
       title: Text(dashboardTitle),
       actions: [
@@ -362,7 +362,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF68A9DF), Color(0xFF4388C7)],
+              colors: [providerSurfaceStrong, providerRoyalBlue],
             ),
             borderRadius: BorderRadius.circular(RaRadius.md),
           ),
