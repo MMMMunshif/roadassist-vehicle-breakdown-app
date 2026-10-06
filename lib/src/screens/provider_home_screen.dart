@@ -90,6 +90,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
   Future<void> _publishProviderLocation() async {
     try {
+      await AuthService().syncProviderDirectory();
       if (!await Geolocator.isLocationServiceEnabled()) return;
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {

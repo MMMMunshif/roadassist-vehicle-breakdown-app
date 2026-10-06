@@ -2,9 +2,9 @@
 
 Requested admin: zimthimuhammed@gmail.com. This is NOT an email allowlist in the app. Admin authorization requires all three: verified Firebase email, admin=true in the signed ID token, and a protected adminAccess/{uid} record with enabled=true. Existing driver/provider roles are preserved.
 
-## Owner provisioning (still required)
+## Owner provisioning for new admin accounts
 
-No owner Application Default Credentials are installed on this computer. The Firebase CLI login used for rules deployment is not automatically an Admin SDK credential. We did not grant the email admin permission or collect its password/private key.
+The existing admin reported successful access after owner provisioning. For additional admin accounts, use trusted owner credentials. Firebase CLI login is not automatically an Admin SDK credential. Never share passwords or private keys.
 
 The project owner should use a trusted computer or Google Cloud Shell with Application Default Credentials for roadassist-lk-munshif and permission to manage Firebase Authentication plus Firestore. On a trusted local machine, Google Cloud CLI's `gcloud auth application-default login` can supply ADC; select the owner's authorized account. Do not upload credential JSON files to chat or commit them.
 
@@ -42,6 +42,10 @@ Normal builds retain driver/provider signup only. Admin builds display a separat
 
 Admin access permits user profile, job, quote, repair evidence, dispute and audit reads. It does not grant arbitrary chat-message/device-token writes or blanket database access. A user's profile admin field has no effect on authorization. Security rules apply regardless of which app build is used.
 
-Firestore reads are subject to Spark quotas. Load-more searches are not a full-text service. Private notes are capped at 50 loaded per target; use a future paginated archive if case histories grow. Provider review identity checks, support contact policy, multi-admin approval and document verification remain operational follow-up work.
+Firestore reads are subject to Spark quotas. Load-more searches are not a full-text service. Private notes are capped at 50 loaded per target; use a future paginated archive if case histories grow. Provider identity submission, reviewer checklist, role separation and operational panels are now implemented. See [provider verification and operations](provider_verification_and_admin_operations.md) for deployment, email configuration and limits. Multi-admin approval and an identity retention/deletion workflow remain follow-up work.
 
 References: https://firebase.google.com/docs/auth/admin/custom-claims and https://cloud.google.com/docs/authentication/application-default-credentials
+
+## Provider document verification update
+
+Profile-only provider approval has been replaced by private document submission, a reviewer checklist, revision binding and expiring approvals. Existing providers need to submit documents too. Operations, Payments, Reports, Settings and Admin team panels are available. See [updated setup and workflow](provider_verification_and_admin_operations.md).

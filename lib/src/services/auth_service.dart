@@ -122,6 +122,33 @@ class AuthService {
     final profile = await _firestore.collection('users').doc(user.uid).get();
     final data = profile.data();
     if (data?['role'] != 'provider') return;
+    final approval =
+        (await _firestore.collection('accountModeration').doc(user.uid).get())
+            .data();
+    if (approval?['verification'] != 'verified' ||
+        approval?['status'] != 'active' ||
+        !user.emailVerified ||
+        !((approval?['validUntil'] as Timestamp?)?.toDate().isAfter(
+              DateTime.now(),
+            ) ??
+            false))
+      return;
+    final application =
+        (await _firestore
+                .collection('providerApplications')
+                .doc(user.uid)
+                .get())
+            .data();
+    if (application == null ||
+        application['revision'] != approval?['verificationRevision'])
+      return;
+    final professional = application['professionalDetails'] as Map?;
+    if (professional == null) return;
+    await updateCurrentProfile({
+      'services': application['services'],
+      'serviceRadius':
+          professional['radiusKm'].toString() + ' km from current location',
+    });
     final jobs = await _firestore
         .collection('requests')
         .where('providerId', isEqualTo: user.uid)
@@ -146,9 +173,13 @@ class AuthService {
     await _firestore.collection('providerDirectory').doc(user.uid).set({
       'displayName':
           data?['displayName'] ?? user.displayName ?? 'Service Provider',
-      'online': data?['online'] ?? true,
-      'services': data?['services'] ?? const <String>[],
-      'serviceRadius': data?['serviceRadius'] ?? '15 km from current location',
+      'online': data?['online'] ?? false,
+      'services': application['services'],
+      'vehicleTypes': application['vehicleTypes'],
+      'verified': true,
+      'verificationExpiresAt': approval!['validUntil'],
+      'serviceRadius':
+          professional['radiusKm'].toString() + ' km from current location',
       'completedJobs': completed.length,
       'averageRating': ratings.isEmpty
           ? 0.0

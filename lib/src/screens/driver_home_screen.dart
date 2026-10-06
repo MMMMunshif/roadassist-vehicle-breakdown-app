@@ -387,31 +387,237 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (action == 'manual') await enterLocationManually();
   }
 
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
-
-  Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(RaSpace.lg, RaSpace.md, RaSpace.lg, 0),
-      child: _Glass(
-        radius: 28,
-        padding: const EdgeInsets.all(RaSpace.md),
-        tint: const Color(0xFF5B9BFF),
-        child: Column(
-          children: [
-            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: signedIn ? AuthService().watchCurrentProfile() : null,
-              builder: (context, profileSnapshot) {
-                final data = profileSnapshot.data?.data();
-                final name =
-                    data?['displayName'] as String? ??
-                    FirebaseAuth.instance.currentUser?.displayName ??
-                    'Driver';
-                final photoData = data?['photoData'] as String?;
-                final seenAt = data?['notificationsSeenAt'] as Timestamp?;
-
-                return Row(
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        const ServiceNotice(),
+        DashboardHeader(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseAuth.instance.currentUser == null
+                        ? null
+                        : AuthService().watchCurrentProfile(),
+                    builder: (context, snapshot) {
+                      final name =
+                          snapshot.data?.data()?['displayName'] as String? ??
+                          FirebaseAuth.instance.currentUser?.displayName ??
+                          'Driver';
+                      final photoData =
+                          snapshot.data?.data()?['photoData'] as String?;
+                      return Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          shape: BoxShape.circle,
+                        ),
+                        child: photoData == null || photoData.isEmpty
+                            ? ProfileInitials(
+                                name: name,
+                                radius: 24,
+                                background: Colors.white,
+                              )
+                            : ClipOval(
+                                child: Image.memory(
+                                  base64Decode(photoData),
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: RaSpace.md),
+                  Expanded(
+                    child:
+                        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                          stream: FirebaseAuth.instance.currentUser == null
+                              ? null
+                              : AuthService().watchCurrentProfile(),
+                          builder: (context, snapshot) {
+                            final name =
+                                snapshot.data?.data()?['displayName']
+                                    as String? ??
+                                FirebaseAuth
+                                    .instance
+                                    .currentUser
+                                    ?.displayName ??
+                                'Driver';
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'WELCOME BACK',
+                                  style: RaText.eyebrow.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                  ),
+                  const _ChatInbox(isProvider: false, buttonOnly: true),
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: signedIn
+                        ? RequestService().watchDriverRequests()
+                        : null,
+                    builder: (context, snapshot) {
+                      return StreamBuilder<
+                        DocumentSnapshot<Map<String, dynamic>>
+                      >(
+                        stream: signedIn
+                            ? AuthService().watchCurrentProfile()
+                            : null,
+                        builder: (context, profileSnapshot) {
+                          final seenAt =
+                              profileSnapshot.data
+                                      ?.data()?['notificationsSeenAt']
+                                  as Timestamp?;
+                          final count =
+                              snapshot.data?.docs.where((doc) {
+                                final updatedAt =
+                                    doc.data()['updatedAt'] as Timestamp?;
+                                return doc.data()['status'] != 'searching' &&
+                                    (seenAt == null ||
+                                        (updatedAt?.compareTo(seenAt) ?? 1) >
+                                            0);
+                              }).length ??
+                              0;
+                          return Badge(
+                            isLabelVisible: count > 0,
+                            label: Text(count > 9 ? '9+' : '$count'),
+                            child: IconButton(
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.16,
+                                ),
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(44, 44),
+                              ),
+                              tooltip: 'Notifications',
+                              onPressed: () {
+                                if (signedIn) {
+                                  push(
+                                    context,
+                                    const DriverNotificationsScreen(),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Sign in to view request notifications.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.notifications_none),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: RaSpace.md),
+              Container(
+                padding: const EdgeInsets.all(RaSpace.md),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(RaRadius.md),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: updatingLocation ? null : changeHomeLocation,
+                  borderRadius: BorderRadius.circular(RaRadius.md),
+                  child: Row(
+                    children: [
+                      const IconBadge(Icons.location_on_outlined, size: 36),
+                      const SizedBox(width: RaSpace.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'CURRENT LOCATION',
+                              style: TextStyle(
+                                color: raMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              locationLabel,
+                              style: RaText.title.copyWith(color: raInk),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (updatingLocation)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        const Icon(
+                          Icons.edit_location_alt_outlined,
+                          color: raBlue,
+                          size: 21,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(RaSpace.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(RaSpace.lg),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF182733)
+                      : const Color(0xFFF3F9FE),
+                  borderRadius: BorderRadius.circular(RaRadius.lg),
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                ),
+                child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(2.5),

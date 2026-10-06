@@ -51,7 +51,8 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
                     final providers = snapshot.data!.docs.where((doc) {
                       final name = (doc.data()['displayName'] as String? ?? '')
                           .toLowerCase();
-                      return name.contains(query);
+                      return _providerHasCurrentVerification(doc.data()) &&
+                          name.contains(query);
                     }).toList();
                     if (providers.isEmpty)
                       return EmptyState(
