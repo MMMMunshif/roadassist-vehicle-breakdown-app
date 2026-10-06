@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -12,6 +14,41 @@ class AdminService {
       throw StateError('Admin access has not been provisioned or was revoked.');
     if (!user.emailVerified || token.claims?['admin'] != true)
       throw StateError('Verified admin access is required.');
+  }
+
+  Future<void> deleteAccount(
+    String uid,
+    String reason,
+    String confirmation,
+  ) async {
+    await requireAdmin();
+    const endpoint = String.fromEnvironment('ADMIN_ACCOUNT_DELETE_API_URL');
+    if (endpoint.isEmpty || Uri.tryParse(endpoint)?.scheme != 'https') {
+      throw StateError(
+        'Deploy and configure the private account deletion endpoint first.',
+      );
+    }
+    final token = await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    final response = await http
+        .post(
+          Uri.parse(endpoint),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'uid': uid,
+            'reason': reason,
+            'confirmation': confirmation,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      final result = jsonDecode(response.body);
+      throw StateError(
+        result['message'] as String? ?? 'Account deletion failed.',
+      );
+    }
   }
 
   Future<void> addPrivateNote(String kind, String target, String text) async {
@@ -31,6 +68,9 @@ class AdminService {
     String? status,
     bool? flagged,
     required String reason,
+    int? verificationRevision,
+    DateTime? validUntil,
+    List<String>? verificationChecks,
   }) async {
     await requireAdmin();
     final actor = FirebaseAuth.instance.currentUser!.uid;
@@ -42,6 +82,16 @@ class AdminService {
         db.collection('providerDirectory').doc(uid),
       );
       final after = <String, dynamic>{
+        if (before['verificationRevision'] != null)
+          'verificationRevision': before['verificationRevision'],
+        if (before['validUntil'] != null) 'validUntil': before['validUntil'],
+        if (before['verificationChecks'] != null)
+          'verificationChecks': before['verificationChecks'],
+        if (verificationRevision != null)
+          'verificationRevision': verificationRevision,
+        if (validUntil != null) 'validUntil': Timestamp.fromDate(validUntil),
+        if (verificationChecks != null)
+          'verificationChecks': verificationChecks,
         'status': status ?? before['status'] ?? 'active',
         'verification': verification ?? before['verification'] ?? 'pending',
         'flagged': flagged ?? before['flagged'] ?? false,
@@ -54,7 +104,7 @@ class AdminService {
       tx.set(ref, after);
       if (directory.exists &&
           (after['status'] == 'suspended' ||
-              after['verification'] == 'rejected')) {
+              after['verification'] != 'verified')) {
         tx.update(directory.reference, {
           'online': false,
           'updatedAt': FieldValue.serverTimestamp(),
@@ -77,6 +127,7 @@ class AdminService {
     required String status,
     required String priority,
     required String decision,
+    DateTime? dueAt,
   }) async {
     await requireAdmin();
     final actor = FirebaseAuth.instance.currentUser!.uid;
@@ -89,6 +140,8 @@ class AdminService {
         'priority': priority,
         'assignedTo': actor,
         'decision': decision.trim(),
+        if (dueAt != null) 'dueAt': Timestamp.fromDate(dueAt),
+        if (dueAt == null && before['dueAt'] != null) 'dueAt': before['dueAt'],
         'updatedAt': FieldValue.serverTimestamp(),
         'lastAuditId': audit.id,
       };
@@ -98,6 +151,65 @@ class AdminService {
         'target': requestId,
         'actor': actor,
         'reason': decision.trim(),
+        'before': before,
+        'after': after,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> sendApprovalEmail(String uid) async {
+    await requireAdmin();
+    final token = await FirebaseAuth.instance.currentUser!.getIdToken(true);
+    const endpoint = String.fromEnvironment('PROVIDER_APPROVAL_EMAIL_API_URL');
+    if (endpoint.isEmpty || Uri.tryParse(endpoint)?.scheme != 'https') {
+      throw StateError(
+        'Configure your deployed approval-email endpoint first.',
+      );
+    }
+    final response = await http
+        .post(
+          Uri.parse(endpoint),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'uid': uid}),
+        )
+        .timeout(const Duration(seconds: 35));
+    if (response.statusCode != 200)
+      throw StateError('Approval email service unavailable.');
+  }
+
+  Future<void> saveSettings({
+    required bool maintenance,
+    required String notice,
+    required String coverage,
+    required List<String> services,
+    required String reason,
+  }) async {
+    await requireAdmin();
+    final ref = db.collection('appSettings').doc('operations'),
+        audit = db.collection('adminAudit').doc();
+    final actor = FirebaseAuth.instance.currentUser!.uid;
+    await db.runTransaction((tx) async {
+      final before = (await tx.get(ref)).data() ?? <String, dynamic>{};
+      final after = {
+        'maintenance': maintenance,
+        'notice': notice,
+        'coverage': coverage,
+        'enabledServices': services,
+        'reason': reason,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'updatedBy': actor,
+        'lastAuditId': audit.id,
+      };
+      tx.set(ref, after);
+      tx.set(audit, {
+        'kind': 'settings',
+        'target': 'operations',
+        'actor': actor,
+        'reason': reason,
         'before': before,
         'after': after,
         'createdAt': FieldValue.serverTimestamp(),
