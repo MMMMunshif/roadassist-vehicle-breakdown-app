@@ -42,6 +42,31 @@ class _AdminUserActivity extends StatelessWidget {
         ),
       StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
+            .collection('requests')
+            .where('cancelledBy', isEqualTo: uid)
+            .limit(50)
+            .snapshots(),
+        builder: (context, snapshot) => ExpansionTile(
+          title: Text(
+            'Cancellations by this account (${snapshot.data?.docs.length ?? 0}; up to 50 shown)',
+          ),
+          children: [
+            if (snapshot.hasError)
+              const Text('Could not load cancellation history.'),
+            for (final doc
+                in snapshot.data?.docs ??
+                    <QueryDocumentSnapshot<Map<String, dynamic>>>[])
+              ListTile(
+                title: Text('${doc.data()['cancellationType']}'),
+                subtitle: Text(
+                  '${doc.data()['cancellationReason']}\nJob: ${doc.id}',
+                ),
+              ),
+          ],
+        ),
+      ),
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
             .collection('adminAudit')
             .where('target', isEqualTo: uid)
             .limit(50)

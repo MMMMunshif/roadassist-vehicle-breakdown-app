@@ -459,6 +459,21 @@ service cloud.firestore {
                 'pendingRepairId', 'lastRepairDecisionId', 'lastRepairDecision', 'repairDecisionAt', 'updatedAt',
                 'approvedRepairId', 'estimatedCost', 'serviceFee', 'dispatchFee', 'extraFee', 'providerDiagnosis']))))
         ||
+        // Cancellation before arrival; history and the approved price remain immutable.
+        (resource.data.providerId is string
+          && resource.data.status in ['accepted','en_route']
+          && (resource.data.providerId == request.auth.uid ||
+            (resource.data.driverId == request.auth.uid && resource.data.status == 'accepted'
+             && resource.data.acceptedAt is timestamp && request.time >= resource.data.acceptedAt + duration.value(10,'m')))
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.cancelledBy == request.auth.uid
+          && request.resource.data.cancellationType == (resource.data.providerId == request.auth.uid ? 'provider_withdrawal' : 'departure_timeout')
+          && request.resource.data.cancellationReason is string
+          && request.resource.data.cancellationReason.size() >= 10 && request.resource.data.cancellationReason.size() <= 500
+          && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationType','cancellationReason']))
+        ||
         // A driver may only cancel their own active request.
         (resource.data.driverId == request.auth.uid
           && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
