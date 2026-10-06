@@ -532,6 +532,49 @@ class RequestService {
     });
   }
 
+  Future<void> withdrawProvider(String id, String reason) async {
+    final value = reason.trim();
+    if (value.length < 10 || value.length > 500)
+      throw StateError('Give a reason of 10â€“500 characters.');
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(id);
+      final request = await tx.get(ref);
+      final data = request.data();
+      if (data == null) throw StateError('Request not found.');
+      final provider = data['providerId'] as String?;
+      final driver = data['driverId'] == _userId;
+      final accepted = (data['acceptedAt'] as Timestamp?)?.toDate();
+      if (provider == null ||
+          !['accepted', 'en_route'].contains(data['status']) ||
+          (!driver && provider != _userId) ||
+          (driver &&
+              (data['status'] != 'accepted' ||
+                  accepted == null ||
+                  DateTime.now().difference(accepted) <
+                      const Duration(minutes: 10)))) {
+        throw StateError(
+          'Provider cancellation is available before arrival. Driver replacement is available after 10 minutes without departure.',
+        );
+      }
+      final directoryRef = _firestore
+          .collection('providerDirectory')
+          .doc(provider);
+      final directory = await tx.get(directoryRef);
+      tx.update(ref, {
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'cancelledBy': _userId,
+        'cancellationReason': value,
+        'cancellationType': driver
+            ? 'departure_timeout'
+            : 'provider_withdrawal',
+      });
+      if (directory.data()?['activeRequestId'] == id)
+        tx.update(directoryRef, {'activeRequestId': null});
+    });
+  }
+
   Future<void> cancelRequest(String id) async {
     await _firestore.runTransaction((transaction) async {
       final reference = _requests.doc(id);

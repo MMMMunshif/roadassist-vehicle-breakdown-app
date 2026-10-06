@@ -15,6 +15,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   String providerPhone = '';
   int estimatedCost = 0;
   bool cancelled = false;
+  String? recoveryReason;
   bool hasProviderLocation = false;
   String? requestError;
   RoadRoute? roadRoute;
@@ -22,6 +23,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
   int routeRequestVersion = 0;
   final statuses = const ['Accepted', 'En Route', 'Arrived', 'Completed'];
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? requestListener;
+
+  Future<void> replaceDelayedProvider() async {
+    final reason = await _adminReason(
+      context,
+      'Reason for replacing the provider',
+    );
+    if (reason == null || !mounted || widget.requestId == null) return;
+    try {
+      await RequestService().withdrawProvider(widget.requestId!, reason);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+    }
+  }
 
   Future<void> refreshRoadRoute(LatLng origin) async {
     final version = ++routeRequestVersion;
@@ -82,6 +99,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 setState(() {
                   status = next;
                   cancelled = value == 'cancelled';
+                  recoveryReason = data?['cancellationReason'] as String?;
                   requestError = null;
                   providerName =
                       data?['providerName'] as String? ?? providerName;
@@ -328,17 +346,40 @@ class _TrackingScreenState extends State<TrackingScreen> {
               ],
             ),
           ),
+          if (cancelled && recoveryReason != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Provider unavailable: $recoveryReason. Choose another provider and approve a new price.',
+              ),
+            ),
+          if (!cancelled && status == 0 && widget.requestId != null)
+            TextButton(
+              onPressed: replaceDelayedProvider,
+              child: const Text(
+                'Provider has not departed? Replace after 10 minutes',
+              ),
+            ),
           BottomAction(
             label: cancelled
-                ? 'Back to Home'
+                ? (recoveryReason == null
+                      ? 'Back to Home'
+                      : 'Find another provider')
                 : widget.requestId != null && status < 3
                 ? 'Waiting for provider update'
                 : status == 3
-                ? 'Back to Home'
+                ? (recoveryReason == null
+                      ? 'Back to Home'
+                      : 'Find another provider')
                 : 'Live tracking unavailable',
             enabled: cancelled || status == 3,
             onTap: () {
-              if (cancelled || status == 3) {
+              if (cancelled && recoveryReason != null) {
+                replace(
+                  context,
+                  ReviewScreen(draft: widget.draft.copyWith(provider: '')),
+                );
+              } else if (cancelled || status == 3) {
                 replace(context, const DriverShell());
               }
             },
