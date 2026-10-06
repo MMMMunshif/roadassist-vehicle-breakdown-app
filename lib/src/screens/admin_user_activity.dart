@@ -26,8 +26,9 @@ class _AdminUserActivity extends StatelessWidget {
                   ListTile(
                     title: Text('${doc.data()['service'] ?? doc.id}'),
                     subtitle: Text(
-                      '${doc.data()['status']} • Payment ${doc.data()['providerConfirmedPayment'] == true ? 'confirmed' : 'unconfirmed'}',
+                      '${doc.data()['status']} • Payment ${doc.data()['providerConfirmedPayment'] == true ? 'confirmed' : 'unconfirmed'}${doc.data()['arrivalConfirmedBy'] == null ? '' : '\nArrival: ${doc.data()['arrivalConfirmationMethod']} at ${doc.data()['arrivalConfirmedAt']} - ${doc.data()['arrivalConfirmationReason']}'}',
                     ),
+                    isThreeLine: doc.data()['arrivalConfirmedBy'] != null,
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(

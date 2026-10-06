@@ -38,7 +38,8 @@ class _DisputeScreenState extends State<DisputeScreen> {
                 () => canReport =
                     snapshot.data()?['driverId'] ==
                         FirebaseAuth.instance.currentUser?.uid &&
-                    snapshot.data()?['status'] == 'completed',
+                    (snapshot.data()?['status'] == 'completed' ||
+                        snapshot.data()?['completionState'] == 'pending'),
               );
             }
           })
@@ -93,7 +94,8 @@ class _DisputeScreenState extends State<DisputeScreen> {
         final existing = await transaction.get(caseRef);
         if (existing.exists ||
             request == null ||
-            request['status'] != 'completed' ||
+            (request['status'] != 'completed' &&
+                request['completionState'] != 'pending') ||
             request['driverId'] != FirebaseAuth.instance.currentUser?.uid)
           throw StateError('Unavailable');
         transaction.set(caseRef, {
