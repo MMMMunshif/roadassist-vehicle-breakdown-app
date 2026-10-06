@@ -22,20 +22,14 @@ class _SplashScreenState extends State<SplashScreen> {
         final profile = await AuthService().getCurrentProfile();
         final profileData = profile.data();
         final role = profileData?['role'] as String?;
-        final driverPhoto = profileData?['photoData'] as String?;
-        final driverPhotoMissing =
-            role == 'driver' && (driverPhoto == null || driverPhoto.isEmpty);
-        if (driverPhotoMissing) {
-          await FirebaseAuth.instance.signOut();
-          destination = const WelcomeScreen();
-        } else if (role == 'provider') {
+        if (role == 'provider') {
           destination = const ProviderShell();
         } else if (role == 'driver') {
           destination = const DriverShell();
         } else {
           await FirebaseAuth.instance.signOut();
         }
-        if (!driverPhotoMissing && (role == 'provider' || role == 'driver')) {
+        if (role == 'provider' || role == 'driver') {
           unawaited(DeviceService().registerCurrentDevice());
         }
       }

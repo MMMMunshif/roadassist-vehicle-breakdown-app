@@ -22,6 +22,19 @@ class RequestService {
   }
 
   Future<String> createRequest(RequestDraft draft) async {
+    final settings =
+        (await _firestore.collection('appSettings').doc('operations').get())
+            .data();
+    if (settings?['maintenance'] == true)
+      throw StateError(
+        'New assistance requests are temporarily paused. ${settings?['notice'] ?? ''}',
+      );
+    final enabled = settings?['enabledServices'] as List?;
+    if (enabled != null &&
+        draft.issues.any((issue) => !enabled.contains(issue)))
+      throw StateError(
+        'One selected service is currently unavailable. Choose another service.',
+      );
     final driverRequests = await _requests
         .where('driverId', isEqualTo: _userId)
         .get();
