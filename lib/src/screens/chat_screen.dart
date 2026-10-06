@@ -67,6 +67,8 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   );
   final notesController = TextEditingController();
   final reasonController = TextEditingController();
+  final warrantyController = TextEditingController();
+  int warrantyDays = 0;
   final evidence = <String>[];
   bool preparingPhoto = false;
   String? evidenceError;
@@ -154,6 +156,14 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                 ),
                 const SizedBox(height: RaSpace.md),
                 Text('Vehicle: ${requestData['modelYear'] ?? ''}'),
+                VehiclePhotoPreview(
+                  model: requestData['modelYear'] as String? ?? '',
+                  photoData: requestVehiclePhoto(requestData),
+                  height: 130,
+                ),
+                const Text(
+                  'Confirm year, engine / variant and part number before choosing parts.',
+                ),
                 Text('Driver symptoms: ${requestData['description'] ?? ''}'),
                 Text(
                   'Parts preference: ${requestData['partsPreference'] ?? 'discuss'}',
@@ -197,6 +207,40 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                     labelText: 'Included work, parts and exclusions',
                     hintText: 'Parts, after-hours fee, or other details',
                   ),
+                ),
+                DropdownButtonFormField<int>(
+                  initialValue: warrantyDays,
+                  decoration: const InputDecoration(
+                    labelText: 'Service warranty',
+                  ),
+                  items: [0, 7, 14, 30, 90, 180, 365]
+                      .map(
+                        (days) => DropdownMenuItem(
+                          value: days,
+                          child: Text(
+                            days == 0 ? 'No service warranty' : '$days days',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: inspectionOnly
+                      ? null
+                      : (value) => setDialogState(() => warrantyDays = value!),
+                ),
+                if (warrantyDays > 0 && !inspectionOnly)
+                  TextField(
+                    controller: warrantyController,
+                    maxLength: 500,
+                    maxLines: 3,
+                    onChanged: (_) => setDialogState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Covered work and exclusions',
+                      hintText:
+                          'State which repair is covered, parts/labour and any travel charge.',
+                    ),
+                  ),
+                const Text(
+                  'Warranty starts when the driver confirms completion. It covers only the stated work.',
                 ),
                 if (revision) ...[
                   TextField(
@@ -287,6 +331,9 @@ Future<Map<String, dynamic>?> requestProviderQuote(
               onPressed:
                   (revision ? total < 0 : total <= 0) ||
                       preparingPhoto ||
+                      (!inspectionOnly &&
+                          warrantyDays > 0 &&
+                          warrantyController.text.trim().length < 10) ||
                       revisionError != null ||
                       total > 10000000 ||
                       (requestData['workflowVersion'] == 2 &&
@@ -299,6 +346,10 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                       'providerDistanceKm': distanceKm,
                       'quoteNotes': notesController.text.trim(),
                       'quoteType': inspectionOnly ? 'inspection' : 'direct',
+                      'warrantyDays': inspectionOnly ? 0 : warrantyDays,
+                      'warrantyTerms': inspectionOnly || warrantyDays == 0
+                          ? ''
+                          : warrantyController.text.trim(),
                       if (revision)
                         'changeReason': reasonController.text.trim(),
                       if (revision)
@@ -325,6 +376,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   extraController.dispose();
   notesController.dispose();
   reasonController.dispose();
+  warrantyController.dispose();
   return result;
 }
 

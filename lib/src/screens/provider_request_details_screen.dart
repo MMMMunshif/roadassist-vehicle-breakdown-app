@@ -121,6 +121,10 @@ class ProviderRequestDetailsScreen extends StatelessWidget {
           ),
           const SizedBox(height: RaSpace.lg),
           const SectionTitle('Vehicle Details'),
+          VehiclePhotoPreview(
+            model: data['modelYear'] as String? ?? '',
+            photoData: requestVehiclePhoto(data),
+          ),
           const SizedBox(height: RaSpace.sm),
           Card(
             color: Theme.of(context).colorScheme.surface,

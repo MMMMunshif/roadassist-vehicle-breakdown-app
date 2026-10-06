@@ -178,6 +178,12 @@ class AuthService {
       'vehicleTypes': application['vehicleTypes'],
       'verified': true,
       'verificationExpiresAt': approval!['validUntil'],
+      'available24Hours': professional['available24Hours'] == true,
+      'scheduleConfigured':
+          (professional['startTime'] as String? ?? '').isNotEmpty &&
+          (professional['endTime'] as String? ?? '').isNotEmpty,
+      'workStartMinute': _workMinute(professional['startTime']),
+      'workEndMinute': _workMinute(professional['endTime']),
       'serviceRadius':
           professional['radiusKm'].toString() + ' km from current location',
       'completedJobs': completed.length,
@@ -215,6 +221,29 @@ class AuthService {
       'locationUpdatedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  static int _workMinute(dynamic value) {
+    final parts = '$value'.split(':');
+    return parts.length == 2
+        ? (int.tryParse(parts[0]) ?? 0) * 60 + (int.tryParse(parts[1]) ?? 0)
+        : 0;
+  }
+
+  Future<void> setProviderAvailability({
+    bool? paused,
+    bool overrideHours = false,
+  }) async {
+    final user = currentUser;
+    if (user == null) throw StateError('Sign in first.');
+    await _firestore.collection('providerDirectory').doc(user.uid).update({
+      if (paused != null) 'requestsPaused': paused,
+      if (overrideHours)
+        'hoursOverrideUntil': Timestamp.fromDate(
+          DateTime.now().add(const Duration(hours: 2)),
+        ),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> setProviderOnline(bool online) async {

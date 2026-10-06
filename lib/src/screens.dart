@@ -14,16 +14,19 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'app.dart';
 import 'models/request_draft.dart';
 import 'models/vehicle.dart';
+import 'models/provider_availability.dart';
 import 'models/provider_analytics.dart';
 import 'services/report_export.dart';
 import 'models/repair_revision.dart';
 import 'services/vehicle_service.dart';
+import 'services/vehicle_image_service.dart';
 import 'services/auth_service.dart';
 import 'services/admin_service.dart';
 import 'services/provider_verification_service.dart';
@@ -90,3 +93,6 @@ part 'screens/provider_case_details_screen.dart';
 part 'screens/gps_issue_screen.dart';
 part 'screens/provider_request_details_screen.dart';
 part 'screens/customer_contact_screen.dart';
+
+part 'widgets/service_warranty.dart';
+part 'widgets/vehicle_photo_preview.dart';

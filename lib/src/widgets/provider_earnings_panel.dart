@@ -451,7 +451,7 @@ class _ProviderReportNoticeState extends State<_ProviderReportNotice> {
         child: ListTile(
           leading: const Icon(Icons.report_problem_outlined, color: raGold),
           title: Text(
-            '${widget.job.data['driverName'] ?? 'Driver'}  -  Service report',
+            '${widget.job.data['driverName'] ?? 'Driver'}  -  ${data['reason'] == 'same_problem' ? 'Warranty review' : 'Service report'}',
           ),
           subtitle: Text(
             '${data['status'].toString().replaceAll('_', ' ')}  -  Invoice ${_businessMoney(widget.job.amount)}',

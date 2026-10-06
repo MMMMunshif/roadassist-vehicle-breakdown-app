@@ -187,10 +187,35 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
       fuel = 'Petrol',
       transmission = 'Automatic';
   bool saving = false;
+  String photoData = '';
+  bool uploadingPhoto = false;
+  Future<void> addPhoto() async {
+    setState(() => uploadingPhoto = true);
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+      );
+      if (photo == null) return;
+      final encoded = await PhotoUploadService().prepareVehiclePhoto(photo);
+      if (mounted) setState(() => photoData = encoded);
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not load photo. Choose another image.'),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => uploadingPhoto = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     final v = widget.vehicle;
+    photoData = v?.photoData ?? '';
     make = TextEditingController(text: v?.make);
     model = TextEditingController(text: v?.model);
     year = TextEditingController(text: v?.year.toString());
@@ -223,6 +248,7 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
           registration: normalizeVehicleRegistration(registration.text),
           fuelType: fuel,
           transmission: transmission,
+          photoData: photoData,
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -263,11 +289,28 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          VehiclePhotoPreview(
+            model: '${make.text} ${model.text} ${year.text}',
+            photoData: photoData,
+          ),
+          OutlinedButton.icon(
+            onPressed: saving || uploadingPhoto ? null : addPhoto,
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: Text(
+              uploadingPhoto ? 'Preparing photo...' : 'Add your vehicle photo',
+            ),
+          ),
+          if (photoData.isNotEmpty)
+            TextButton(
+              onPressed: saving ? null : () => setState(() => photoData = ''),
+              child: const Text('Remove saved photo / Use reference photo'),
+            ),
           for (final entry in [('Make', make), ('Model', model)])
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: TextFormField(
                 controller: entry.$2,
+                onChanged: (_) => setState(() {}),
                 enabled: !saving,
                 maxLength: 40,
                 decoration: InputDecoration(labelText: entry.$1),
@@ -277,6 +320,7 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
             ),
           TextFormField(
             controller: year,
+            onChanged: (_) => setState(() {}),
             enabled: !saving,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Year'),
@@ -318,7 +362,7 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
           ], (v) => setState(() => transmission = v)),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: saving ? null : save,
+            onPressed: saving || uploadingPhoto ? null : save,
             child: Text(saving ? 'Saving…' : 'Save Vehicle'),
           ),
         ],
