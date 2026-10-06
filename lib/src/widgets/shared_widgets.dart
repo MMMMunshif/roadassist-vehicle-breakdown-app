@@ -2543,12 +2543,23 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
     final (Color bg, Color fg) = switch (tone) {
-      RaTone.success => (raSuccessPale, raSuccess),
-      RaTone.danger => (raDangerPale, raDanger),
-      RaTone.warning => (raGoldPale, const Color(0xFFA5670C)),
-      RaTone.info => (raPale, raBlue),
-      RaTone.neutral => (const Color(0xFFF0F2F6), raMuted),
+      RaTone.success =>
+        dark
+            ? (const Color(0xFF123D30), const Color(0xFF87DDB3))
+            : (raSuccessPale, const Color(0xFF08643C)),
+      RaTone.danger => (colors.errorContainer, colors.onErrorContainer),
+      RaTone.warning =>
+        dark
+            ? (const Color(0xFF493819), const Color(0xFFF2CF83))
+            : (raGoldPale, const Color(0xFF805000)),
+      RaTone.info => (colors.primaryContainer, colors.onPrimaryContainer),
+      RaTone.neutral => (
+        colors.surfaceContainerHighest,
+        colors.onSurfaceVariant,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -2567,13 +2578,15 @@ class StatusPill extends StatelessWidget {
             ),
             const SizedBox(width: 6),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: fg,
-              letterSpacing: 0.2,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: fg,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],
