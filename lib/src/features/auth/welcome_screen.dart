@@ -1,91 +1,240 @@
 part of '../../screens.dart';
 
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({
+    super.key,
+  });
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: raNavyDeep,
-    body: Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.asset(
-          'assets/images/welcome_assistance.jpg',
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: ListView(
+          padding:
+              const EdgeInsets.fromLTRB(
+            RaSpace.lg,
+            RaSpace.xl,
+            RaSpace.lg,
+            RaSpace.xxxl,
+          ),
+          children: [
+            const _AuthWordmark(),
+
+            const SizedBox(
+              height: RaSpace.xl,
+            ),
+
+            const _AuthRoadArtwork(),
+
+            const SizedBox(
+              height: RaSpace.xxl,
+            ),
+
+            Text(
+              'Your journey.\nOur support.',
+              style: theme
+                  .textTheme.headlineMedium
+                  ?.copyWith(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                height: 1.08,
+                letterSpacing: -1,
+              ),
+            ),
+
+            const SizedBox(
+              height: RaSpace.md,
+            ),
+
+            Text(
+              'Request roadside assistance, compare provider quotes and follow your service progress from one place.',
+              style: theme
+                  .textTheme.bodyLarge
+                  ?.copyWith(
+                color:
+                    colors.onSurfaceVariant,
+                height: 1.55,
+              ),
+            ),
+
+            const SizedBox(
+              height: RaSpace.xl,
+            ),
+
+            const _WelcomeBenefit(
+              icon:
+                  Icons.request_quote_outlined,
+              title:
+                  'Approve the price first',
+              description:
+                  'Compare available provider offers before choosing who handles your request.',
+            ),
+
+            const SizedBox(
+              height: RaSpace.sm,
+            ),
+
+            const _WelcomeBenefit(
+              icon:
+                  Icons.route_outlined,
+              title:
+                  'Follow active assistance',
+              description:
+                  'See meaningful job updates while your provider travels and works.',
+            ),
+
+            const SizedBox(
+              height: RaSpace.sm,
+            ),
+
+            const _WelcomeBenefit(
+              icon:
+                  Icons.receipt_long_outlined,
+              title:
+                  'Clear service history',
+              description:
+                  'Keep approved quotes, invoices and completed assistance records together.',
+            ),
+
+            const SizedBox(
+              height: RaSpace.xl,
+            ),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => push(
+                  context,
+                  const RoleSelectionScreen(),
+                ),
+                icon: const Icon(
+                  Icons.arrow_forward_rounded,
+                ),
+                label: const Text(
+                  'Get Started',
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              height: RaSpace.sm,
+            ),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => push(
+                  context,
+                  const RoleSelectionScreen(),
+                ),
+                child: const Text(
+                  'I Already Have an Account',
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              height: RaSpace.xl,
+            ),
+
+            Text(
+              'Built for roadside assistance across Sri Lanka.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(
+                color:
+                    colors.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              stops: [0, .3, .62, 1],
-              colors: [
-                Color(0xB3071A2C),
-                Color(0x33071A2C),
-                Color(0x12071A2C),
-                Color(0xE6071A2C),
-              ],
+      ),
+    );
+  }
+}
+
+class _WelcomeBenefit
+    extends StatelessWidget {
+  const _WelcomeBenefit({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(
+        RaSpace.md,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: colors.outlineVariant
+              .withValues(alpha: .55),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius:
+                  BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              size: 21,
+              color:
+                  colors.onPrimaryContainer,
             ),
           ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+          const SizedBox(width: RaSpace.md),
+          Expanded(
             child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
-                const Spacer(),
-                const Text(
-                  'Help is closer than you think.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 25,
-                    height: 1.15,
-                    fontWeight: FontWeight.w800,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 10)],
+                Text(
+                  title,
+                  style: theme
+                      .textTheme.titleSmall
+                      ?.copyWith(
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Fast, trusted roadside assistance wherever your journey takes you.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFFE5EDF5),
-                    fontSize: 14,
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(
+                    color:
+                        colors.onSurfaceVariant,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF075866),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: const StadiumBorder(),
-                    ),
-                    onPressed: () => push(context, const RoleSelectionScreen()),
-                    child: const Text('Get Started'),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                TextButton(
-                  onPressed: () => push(context, const RoleSelectionScreen()),
-                  child: const Text(
-                    'Already have an account?  Log in',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

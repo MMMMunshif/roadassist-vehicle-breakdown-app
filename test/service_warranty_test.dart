@@ -34,8 +34,8 @@ void main() {
         'Puncture repair',
       );
       await tester.ensureVisible(find.text('No service warranty'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('No service warranty'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('No service warranty'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('30 days').last);
       await tester.pumpAndSettle();
@@ -48,10 +48,10 @@ void main() {
         isNull,
       );
       await tester.ensureVisible(
-        find.widgetWithText(TextField, 'Covered work and exclusions'),
+        find.widgetWithText(TextField, 'Warranty coverage'),
       );
       await tester.enterText(
-        find.widgetWithText(TextField, 'Covered work and exclusions'),
+        find.widgetWithText(TextField, 'Warranty coverage'),
         'Same puncture only; new damage excluded.',
       );
       await tester.pump();

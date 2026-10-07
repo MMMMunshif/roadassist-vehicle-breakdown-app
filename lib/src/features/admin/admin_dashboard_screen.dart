@@ -1,38 +1,24 @@
 part of '../../screens.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key, required this.onSignOut});
+  const AdminDashboardScreen({
+    super.key,
+    required this.onSignOut,
+  });
+
   final Future<void> Function() onSignOut;
+
   @override
-  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+  State<AdminDashboardScreen> createState() =>
+      _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int tab = 0;
-  String accessRole = 'support';
-  List<int> get visibleTabs => accessRole == 'reviewer'
-      ? [0, 1, 4, 5, 6]
-      : accessRole == 'support'
-      ? [0, 2, 3, 4, 5, 6, 7, 8]
-      : List.generate(tabs.length, (i) => i);
-  @override
-  void initState() {
-    super.initState();
-    unawaited(loadAccessRole());
-  }
 
-  Future<void> loadAccessRole() async {
-    try {
-      final access = await FirebaseFirestore.instance
-          .collection('adminAccess')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .get();
-      if (mounted)
-        setState(
-          () => accessRole = access.data()?['role'] as String? ?? 'super_admin',
-        );
-    } catch (_) {}
-  }
+  String accessRole = 'support';
+
+  bool loadingRole = true;
 
   static const tabs = [
     'Overview',
@@ -47,196 +33,617 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     'Settings',
     'Admin team',
   ];
+
   static const icons = [
     Icons.dashboard_outlined,
     Icons.handyman_outlined,
-    Icons.people_outline,
-    Icons.support_agent,
+    Icons.people_outline_rounded,
+    Icons.support_agent_outlined,
     Icons.route_outlined,
-    Icons.history,
+    Icons.history_rounded,
     Icons.monitor_heart_outlined,
     Icons.payments_outlined,
-    Icons.bar_chart,
+    Icons.bar_chart_rounded,
     Icons.settings_outlined,
     Icons.admin_panel_settings_outlined,
   ];
+
   static const descriptions = [
-    'Your live operations at a glance',
-    'Review provider accounts and verification',
-    'Find and manage RoadAssist accounts',
-    'Review reports, evidence and decisions',
-    'Monitor assistance and service progress',
-    'Trace administrative decisions',
-    'Review waiting requests and delayed updates',
-    'Reconcile manually reported payments',
-    'Explore and export loaded job metrics',
-    'Manage notices and service availability',
-    'Review private administrative access',
+    'Live RoadAssist operations at a glance.',
+    'Review provider accounts, documents and verification.',
+    'Find and review RoadAssist user accounts.',
+    'Review service reports, evidence and case decisions.',
+    'Monitor assistance requests and service progress.',
+    'Trace administrative actions and decisions.',
+    'Identify waiting requests and delayed active jobs.',
+    'Review manually reported and confirmed payments.',
+    'Explore loaded operational metrics and exports.',
+    'Manage service availability and public notices.',
+    'Review private administrative access roles.',
   ];
 
-  Widget content() => switch (tab) {
-    0 => const AdminOverviewScreen(),
-    1 => const AdminProvidersScreen(),
-    2 => const AdminUsersScreen(),
-    3 => const AdminComplaintsScreen(),
-    4 => const AdminJobsScreen(),
-    5 => const AdminAuditScreen(),
-    6 => const AdminOperationsScreen(),
-    7 => const AdminPaymentsScreen(),
-    8 => const AdminReportsScreen(),
-    9 => const AdminSettingsScreen(),
-    _ => const AdminTeamScreen(),
-  };
+  List<int> get visibleTabs {
+    if (accessRole == 'reviewer') {
+      return [0, 1, 4, 5, 6];
+    }
+
+    if (accessRole == 'support') {
+      return [0, 2, 3, 4, 5, 6, 7, 8];
+    }
+
+    return List.generate(
+      tabs.length,
+      (index) => index,
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 850;
-          final colors = Theme.of(context).colorScheme;
-          return Row(
-            children: [
-              if (wide)
-                Container(
-                  width: 210,
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerLow,
-                    border: Border(
-                      right: BorderSide(color: colors.outlineVariant),
+  void initState() {
+    super.initState();
+    unawaited(loadAccessRole());
+  }
+
+  Future<void> loadAccessRole() async {
+    try {
+      final currentUser =
+          FirebaseAuth.instance.currentUser;
+
+      if (currentUser == null) {
+        return;
+      }
+
+      final access =
+          await FirebaseFirestore.instance
+              .collection('adminAccess')
+              .doc(currentUser.uid)
+              .get();
+
+      if (!mounted) return;
+
+      final role =
+          access.data()?['role'] as String? ??
+          'super_admin';
+
+      final allowed = role == 'reviewer'
+          ? [0, 1, 4, 5, 6]
+          : role == 'support'
+          ? [0, 2, 3, 4, 5, 6, 7, 8]
+          : List.generate(
+              tabs.length,
+              (index) => index,
+            );
+
+      setState(() {
+        accessRole = role;
+
+        if (!allowed.contains(tab)) {
+          tab = allowed.first;
+        }
+      });
+    } catch (_) {
+      // Existing access rules remain authoritative.
+    } finally {
+      if (mounted) {
+        setState(() {
+          loadingRole = false;
+        });
+      }
+    }
+  }
+
+  Widget content() {
+    return switch (tab) {
+      0 => const AdminOverviewScreen(),
+      1 => const AdminProvidersScreen(),
+      2 => const AdminUsersScreen(),
+      3 => const AdminComplaintsScreen(),
+      4 => const AdminJobsScreen(),
+      5 => const AdminAuditScreen(),
+      6 => const AdminOperationsScreen(),
+      7 => const AdminPaymentsScreen(),
+      8 => const AdminReportsScreen(),
+      9 => const AdminSettingsScreen(),
+      _ => const AdminTeamScreen(),
+    };
+  }
+
+  String get roleLabel {
+    return switch (accessRole) {
+      'super_admin' => 'Super Admin',
+      'reviewer' => 'Reviewer',
+      'support' => 'Support',
+      _ => accessRole.replaceAll('_', ' '),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final desktop =
+                constraints.maxWidth >= 980;
+
+            return Row(
+              children: [
+                if (desktop)
+                  Container(
+                    width: 254,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      border: Border(
+                        right: BorderSide(
+                          color: colors.outlineVariant
+                              .withValues(
+                            alpha: .65,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 30, 24, 4),
-                        child: Text(
-                          'RoadAssist',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding:
+                              const EdgeInsets.fromLTRB(
+                            22,
+                            24,
+                            22,
+                            20,
                           ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-                        child: Text(
-                          'ADMIN WORKSPACE',
-                          style: TextStyle(
-                            fontSize: 11,
-                            letterSpacing: 1.5,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView(
-                          children: [
-                            for (final i in visibleTabs)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                child: ListTile(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration:
+                                    BoxDecoration(
+                                  gradient:
+                                      LinearGradient(
+                                    begin:
+                                        Alignment.topLeft,
+                                    end:
+                                        Alignment
+                                            .bottomRight,
+                                    colors: [
+                                      colors.primary,
+                                      const Color(
+                                        0xFF007D70,
+                                      ),
+                                    ],
                                   ),
-                                  selected: tab == i,
-                                  selectedTileColor: colors.primaryContainer,
-                                  selectedColor: colors.onPrimaryContainer,
-                                  leading: Icon(icons[i]),
-                                  title: Text(tabs[i]),
-                                  onTap: () => setState(() => tab = i),
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    14,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons
+                                      .shield_outlined,
+                                  color: Colors.white,
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'Private access\nAll moderation actions are audited.',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(wide ? 28 : 16, 24, 16, 20),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  tabs[tab],
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              const SizedBox(
+                                width: RaSpace.md,
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      'RoadAssist',
+                                      style: theme
+                                          .textTheme
+                                          .titleLarge
+                                          ?.copyWith(
+                                        fontWeight:
+                                            FontWeight
+                                                .w900,
+                                      ),
+                                    ),
+                                    Text(
+                                      'ADMIN WORKSPACE',
+                                      style: theme
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                        color: colors
+                                            .onSurfaceVariant,
+                                        letterSpacing:
+                                            1.1,
+                                        fontWeight:
+                                            FontWeight
+                                                .w800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  descriptions[tab],
-                                  style: TextStyle(
-                                    color: colors.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(
+                            horizontal: 14,
+                          ),
+                          child: Container(
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration:
+                                BoxDecoration(
+                              color: colors
+                                  .primaryContainer
+                                  .withValues(
+                                alpha: .35,
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(
+                                14,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons
+                                      .admin_panel_settings_outlined,
+                                  size: 18,
+                                  color:
+                                      colors.primary,
+                                ),
+                                const SizedBox(
+                                  width:
+                                      RaSpace.sm,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    loadingRole
+                                        ? 'Loading access…'
+                                        : roleLabel,
+                                    style: theme
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                      fontWeight:
+                                          FontWeight
+                                              .w800,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          IconButton(
-                            onPressed: widget.onSignOut,
-                            tooltip: 'Sign out',
-                            icon: const Icon(Icons.logout),
+                        ),
+
+                        const SizedBox(
+                          height: RaSpace.md,
+                        ),
+
+                        Expanded(
+                          child: ListView(
+                            padding:
+                                const EdgeInsets
+                                    .fromLTRB(
+                              10,
+                              4,
+                              10,
+                              12,
+                            ),
+                            children: [
+                              for (final i
+                                  in visibleTabs)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets
+                                          .only(
+                                    bottom: 4,
+                                  ),
+                                  child: Material(
+                                    color: tab == i
+                                        ? colors
+                                            .primaryContainer
+                                        : Colors
+                                            .transparent,
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(
+                                      14,
+                                    ),
+                                    clipBehavior:
+                                        Clip.antiAlias,
+                                    child: InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          tab = i;
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets
+                                                .symmetric(
+                                          horizontal:
+                                              13,
+                                          vertical:
+                                              11,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              icons[i],
+                                              size: 21,
+                                              color: tab ==
+                                                      i
+                                                  ? colors
+                                                      .onPrimaryContainer
+                                                  : colors
+                                                      .onSurfaceVariant,
+                                            ),
+                                            const SizedBox(
+                                              width:
+                                                  RaSpace
+                                                      .md,
+                                            ),
+                                            Expanded(
+                                              child:
+                                                  Text(
+                                                tabs[i],
+                                                style: theme
+                                                    .textTheme
+                                                    .labelLarge
+                                                    ?.copyWith(
+                                                  color: tab ==
+                                                          i
+                                                      ? colors
+                                                          .onPrimaryContainer
+                                                      : null,
+                                                  fontWeight: tab ==
+                                                          i
+                                                      ? FontWeight
+                                                          .w900
+                                                      : FontWeight
+                                                          .w600,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+
+                        Padding(
+                          padding:
+                              const EdgeInsets.all(
+                            14,
+                          ),
+                          child: Container(
+                            padding:
+                                const EdgeInsets.all(
+                              RaSpace.md,
+                            ),
+                            decoration:
+                                BoxDecoration(
+                              color: colors
+                                  .surfaceContainerHighest
+                                  .withValues(
+                                alpha: .42,
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(
+                                15,
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment
+                                      .start,
+                              children: [
+                                Icon(
+                                  Icons
+                                      .lock_outline_rounded,
+                                  size: 17,
+                                  color: colors
+                                      .onSurfaceVariant,
+                                ),
+                                const SizedBox(
+                                  width:
+                                      RaSpace.sm,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    'Private access. Administrative actions are audited.',
+                                    style: theme
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    if (!wide)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.fromLTRB(
+                          desktop ? 30 : 16,
+                          desktop ? 24 : 16,
+                          desktop ? 30 : 16,
+                          18,
+                        ),
+                        color: colors.surface,
                         child: Row(
                           children: [
-                            for (final i in visibleTabs)
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  right: 8,
-                                  bottom: 12,
-                                ),
-                                child: ChoiceChip(
-                                  avatar: Icon(icons[i], size: 18),
-                                  label: Text(tabs[i]),
-                                  selected: tab == i,
-                                  onSelected: (_) => setState(() => tab = i),
-                                ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment
+                                        .start,
+                                children: [
+                                  Text(
+                                    tabs[tab],
+                                    style: theme
+                                        .textTheme
+                                        .headlineMedium
+                                        ?.copyWith(
+                                      fontWeight:
+                                          FontWeight
+                                              .w900,
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: 4,
+                                  ),
+                                  Text(
+                                    descriptions[tab],
+                                    style: theme
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                      color: colors
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+
+                            const SizedBox(
+                              width: RaSpace.md,
+                            ),
+
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                unawaited(
+                                  widget.onSignOut(),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.logout_rounded,
+                              ),
+                              label: desktop
+                                  ? const Text(
+                                      'Sign out',
+                                    )
+                                  : const SizedBox
+                                      .shrink(),
+                            ),
                           ],
                         ),
                       ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.all(wide ? 20 : 12),
-                        child: content(),
+
+                      if (!desktop)
+                        Container(
+                          width: double.infinity,
+                          color: colors.surface,
+                          child:
+                              SingleChildScrollView(
+                            scrollDirection:
+                                Axis.horizontal,
+                            padding:
+                                const EdgeInsets
+                                    .fromLTRB(
+                              12,
+                              0,
+                              12,
+                              12,
+                            ),
+                            child: Row(
+                              children: [
+                                for (final i
+                                    in visibleTabs)
+                                  Padding(
+                                    padding:
+                                        const EdgeInsets
+                                            .only(
+                                      right: 7,
+                                    ),
+                                    child:
+                                        ChoiceChip(
+                                      avatar: Icon(
+                                        icons[i],
+                                        size: 17,
+                                      ),
+                                      label:
+                                          Text(
+                                        tabs[i],
+                                      ),
+                                      selected:
+                                          tab == i,
+                                      onSelected:
+                                          (_) {
+                                        setState(
+                                          () {
+                                            tab = i;
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      Divider(
+                        height: 1,
+                        color: colors.outlineVariant
+                            .withValues(
+                          alpha: .55,
+                        ),
                       ),
-                    ),
-                  ],
+
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.all(
+                            desktop ? 22 : 12,
+                          ),
+                          child: ClipRRect(
+                            borderRadius:
+                                BorderRadius.circular(
+                              desktop ? 22 : 16,
+                            ),
+                            child: Material(
+                              color: colors.surface,
+                              child: content(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
