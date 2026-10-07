@@ -1511,23 +1511,12 @@ class BrandMark extends StatelessWidget {
   final double size;
   final bool elevated;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Image.asset(
+    'assets/images/roadassist_mark.png',
     width: size,
     height: size,
-    decoration: BoxDecoration(
-      color: raBlue,
-      borderRadius: BorderRadius.circular(size * .26),
-      boxShadow: elevated
-          ? [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ]
-          : null,
-    ),
-    child: Icon(Icons.shield_outlined, color: Colors.white, size: size * .55),
+    fit: BoxFit.contain,
+    semanticLabel: 'RoadAssist logo',
   );
 }
 

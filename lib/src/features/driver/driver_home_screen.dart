@@ -6,66 +6,9 @@ part of '../../screens.dart';
 
 class _RoadAssistLogo extends StatelessWidget {
   const _RoadAssistLogo({this.size = 42});
-
   final double size;
-
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.primary,
-            colors.secondary,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(size * .30),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withValues(alpha: .18),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(
-            Icons.add_road_rounded,
-            color: colors.onPrimary,
-            size: size * .55,
-          ),
-          Positioned(
-            right: size * .08,
-            bottom: size * .08,
-            child: Container(
-              width: size * .30,
-              height: size * .30,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: colors.primary.withValues(alpha: .15),
-                ),
-              ),
-              child: Icon(
-                Icons.build_rounded,
-                size: size * .17,
-                color: colors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => BrandMark(size: size);
 }
 
 class _HomeSurface extends StatelessWidget {
@@ -723,6 +666,22 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       ),
                     ),
                   ),
+                  const _WelcomeThemeToggle(),
+                ],
+              ),
+              const SizedBox(
+                height: RaSpace.lg,
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$greeting,',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                   _buildNotificationButton(
                     context,
                     data?[
@@ -746,19 +705,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(
-                height: RaSpace.lg,
-              ),
-              Text(
-                '$greeting,',
-                style: theme
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(
-                  color:
-                      colors.onSurfaceVariant,
-                ),
               ),
               const SizedBox(height: 2),
               Text(

@@ -1733,6 +1733,7 @@ class _DriverProfileActionCard
             ),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment:
                 CrossAxisAlignment.start,
             children: [
@@ -1755,7 +1756,7 @@ class _DriverProfileActionCard
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: RaSpace.md),
 
               Text(
                 title,
