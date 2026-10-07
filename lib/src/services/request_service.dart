@@ -1,3 +1,4 @@
+import '../models/provider_availability.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -170,6 +171,8 @@ class RequestService {
     required double providerDistanceKm,
     required String quoteNotes,
     String quoteType = 'direct',
+    int warrantyDays = 0,
+    String warrantyTerms = '',
   }) async {
     if (serviceFee < 0 || travelFee < 0 || extraFee < 0) {
       throw ArgumentError('Quote amounts must not be negative.');
@@ -181,6 +184,10 @@ class RequestService {
       await _requests.doc(id).collection('quotes').doc(_userId).set({
         'providerId': _userId,
         'quoteType': quoteType,
+        'warrantyDays': quoteType == 'inspection' ? 0 : warrantyDays,
+        'warrantyTerms': quoteType == 'inspection' || warrantyDays == 0
+            ? ''
+            : warrantyTerms.trim(),
         'providerName': profile.data()?['displayName'] ?? 'Service Provider',
         'providerPhone': profile.data()?['phone'] ?? '',
         'serviceFee': serviceFee,
@@ -272,7 +279,11 @@ class RequestService {
   Stream<QuerySnapshot<Map<String, dynamic>>> watchQuotes(String id) =>
       _requests.doc(id).collection('quotes').snapshots();
 
-  Future<void> selectQuote(String id, String quoteId) async {
+  Future<void> selectQuote(
+    String id,
+    String quoteId, {
+    Map<String, dynamic>? expectedOffer,
+  }) async {
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final request = await tx.get(ref);
@@ -284,12 +295,34 @@ class RequestService {
         throw StateError('This request or offer is no longer available.');
       }
       final offer = quote.data()!;
+      if (expectedOffer != null &&
+          [
+            'total',
+            'serviceFee',
+            'travelFee',
+            'extraFee',
+            'notes',
+            'quoteType',
+            'warrantyDays',
+            'warrantyTerms',
+          ].any((key) => offer[key] != expectedOffer[key])) {
+        throw StateError(
+          'The provider changed this offer. Review the updated price and warranty before selecting.',
+        );
+      }
       final providerRef = _firestore
           .collection('providerDirectory')
           .doc(quoteId);
       final provider = await tx.get(providerRef);
       if (!provider.exists ||
-          provider.data()?['online'] != true ||
+          ProviderAvailability.status(
+                provider.data() ?? {},
+                DateTime.now(),
+                overrideUntil:
+                    (provider.data()?['hoursOverrideUntil'] as Timestamp?)
+                        ?.toDate(),
+              ) !=
+              'Online' ||
           (provider.data()?['activeRequestId'] as String? ?? '').isNotEmpty) {
         throw StateError('This provider is unavailable. Choose another offer.');
       }
@@ -354,6 +387,8 @@ class RequestService {
       if (invalid != null) throw ArgumentError(invalid);
       tx.set(revision, {
         'changeReason': reason,
+        'warrantyDays': quote['warrantyDays'] ?? 0,
+        'warrantyTerms': quote['warrantyTerms'] ?? '',
         'evidencePhotoData': photos,
         'providerId': _userId,
         'previousTotal': data['estimatedCost'],

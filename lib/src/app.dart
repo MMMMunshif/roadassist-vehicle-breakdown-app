@@ -10,17 +10,18 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'screens.dart';
 
-part 'screens/appearance_screen.dart';
+part 'features/settings/appearance_screen.dart';
+part 'core/theme/app_theme.dart';
 
 // ============================================================
 // COLOR TOKENS
 // Light corporate palette: white foundations, airy blue surfaces and
-// medium-blue actions. The legacy dark navy look is intentionally removed.
+// deep-blue actions, with matching dark-mode semantic surfaces.
 // ============================================================
-const raNavy = Color(0xFF397DBD); // medium corporate header blue
-const raNavyDeep = Color(0xFF2F6FAE); // pressed/header gradient blue
-const raBlue = Color(0xFF4A90CF); // primary action
-const raBlueDeep = Color(0xFF3E82C2); // gradient start
+const raNavy = Color(0xFF095BA8); // medium corporate header blue
+const raNavyDeep = Color(0xFF074980); // pressed/header gradient blue
+const raBlue = Color(0xFF0963BA); // primary action
+const raBlueDeep = Color(0xFF07569E); // gradient start
 const raBlueBright = Color(0xFF73B3EA); // light accent
 const raGold = Color(0xFFE9A227); // rating / certified / premium only
 const raGoldPale = Color(0xFFFBF0DA);
@@ -28,10 +29,10 @@ const raSuccess = Color(0xFF158A56);
 const raSuccessPale = Color(0xFFE3F5EC);
 const raDanger = Color(0xFFD8362A);
 const raDangerPale = Color(0xFFFBEAE8);
-const raInk = Color(0xFF18324A); // corporate slate text
+const raInk = Color(0xFF14283F); // corporate slate text
 const raMuted = Color(0xFF60758A); // secondary text
 const raFaint = Color(0xFF91A5B8); // placeholders
-const raCanvas = Color(0xFFFFFFFF); // clean white app background
+const raCanvas = Color(0xFFF5F8FC); // calm neutral app background
 const raLine = Color(0xFFCEE1F1); // soft blue borders
 const raPale = Color(0xFFE7F3FD); // light-blue icon surfaces
 const raCard = Color(0xFFF3F9FE); // light-blue cards
@@ -90,10 +91,10 @@ class RaText {
     height: 1.3,
     fontWeight: FontWeight.w700,
   );
-  static const body = TextStyle(fontSize: 13.5, height: 1.5);
-  static const bodyMuted = TextStyle(fontSize: 13, height: 1.5);
+  static const body = TextStyle(fontSize: 15, height: 1.5);
+  static const bodyMuted = TextStyle(fontSize: 14, height: 1.5);
   static const label = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700);
-  static const caption = TextStyle(fontSize: 11, height: 1.4);
+  static const caption = TextStyle(fontSize: 12, height: 1.4);
   static const numeric = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w800,
@@ -302,281 +303,8 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
         ),
       ),
       themeMode: themeMode,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: raCanvas,
-        splashFactory: InkSparkle.splashFactory,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: raBlue,
-          primary: raBlue,
-          secondary: raGold,
-          error: raDanger,
-          surface: raCard,
-        ),
-        textTheme: const TextTheme(
-          headlineMedium: RaText.display,
-          headlineSmall: RaText.headline,
-          titleMedium: RaText.title,
-          bodyMedium: RaText.body,
-          bodySmall: RaText.bodyMuted,
-          labelLarge: RaText.label,
-        ),
-        dividerTheme: const DividerThemeData(color: raLine, thickness: 1),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: raInk,
-          elevation: 0,
-          scrolledUnderElevation: 0.5,
-          surfaceTintColor: Colors.white,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: raInk,
-            fontSize: 16.5,
-            fontWeight: FontWeight.w800,
-          ),
-          iconTheme: IconThemeData(color: raInk),
-        ),
-        cardTheme: CardThemeData(
-          color: raCard,
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(RaRadius.lg),
-            side: const BorderSide(color: raLine),
-          ),
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: raPale,
-          labelStyle: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: raNavy,
-          ),
-          side: BorderSide.none,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(RaRadius.pill),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: raBlue,
-            disabledBackgroundColor: raBlue.withValues(alpha: 0.4),
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(RaRadius.sm),
-            ),
-            textStyle: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.1,
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: raNavy,
-            minimumSize: const Size.fromHeight(48),
-            side: const BorderSide(color: raLine, width: 1.3),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(RaRadius.sm),
-            ),
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: raBlue,
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        iconButtonTheme: IconButtonThemeData(
-          style: IconButton.styleFrom(
-            backgroundColor: raPale,
-            foregroundColor: raBlue,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(RaRadius.sm),
-            ),
-          ),
-        ),
-        switchTheme: SwitchThemeData(
-          thumbColor: const WidgetStatePropertyAll(Colors.white),
-          trackColor: WidgetStateProperty.resolveWith(
-            (states) =>
-                states.contains(WidgetState.selected) ? raSuccess : raLine,
-          ),
-          trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFFF5FAFE),
-          hintStyle: const TextStyle(color: raFaint, fontSize: 13.5),
-          labelStyle: const TextStyle(color: raMuted, fontSize: 13.5),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 15,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: raLine),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: raLine),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: raBlue, width: 1.6),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: raDanger),
-          ),
-        ),
-        navigationBarTheme: const NavigationBarThemeData(
-          backgroundColor: Colors.white,
-          indicatorColor: raPale,
-          elevation: 0,
-          height: 66,
-          labelTextStyle: WidgetStatePropertyAll(
-            TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
-          ),
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(RaRadius.lg),
-          ),
-          titleTextStyle: const TextStyle(
-            color: raInk,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-          ),
-          contentTextStyle: const TextStyle(
-            color: raMuted,
-            fontSize: 13.5,
-            height: 1.45,
-          ),
-        ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: const Color(0xFF397DBD),
-          contentTextStyle: const TextStyle(color: Colors.white, fontSize: 13),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-          ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF101820),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: raBlueBright,
-          brightness: Brightness.dark,
-          primary: raBlueBright,
-          secondary: raGold,
-          error: const Color(0xFFFF7B72),
-          surface: const Color(0xFF182733),
-        ),
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(color: Color(0xFFF3F8FC)),
-          headlineSmall: TextStyle(color: Color(0xFFF3F8FC)),
-          titleLarge: TextStyle(color: Color(0xFFF3F8FC)),
-          titleMedium: TextStyle(color: Color(0xFFF3F8FC)),
-          bodyLarge: TextStyle(color: Color(0xFFD9E5ED)),
-          bodyMedium: TextStyle(color: Color(0xFFD9E5ED)),
-          bodySmall: TextStyle(color: Color(0xFFAFC0CC)),
-          labelLarge: TextStyle(color: Color(0xFFE7F1F7)),
-        ),
-        dividerTheme: const DividerThemeData(
-          color: Color(0xFF345062),
-          thickness: 1,
-        ),
-        iconTheme: const IconThemeData(color: Color(0xFFD9E5ED)),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF101820),
-          foregroundColor: Color(0xFFEAF4FB),
-          elevation: 0,
-          scrolledUnderElevation: 0.5,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Color(0xFFEAF4FB),
-            fontSize: 16.5,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF182733),
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(RaRadius.lg),
-            side: const BorderSide(color: Color(0xFF294353)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: const Color(0xFF182733),
-          hintStyle: const TextStyle(color: Color(0xFF91A5B8)),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: Color(0xFF294353)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: Color(0xFF294353)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(RaRadius.sm),
-            borderSide: const BorderSide(color: raBlueBright, width: 1.6),
-          ),
-        ),
-        navigationBarTheme: const NavigationBarThemeData(
-          backgroundColor: Color(0xFF101820),
-          indicatorColor: Color(0xFF294353),
-          elevation: 0,
-          height: 66,
-          labelTextStyle: WidgetStatePropertyAll(
-            TextStyle(color: Color(0xFFD9E5ED), fontWeight: FontWeight.w700),
-          ),
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: const Color(0xFF182733),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(RaRadius.lg),
-          ),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: raBlue,
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(52),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(RaRadius.sm),
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: raBlueBright,
-            minimumSize: const Size.fromHeight(48),
-            side: const BorderSide(color: Color(0xFF3D5B6E)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(RaRadius.sm),
-            ),
-          ),
-        ),
-        switchTheme: SwitchThemeData(
-          thumbColor: const WidgetStatePropertyAll(Colors.white),
-          trackColor: WidgetStateProperty.resolveWith(
-            (states) => states.contains(WidgetState.selected)
-                ? raBlue
-                : const Color(0xFF3D5B6E),
-          ),
-        ),
-      ),
+      theme: buildRoadAssistTheme(Brightness.light),
+      darkTheme: buildRoadAssistTheme(Brightness.dark),
       home: const bool.fromEnvironment('ADMIN_PORTAL')
           ? const AdminPortalScreen()
           : const SplashScreen(),

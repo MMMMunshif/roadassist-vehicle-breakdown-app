@@ -141,15 +141,23 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
 }
 
 class InlineMessage extends StatelessWidget {
-  const InlineMessage({super.key, required this.icon, required this.text});
+  const InlineMessage({
+    super.key,
+    this.icon = Icons.info_outline,
+    required this.text,
+    this.error = false,
+  });
   final IconData icon;
   final String text;
+  final bool error;
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(RaSpace.lg),
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
+      color: error
+          ? Theme.of(context).colorScheme.errorContainer
+          : Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(RaRadius.md),
       border: Border.all(color: Theme.of(context).dividerColor),
     ),
@@ -161,7 +169,9 @@ class InlineMessage extends StatelessWidget {
           child: Text(
             text,
             style: RaText.bodyMuted.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: error
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -1501,23 +1511,12 @@ class BrandMark extends StatelessWidget {
   final double size;
   final bool elevated;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Image.asset(
+    'assets/images/roadassist_mark.png',
     width: size,
     height: size,
-    decoration: BoxDecoration(
-      color: raBlue,
-      borderRadius: BorderRadius.circular(size * .26),
-      boxShadow: elevated
-          ? [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ]
-          : null,
-    ),
-    child: Icon(Icons.shield_outlined, color: Colors.white, size: size * .55),
+    fit: BoxFit.contain,
+    semanticLabel: 'RoadAssist logo',
   );
 }
 
@@ -2543,12 +2542,23 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
     final (Color bg, Color fg) = switch (tone) {
-      RaTone.success => (raSuccessPale, raSuccess),
-      RaTone.danger => (raDangerPale, raDanger),
-      RaTone.warning => (raGoldPale, const Color(0xFFA5670C)),
-      RaTone.info => (raPale, raBlue),
-      RaTone.neutral => (const Color(0xFFF0F2F6), raMuted),
+      RaTone.success =>
+        dark
+            ? (const Color(0xFF123D30), const Color(0xFF87DDB3))
+            : (raSuccessPale, const Color(0xFF08643C)),
+      RaTone.danger => (colors.errorContainer, colors.onErrorContainer),
+      RaTone.warning =>
+        dark
+            ? (const Color(0xFF493819), const Color(0xFFF2CF83))
+            : (raGoldPale, const Color(0xFF805000)),
+      RaTone.info => (colors.primaryContainer, colors.onPrimaryContainer),
+      RaTone.neutral => (
+        colors.surfaceContainerHighest,
+        colors.onSurfaceVariant,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -2567,13 +2577,15 @@ class StatusPill extends StatelessWidget {
             ),
             const SizedBox(width: 6),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: fg,
-              letterSpacing: 0.2,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: fg,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],
