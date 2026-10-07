@@ -151,3 +151,5 @@ part 'features/admin/admin_settings_screen.dart';
 part 'features/admin/admin_team_screen.dart';
 
 part 'features/chat/chat_inbox_screen.dart';
+
+part 'features/auth/auth_visuals.dart';

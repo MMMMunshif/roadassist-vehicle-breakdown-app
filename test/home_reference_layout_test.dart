@@ -43,7 +43,7 @@ void main() {
             expect(find.text('Flat Tyre'), findsOneWidget);
             expect(tester.takeException(), isNull);
             await tester.scrollUntilVisible(
-              find.text('Emergency Contacts'),
+              find.text('Emergency'),
               200,
             );
             await tester.pumpAndSettle();

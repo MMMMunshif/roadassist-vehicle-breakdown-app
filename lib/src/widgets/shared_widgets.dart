@@ -141,15 +141,23 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
 }
 
 class InlineMessage extends StatelessWidget {
-  const InlineMessage({super.key, required this.icon, required this.text});
+  const InlineMessage({
+    super.key,
+    this.icon = Icons.info_outline,
+    required this.text,
+    this.error = false,
+  });
   final IconData icon;
   final String text;
+  final bool error;
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(RaSpace.lg),
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
+      color: error
+          ? Theme.of(context).colorScheme.errorContainer
+          : Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(RaRadius.md),
       border: Border.all(color: Theme.of(context).dividerColor),
     ),
@@ -161,7 +169,9 @@ class InlineMessage extends StatelessWidget {
           child: Text(
             text,
             style: RaText.bodyMuted.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: error
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),

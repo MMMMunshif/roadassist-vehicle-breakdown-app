@@ -61,13 +61,15 @@ class _VehiclePhotoPreviewState extends State<VehiclePhotoPreview> {
       : SizedBox(
           height: widget.height,
           width: double.infinity,
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.directions_car, size: 48),
-              Text('Enter make and model, or add your vehicle photo.'),
-              Text('Reference photo may be unavailable offline.'),
-            ],
+          child: const SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.directions_car, size: 48),
+                Text('Enter make and model, or add your vehicle photo.'),
+                Text('Reference photo may be unavailable offline.'),
+              ],
+            ),
           ),
         );
   Widget frame(
