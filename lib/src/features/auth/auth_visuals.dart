@@ -2,70 +2,23 @@ part of '../../screens.dart';
 
 class _AuthWordmark extends StatelessWidget {
   const _AuthWordmark();
-
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.primary,
-                const Color(0xFF007D70),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: colors.primary.withValues(alpha: .14),
-                blurRadius: 18,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.add_road_rounded,
-            color: Colors.white,
-            size: 27,
-          ),
-        ),
-        const SizedBox(width: 11),
-        Flexible(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Road',
-                  style: TextStyle(
-                    color: colors.onSurface,
-                  ),
-                ),
-                TextSpan(
-                  text: 'Assist',
-                  style: TextStyle(
-                    color: colors.primary,
-                  ),
-                ),
-              ],
-            ),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -.7,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Image.asset(
+        'assets/images/roadassist_logo.png',
+        width: 220,
+        fit: BoxFit.contain,
+        semanticLabel: 'RoadAssist',
+      ),
+    ),
+  );
 }
 
 class _AuthRoadArtwork extends StatelessWidget {

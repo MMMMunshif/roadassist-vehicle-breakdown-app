@@ -18,9 +18,9 @@ void main() {
       expect(tester.takeException(), isNull);
       final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await mouse.addPointer(location: Offset.zero);
-      await mouse.moveTo(tester.getCenter(find.text('Call Customer')));
+      await mouse.moveTo(tester.getCenter(find.text('Call')));
       await tester.pump();
-      await mouse.moveTo(tester.getCenter(find.text('Send Message')));
+      await mouse.moveTo(tester.getCenter(find.text('Open Messages')));
       await tester.pump();
       await mouse.removePointer();
       expect(tester.takeException(), isNull);
