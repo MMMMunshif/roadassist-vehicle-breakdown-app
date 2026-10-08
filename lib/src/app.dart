@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +39,7 @@ const raPale = Color(0xFFE7F3FD); // light-blue icon surfaces
 const raCard = Color(0xFFF3F9FE); // light-blue cards
 
 // ============================================================
-// SPACING SCALE — an 4/8 grid. Use these instead of ad hoc
+// SPACING SCALE â€” an 4/8 grid. Use these instead of ad hoc
 // numbers for anything new or touched.
 // ============================================================
 class RaSpace {
@@ -59,7 +60,7 @@ class RaRadius {
 }
 
 // ============================================================
-// TYPE SCALE — one place for every recurring text role so
+// TYPE SCALE â€” one place for every recurring text role so
 // screens stop inventing their own TextStyle each time.
 // ============================================================
 class RaText {
@@ -243,6 +244,10 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
     foregroundMessageSubscription = FirebaseMessaging.onMessage.listen((
       message,
     ) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final recipient = message.data['recipientUid'];
+      if (uid == null || (recipient != null && recipient != uid)) return;
+      unawaited(_playForegroundAlert());
       final title = message.notification?.title ?? 'RoadAssist update';
       final body =
           message.notification?.body ??
@@ -264,6 +269,16 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
     });
   }
 
+  Future<void> _playForegroundAlert() async {
+    try {
+      await const MethodChannel('roadassist/alerts').invokeMethod<void>('play');
+    } on MissingPluginException {
+      // Web and other platforms retain their existing notification behavior.
+    } on PlatformException {
+      // Notification presentation must continue if sound is unavailable.
+    }
+  }
+
   @override
   void dispose() {
     foregroundMessageSubscription?.cancel();
@@ -275,7 +290,9 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
   Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
     valueListenable: AppThemeController.mode,
     builder: (context, themeMode, _) => MaterialApp(
-      title: 'RoadAssist',
+      title: const bool.fromEnvironment('ADMIN_PORTAL')
+          ? 'RoadAssist Admin'
+          : 'RoadAssist',
       navigatorKey: navigationKey,
       navigatorObservers: [
         _NotificationNavigationObserver(() {

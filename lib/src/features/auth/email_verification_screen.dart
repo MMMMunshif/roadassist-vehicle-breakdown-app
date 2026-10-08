@@ -116,7 +116,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
     return PopScope(
       canPop: false,
-      child: Scaffold(
+      child: RaScaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           child: ListView(

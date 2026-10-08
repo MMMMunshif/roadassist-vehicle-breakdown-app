@@ -14,12 +14,14 @@ class EmergencyScreen extends StatelessWidget {
       useSafeArea: true,
       showDragHandle: true,
       builder: (sheetContext) {
+        final colors = Theme.of(sheetContext).colorScheme;
+
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            RaSpace.lg,
+            18,
             0,
-            RaSpace.lg,
-            MediaQuery.of(sheetContext).viewInsets.bottom + RaSpace.lg,
+            18,
+            MediaQuery.of(sheetContext).viewInsets.bottom + 18,
           ),
           child: Form(
             key: formKey,
@@ -30,40 +32,43 @@ class EmergencyScreen extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 47,
+                      height: 47,
                       decoration: BoxDecoration(
-                        color: raDangerPale,
-                        borderRadius: BorderRadius.circular(16),
+                        color: colors.error.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(15),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.contact_emergency_outlined,
-                        color: raDanger,
+                        color: colors.error,
                       ),
                     ),
-                    const SizedBox(width: RaSpace.md),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Emergency contact',
-                            style: Theme.of(sheetContext).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w900),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Add a trusted contact you may need during roadside assistance.',
-                            style: Theme.of(sheetContext).textTheme.bodySmall,
+                            'Save a trusted contact for roadside situations.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 8,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: RaSpace.xl),
-
+                const SizedBox(height: 18),
                 TextFormField(
                   initialValue: updatedContact,
                   autofocus: true,
@@ -87,9 +92,7 @@ class EmergencyScreen extends StatelessWidget {
                     }
                   },
                 ),
-
-                const SizedBox(height: RaSpace.lg),
-
+                const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () {
                     if (!(formKey.currentState?.validate() ?? false)) {
@@ -139,408 +142,371 @@ class EmergencyScreen extends StatelessWidget {
     }
   }
 
-  Widget _hero(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(RaSpace.xl),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFD8362A), Color(0xFFAA2720)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Stack(
+  @override
+  Widget build(BuildContext context) {
+    return RaScaffold(
+      appBar: AppBar(title: const Text('Emergency')),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
         children: [
-          Positioned(
-            right: -22,
-            bottom: -28,
-            child: Icon(
-              Icons.sos_rounded,
-              size: 130,
-              color: Colors.white.withValues(alpha: .07),
+          const _RaEmergencyHero(),
+          const SizedBox(height: 20),
+          const Text(
+            'Sri Lanka emergency services',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Numbers are available offline. Tap Call to open your phone dialer.',
+          ),
+          const SizedBox(height: 12),
+          for (final item in const [
+            (
+              'Suwa Seriya Ambulance',
+              '1990',
+              Icons.medical_services_outlined,
+              'Free emergency ambulance',
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.health_and_safety_outlined,
-                  color: Colors.white,
-                  size: 28,
+            (
+              'Police Emergency',
+              '119',
+              Icons.local_police_outlined,
+              'Immediate police assistance',
+            ),
+            (
+              'Fire & Rescue',
+              '110',
+              Icons.local_fire_department_outlined,
+              'Fire and rescue emergency',
+            ),
+            (
+              'Disaster Management',
+              '117',
+              Icons.flood_outlined,
+              'Disaster emergency assistance',
+            ),
+          ]) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          item.$3,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.$1,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(item.$4),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          item.$2,
+                          style: const TextStyle(
+                            fontSize: 25,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        try {
+                          final opened = await launchUrl(
+                            Uri(scheme: 'tel', path: item.$2),
+                          );
+                          if (!opened && context.mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Unable to open dialer. Call ${item.$2} from your phone.',
+                                ),
+                              ),
+                            );
+                        } catch (_) {
+                          if (context.mounted)
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Call ${item.$2} from your phone dialer.',
+                                ),
+                              ),
+                            );
+                        }
+                      },
+                      icon: const Icon(Icons.call_outlined),
+                      label: Text('Call ${item.$2}'),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: RaSpace.lg),
-              Text(
-                'Emergency assistance',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'For immediate danger, contact emergency services first. Your saved family contact is available below for personal assistance.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withValues(alpha: .86),
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 12),
+          const _EmergencyLiveLocation(),
+          const SizedBox(height: 18),
+          if (signedIn)
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: AuthService().watchCurrentProfile(),
+              builder: (context, snapshot) {
+                final contact =
+                    snapshot.data?.data()?['emergencyContact']?.toString() ??
+                    '';
+                final configured = contact.isNotEmpty && contact != 'Not added';
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Trusted contact',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          snapshot.hasError
+                              ? 'Unable to load your saved contact.'
+                              : configured
+                              ? contact
+                              : 'Add someone you trust for emergencies.',
+                        ),
+                        if (snapshot.connectionState == ConnectionState.waiting)
+                          const LinearProgressIndicator(),
+                        const SizedBox(height: 10),
+                        if (configured)
+                          FilledButton.icon(
+                            onPressed: () => showCallPrompt(
+                              context,
+                              name: 'Trusted contact',
+                              number: contact,
+                            ),
+                            icon: const Icon(Icons.call),
+                            label: const Text('Call Trusted Contact'),
+                          ),
+                        TextButton(
+                          onPressed: snapshot.hasError
+                              ? null
+                              : () => editContact(context, contact),
+                          child: Text(
+                            configured ? 'Change Contact' : 'Add Contact',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 12),
+          const SafetyBox(),
         ],
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-
-      appBar: AppBar(title: const Text('Emergency')),
-
-      body: !signedIn
-          ? const Padding(
-              padding: EdgeInsets.all(RaSpace.lg),
-              child: EmptyState(
-                icon: Icons.login_outlined,
-                title: 'Sign in required',
-                message: 'Sign in as a driver to manage an emergency contact.',
-              ),
-            )
-          : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-              stream: AuthService().watchCurrentProfile(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const EmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Unable to load contact',
-                    message: 'Check your connection and try again.',
-                  );
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final data = snapshot.data!.data() ?? {};
-
-                final contact = data['emergencyContact'] as String? ?? '';
-
-                final configured =
-                    contact.trim().isNotEmpty && contact != 'Not added';
-
-                final location =
-                    data['currentLocationLabel'] as String? ??
-                    'Current location not available';
-
-                final hasLocation =
-                    location != 'Current location not available';
-
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    RaSpace.lg,
-                    RaSpace.md,
-                    RaSpace.lg,
-                    RaSpace.xxxl,
-                  ),
-                  children: [
-                    _hero(context),
-
-                    const SizedBox(height: RaSpace.xl),
-
-                    Text(
-                      'Emergency services',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.md),
-
-                    _EmergencyScreenActionCard(
-                      icon: Icons.sos_rounded,
-                      title: 'Police Emergency',
-                      subtitle: 'Call 119 for immediate emergency assistance.',
-                      danger: true,
-                      actionLabel: 'Call 119',
-                      onTap: () => showCallPrompt(
-                        context,
-                        name: 'Emergency Services',
-                        number: '119',
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.xxl),
-
-                    Text(
-                      'Trusted contact',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.md),
-
-                    Container(
-                      padding: const EdgeInsets.all(RaSpace.lg),
-                      decoration: BoxDecoration(
-                        color: colors.surface,
-                        borderRadius: BorderRadius.circular(21),
-                        border: Border.all(
-                          color: colors.outlineVariant.withValues(alpha: .6),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 52,
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  color: colors.primaryContainer,
-                                  borderRadius: BorderRadius.circular(17),
-                                ),
-                                child: Icon(
-                                  Icons.contact_emergency_outlined,
-                                  color: colors.onPrimaryContainer,
-                                ),
-                              ),
-
-                              const SizedBox(width: RaSpace.md),
-
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Family Contact',
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      configured
-                                          ? contact
-                                          : 'No emergency contact added',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: colors.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              IconButton(
-                                tooltip: configured
-                                    ? 'Change contact'
-                                    : 'Add contact',
-                                onPressed: () => editContact(context, contact),
-                                icon: const Icon(Icons.edit_outlined),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: RaSpace.md),
-
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: configured
-                                  ? () => showCallPrompt(
-                                      context,
-                                      name: 'Family Contact',
-                                      number: contact,
-                                    )
-                                  : () => editContact(context, contact),
-                              icon: Icon(
-                                configured
-                                    ? Icons.call_rounded
-                                    : Icons.person_add_alt_1_outlined,
-                              ),
-                              label: Text(
-                                configured
-                                    ? 'Call Emergency Contact'
-                                    : 'Add Emergency Contact',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.xxl),
-
-                    Text(
-                      'Current location',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.md),
-
-                    Container(
-                      padding: const EdgeInsets.all(RaSpace.lg),
-                      decoration: BoxDecoration(
-                        color: colors.surface,
-                        borderRadius: BorderRadius.circular(21),
-                        border: Border.all(
-                          color: colors.outlineVariant.withValues(alpha: .6),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 46,
-                                height: 46,
-                                decoration: BoxDecoration(
-                                  color: hasLocation
-                                      ? colors.primaryContainer
-                                      : colors.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Icon(
-                                  hasLocation
-                                      ? Icons.location_on_rounded
-                                      : Icons.location_off_outlined,
-                                  color: hasLocation
-                                      ? colors.onPrimaryContainer
-                                      : colors.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(width: RaSpace.md),
-                              Expanded(
-                                child: Text(
-                                  location,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: RaSpace.md),
-
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: hasLocation
-                                  ? () => copyLocation(context, location)
-                                  : null,
-                              icon: const Icon(Icons.share_location_outlined),
-                              label: const Text('Copy / Share Location'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-    );
-  }
 }
 
-class _EmergencyScreenActionCard extends StatelessWidget {
-  const _EmergencyScreenActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.actionLabel,
-    required this.onTap,
-    this.danger = false,
-  });
+class _EmergencyLiveLocation extends StatefulWidget {
+  const _EmergencyLiveLocation();
+  @override
+  State<_EmergencyLiveLocation> createState() => _EmergencyLiveLocationState();
+}
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String actionLabel;
-  final VoidCallback onTap;
-  final bool danger;
+class _EmergencyLiveLocationState extends State<_EmergencyLiveLocation> {
+  String? location;
+  String? error;
+  bool loading = false;
+
+  Future<void> locate() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      if (!await Geolocator.isLocationServiceEnabled())
+        throw StateError('Turn on location services and try again.');
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied)
+        permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever)
+        throw StateError('Allow location access in your phone settings.');
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      if (mounted)
+        setState(
+          () => location =
+              'https://maps.google.com/?q=${position.latitude},${position.longitude}',
+        );
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => error =
+              'Location unavailable. Check GPS and location permission, then try again.',
+        );
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Share your location',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+          const Text(
+            'Get your current GPS location before copying or sharing. Refresh if you move.',
+          ),
+          if (error != null)
+            Text(
+              error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          if (location != null) SelectableText(location!),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: loading ? null : locate,
+            icon: const Icon(Icons.my_location),
+            label: Text(
+              loading ? 'Getting location...' : 'Get / Refresh Location',
+            ),
+          ),
+          if (location != null) ...[
+            OutlinedButton.icon(
+              onPressed: () => copyLocation(context, location!),
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy Location'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final uri = Uri.parse(
+                  'sms:?body=${Uri.encodeComponent('I need assistance. My location: $location')}',
+                );
+                try {
+                  if (!await launchUrl(uri) && context.mounted)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Messaging unavailable. Use Copy Location instead.',
+                        ),
+                      ),
+                    );
+                } catch (_) {
+                  if (context.mounted)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Messaging unavailable. Use Copy Location instead.',
+                        ),
+                      ),
+                    );
+                }
+              },
+              icon: const Icon(Icons.share_outlined),
+              label: const Text('Share via SMS'),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _RaEmergencyHero extends StatelessWidget {
+  const _RaEmergencyHero();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final color = danger ? colors.error : colors.primary;
-
     return Container(
-      padding: const EdgeInsets.all(RaSpace.lg),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .07),
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: color.withValues(alpha: .24)),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFD8362A), Color(0xFFA92720)],
+        ),
+        borderRadius: BorderRadius.circular(23),
       ),
-      child: Column(
+      child: Stack(
         children: [
+          Positioned(
+            right: -20,
+            bottom: -28,
+            child: Icon(
+              Icons.sos_rounded,
+              size: 120,
+              color: Colors.white.withValues(alpha: .07),
+            ),
+          ),
           Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 51,
+                height: 51,
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(17),
+                  color: Colors.white.withValues(alpha: .14),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: color),
+                child: const Icon(
+                  Icons.health_and_safety_outlined,
+                  color: Colors.white,
+                  size: 27,
+                ),
               ),
-              const SizedBox(width: RaSpace.md),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
+                      'Emergency assistance',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(subtitle, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      'For immediate danger, contact emergency services before continuing with RoadAssist.',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white70,
+                        fontSize: 8.4,
+                        height: 1.4,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: RaSpace.md),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: onTap,
-              icon: const Icon(Icons.call_rounded),
-              label: Text(actionLabel),
-            ),
           ),
         ],
       ),

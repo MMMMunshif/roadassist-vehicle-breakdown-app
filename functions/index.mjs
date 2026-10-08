@@ -34,7 +34,8 @@ async function sendTo(uid, notice, eventId, requestId) {
       const response = await getMessaging().sendEachForMulticast({
         tokens:batch.map(d=>d.data().token),notification:{title:notice.title,body:notice.body},
         data:{requestId,type:notice.type,eventId:key,recipientUid:uid},
-        android:{priority:'high',notification:{tag:key}},
+        android:{priority:'high',notification:{tag:key,channelId:'roadassist_alerts_v1',sound:'default'}},
+        apns:{payload:{aps:{sound:'default'}}},
         webpush:{headers:{TTL:'86400'},notification:{tag:key,icon:'/icons/Icon-192.png'}},
       });
       const processed = [];

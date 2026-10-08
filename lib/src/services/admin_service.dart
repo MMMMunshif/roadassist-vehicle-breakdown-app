@@ -78,6 +78,13 @@ class AdminService {
     final audit = db.collection('adminAudit').doc();
     await db.runTransaction((tx) async {
       final before = (await tx.get(ref)).data() ?? <String, dynamic>{};
+      if (verification == 'verified') {
+        final application = (await tx.get(db.collection('providerApplications').doc(uid))).data();
+        if (application == null || application['applicationStatus'] == 'withdrawn' || application['revision'] != verificationRevision) {
+          throw StateError('Application withdrawn or changed. Refresh before reviewing.');
+        }
+      }
+
       final directory = await tx.get(
         db.collection('providerDirectory').doc(uid),
       );

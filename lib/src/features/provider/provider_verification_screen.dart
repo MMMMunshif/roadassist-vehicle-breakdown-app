@@ -33,33 +33,55 @@ class _ProviderVerificationScreenState
   };
 
   final name = TextEditingController();
+
   final nic = TextEditingController();
+
   final address = TextEditingController();
 
   final business = TextEditingController();
+
   final emergency = TextEditingController();
+
   final experience = TextEditingController();
 
   final photos = <String, String>{};
+
   final services = <String>{};
+  final customServices = <Map<String, String>>[];
+  bool applyAgain = false;
+
   final vehicleTypes = <String>{};
 
   bool consent = false;
   bool busy = false;
+  bool submittedThisSession = false;
+  bool dirty = false;
 
   String? error;
 
   static const documents = {
-    'businessProof':
-        'Business registration document',
+    'businessProof': 'Business registration document',
     'nicFront': 'NIC front',
     'nicBack': 'NIC back',
-    'selfie': 'Recent face photo',
-    'serviceProof':
-        'Qualification / business / service experience proof',
-    'recoveryProof':
-        'Recovery vehicle registration / authorization',
+    'selfie': 'Provider selfie (clear face photo)',
+    'serviceProof': 'Qualification / business / service experience proof',
+    'recoveryProof': 'Recovery vehicle registration / authorization',
   };
+
+  static const serviceOptions = [
+    'General Mechanic',
+    'Vehicle Towing',
+    'Flat Tyre',
+    'Battery Jumpstart',
+  ];
+
+  static const vehicleOptions = [
+    'Sedan / Hatchback',
+    'SUV',
+    'Van',
+    'Motorcycle',
+    'Other',
+  ];
 
   @override
   void initState() {
@@ -72,61 +94,53 @@ class _ProviderVerificationScreenState
     );
 
     for (final entry in professionalControllers.entries) {
-      entry.value.text =
-          '${saved[entry.key] ?? {
-                'radiusKm': 15,
-                'qualificationYear': 0,
-                'towCapacityKg': 0,
-                'startTime': '',
-                'endTime': '',
-              }[entry.key] ?? ''}';
+      final value = saved[entry.key];
+
+      entry.value.text = value == null ? '' : '$value';
     }
 
-    for (final key in [
-      'providerType',
-      'available24Hours',
-    ]) {
-      if (saved[key] != null) {
-        professional[key] = saved[key];
-      }
+    if (saved['providerType'] != null) {
+      professional['providerType'] = saved['providerType'];
+    }
+
+    if (saved['available24Hours'] != null) {
+      professional['available24Hours'] = saved['available24Hours'];
     }
 
     for (final key in _ProviderProfessionalFields.selections.keys) {
-      professional[key] = List<String>.from(
-        saved[key] as List? ?? [],
-      );
+      professional[key] = List<String>.from(saved[key] as List? ?? const []);
     }
 
-    name.text =
-        application?['legalName'] as String? ?? '';
+    name.text = application?['legalName'] as String? ?? '';
 
-    nic.text =
-        application?['nicNumber'] as String? ?? '';
+    nic.text = application?['nicNumber'] as String? ?? '';
 
-    address.text =
-        application?['address'] as String? ?? '';
+    address.text = application?['address'] as String? ?? '';
 
-    business.text =
-        application?['businessName'] as String? ?? '';
+    business.text = application?['businessName'] as String? ?? '';
 
-    emergency.text =
-        application?['emergencyPhone'] as String? ?? '';
+    emergency.text = application?['emergencyPhone'] as String? ?? '';
 
-    experience.text =
-        '${application?['experienceYears'] ?? 0}';
+    final savedExperience = application?['experienceYears'];
+
+    experience.text = savedExperience == null ? '' : '$savedExperience';
 
     services.addAll(
-      (application?['services'] as List? ?? []).cast<String>(),
+      (application?['services'] as List? ?? const []).whereType<String>(),
+    );
+
+    customServices.addAll(
+      (application?['customServices'] as List? ?? []).whereType<Map>().map(
+        (item) => Map<String, String>.from(item),
+      ),
     );
 
     vehicleTypes.addAll(
-      (application?['vehicleTypes'] as List? ?? []).cast<String>(),
+      (application?['vehicleTypes'] as List? ?? const []).whereType<String>(),
     );
 
     photos.addAll(
-      Map<String, String>.from(
-        application?['documents'] as Map? ?? {},
-      ),
+      Map<String, String>.from(application?['documents'] as Map? ?? {}),
     );
 
     unawaited(prefillContact());
@@ -134,16 +148,12 @@ class _ProviderVerificationScreenState
 
   @override
   void dispose() {
-    for (final controller in [
-      name,
-      nic,
-      address,
-      business,
-      emergency,
-      experience,
-    ]) {
-      controller.dispose();
-    }
+    name.dispose();
+    nic.dispose();
+    address.dispose();
+    business.dispose();
+    emergency.dispose();
+    experience.dispose();
 
     for (final controller in professionalControllers.values) {
       controller.dispose();
@@ -154,34 +164,70 @@ class _ProviderVerificationScreenState
 
   Future<void> prefillContact() async {
     try {
-      final profile =
-          await AuthService().getCurrentProfile();
+      final profile = await AuthService().getCurrentProfile();
 
       if (!mounted) return;
 
       final data = profile.data();
 
-      if (name.text.isEmpty) {
-        name.text =
-            data?['displayName'] as String? ?? '';
+      if (name.text.trim().isEmpty) {
+        name.text = data?['displayName'] as String? ?? '';
       }
 
-      if (professionalControllers['businessPhone']!
-          .text
-          .isEmpty) {
-        professionalControllers['businessPhone']!.text =
-            data?['phone'] as String? ?? '';
+      final businessPhone = professionalControllers['businessPhone'];
+
+      if (businessPhone != null && businessPhone.text.trim().isEmpty) {
+        businessPhone.text = data?['phone'] as String? ?? '';
       }
     } catch (_) {
-      // Fields remain editable if profile loading fails.
+      // Fields remain editable if profile prefill is unavailable.
     }
   }
 
   Future<void> pick(String kind) async {
-    final photo = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
+    if (busy) return;
+
+    final navigator = Navigator.of(context);
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return const SafeArea(
+          child: Wrap(
+            children: [
+              _PhotoSourceTile(
+                icon: Icons.camera_alt_outlined,
+                label: 'Take a photo',
+                source: ImageSource.camera,
+              ),
+              _PhotoSourceTile(
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                source: ImageSource.gallery,
+              ),
+            ],
+          ),
+        );
+      },
     );
+
+    if (source == null || !mounted) {
+      return;
+    }
+
+    final photo = source == ImageSource.camera
+        ? await navigator.push<XFile>(
+            MaterialPageRoute(
+              builder: (_) =>
+                  CameraCaptureScreen(preferFrontCamera: kind == 'selfie'),
+            ),
+          )
+        : await ImagePicker().pickImage(
+            source: ImageSource.gallery,
+            maxWidth: 1600,
+          );
 
     if (photo == null || !mounted) {
       return;
@@ -193,14 +239,12 @@ class _ProviderVerificationScreenState
     });
 
     try {
-      final prepared =
-          await PhotoUploadService().prepareIdentityPhoto(
-        photo,
-      );
+      final prepared = await PhotoUploadService().prepareIdentityPhoto(photo);
 
       if (!mounted) return;
 
       setState(() {
+        dirty = true;
         photos[kind] = prepared;
       });
     } catch (_) {
@@ -208,7 +252,7 @@ class _ProviderVerificationScreenState
 
       setState(() {
         error =
-            'Choose a clear JPG or PNG photo under 8 MB.';
+            'Choose a clear JPG or PNG photo under the supported upload size.';
       });
     } finally {
       if (mounted) {
@@ -219,14 +263,8 @@ class _ProviderVerificationScreenState
     }
   }
 
-  Future<void> submit() async {
-    FocusScope.of(context).unfocus();
-
-    if (!(form.currentState?.validate() ?? false)) {
-      return;
-    }
-
-    final needed = [
+  List<String> get requiredDocuments {
+    return [
       'nicFront',
       'nicBack',
       'selfie',
@@ -234,14 +272,31 @@ class _ProviderVerificationScreenState
       if (services.contains('Vehicle Towing')) 'recoveryProof',
       if (professional['providerType'] == 'business') 'businessProof',
     ];
+  }
+
+  Future<void> submit() async {
+    services.addAll(customServices.map((item) => item['category']!));
+    FocusScope.of(context).unfocus();
+
+    if (busy ||
+        submittedThisSession ||
+        !(form.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    final missingDocuments = requiredDocuments.where((key) {
+      final value = photos[key];
+
+      return value == null || value.trim().isEmpty;
+    }).toList();
 
     if (!consent ||
         services.isEmpty ||
         vehicleTypes.isEmpty ||
-        needed.any((key) => !photos.containsKey(key))) {
+        missingDocuments.isNotEmpty) {
       setState(() {
         error =
-            'Select services and supported vehicles, upload all required documents, and accept the declaration.';
+            'Select services and supported vehicles, upload every required document and accept the declaration.';
       });
 
       return;
@@ -257,7 +312,8 @@ class _ProviderVerificationScreenState
         'professionalDetails': {
           ...professional,
           for (final entry in professionalControllers.entries)
-            entry.key: [
+            entry.key:
+                [
                   'radiusKm',
                   'qualificationYear',
                   'towCapacityKg',
@@ -270,25 +326,28 @@ class _ProviderVerificationScreenState
         'legalName': name.text.trim(),
         'nicNumber': nic.text.trim().toUpperCase(),
         'address': address.text.trim(),
-        'businessName': business.text.trim(),
-        'emergencyPhone': normalizeSriLankaPhone(
-          emergency.text,
-        ),
-        'experienceYears': int.parse(
-          experience.text,
-        ),
+        'businessName': professional['providerType'] == 'business'
+            ? business.text.trim()
+            : '',
+        'emergencyPhone': emergency.text.trim().isEmpty
+            ? ''
+            : normalizeSriLankaPhone(emergency.text),
+        'experienceYears': int.parse(experience.text.trim()),
         'services': services.toList(),
+        'customServices': customServices,
         'vehicleTypes': vehicleTypes.toList(),
         'documents': photos,
       });
 
       if (!mounted) return;
 
+      setState(() {
+        submittedThisSession = true;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Provider verification application submitted.',
-          ),
+          content: Text('Verification application submitted for review.'),
         ),
       );
     } catch (_) {
@@ -296,7 +355,7 @@ class _ProviderVerificationScreenState
 
       setState(() {
         error =
-            'Could not submit. Verify your email and connection. An application already under review cannot be edited.';
+            'Could not submit the application. Verify your email, check your connection and confirm that the application is editable.';
       });
     } finally {
       if (mounted) {
@@ -307,507 +366,439 @@ class _ProviderVerificationScreenState
     }
   }
 
-  IconData _serviceIcon(String service) {
-    return switch (service) {
-      'Vehicle Towing' => Icons.fire_truck_outlined,
-      'Battery Jumpstart' => Icons.battery_charging_full,
-      'Flat Tyre' => Icons.tire_repair,
-      _ => Icons.car_repair_outlined,
+  bool get changesRequested {
+    final application = widget.application;
+
+    final moderation = widget.moderation;
+
+    if (application == null || moderation?['verification'] != 'pending') {
+      return false;
+    }
+
+    final moderationUpdated = (moderation?['updatedAt'] as Timestamp?)
+        ?.toDate();
+
+    final submitted = (application['submittedAt'] as Timestamp?)?.toDate();
+
+    if (moderationUpdated == null || submitted == null) {
+      return false;
+    }
+
+    return moderationUpdated.isAfter(submitted);
+  }
+
+  bool get withdrawn => widget.application?['applicationStatus'] == 'withdrawn';
+
+  bool get canEdit {
+    final application = widget.application;
+
+    return !submittedThisSession &&
+        (application == null ||
+            application['professionalDetails'] is! Map ||
+            changesRequested ||
+            (withdrawn && applyAgain));
+  }
+
+  String get verificationStatus {
+    if (withdrawn) return 'withdrawn';
+    return widget.moderation?['verification'] as String? ?? 'pending';
+  }
+
+  RaTone get verificationTone {
+    return switch (verificationStatus) {
+      'verified' => RaTone.success,
+      'rejected' => RaTone.danger,
+      'pending' => RaTone.warning,
+      _ => RaTone.info,
     };
+  }
+
+  String get statusTitle {
+    if (withdrawn) return 'Application withdrawn';
+    if (submittedThisSession) {
+      return 'Application submitted';
+    }
+
+    if (widget.application == null) {
+      return 'Become a verified provider';
+    }
+
+    if (changesRequested) {
+      return 'Changes requested';
+    }
+
+    return switch (verificationStatus) {
+      'verified' => 'Provider verified',
+      'rejected' => 'Application needs attention',
+      _ => 'Application under review',
+    };
+  }
+
+  String get statusMessage {
+    if (withdrawn)
+      return 'Review has stopped. You can continue as a driver or apply again using your saved documents.';
+    if (submittedThisSession) {
+      return 'Your documents have been submitted for manual review.';
+    }
+
+    final reason = widget.moderation?['reason'] as String?;
+
+    if (reason != null && reason.trim().isNotEmpty) {
+      return reason;
+    }
+
+    if (widget.application == null) {
+      return 'Complete your identity and service details to unlock provider jobs after manual approval.';
+    }
+
+    if (verificationStatus == 'verified') {
+      return 'Your RoadAssist provider verification is currently approved.';
+    }
+
+    if (verificationStatus == 'rejected') {
+      return 'Review the feedback and contact RoadAssist support if you need assistance.';
+    }
+
+    return 'Your submitted documents are waiting for manual review.';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final colors = theme.colorScheme;
 
-    final application = widget.application;
-    final moderation = widget.moderation;
-
-    final submittedAt =
-        (application?['submittedAt'] as Timestamp?)?.toDate();
-
-    final moderationUpdated =
-        (moderation?['updatedAt'] as Timestamp?)?.toDate();
-
-    final changesRequested =
-        application != null &&
-        moderation?['verification'] == 'pending' &&
-        moderationUpdated != null &&
-        moderationUpdated.isAfter(
-          submittedAt ?? DateTime.now(),
-        );
-
-    final canEdit =
-        application == null ||
-        application['professionalDetails'] is! Map ||
-        changesRequested;
-
-    final verifiedEmail =
+    final emailVerified =
         FirebaseAuth.instance.currentUser?.emailVerified == true;
 
-    final verification =
-        moderation?['verification'] as String? ?? 'pending';
+    final validUntil = (widget.moderation?['validUntil'] as Timestamp?)
+        ?.toDate()
+        .toLocal();
 
-    final validUntil =
-        (moderation?['validUntil'] as Timestamp?)?.toDate();
+    final approvalExpired =
+        verificationStatus == 'verified' &&
+        (validUntil == null || !validUntil.isAfter(DateTime.now()));
 
-    final expiredApproval =
-        application != null &&
-        verification == 'verified' &&
-        !(validUntil?.isAfter(DateTime.now()) ?? false);
-
-    return Scaffold(
+    return RaScaffold(
+      preventLeave: busy || (dirty && canEdit),
+      leaveMessage: busy
+          ? 'Please wait until your document upload or application update finishes.'
+          : 'You have unsaved application changes. Leave without saving?',
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Provider Verification'),
+        title: Text(
+          'Provider Verification',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.45,
+          ),
+        ),
         actions: [
           IconButton(
-            tooltip: 'Help & support',
-            onPressed: () => push(
-              context,
-              const SupportScreen(isProvider: true),
-            ),
-            icon: const Icon(Icons.help_outline_rounded),
-          ),
-          IconButton(
             tooltip: 'Sign out',
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () async {
-              await AuthService().signOut();
+            onPressed: busy
+                ? null
+                : () async {
+                    if (!await _confirmProviderSignOut(context)) return;
+                    if (!context.mounted) return;
+                    await AuthService().signOut();
 
-              if (context.mounted) {
-                replace(
-                  context,
-                  const WelcomeScreen(),
-                );
-              }
-            },
+                    if (!context.mounted) {
+                      return;
+                    }
+
+                    replace(context, const WelcomeScreen());
+                  },
+            icon: const Icon(Icons.logout_rounded),
           ),
-          const SizedBox(width: RaSpace.xs),
+          const SizedBox(width: 4),
         ],
       ),
       body: ListView(
-        keyboardDismissBehavior:
-            ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.fromLTRB(
-          RaSpace.lg,
-          RaSpace.md,
-          RaSpace.lg,
-          RaSpace.xxxl,
-        ),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
-          Container(
-            padding: const EdgeInsets.all(RaSpace.xl),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  colors.primary,
-                  const Color(0xFF007D70),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .14),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.verified_user_outlined,
-                    color: Colors.white,
-                    size: 29,
-                  ),
-                ),
-                const SizedBox(height: RaSpace.lg),
-                Text(
-                  application == null
-                      ? 'Become a verified RoadAssist provider'
-                      : changesRequested
-                      ? 'Update your provider application'
-                      : 'Provider verification status',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  'Your provider dashboard and assistance jobs unlock after identity and service capability review.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: .84),
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ),
+          _RaProviderVerificationHero(
+            title: statusTitle,
+            message: statusMessage,
+            status: verificationStatus,
+            tone: verificationTone,
           ),
 
-          const SizedBox(height: RaSpace.md),
+          if (!emailVerified) ...[
+            const SizedBox(height: 12),
 
-          Container(
-            padding: const EdgeInsets.all(RaSpace.md),
-            decoration: BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest
-                  .withValues(alpha: .38),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.info_outline_rounded,
-                  size: 19,
-                ),
-                SizedBox(width: RaSpace.sm),
-                Expanded(
-                  child: Text(
-                    'Verification is a manual account review. Approval confirms that submitted information was reviewed; it is not a guarantee of service quality.',
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          if (!verifiedEmail) ...[
-            const SizedBox(height: RaSpace.md),
-
-            Container(
-              padding: const EdgeInsets.all(RaSpace.lg),
-              decoration: BoxDecoration(
-                color:
-                    raGold.withValues(alpha: .09),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color:
-                      raGold.withValues(alpha: .25),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.mark_email_unread_outlined,
-                        color: raGold,
-                      ),
-                      SizedBox(width: RaSpace.sm),
-                      Expanded(
-                        child: Text(
-                          'Email verification required',
-                          style: RaText.title,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: RaSpace.sm),
-                  const Text(
-                    'Verify your email before submitting the provider application.',
-                    style: RaText.bodyMuted,
-                  ),
-                  const SizedBox(height: RaSpace.md),
-                  OutlinedButton.icon(
-                    onPressed: () => push(
-                      context,
-                      const EmailVerificationScreen(
-                        role: 'provider',
-                      ),
-                    ),
-                    icon: const Icon(
-                      Icons.forward_to_inbox_outlined,
-                    ),
-                    label: const Text('Verify Email'),
-                  ),
-                ],
-              ),
+            _RaProviderVerificationNotice(
+              icon: Icons.mark_email_unread_outlined,
+              title: 'Email verification required',
+              message:
+                  'Verify the email address on this account before submitting provider documents.',
+              tone: colors.primary,
+              actionLabel: 'Verify Email',
+              onAction: () {
+                push(context, const EmailVerificationScreen(role: 'provider'));
+              },
             ),
           ],
 
-          if (expiredApproval) ...[
-            const SizedBox(height: RaSpace.md),
+          if (approvalExpired) ...[
+            const SizedBox(height: 12),
 
-            Container(
-              padding: const EdgeInsets.all(RaSpace.md),
-              decoration: BoxDecoration(
-                color: raGoldPale,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.event_busy_outlined,
-                    color: raGold,
-                  ),
-                  SizedBox(width: RaSpace.sm),
-                  Expanded(
-                    child: Text(
-                      'Your previous provider approval has expired or requires renewal. Contact support for document review.',
-                    ),
-                  ),
-                ],
-              ),
+            const _RaProviderVerificationNotice(
+              icon: Icons.event_busy_outlined,
+              title: 'Verification renewal required',
+              message:
+                  'The provider approval has expired or requires renewal. Contact RoadAssist support for another document review.',
+              tone: raGold,
             ),
           ],
 
-          if (application != null) ...[
-            const SizedBox(height: RaSpace.lg),
+          if (validUntil != null &&
+              verificationStatus == 'verified' &&
+              !approvalExpired) ...[
+            const SizedBox(height: 12),
 
-            Container(
-              padding: const EdgeInsets.all(RaSpace.lg),
-              decoration: BoxDecoration(
-                color: colors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: colors.outlineVariant.withValues(alpha: .6),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Application status',
-                          style: RaText.title,
-                        ),
-                      ),
-                      _AdminStatusBadge(
-                        status: verification,
-                      ),
-                    ],
-                  ),
+            _RaProviderVerificationNotice(
+              icon: Icons.verified_user_outlined,
+              title: 'Verification valid',
+              message:
+                  'Current approval is valid until ${validUntil.day.toString().padLeft(2, '0')}/${validUntil.month.toString().padLeft(2, '0')}/${validUntil.year}.',
+              tone: raSuccess,
+            ),
+          ],
 
-                  const SizedBox(height: RaSpace.md),
+          if (widget.application != null) ...[
+            const SizedBox(height: 20),
 
-                  Text(
-                    moderation?['reason'] as String? ??
-                        'Submitted. Waiting for an authorized reviewer to assess your documents.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      height: 1.45,
-                    ),
-                  ),
-
-                  if (validUntil != null) ...[
-                    const SizedBox(height: RaSpace.sm),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.event_available_outlined,
-                          size: 18,
-                          color: colors.primary,
-                        ),
-                        const SizedBox(width: RaSpace.sm),
-                        Expanded(
-                          child: Text(
-                            'Approval expires: ${validUntil.toLocal().toString().split(' ').first}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-
-                  if (!canEdit) ...[
-                    const SizedBox(height: RaSpace.md),
-                    Container(
-                      padding: const EdgeInsets.all(RaSpace.md),
-                      decoration: BoxDecoration(
-                        color: colors
-                            .surfaceContainerHighest
-                            .withValues(alpha: .35),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.lock_outline_rounded,
-                            size: 18,
-                          ),
-                          SizedBox(width: RaSpace.sm),
-                          Expanded(
-                            child: Text(
-                              'Documents are locked while the application is under review. Contact support if changes are required.',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+            _RaProviderVerificationStatusCard(
+              status: verificationStatus,
+              tone: verificationTone,
+              reason: statusMessage,
+              editable: canEdit,
             ),
           ],
 
           if (canEdit) ...[
-            const SizedBox(height: RaSpace.xxl),
+            const SizedBox(height: 25),
+
+            const _RaProviderVerificationSection(
+              icon: Icons.badge_outlined,
+              title: 'Identity details',
+              subtitle:
+                  'Enter details exactly as they appear on your official documents.',
+            ),
+
+            const SizedBox(height: 10),
 
             Form(
+              onChanged: () {
+                if (!dirty) setState(() => dirty = true);
+              },
               key: form,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _ProviderVerificationSection(
-                    title: 'Identity & contact',
-                    subtitle:
-                        'Enter information exactly as it appears on your identification documents.',
-                    icon: Icons.badge_outlined,
+                  _RaProviderVerificationSurface(
                     child: Column(
                       children: [
-                        for (final pair in [
-                          (
-                            name,
-                            'Full name as shown on NIC',
-                            100,
-                            Icons.person_outline_rounded,
+                        TextFormField(
+                          controller: name,
+                          maxLength: 100,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: const InputDecoration(
+                            labelText: 'Full name as shown on NIC',
+                            prefixIcon: Icon(Icons.person_outline_rounded),
                           ),
-                          (
-                            nic,
-                            'NIC number',
-                            12,
-                            Icons.badge_outlined,
+                          validator: (value) {
+                            final text = value?.trim() ?? '';
+
+                            if (text.isEmpty) {
+                              return 'Required';
+                            }
+
+                            if (text.length < 2) {
+                              return 'Enter a valid name';
+                            }
+
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        TextFormField(
+                          controller: nic,
+                          maxLength: 12,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: const InputDecoration(
+                            labelText: 'NIC number',
+                            prefixIcon: Icon(Icons.fingerprint_rounded),
                           ),
-                          (
-                            address,
-                            'Residential / business address',
-                            300,
-                            Icons.location_on_outlined,
-                          ),
-                          if (professional['providerType'] == 'business')
-                            (
-                              business,
-                              'Business name',
-                              100,
-                              Icons.business_outlined,
-                            ),
-                          (
-                            emergency,
-                            'Emergency contact phone (optional)',
-                            16,
-                            Icons.contact_emergency_outlined,
-                          ),
-                          (
-                            experience,
-                            'Years of service experience',
-                            2,
-                            Icons.work_history_outlined,
-                          ),
-                        ])
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: RaSpace.md,
-                            ),
-                            child: TextFormField(
-                              controller: pair.$1,
-                              enabled: !busy,
-                              maxLength: pair.$3,
-                              keyboardType:
-                                  pair.$1 == emergency
-                                  ? TextInputType.phone
-                                  : pair.$1 == experience
-                                  ? TextInputType.number
-                                  : TextInputType.text,
-                              textCapitalization:
-                                  pair.$1 == name ||
-                                      pair.$1 == address ||
-                                      pair.$1 == business
-                                  ? TextCapitalization.words
-                                  : TextCapitalization.none,
-                              decoration: InputDecoration(
-                                labelText: pair.$2,
-                                prefixIcon: Icon(pair.$4),
-                              ),
-                              validator: (value) {
-                                final text =
-                                    value?.trim() ?? '';
+                          validator: (value) {
+                            final text = value?.trim() ?? '';
 
-                                if (pair.$1 == emergency &&
-                                    text.isEmpty) {
-                                  return null;
-                                }
+                            if (text.isEmpty) {
+                              return 'Required';
+                            }
 
-                                if (text.isEmpty) {
-                                  return 'Required';
-                                }
+                            if (!RegExp(
+                              r'^(\d{9}[VXvx]|\d{12})$',
+                            ).hasMatch(text)) {
+                              return 'Enter a valid NIC format';
+                            }
 
-                                if (pair.$1 == nic &&
-                                    !RegExp(
-                                      r'^(\d{9}[VXvx]|\d{12})$',
-                                    ).hasMatch(text)) {
-                                  return 'Enter a valid NIC format';
-                                }
+                            return null;
+                          },
+                        ),
 
-                                if (pair.$1 == emergency) {
-                                  return validateSriLankaPhone(text);
-                                }
+                        const SizedBox(height: 12),
 
-                                if (pair.$1 == experience &&
-                                    (int.tryParse(text) == null ||
-                                        int.parse(text) > 60 ||
-                                        int.parse(text) < 0)) {
-                                  return 'Enter 0 to 60';
-                                }
-
-                                return null;
-                              },
+                        TextFormField(
+                          controller: address,
+                          maxLength: 300,
+                          minLines: 2,
+                          maxLines: 3,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            labelText: 'Residential / business address',
+                            alignLabelWithHint: true,
+                            prefixIcon: Padding(
+                              padding: EdgeInsets.only(bottom: 40),
+                              child: Icon(Icons.location_on_outlined),
                             ),
                           ),
+                          validator: (value) {
+                            return (value?.trim().isEmpty ?? true)
+                                ? 'Required'
+                                : null;
+                          },
+                        ),
+
+                        if (professional['providerType'] == 'business') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: business,
+                            maxLength: 100,
+                            decoration: const InputDecoration(
+                              labelText: 'Business name',
+                              prefixIcon: Icon(Icons.business_outlined),
+                            ),
+                            validator: (value) {
+                              return (value?.trim().isEmpty ?? true)
+                                  ? 'Required'
+                                  : null;
+                            },
+                          ),
+                        ],
+
+                        const SizedBox(height: 12),
+
+                        TextFormField(
+                          controller: emergency,
+                          maxLength: 16,
+                          keyboardType: TextInputType.phone,
+                          decoration: const InputDecoration(
+                            labelText: 'Emergency contact phone (optional)',
+                            prefixIcon: Icon(Icons.contact_phone_outlined),
+                          ),
+                          validator: (value) {
+                            final text = value?.trim() ?? '';
+
+                            if (text.isEmpty) {
+                              return null;
+                            }
+
+                            return validateSriLankaPhone(text);
+                          },
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        TextFormField(
+                          controller: experience,
+                          maxLength: 2,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Years of service experience',
+                            prefixIcon: Icon(Icons.workspace_premium_outlined),
+                          ),
+                          validator: (value) {
+                            final parsed = int.tryParse(value?.trim() ?? '');
+
+                            if (parsed == null) {
+                              return 'Required';
+                            }
+
+                            if (parsed < 0 || parsed > 60) {
+                              return 'Enter 0 to 60';
+                            }
+
+                            return null;
+                          },
+                        ),
                       ],
                     ),
                   ),
 
-                  _ProviderProfessionalFields(
-                    controllers: professionalControllers,
-                    details: professional,
-                    onChanged: () {
-                      setState(() {});
-                    },
-                    towing: services.contains('Vehicle Towing'),
-                    busy: busy,
+                  const SizedBox(height: 25),
+
+                  const _RaProviderVerificationSection(
+                    icon: Icons.engineering_outlined,
+                    title: 'Professional details',
+                    subtitle:
+                        'Describe your service capability, working pattern and professional setup.',
                   ),
 
-                  _ProviderVerificationSection(
-                    title: 'Services offered',
+                  const SizedBox(height: 10),
+
+                  _RaProviderVerificationSurface(
+                    child: _ProviderProfessionalFields(
+                      controllers: professionalControllers,
+                      details: professional,
+                      onChanged: () {
+                        setState(() {});
+                      },
+                      towing: services.contains('Vehicle Towing'),
+                      busy: busy,
+                    ),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  const _RaProviderVerificationSection(
+                    icon: Icons.home_repair_service_outlined,
+                    title: 'Services',
                     subtitle:
-                        'Only select services you are currently able to provide.',
-                    icon: Icons.car_repair_outlined,
+                        'Select every roadside service you are qualified and equipped to provide.',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _RaProviderVerificationSurface(
                     child: Wrap(
-                      spacing: RaSpace.sm,
-                      runSpacing: RaSpace.sm,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        for (final service in [
-                          'General Mechanic',
-                          'Vehicle Towing',
-                          'Flat Tyre',
-                          'Battery Jumpstart',
-                        ])
+                        for (final value in serviceOptions)
                           FilterChip(
-                            avatar: Icon(
-                              _serviceIcon(service),
-                              size: 17,
-                            ),
-                            label: Text(service),
-                            selected: services.contains(service),
+                            label: Text(value),
+                            selected: services.contains(value),
                             onSelected: busy
                                 ? null
                                 : (selected) {
                                     setState(() {
                                       if (selected) {
-                                        services.add(service);
+                                        services.add(value);
                                       } else {
-                                        services.remove(service);
+                                        if (!customServices.any(
+                                          (item) => item['category'] == value,
+                                        ))
+                                          services.remove(value);
                                       }
                                     });
                                   },
@@ -816,35 +807,45 @@ class _ProviderVerificationScreenState
                     ),
                   ),
 
-                  const SizedBox(height: RaSpace.md),
+                  const SizedBox(height: 25),
 
-                  _ProviderVerificationSection(
+                  _ProviderAdditionalServices(
+                    values: customServices,
+                    onChanged: busy
+                        ? null
+                        : () => setState(() {
+                            services.addAll(
+                              customServices.map((item) => item['category']!),
+                            );
+                          }),
+                  ),
+                  const SizedBox(height: 25),
+                  const _RaProviderVerificationSection(
+                    icon: Icons.directions_car_outlined,
                     title: 'Supported vehicles',
                     subtitle:
-                        'Select vehicle categories you can safely service.',
-                    icon: Icons.directions_car_outlined,
+                        'Choose the vehicle categories you can safely service.',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _RaProviderVerificationSurface(
                     child: Wrap(
-                      spacing: RaSpace.sm,
-                      runSpacing: RaSpace.sm,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        for (final vehicle in [
-                          'Sedan / Hatchback',
-                          'SUV',
-                          'Van',
-                          'Motorcycle',
-                          'Other',
-                        ])
+                        for (final value in vehicleOptions)
                           FilterChip(
-                            label: Text(vehicle),
-                            selected: vehicleTypes.contains(vehicle),
+                            label: Text(value),
+                            selected: vehicleTypes.contains(value),
                             onSelected: busy
                                 ? null
                                 : (selected) {
                                     setState(() {
                                       if (selected) {
-                                        vehicleTypes.add(vehicle);
+                                        vehicleTypes.add(value);
                                       } else {
-                                        vehicleTypes.remove(vehicle);
+                                        vehicleTypes.remove(value);
                                       }
                                     });
                                   },
@@ -853,103 +854,71 @@ class _ProviderVerificationScreenState
                     ),
                   ),
 
-                  const SizedBox(height: RaSpace.xxl),
+                  const SizedBox(height: 25),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Verification documents',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Upload clear images with readable text.',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${photos.length} uploaded',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
+                  const _RaProviderVerificationSection(
+                    icon: Icons.folder_shared_outlined,
+                    title: 'Verification documents',
+                    subtitle:
+                        'Documents remain private and are used only for provider verification.',
                   ),
 
-                  const SizedBox(height: RaSpace.sm),
+                  const SizedBox(height: 10),
 
-                  Container(
-                    padding: const EdgeInsets.all(RaSpace.md),
-                    decoration: BoxDecoration(
-                      color: colors
-                          .surfaceContainerHighest
-                          .withValues(alpha: .34),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.privacy_tip_outlined,
-                          size: 19,
-                        ),
-                        SizedBox(width: RaSpace.sm),
-                        Expanded(
-                          child: Text(
-                            'Identity documents are private to you and authorized reviewers. They are not displayed to drivers.',
-                          ),
-                        ),
-                      ],
-                    ),
+                  _RaProviderVerificationNotice(
+                    icon: Icons.lock_outline_rounded,
+                    title: 'Private documents',
+                    message:
+                        'Identity and professional evidence are never displayed to drivers.',
+                    tone: colors.primary,
                   ),
 
-                  const SizedBox(height: RaSpace.md),
+                  const SizedBox(height: 10),
 
-                  for (final entry in documents.entries.where(
-                    (entry) =>
-                        (entry.key != 'businessProof' ||
-                            professional['providerType'] == 'business') &&
-                        (entry.key != 'recoveryProof' ||
-                            services.contains('Vehicle Towing')),
-                  ))
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: RaSpace.sm,
-                      ),
-                      child: _ProviderDocumentCard(
-                        title: entry.value,
-                        uploaded: photos.containsKey(entry.key),
-                        previewData: photos[entry.key],
-                        busy: busy,
-                        onTap: () => pick(entry.key),
-                      ),
+                  const InlineMessage(
+                    icon: Icons.face_outlined,
+                    text:
+                        'Provider selfie: upload a recent, clear photo showing your whole face in good lighting, without a mask or sunglasses. Use the front camera or choose a photo. Only authorized reviewers can view it alongside your NIC.',
+                  ),
+                  const SizedBox(height: 10),
+                  for (final entry in documents.entries.where((entry) {
+                    if (entry.key == 'businessProof' &&
+                        professional['providerType'] != 'business') {
+                      return false;
+                    }
+
+                    if (entry.key == 'recoveryProof' &&
+                        !services.contains('Vehicle Towing')) {
+                      return false;
+                    }
+
+                    return true;
+                  })) ...[
+                    _RaProviderVerificationDocumentCard(
+                      title: entry.value,
+                      required: requiredDocuments.contains(entry.key),
+                      data: photos[entry.key],
+                      busy: busy,
+                      onTap: () {
+                        pick(entry.key);
+                      },
                     ),
+                    const SizedBox(height: 8),
+                  ],
 
-                  const SizedBox(height: RaSpace.lg),
+                  const SizedBox(height: 17),
 
                   Container(
                     decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: colors.outlineVariant.withValues(alpha: .55),
+                      color: colors.surfaceContainerHighest.withValues(
+                        alpha: .25,
                       ),
+                      borderRadius: BorderRadius.circular(17),
                     ),
                     child: CheckboxListTile(
-                      contentPadding: const EdgeInsets.all(RaSpace.md),
-                      controlAffinity:
-                          ListTileControlAffinity.leading,
                       value: consent,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: const EdgeInsets.all(11),
                       onChanged: busy
                           ? null
                           : (value) {
@@ -957,91 +926,175 @@ class _ProviderVerificationScreenState
                                 consent = value ?? false;
                               });
                             },
-                      title: const Text(
-                        'Declaration & approval',
-                        style: RaText.title,
+                      title: Text(
+                        'Provider declaration',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      subtitle: const Padding(
-                        padding: EdgeInsets.only(top: 5),
-                        child: Text(
-                          'I confirm that these documents are mine, the information is accurate, and I authorize private verification. I will request driver approval before additional work or charges.',
+                      subtitle: Text(
+                        'I confirm that these documents are mine, the information is accurate and I will request driver approval before additional work or charges.',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 8.4,
+                          height: 1.45,
                         ),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: RaSpace.lg),
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
 
-                  FilledButton.icon(
-                    onPressed:
-                        busy || !verifiedEmail ? null : submit,
-                    icon: busy
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.verified_outlined,
-                          ),
-                    label: Text(
-                      busy
-                          ? 'Submitting Application…'
-                          : application == null
-                          ? 'Submit for Verification'
-                          : 'Submit Updated Application',
+                    _RaProviderVerificationNotice(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Unable to continue',
+                      message: error!,
+                      tone: colors.error,
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                  ],
 
-          if (busy) ...[
-            const SizedBox(height: RaSpace.md),
-            const LinearProgressIndicator(),
-          ],
+                  const SizedBox(height: 16),
 
-          if (error != null) ...[
-            const SizedBox(height: RaSpace.md),
-            Container(
-              padding: const EdgeInsets.all(RaSpace.md),
-              decoration: BoxDecoration(
-                color: colors.errorContainer.withValues(alpha: .45),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.error_outline_rounded,
-                    color: colors.error,
-                  ),
-                  const SizedBox(width: RaSpace.sm),
-                  Expanded(
-                    child: Text(
-                      error!,
-                      style: TextStyle(
-                        color: colors.onErrorContainer,
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: busy || !emailVerified ? null : submit,
+                      icon: busy
+                          ? const SizedBox.square(
+                              dimension: 17,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.verified_user_outlined),
+                      label: Text(
+                        busy
+                            ? 'Submitting...'
+                            : changesRequested
+                            ? 'Submit Updated Application'
+                            : 'Submit for Verification',
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+          ] else if (!submittedThisSession && widget.application != null) ...[
+            const SizedBox(height: 16),
+
+            _RaProviderVerificationNotice(
+              icon: Icons.lock_clock_outlined,
+              title: 'Documents locked',
+              message:
+                  'The application cannot be edited while it is under review unless a reviewer requests changes.',
+              tone: colors.primary,
+            ),
           ],
 
-          const SizedBox(height: RaSpace.xl),
+          if (error != null && !canEdit) ...[
+            const SizedBox(height: 12),
+            InlineMessage(icon: Icons.error_outline, text: error!),
+          ],
+          if (emailVerified &&
+              verificationStatus != 'verified' &&
+              verificationStatus != 'rejected') ...[
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      setState(() => busy = true);
+                      try {
+                        await ProviderVerificationService().continueAsDriver();
+                        if (context.mounted)
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => const DriverShell(),
+                            ),
+                            (_) => false,
+                          );
+                      } catch (_) {
+                        if (mounted)
+                          setState(() {
+                            busy = false;
+                            error =
+                                'Unable to switch to driver. Please try again.';
+                          });
+                      }
+                    },
+              icon: const Icon(Icons.directions_car_outlined),
+              label: const Text('Continue as Driver'),
+            ),
+            if (withdrawn && !applyAgain)
+              OutlinedButton.icon(
+                onPressed: busy
+                    ? null
+                    : () => setState(() {
+                        applyAgain = true;
+                        submittedThisSession = false;
+                        consent = false;
+                      }),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Apply Again'),
+              ),
+            if (!withdrawn &&
+                (widget.application != null || submittedThisSession))
+              TextButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (dialogContext) => AlertDialog(
+                            title: const Text('Withdraw provider application?'),
+                            content: const Text(
+                              'Admin review will stop. Your account and saved documents remain available, and you can apply again later.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.pop(dialogContext, false),
+                                child: const Text('Keep Application'),
+                              ),
+                              FilledButton(
+                                onPressed: () =>
+                                    Navigator.pop(dialogContext, true),
+                                child: const Text('Withdraw Application'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true || !mounted) return;
+                        setState(() => busy = true);
+                        try {
+                          await ProviderVerificationService().withdraw();
+                          if (mounted)
+                            setState(() {
+                              busy = false;
+                              submittedThisSession = false;
+                            });
+                        } catch (_) {
+                          if (mounted)
+                            setState(() {
+                              busy = false;
+                              error =
+                                  'Unable to withdraw. The review may have changed; refresh and try again.';
+                            });
+                        }
+                      },
+                child: const Text('Withdraw Application'),
+              ),
+          ],
+          const SizedBox(height: 22),
 
           OutlinedButton.icon(
-            onPressed: () => push(
-              context,
-              const SupportScreen(isProvider: true),
-            ),
+            onPressed: () {
+              push(context, const SupportScreen(isProvider: true));
+            },
             icon: const Icon(Icons.support_agent_outlined),
-            label: const Text('Contact Support'),
+            label: const Text('Contact RoadAssist Support'),
           ),
         ],
       ),
@@ -1049,175 +1102,563 @@ class _ProviderVerificationScreenState
   }
 }
 
-class _ProviderVerificationSection extends StatelessWidget {
-  const _ProviderVerificationSection({
+class _RaProviderVerificationHero extends StatelessWidget {
+  const _RaProviderVerificationHero({
     required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.child,
+    required this.message,
+    required this.status,
+    required this.tone,
   });
 
   final String title;
-  final String subtitle;
+  final String message;
+  final String status;
+  final RaTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [Color(0xFF0A497F), Color(0xFF08635D)]
+              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .13),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.verified_user_outlined,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              StatusPill(
+                label: status.replaceAll('_', ' ').toUpperCase(),
+                tone: tone,
+              ),
+            ],
+          ),
+          const SizedBox(height: 17),
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.4,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white.withValues(alpha: .76),
+              fontSize: 9.3,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Verification is a manual review of identity and service capability. Approval is not a guarantee of service quality.',
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white.withValues(alpha: .58),
+              fontSize: 7.8,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderVerificationSection extends StatelessWidget {
+  const _RaProviderVerificationSection({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
   final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 39,
+          height: 39,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: .075),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: colors.primary, size: 19),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 8.8,
+                  height: 1.4,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaProviderVerificationSurface extends StatelessWidget {
+  const _RaProviderVerificationSurface({required this.child});
+
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final colors = theme.colorScheme;
 
     return Container(
-      margin: const EdgeInsets.only(
-        bottom: RaSpace.md,
-      ),
-      padding: const EdgeInsets.all(RaSpace.lg),
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .55),
-        ),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D1D2B)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: child,
+    );
+  }
+}
+
+class _RaProviderVerificationNotice extends StatelessWidget {
+  const _RaProviderVerificationNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.tone,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color tone;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: tone.withValues(alpha: .18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(13),
+          Icon(icon, color: tone, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  size: 21,
-                  color: colors.onPrimaryContainer,
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 8.6,
+                    height: 1.45,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(width: RaSpace.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 7),
+                  TextButton(onPressed: onAction, child: Text(actionLabel!)),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: RaSpace.lg),
-          child,
         ],
       ),
     );
   }
 }
 
-class _ProviderDocumentCard extends StatelessWidget {
-  const _ProviderDocumentCard({
+class _RaProviderVerificationStatusCard extends StatelessWidget {
+  const _RaProviderVerificationStatusCard({
+    required this.status,
+    required this.tone,
+    required this.reason,
+    required this.editable,
+  });
+
+  final String status;
+  final RaTone tone;
+  final String reason;
+  final bool editable;
+
+  @override
+  Widget build(BuildContext context) {
+    return _RaProviderVerificationSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              StatusPill(
+                label: status.replaceAll('_', ' ').toUpperCase(),
+                tone: tone,
+              ),
+              const Spacer(),
+              Icon(
+                editable ? Icons.edit_outlined : Icons.lock_outline_rounded,
+                size: 18,
+              ),
+            ],
+          ),
+          const SizedBox(height: 11),
+          Text(
+            reason,
+            style: GoogleFonts.plusJakartaSans(fontSize: 9.2, height: 1.5),
+          ),
+          if (!editable) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Documents are locked while the current review is active.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 8,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderVerificationDocumentCard extends StatelessWidget {
+  const _RaProviderVerificationDocumentCard({
     required this.title,
-    required this.uploaded,
-    required this.previewData,
+    required this.required,
+    required this.data,
     required this.busy,
     required this.onTap,
   });
 
   final String title;
-  final bool uploaded;
-  final String? previewData;
+  final bool required;
+  final String? data;
   final bool busy;
   final VoidCallback onTap;
+
+  Widget _preview(BuildContext context) {
+    final value = data;
+
+    if (value == null || value.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final clean = value.contains(',') ? value.split(',').last : value;
+
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: Image.memory(
+          base64Decode(clean),
+          height: 125,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    } catch (_) {
+      return Container(
+        height: 80,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: const Icon(Icons.image_not_supported_outlined),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final colors = theme.colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: uploaded
-              ? raSuccess.withValues(alpha: .32)
-              : colors.outlineVariant.withValues(alpha: .55),
-        ),
+    final uploaded = data != null && data!.trim().isNotEmpty;
+
+    return Material(
+      color: theme.brightness == Brightness.dark
+          ? const Color(0xFF0D1D2B)
+          : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(17),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: RaSpace.md,
-              vertical: 5,
-            ),
-            leading: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: uploaded
-                    ? raSuccess.withValues(alpha: .10)
-                    : colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: busy ? null : onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 39,
+                    height: 39,
+                    decoration: BoxDecoration(
+                      color: (uploaded ? raSuccess : colors.primary).withValues(
+                        alpha: .08,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      uploaded
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.upload_file_outlined,
+                      color: uploaded ? raSuccess : colors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.6,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          required ? 'Required' : 'Optional',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 7.5,
+                            color: required
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    uploaded
+                        ? Icons.edit_outlined
+                        : Icons.add_photo_alternate_outlined,
+                    size: 18,
+                  ),
+                ],
               ),
-              child: Icon(
-                uploaded
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.upload_file_outlined,
-                color:
-                    uploaded ? raSuccess : colors.onSurfaceVariant,
-              ),
-            ),
-            title: Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            subtitle: Text(
-              uploaded
-                  ? 'Document added'
-                  : 'Tap to choose an image',
-            ),
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-            ),
-            onTap: busy ? null : onTap,
+              if (uploaded) ...[const SizedBox(height: 11), _preview(context)],
+            ],
           ),
-          if (previewData != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                RaSpace.md,
-                0,
-                RaSpace.md,
-                RaSpace.md,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: _privateDocumentPreview(
-                  previewData!,
-                  150,
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _ProviderAdditionalServices extends StatelessWidget {
+  const _ProviderAdditionalServices({
+    required this.values,
+    required this.onChanged,
+  });
+  final List<Map<String, String>> values;
+  final VoidCallback? onChanged;
+
+  Future<void> add(BuildContext context) async {
+    final form = GlobalKey<FormState>();
+    var name = '';
+    var description = '';
+    var category = 'General Mechanic';
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add another service'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Service name',
+                    hintText: 'Fuel delivery / Vehicle lockout',
+                  ),
+                  maxLength: 60,
+                  onChanged: (value) => name = value.trim(),
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.length < 3) return 'Enter at least 3 characters';
+                    if (values.any(
+                      (item) =>
+                          item['name']!.toLowerCase() == text.toLowerCase(),
+                    ))
+                      return 'This service is already added';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Request matching category',
+                  ),
+                  items: [
+                    for (final item
+                        in _ProviderVerificationScreenState.serviceOptions)
+                      DropdownMenuItem(value: item, child: Text(item)),
+                  ],
+                  onChanged: (value) => category = value ?? category,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'What can you provide?',
+                  ),
+                  maxLength: 160,
+                  maxLines: 3,
+                  onChanged: (value) => description = value.trim(),
+                  validator: (value) => (value?.trim().length ?? 0) < 10
+                      ? 'Describe the service in at least 10 characters'
+                      : null,
+                ),
+                const Text(
+                  'This service is reviewed with your application and matches requests using the selected category.',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState?.validate() == true)
+                Navigator.pop(dialogContext, {
+                  'name': name,
+                  'description': description,
+                  'category': category,
+                });
+            },
+            child: const Text('Add Service'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && context.mounted && onChanged != null) {
+      values.add(result);
+      onChanged!();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const Text(
+        'Additional services / Other',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 6),
+      const Text(
+        'Examples: Fuel delivery, Vehicle lockout, Auto electrical, Engine overheating. Add up to 5 services you can safely provide.',
+      ),
+      for (final item in values)
+        Card(
+          child: ListTile(
+            title: Text(item['name']!),
+            subtitle: Text(
+              '${item['category']} Ãƒâ€šÃ‚Â· ${item['description']}',
+            ),
+            trailing: IconButton(
+              tooltip: 'Remove service',
+              onPressed: onChanged == null
+                  ? null
+                  : () {
+                      values.remove(item);
+                      onChanged!();
+                    },
+              icon: const Icon(Icons.close),
+            ),
+          ),
+        ),
+      OutlinedButton.icon(
+        onPressed: onChanged == null || values.length >= 5
+            ? null
+            : () => add(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Other Service'),
+      ),
+    ],
+  );
 }

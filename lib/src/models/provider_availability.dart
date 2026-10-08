@@ -1,4 +1,12 @@
 class ProviderAvailability {
+  static const locationLifetime = Duration(minutes: 2);
+
+  static bool hasFreshLocation(DateTime? updated, DateTime now) {
+    if (updated == null) return false;
+    final age = now.difference(updated);
+    return !age.isNegative && age < locationLifetime;
+  }
+
   static bool withinHours(Map<String, dynamic> data, DateTime now) {
     if (data['available24Hours'] == true || data['scheduleConfigured'] != true)
       return true;
@@ -17,8 +25,11 @@ class ProviderAvailability {
     Map<String, dynamic> data,
     DateTime now, {
     DateTime? overrideUntil,
+    DateTime? locationUpdatedAt,
   }) {
-    if (data['online'] != true) return 'Offline';
+    if (data['online'] != true || !hasFreshLocation(locationUpdatedAt, now)) {
+      return 'Offline';
+    }
     if ((data['activeRequestId'] as String? ?? '').isNotEmpty) return 'Busy';
     if (data['requestsPaused'] == true) return 'Paused';
     if (overrideUntil?.isAfter(now) != true && !withinHours(data, now))

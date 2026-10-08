@@ -1,7 +1,6 @@
 part of '../../screens.dart';
 
-class InvoiceScreen
-    extends StatefulWidget {
+class InvoiceScreen extends StatefulWidget {
   const InvoiceScreen({
     super.key,
     required this.requestId,
@@ -17,9 +16,7 @@ class InvoiceScreen
 class _InvoiceScreenState
     extends State<InvoiceScreen> {
   late final Stream<
-          DocumentSnapshot<
-              Map<String, dynamic>>>
-      request;
+      DocumentSnapshot<Map<String, dynamic>>> request;
 
   bool saving = false;
 
@@ -27,8 +24,7 @@ class _InvoiceScreenState
   void initState() {
     super.initState();
 
-    request = RequestService()
-        .watchRequest(
+    request = RequestService().watchRequest(
       widget.requestId,
     );
   }
@@ -36,24 +32,30 @@ class _InvoiceScreenState
   Future<void> record(
     String method,
   ) async {
+    if (saving) return;
+
     setState(() {
       saving = true;
     });
 
     try {
-      await RequestService()
-          .recordPayment(
+      await RequestService().recordPayment(
         widget.requestId,
         method,
       );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('$error'),
+          content: Text(
+            error
+                .toString()
+                .replaceFirst(
+                  'Exception: ',
+                  '',
+                ),
+          ),
         ),
       );
     } finally {
@@ -66,177 +68,52 @@ class _InvoiceScreenState
   }
 
   String money(
-    dynamic value,
+    int value,
   ) {
-    final amount =
-        (value as num?)?.toInt() ??
-            0;
+    final source =
+        value.abs().toString();
 
-    final digits =
-        amount.abs().toString();
-
-    final buffer =
+    final output =
         StringBuffer();
 
     for (var index = 0;
-        index < digits.length;
+        index < source.length;
         index++) {
       if (index > 0 &&
-          (digits.length - index) %
+          (source.length - index) %
                   3 ==
               0) {
-        buffer.write(',');
+        output.write(',');
       }
 
-      buffer.write(
-        digits[index],
+      output.write(
+        source[index],
       );
     }
 
-    return 'Rs. ${amount < 0 ? '-' : ''}${buffer.toString()}';
-  }
-
-  Widget _paymentStatus(
-    BuildContext context,
-    Map<String, dynamic> data,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
-
-    final providerConfirmed =
-        data['providerConfirmedPayment'] ==
-            true;
-
-    final driverReported =
-        data['driverReportedPayment'] ==
-            true;
-
-    final color = providerConfirmed
-        ? raSuccess
-        : driverReported
-            ? raGold
-            : colors
-                .onSurfaceVariant;
-
-    final icon = providerConfirmed
-        ? Icons
-            .verified_outlined
-        : driverReported
-            ? Icons
-                .schedule_outlined
-            : Icons
-                .payments_outlined;
-
-    final title = providerConfirmed
-        ? 'Payment confirmed'
-        : driverReported
-            ? 'Payment awaiting provider confirmation'
-            : 'Payment not recorded';
-
-    return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
-      decoration: BoxDecoration(
-        color:
-            color.withValues(
-          alpha: .08,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: color.withValues(
-            alpha: .22,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration:
-                BoxDecoration(
-              color: color
-                  .withValues(
-                alpha: .12,
-              ),
-              borderRadius:
-                  BorderRadius.circular(
-                15,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-            ),
-          ),
-
-          const SizedBox(
-            width: RaSpace.md,
-          ),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-                if (data['paymentMethod']
-                    is String) ...[
-                  const SizedBox(
-                    height: 3,
-                  ),
-                  Text(
-                    'Method: ${data['paymentMethod']}',
-                    style: theme
-                        .textTheme
-                        .bodySmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return 'Rs. ${value < 0 ? '-' : ''}${output.toString()}';
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     final theme =
         Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
-
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
-
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Service Invoice',
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight:
+                FontWeight.w800,
+            letterSpacing: -.45,
+          ),
         ),
       ),
-
       body: StreamBuilder<
           DocumentSnapshot<
               Map<String, dynamic>>>(
@@ -246,13 +123,17 @@ class _InvoiceScreenState
           snapshot,
         ) {
           if (snapshot.hasError) {
-            return const EmptyState(
-              icon: Icons
-                  .cloud_off_outlined,
-              title:
-                  'Unable to load invoice',
-              message:
-                  'Check your connection and try again.',
+            return const Padding(
+              padding:
+                  EdgeInsets.all(20),
+              child: EmptyState(
+                icon:
+                    Icons.cloud_off_outlined,
+                title:
+                    'Unable to load invoice',
+                message:
+                    'Reconnect to the internet and try again.',
+              ),
             );
           }
 
@@ -266,34 +147,77 @@ class _InvoiceScreenState
           final data =
               snapshot.data!.data();
 
-          if (data == null ||
-              data['status'] !=
-                  'completed') {
-            return const EmptyState(
-              icon: Icons
-                  .receipt_long_outlined,
-              title:
-                  'Invoice not available yet',
-              message:
-                  'The final invoice becomes available after service completion.',
+          if (data == null) {
+            return const Padding(
+              padding:
+                  EdgeInsets.all(20),
+              child: EmptyState(
+                icon:
+                    Icons.receipt_long_outlined,
+                title:
+                    'Invoice unavailable',
+                message:
+                    'This service record could not be found.',
+              ),
+            );
+          }
+
+          if (data['status'] !=
+              'completed') {
+            return const Padding(
+              padding:
+                  EdgeInsets.all(20),
+              child: EmptyState(
+                icon:
+                    Icons.hourglass_top_rounded,
+                title:
+                    'Invoice not ready',
+                message:
+                    'The final service invoice becomes available after completion.',
+              ),
             );
           }
 
           final approved =
               (data['estimatedCost']
-                          as num?)
-                      ?.toInt() ??
-                  0;
+                      as num?)
+                  ?.toInt() ??
+              0;
 
           final total =
               (data['finalCost']
-                          as num?)
-                      ?.toInt() ??
-                  approved;
+                      as num?)
+                  ?.toInt() ??
+              approved;
+
+          final serviceFee =
+              (data['serviceFee']
+                      as num?)
+                  ?.toInt() ??
+              0;
+
+          final travelFee =
+              (data['dispatchFee']
+                      as num?)
+                  ?.toInt() ??
+              (data['travelFee']
+                      as num?)
+                  ?.toInt() ??
+              0;
+
+          final extraFee =
+              (data['extraFee']
+                      as num?)
+                  ?.toInt() ??
+              0;
+
+          final discount =
+              approved > total
+                  ? approved - total
+                  : 0;
 
           final uid =
-              FirebaseAuth
-                  .instance
+              FirebaseAuth.instance
                   .currentUser
                   ?.uid;
 
@@ -305,516 +229,335 @@ class _InvoiceScreenState
               uid ==
                   data['driverId'];
 
-          final serviceFee =
-              data['serviceFee'];
+          final driverReported =
+              data['driverReportedPayment'] ==
+                  true;
 
-          final travelFee =
-              data['dispatchFee'];
+          final providerConfirmed =
+              data['providerConfirmedPayment'] ==
+                  true;
 
-          final extraFee =
-              data['extraFee'];
+          final paymentMethod =
+              data['paymentMethod']
+                  as String?;
+
+          final providerName =
+              data['providerName']
+                      as String? ??
+                  'Service Provider';
+
+          final driverName =
+              data['driverName']
+                      as String? ??
+                  'Driver';
+
+          final registration =
+              data['registration']
+                      as String? ??
+                  '';
+
+          final vehicle = [
+            data['vehicleType']
+                    as String? ??
+                '',
+            data['modelYear']
+                    as String? ??
+                '',
+            registration,
+          ]
+              .where(
+                (value) =>
+                    value.trim().isNotEmpty,
+              )
+              .join(' • ');
+
+          final completedAt =
+              (data['completedAt']
+                      as Timestamp?)
+                  ?.toDate()
+                  .toLocal();
 
           return ListView(
+            physics:
+                const BouncingScrollPhysics(),
             padding:
-                const EdgeInsets
-                    .fromLTRB(
-              RaSpace.lg,
-              RaSpace.md,
-              RaSpace.lg,
-              RaSpace.xxxl,
+                const EdgeInsets.fromLTRB(
+              18,
+              8,
+              18,
+              32,
             ),
             children: [
-              Container(
-                padding:
-                    const EdgeInsets
-                        .all(
-                  RaSpace.xl,
-                ),
-                decoration:
-                    BoxDecoration(
-                  gradient:
-                      LinearGradient(
-                    begin:
-                        Alignment
-                            .topLeft,
-                    end:
-                        Alignment
-                            .bottomRight,
-                    colors: [
-                      colors.primary,
-                      const Color(
-                        0xFF007D70,
-                      ),
-                    ],
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    24,
-                  ),
-                ),
+              _RaInvoiceHero(
+                total:
+                    money(total),
+                requestId:
+                    widget.requestId,
+                completedAt:
+                    completedAt,
+                paymentConfirmed:
+                    providerConfirmed,
+              ),
+
+              const SizedBox(height: 24),
+
+              const _RaInvoiceSectionHeading(
+                title:
+                    'Service details',
+                subtitle:
+                    'RoadAssist record for this completed roadside job.',
+              ),
+
+              const SizedBox(height: 10),
+
+              _RaInvoiceSurface(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration:
-                              BoxDecoration(
-                            color: Colors
-                                .white
-                                .withValues(
-                              alpha:
-                                  .14,
-                            ),
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              17,
-                            ),
-                          ),
-                          child:
-                              const Icon(
-                            Icons
-                                .receipt_long_outlined,
-                            color:
-                                Colors.white,
-                            size:
-                                27,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding:
-                              const EdgeInsets
-                                  .symmetric(
-                            horizontal:
-                                10,
-                            vertical: 6,
-                          ),
-                          decoration:
-                              BoxDecoration(
-                            color: Colors
-                                .white
-                                .withValues(
-                              alpha:
-                                  .14,
-                            ),
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              999,
-                            ),
-                          ),
-                          child:
-                              const Text(
-                            'COMPLETED',
-                            style:
-                                TextStyle(
-                              color: Colors
-                                  .white,
-                              fontWeight:
-                                  FontWeight
-                                      .w900,
-                              fontSize:
-                                  11,
-                            ),
-                          ),
-                        ),
-                      ],
+                    _RaInvoiceInfoRow(
+                      icon: Icons
+                          .person_outline_rounded,
+                      label:
+                          'Driver',
+                      value:
+                          driverName,
                     ),
 
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
+                    const _RaInvoiceDivider(),
 
-                    Text(
-                      'Final service invoice',
-                      style: theme
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(
-                        color:
-                            Colors.white,
-                        fontWeight:
-                            FontWeight
-                                .w900,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 5,
-                    ),
-
-                    Text(
-                      money(total),
-                      style: theme
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(
-                        color:
-                            Colors.white,
-                        fontWeight:
-                            FontWeight
-                                .w900,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: 5,
-                    ),
-
-                    Text(
-                      'Job ${widget.requestId}',
-                      style: theme
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color: Colors
-                            .white
-                            .withValues(
-                          alpha: .78,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(
-                height: RaSpace.xl,
-              ),
-
-              Text(
-                'Service details',
-                style: theme
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(
-                  fontWeight:
-                      FontWeight.w900,
-                ),
-              ),
-
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              _InvoiceCard(
-                children: [
-                  _InvoiceRow(
-                    icon: Icons
-                        .person_outline_rounded,
-                    label:
-                        'Provider',
-                    value:
-                        data['providerName']
-                                as String? ??
-                            'Not recorded',
-                  ),
-                  _InvoiceRow(
-                    icon: Icons
-                        .directions_car_outlined,
-                    label:
-                        'Vehicle',
-                    value:
-                        data['modelYear']
-                                as String? ??
-                            'Not recorded',
-                  ),
-                  _InvoiceRow(
-                    icon: Icons
-                        .pin_outlined,
-                    label:
-                        'Registration',
-                    value:
-                        data['registration']
-                                as String? ??
-                            'Not recorded',
-                  ),
-                  _InvoiceRow(
-                    icon: Icons
-                        .car_repair_outlined,
-                    label:
-                        'Reported problem',
-                    value:
-                        requestIssueLabel(
-                      data,
-                    ),
-                  ),
-                  if (data['providerDiagnosis']
-                      is String)
-                    _InvoiceRow(
+                    _RaInvoiceInfoRow(
                       icon: Icons
                           .engineering_outlined,
                       label:
-                          'Diagnosis / approved work',
+                          'Provider',
                       value:
-                          data['providerDiagnosis']
-                              as String,
+                          providerName,
                     ),
-                ],
-              ),
 
-              const SizedBox(
-                height: RaSpace.xxl,
-              ),
+                    const _RaInvoiceDivider(),
 
-              Text(
-                'Price breakdown',
-                style: theme
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(
-                  fontWeight:
-                      FontWeight.w900,
-                ),
-              ),
-
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              _InvoiceCard(
-                children: [
-                  _InvoiceRow(
-                    icon: Icons
-                        .build_outlined,
-                    label:
-                        'Service / labour',
-                    value:
-                        money(
-                      serviceFee,
-                    ),
-                  ),
-                  _InvoiceRow(
-                    icon: Icons
-                        .route_outlined,
-                    label:
-                        'Travel',
-                    value:
-                        money(
-                      travelFee,
-                    ),
-                  ),
-                  _InvoiceRow(
-                    icon: Icons
-                        .add_card_outlined,
-                    label:
-                        'Parts / other approved charges',
-                    value:
-                        money(
-                      extraFee,
-                    ),
-                  ),
-                  if (total <
-                      approved)
-                    _InvoiceRow(
+                    _RaInvoiceInfoRow(
                       icon: Icons
-                          .discount_outlined,
+                          .car_repair_outlined,
                       label:
-                          'Discount',
+                          'Reported problem',
                       value:
-                          money(
-                        approved -
-                            total,
+                          requestIssueLabel(
+                        data,
                       ),
                     ),
-                  _InvoiceRow(
-                    icon: Icons
-                        .payments_outlined,
-                    label:
-                        'Final total',
-                    value:
-                        money(total),
-                    strong: true,
-                  ),
-                ],
-              ),
 
-              const SizedBox(
-                height: RaSpace.xxl,
-              ),
+                    if (vehicle.isNotEmpty) ...[
+                      const _RaInvoiceDivider(),
+                      _RaInvoiceInfoRow(
+                        icon: Icons
+                            .directions_car_outlined,
+                        label:
+                            'Vehicle',
+                        value:
+                            vehicle,
+                      ),
+                    ],
 
-              Text(
-                'Payment',
-                style: theme
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(
-                  fontWeight:
-                      FontWeight.w900,
+                    if (data['providerDiagnosis']
+                            is String &&
+                        (data['providerDiagnosis']
+                                as String)
+                            .trim()
+                            .isNotEmpty) ...[
+                      const _RaInvoiceDivider(),
+                      _RaInvoiceInfoRow(
+                        icon: Icons
+                            .fact_check_outlined,
+                        label:
+                            'Diagnosis / approved work',
+                        value:
+                            data['providerDiagnosis']
+                                as String,
+                      ),
+                    ],
+                  ],
                 ),
               ),
 
-              const SizedBox(
-                height: RaSpace.md,
+              const SizedBox(height: 24),
+
+              const _RaInvoiceSectionHeading(
+                title:
+                    'Price breakdown',
+                subtitle:
+                    'Final bill based on approved RoadAssist service charges.',
               ),
 
-              _paymentStatus(
-                context,
-                data,
-              ),
+              const SizedBox(height: 10),
 
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              Container(
-                padding:
-                    const EdgeInsets
-                        .all(
-                  RaSpace.md,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: colors
-                      .surfaceContainerHighest
-                      .withValues(
-                    alpha: .42,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    16,
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+              _RaInvoiceSurface(
+                child: Column(
                   children: [
-                    Icon(
-                      Icons
-                          .info_outline_rounded,
-                      color: colors
-                          .primary,
-                      size: 19,
+                    _RaInvoicePriceRow(
+                      label:
+                          'Service / labour',
+                      value:
+                          money(serviceFee),
                     ),
-                    const SizedBox(
-                      width:
-                          RaSpace.sm,
+
+                    _RaInvoicePriceRow(
+                      label:
+                          'Travel / dispatch',
+                      value:
+                          money(travelFee),
                     ),
-                    Expanded(
-                      child: Text(
-                        'Cash and external payments are recorded manually. RoadAssist does not process the payment inside the app.',
-                        style: theme
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(
-                          height:
-                              1.4,
-                        ),
+
+                    _RaInvoicePriceRow(
+                      label:
+                          'Parts / other approved charges',
+                      value:
+                          money(extraFee),
+                    ),
+
+                    if (discount > 0)
+                      _RaInvoicePriceRow(
+                        label:
+                            'Discount',
+                        value:
+                            '-${money(discount)}',
+                        success:
+                            true,
                       ),
+
+                    const Divider(),
+
+                    _RaInvoicePriceRow(
+                      label:
+                          'Final total',
+                      value:
+                          money(total),
+                      strong:
+                          true,
                     ),
                   ],
                 ),
+              ),
+
+              const SizedBox(height: 24),
+
+              const _RaInvoiceSectionHeading(
+                title:
+                    'Payment status',
+                subtitle:
+                    'RoadAssist records cash or external payment confirmation only.',
+              ),
+
+              const SizedBox(height: 10),
+
+              _RaInvoicePaymentCard(
+                driverReported:
+                    driverReported,
+                providerConfirmed:
+                    providerConfirmed,
+                paymentMethod:
+                    paymentMethod,
               ),
 
               if (driver &&
-                  data['driverReportedPayment'] !=
-                      true) ...[
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
+                  !driverReported) ...[
+                const SizedBox(height: 11),
 
-                Text(
-                  'Only record payment after you have actually paid the provider.',
-                  style: theme
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(
-                    color: colors
-                        .onSurfaceVariant,
-                  ),
-                ),
+                _RaInvoiceSurface(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .stretch,
+                    children: [
+                      Text(
+                        'Record Payment',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight:
+                              FontWeight
+                                  .w800,
+                        ),
+                      ),
 
-                const SizedBox(
-                  height: RaSpace.sm,
-                ),
+                      const SizedBox(height: 5),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child:
-                          OutlinedButton.icon(
-                        onPressed:
-                            saving
-                                ? null
-                                : () =>
-                                    record(
-                                      'cash',
-                                    ),
-                        icon:
-                            const Icon(
+                      Text(
+                        'Only record payment after money has actually been paid to the provider.',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 8.5,
+                          height: 1.45,
+                          color: Theme.of(
+                            context,
+                          )
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      OutlinedButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () {
+                                record(
+                                  'cash',
+                                );
+                              },
+                        icon: const Icon(
                           Icons
                               .payments_outlined,
                         ),
-                        label:
-                            const Text(
-                          'Paid Cash',
+                        label: const Text(
+                          'I Paid Cash',
                         ),
                       ),
-                    ),
-                    const SizedBox(
-                      width:
-                          RaSpace.sm,
-                    ),
-                    Expanded(
-                      child:
-                          OutlinedButton.icon(
-                        onPressed:
-                            saving
-                                ? null
-                                : () =>
-                                    record(
-                                      'external',
-                                    ),
-                        icon:
-                            const Icon(
+
+                      const SizedBox(height: 7),
+
+                      OutlinedButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () {
+                                record(
+                                  'external',
+                                );
+                              },
+                        icon: const Icon(
                           Icons
                               .open_in_new_rounded,
                         ),
-                        label:
-                            const Text(
-                          'Paid Externally',
+                        label: const Text(
+                          'I Paid Outside the App',
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
 
               if (provider &&
-                  data['driverReportedPayment'] ==
-                      true &&
-                  data['providerConfirmedPayment'] !=
-                      true) ...[
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
+                  driverReported &&
+                  !providerConfirmed) ...[
+                const SizedBox(height: 11),
+
                 SizedBox(
-                  width:
-                      double.infinity,
+                  width: double.infinity,
                   child:
                       FilledButton.icon(
-                    onPressed:
-                        saving
-                            ? null
-                            : () =>
-                                record(
-                                  data['paymentMethod']
-                                          as String? ??
-                                      'external',
-                                ),
+                    onPressed: saving ||
+                            paymentMethod ==
+                                null
+                        ? null
+                        : () {
+                            record(
+                              paymentMethod,
+                            );
+                          },
                     icon: const Icon(
                       Icons
-                          .verified_outlined,
+                          .check_circle_outline_rounded,
                     ),
                     label: const Text(
                       'Confirm Payment Received',
@@ -824,50 +567,52 @@ class _InvoiceScreenState
               ],
 
               if (saving) ...[
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
-                const LinearProgressIndicator(
-                  minHeight: 3,
-                ),
+                const SizedBox(height: 10),
+                const LinearProgressIndicator(),
               ],
 
-              const SizedBox(
-                height: RaSpace.xxl,
+              const SizedBox(height: 24),
+
+              const _RaInvoiceSectionHeading(
+                title:
+                    'Warranty',
+                subtitle:
+                    'Any agreed service warranty is shown from the completed job record.',
               ),
+
+              const SizedBox(height: 10),
 
               ServiceWarranty(
                 requestId:
                     widget.requestId,
-                job: data,
+                job:
+                    data,
               ),
 
               if (driver) ...[
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
+                const SizedBox(height: 10),
+
                 SizedBox(
-                  width:
-                      double.infinity,
+                  width: double.infinity,
                   child:
                       OutlinedButton.icon(
-                    onPressed: () =>
-                        push(
-                      context,
-                      DisputeScreen(
-                        requestId:
-                            widget
-                                .requestId,
-                        sameProblem:
-                            true,
-                      ),
-                    ),
+                    onPressed: () {
+                      push(
+                        context,
+                        DisputeScreen(
+                          requestId:
+                              widget.requestId,
+                          sameProblem:
+                              true,
+                        ),
+                      );
+                    },
                     icon: const Icon(
                       Icons
-                          .build_circle_outlined,
+                          .published_with_changes_outlined,
                     ),
                     label: const Text(
-                      'Same Problem Again / Warranty Review',
+                      'Same Problem / Warranty Review',
                     ),
                   ),
                 ),
@@ -875,29 +620,21 @@ class _InvoiceScreenState
 
               if (driver ||
                   provider) ...[
-                const SizedBox(
-                  height: RaSpace.sm,
-                ),
+                const SizedBox(height: 8),
+
                 SizedBox(
-                  width:
-                      double.infinity,
+                  width: double.infinity,
                   child:
                       OutlinedButton.icon(
-                    style:
-                        OutlinedButton
-                            .styleFrom(
-                      foregroundColor:
-                          colors.error,
-                    ),
-                    onPressed: () =>
-                        push(
-                      context,
-                      DisputeScreen(
-                        requestId:
-                            widget
-                                .requestId,
-                      ),
-                    ),
+                    onPressed: () {
+                      push(
+                        context,
+                        DisputeScreen(
+                          requestId:
+                              widget.requestId,
+                        ),
+                      );
+                    },
                     icon: const Icon(
                       Icons
                           .report_problem_outlined,
@@ -913,9 +650,17 @@ class _InvoiceScreenState
 
               if (data['workflowVersion'] ==
                   2) ...[
-                const SizedBox(
-                  height: RaSpace.xxl,
+                const SizedBox(height: 25),
+
+                const _RaInvoiceSectionHeading(
+                  title:
+                      'Approval history',
+                  subtitle:
+                      'Original offers and later repair revisions recorded for this service.',
                 ),
+
+                const SizedBox(height: 10),
+
                 _InvoiceApprovalHistory(
                   requestId:
                       widget.requestId,
@@ -932,71 +677,264 @@ class _InvoiceScreenState
   }
 }
 
-class _InvoiceCard
-    extends StatelessWidget {
-  const _InvoiceCard({
-    required this.children,
+class _RaInvoiceHero extends StatelessWidget {
+  const _RaInvoiceHero({
+    required this.total,
+    required this.requestId,
+    required this.completedAt,
+    required this.paymentConfirmed,
   });
 
-  final List<_InvoiceRow>
-      children;
+  final String total;
+  final String requestId;
+  final DateTime? completedAt;
+  final bool paymentConfirmed;
+
+  String get dateLabel {
+    final value =
+        completedAt;
+
+    if (value == null) {
+      return 'Completion time unavailable';
+    }
+
+    final hour =
+        value.hour % 12 == 0
+            ? 12
+            : value.hour % 12;
+
+    final minute =
+        value.minute
+            .toString()
+            .padLeft(
+              2,
+              '0',
+            );
+
+    final period =
+        value.hour >= 12
+            ? 'PM'
+            : 'AM';
+
+    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year} • $hour:$minute $period';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final dark =
+        Theme.of(context)
+                .brightness ==
+            Brightness.dark;
 
     return Container(
       padding:
-          const EdgeInsets.symmetric(
-        horizontal: RaSpace.lg,
+          const EdgeInsets.all(
+        18,
       ),
       decoration: BoxDecoration(
-        color: colors.surface,
+        gradient: LinearGradient(
+          begin:
+              Alignment.topLeft,
+          end:
+              Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(
+                    0xFF0A497F,
+                  ),
+                  Color(
+                    0xFF08635D,
+                  ),
+                ]
+              : const [
+                  Color(
+                    0xFF075BA8,
+                  ),
+                  Color(
+                    0xFF078C7E,
+                  ),
+                ],
+        ),
         borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .6),
+            BorderRadius.circular(
+          24,
         ),
       ),
       child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          for (var index = 0;
-              index < children.length;
-              index++) ...[
-            children[index],
-            if (index !=
-                children.length - 1)
-              Divider(
-                height: 1,
-                indent: 50,
-                color: colors
-                    .outlineVariant
-                    .withValues(
-                  alpha: .5,
+          Row(
+            children: [
+              Container(
+                width: 45,
+                height: 45,
+                decoration:
+                    BoxDecoration(
+                  color: Colors.white
+                      .withValues(
+                    alpha: .13,
+                  ),
+                  borderRadius:
+                      BorderRadius
+                          .circular(
+                    14,
+                  ),
+                ),
+                child: const Icon(
+                  Icons
+                      .receipt_long_outlined,
+                  color:
+                      Colors.white,
                 ),
               ),
-          ],
+              const Spacer(),
+              StatusPill(
+                label:
+                    paymentConfirmed
+                        ? 'PAID'
+                        : 'COMPLETED',
+                tone:
+                    paymentConfirmed
+                        ? RaTone
+                            .success
+                        : RaTone.info,
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height: 17,
+          ),
+
+          Text(
+            'FINAL TOTAL',
+            style: GoogleFonts
+                .plusJakartaSans(
+              color: Colors.white
+                  .withValues(
+                alpha: .65,
+              ),
+              fontSize: 8,
+              fontWeight:
+                  FontWeight.w800,
+              letterSpacing: .8,
+            ),
+          ),
+
+          const SizedBox(
+            height: 3,
+          ),
+
+          Text(
+            total,
+            style: GoogleFonts
+                .plusJakartaSans(
+              color: Colors.white,
+              fontSize: 27,
+              fontWeight:
+                  FontWeight.w800,
+              letterSpacing: -.7,
+            ),
+          ),
+
+          const SizedBox(
+            height: 13,
+          ),
+
+          Text(
+            dateLabel,
+            style: GoogleFonts
+                .plusJakartaSans(
+              color: Colors.white70,
+              fontSize: 8.5,
+            ),
+          ),
+
+          const SizedBox(
+            height: 4,
+          ),
+
+          Text(
+            'JOB $requestId',
+            maxLines: 1,
+            overflow:
+                TextOverflow
+                    .ellipsis,
+            style: GoogleFonts
+                .plusJakartaSans(
+              color: Colors.white
+                  .withValues(
+                alpha: .52,
+              ),
+              fontSize: 7.5,
+              fontWeight:
+                  FontWeight.w600,
+              letterSpacing: .45,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _InvoiceRow
+class _RaInvoiceSectionHeading
     extends StatelessWidget {
-  const _InvoiceRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.strong = false,
+  const _RaInvoiceSectionHeading({
+    required this.title,
+    required this.subtitle,
   });
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool strong;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment
+              .start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts
+              .plusJakartaSans(
+            fontSize: 16.5,
+            fontWeight:
+                FontWeight.w800,
+            letterSpacing: -.3,
+          ),
+        ),
+        const SizedBox(
+          height: 3,
+        ),
+        Text(
+          subtitle,
+          style: GoogleFonts
+              .plusJakartaSans(
+            fontSize: 9,
+            height: 1.4,
+            color: colors
+                .onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaInvoiceSurface
+    extends StatelessWidget {
+  const _RaInvoiceSurface({
+    required this.child,
+  });
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -1006,50 +944,101 @@ class _InvoiceRow
     final colors =
         theme.colorScheme;
 
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(
+        15,
+      ),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(
+          19,
+        ),
+        border: Border.all(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _RaInvoiceInfoRow
+    extends StatelessWidget {
+  const _RaInvoiceInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
     return Padding(
       padding:
-          const EdgeInsets.symmetric(
-        vertical: RaSpace.md,
+          const EdgeInsets
+              .symmetric(
+        vertical: 8,
       ),
       child: Row(
         crossAxisAlignment:
-            CrossAxisAlignment.start,
+            CrossAxisAlignment
+                .start,
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 37,
+            height: 37,
             decoration:
                 BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest,
+              color: colors.primary
+                  .withValues(
+                alpha: .07,
+              ),
               borderRadius:
-                  BorderRadius.circular(
+                  BorderRadius
+                      .circular(
                 12,
               ),
             ),
             child: Icon(
               icon,
-              size: 19,
-              color: strong
-                  ? colors.primary
-                  : colors
-                      .onSurfaceVariant,
+              color:
+                  colors.primary,
+              size: 18,
             ),
           ),
           const SizedBox(
-            width: RaSpace.md,
+            width: 10,
           ),
           Expanded(
             child: Column(
               crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
               children: [
                 Text(
                   label,
-                  style: theme
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8,
                     color: colors
                         .onSurfaceVariant,
                   ),
@@ -1059,17 +1048,235 @@ class _InvoiceRow
                 ),
                 Text(
                   value,
-                  style: theme
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontWeight: strong
-                        ? FontWeight.w900
-                        : FontWeight.w700,
-                    color: strong
-                        ? colors.primary
-                        : null,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 10,
                     height: 1.4,
+                    fontWeight:
+                        FontWeight
+                            .w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaInvoiceDivider
+    extends StatelessWidget {
+  const _RaInvoiceDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 47,
+      color: Theme.of(context)
+          .colorScheme
+          .outlineVariant
+          .withValues(
+        alpha: .35,
+      ),
+    );
+  }
+}
+
+class _RaInvoicePriceRow
+    extends StatelessWidget {
+  const _RaInvoicePriceRow({
+    required this.label,
+    required this.value,
+    this.strong = false,
+    this.success = false,
+  });
+
+  final String label;
+  final String value;
+  final bool strong;
+  final bool success;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    return Padding(
+      padding:
+          const EdgeInsets
+              .symmetric(
+        vertical: 7,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts
+                  .plusJakartaSans(
+                fontSize:
+                    strong ? 10 : 9,
+                fontWeight:
+                    strong
+                        ? FontWeight
+                            .w700
+                        : FontWeight
+                            .w500,
+                color: strong
+                    ? colors.onSurface
+                    : colors
+                        .onSurfaceVariant,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts
+                .plusJakartaSans(
+              fontSize:
+                  strong ? 13 : 9.5,
+              fontWeight:
+                  strong
+                      ? FontWeight
+                          .w800
+                      : FontWeight
+                          .w600,
+              color: success
+                  ? raSuccess
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaInvoicePaymentCard
+    extends StatelessWidget {
+  const _RaInvoicePaymentCard({
+    required this.driverReported,
+    required this.providerConfirmed,
+    required this.paymentMethod,
+  });
+
+  final bool driverReported;
+  final bool providerConfirmed;
+  final String? paymentMethod;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    final Color tone;
+    final IconData icon;
+    final String title;
+    final String message;
+
+    if (providerConfirmed) {
+      tone = raSuccess;
+      icon =
+          Icons.verified_outlined;
+      title =
+          'Payment confirmed';
+      message =
+          'The provider confirmed that payment was received.';
+    } else if (driverReported) {
+      tone = raGold;
+      icon =
+          Icons.hourglass_top_rounded;
+      title =
+          'Awaiting provider confirmation';
+      message =
+          'The driver reported payment${paymentMethod == null ? '' : ' by ${paymentMethod!.replaceAll('_', ' ')}'}.';
+    } else {
+      tone = colors.primary;
+      icon =
+          Icons.payments_outlined;
+      title =
+          'Payment not recorded';
+      message =
+          'No cash or external payment has been recorded for this job.';
+    }
+
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: tone.withValues(
+          alpha: .07,
+        ),
+        borderRadius:
+            BorderRadius.circular(
+          18,
+        ),
+        border: Border.all(
+          color: tone.withValues(
+            alpha: .18,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment
+                .start,
+        children: [
+          Icon(
+            icon,
+            color: tone,
+            size: 21,
+          ),
+          const SizedBox(
+            width: 9,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 10.5,
+                    fontWeight:
+                        FontWeight
+                            .w700,
+                  ),
+                ),
+                const SizedBox(
+                  height: 3,
+                ),
+                Text(
+                  message,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8.6,
+                    height: 1.4,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(
+                  height: 6,
+                ),
+                Text(
+                  'RoadAssist does not process an online payment for this record.',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 7.8,
+                    height: 1.4,
+                    color: colors
+                        .onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1123,20 +1330,24 @@ class _InvoiceApprovalHistoryState
             .collection('requests')
             .doc(widget.requestId);
 
-    revisions = ref
-        .collection('repairQuotes')
-        .snapshots();
+    revisions =
+        ref.collection(
+          'repairQuotes',
+        ).snapshots();
 
-    decisions = ref
-        .collection('repairDecisions')
-        .snapshots();
+    decisions =
+        ref.collection(
+          'repairDecisions',
+        ).snapshots();
 
     initialQuote =
         widget.selectedQuoteId ==
                 null
             ? null
             : ref
-                .collection('quotes')
+                .collection(
+                  'quotes',
+                )
                 .doc(
                   widget
                       .selectedQuoteId,
@@ -1146,453 +1357,441 @@ class _InvoiceApprovalHistoryState
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    return _RaInvoiceSurface(
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment
+                .stretch,
+        children: [
+          if (initialQuote != null)
+            StreamBuilder<
+                DocumentSnapshot<
+                    Map<String,
+                        dynamic>>>(
+              stream:
+                  initialQuote,
+              builder: (
+                context,
+                snapshot,
+              ) {
+                if (snapshot
+                    .hasError) {
+                  return const InlineMessage(
+                    icon: Icons
+                        .error_outline_rounded,
+                    text:
+                        'Could not load the original approved quote.',
+                  );
+                }
 
-    final colors =
-        theme.colorScheme;
+                final quote =
+                    snapshot.data
+                        ?.data();
 
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quote & approval history',
-          style: theme
-              .textTheme.titleLarge
-              ?.copyWith(
-            fontWeight:
-                FontWeight.w900,
-          ),
-        ),
+                if (quote ==
+                    null) {
+                  return const LinearProgressIndicator();
+                }
 
-        const SizedBox(
-          height: 4,
-        ),
+                final quoteType =
+                    quote['quoteType']
+                            as String? ??
+                        'service';
 
-        Text(
-          'Rejected or unapproved repair proposals are not added to the final bill.',
-          style: theme
-              .textTheme.bodySmall,
-        ),
+                return _RaInvoiceApprovalEntry(
+                  icon: Icons
+                      .request_quote_outlined,
+                  title:
+                      'Original approved ${quoteType == 'inspection' ? 'inspection' : 'service'} offer',
+                  amount:
+                      'Rs. ${quote['total'] ?? 0}',
+                  message:
+                      quote['notes']
+                                  ?.toString()
+                                  .trim()
+                                  .isNotEmpty ==
+                              true
+                          ? '${quote['notes']}'
+                          : 'No additional quote notes recorded.',
+                  tone:
+                      Theme.of(
+                    context,
+                  ).colorScheme.primary,
+                );
+              },
+            ),
 
-        const SizedBox(
-          height: RaSpace.md,
-        ),
+          if (initialQuote !=
+              null)
+            const SizedBox(
+              height: 10,
+            ),
 
-        if (initialQuote != null)
           StreamBuilder<
-              DocumentSnapshot<
+              QuerySnapshot<
                   Map<String,
                       dynamic>>>(
-            stream: initialQuote,
+            stream: decisions,
             builder: (
               context,
-              snapshot,
+              decisionSnapshot,
             ) {
-              if (snapshot
-                  .hasError) {
-                return const InlineMessage(
-                  text:
-                      'Could not load the original quote.',
-                  error: true,
-                );
-              }
+              return StreamBuilder<
+                  QuerySnapshot<
+                      Map<String,
+                          dynamic>>>(
+                stream:
+                    revisions,
+                builder: (
+                  context,
+                  revisionSnapshot,
+                ) {
+                  if (revisionSnapshot
+                          .hasError ||
+                      decisionSnapshot
+                          .hasError) {
+                    return const InlineMessage(
+                      icon: Icons
+                          .history_toggle_off_rounded,
+                      text:
+                          'Could not load quote approval history.',
+                    );
+                  }
 
-              final quote =
-                  snapshot.data
-                      ?.data();
+                  if (!revisionSnapshot
+                          .hasData ||
+                      !decisionSnapshot
+                          .hasData) {
+                    return const LinearProgressIndicator();
+                  }
 
-              if (quote == null) {
-                return const LinearProgressIndicator(
-                  minHeight: 3,
-                );
-              }
+                  final outcomes = {
+                    for (final decision
+                        in decisionSnapshot
+                            .data!
+                            .docs)
+                      decision.id:
+                          decision
+                              .data(),
+                  };
 
-              return Container(
-                padding:
-                    const EdgeInsets
-                        .all(
-                  RaSpace.md,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: colors
-                      .primaryContainer
-                      .withValues(
-                    alpha: .30,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    16,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
-                  children: [
-                    Text(
-                      'Original approved ${quote['quoteType'] == 'inspection' ? 'inspection' : 'service'} offer',
-                      style: theme
-                          .textTheme
-                          .labelLarge
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight
-                                .w900,
+                  final entries =
+                      revisionSnapshot
+                          .data!
+                          .docs
+                          .toList();
+
+                  entries.sort(
+                    (a, b) {
+                      final aTime =
+                          (a.data()[
+                                      'createdAt']
+                                  as Timestamp?)
+                              ?.toDate();
+
+                      final bTime =
+                          (b.data()[
+                                      'createdAt']
+                                  as Timestamp?)
+                              ?.toDate();
+
+                      if (aTime ==
+                              null &&
+                          bTime ==
+                              null) {
+                        return 0;
+                      }
+
+                      if (aTime ==
+                          null) {
+                        return 1;
+                      }
+
+                      if (bTime ==
+                          null) {
+                        return -1;
+                      }
+
+                      return aTime
+                          .compareTo(
+                        bTime,
+                      );
+                    },
+                  );
+
+                  if (entries
+                      .isEmpty) {
+                    return Text(
+                      'No repair revisions were proposed.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.8,
+                        color: Theme.of(
+                          context,
+                        )
+                            .colorScheme
+                            .onSurfaceVariant,
                       ),
-                    ),
-                    const SizedBox(
-                      height: 3,
-                    ),
-                    Text(
-                      'Rs. ${quote['total']}',
-                      style: theme
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(
-                        color:
-                            colors.primary,
-                        fontWeight:
-                            FontWeight
-                                .w900,
-                      ),
-                    ),
-                    if ((quote['notes']
-                                as String? ??
-                            '')
-                        .isNotEmpty) ...[
-                      const SizedBox(
-                        height:
-                            RaSpace.sm,
-                      ),
-                      Text(
-                        'Included work / exclusions: ${quote['notes']}',
-                        style: theme
-                            .textTheme
-                            .bodySmall,
-                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      for (var index =
+                              0;
+                          index <
+                              entries
+                                  .length;
+                          index++) ...[
+                        if (index >
+                            0)
+                          const SizedBox(
+                            height: 10,
+                          ),
+
+                        _RaInvoiceRevisionEntry(
+                          revision:
+                              entries[index]
+                                  .data(),
+                          decision:
+                              outcomes[
+                                entries[index]
+                                    .id
+                              ],
+                        ),
+                      ],
                     ],
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+}
 
-        if (initialQuote !=
-            null)
-          const SizedBox(
-            height: RaSpace.md,
-          ),
+class _RaInvoiceApprovalEntry
+    extends StatelessWidget {
+  const _RaInvoiceApprovalEntry({
+    required this.icon,
+    required this.title,
+    required this.amount,
+    required this.message,
+    required this.tone,
+  });
 
-        StreamBuilder<
-            QuerySnapshot<
-                Map<String,
-                    dynamic>>>(
-          stream: decisions,
-          builder: (
-            context,
-            decisionSnapshot,
-          ) {
-            return StreamBuilder<
-                QuerySnapshot<
-                    Map<String,
-                        dynamic>>>(
-              stream: revisions,
-              builder: (
-                context,
-                revisionSnapshot,
-              ) {
-                if (revisionSnapshot
-                        .hasError ||
-                    decisionSnapshot
-                        .hasError) {
-                  return const InlineMessage(
-                    text:
-                        'Could not load approval history.',
-                    error: true,
-                  );
-                }
+  final IconData icon;
+  final String title;
+  final String amount;
+  final String message;
+  final Color tone;
 
-                if (!revisionSnapshot
-                        .hasData ||
-                    !decisionSnapshot
-                        .hasData) {
-                  return const LinearProgressIndicator(
-                    minHeight: 3,
-                  );
-                }
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
 
-                final outcomes = {
-                  for (final decision
-                      in decisionSnapshot
-                          .data!.docs)
-                    decision.id:
-                        decision.data(),
-                };
-
-                final entries =
-                    revisionSnapshot
-                        .data!.docs
-                        .toList()
-                      ..sort(
-                        (
-                          first,
-                          second,
-                        ) {
-                          final firstTime =
-                              first.data()[
-                                      'createdAt']
-                                  as Timestamp?;
-
-                          final secondTime =
-                              second.data()[
-                                      'createdAt']
-                                  as Timestamp?;
-
-                          if (firstTime ==
-                                  null ||
-                              secondTime ==
-                                  null) {
-                            return 0;
-                          }
-
-                          return firstTime
-                              .compareTo(
-                            secondTime,
-                          );
-                        },
-                      );
-
-                if (entries.isEmpty) {
-                  return Container(
-                    padding:
-                        const EdgeInsets
-                            .all(
-                      RaSpace.md,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color: colors
-                          .surfaceContainerHighest
-                          .withValues(
-                        alpha: .4,
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        15,
-                      ),
-                    ),
-                    child: const Text(
-                      'No repair revisions were proposed.',
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    for (final entry
-                        in entries) ...[
-                      Builder(
-                        builder:
-                            (context) {
-                          final revision =
-                              entry
-                                  .data();
-
-                          final decision =
-                              outcomes[
-                                  entry
-                                      .id];
-
-                          final outcome =
-                              decision?[
-                                      'decision']
-                                  as String? ??
-                                  'not approved';
-
-                          final timestamp =
-                              (decision?[
-                                          'createdAt']
-                                      as Timestamp?) ??
-                                  revision[
-                                          'createdAt']
-                                      as Timestamp?;
-
-                          final date =
-                              timestamp
-                                  ?.toDate()
-                                  .toLocal();
-
-                          final color =
-                              outcome ==
-                                      'approved'
-                                  ? raSuccess
-                                  : outcome ==
-                                          'rejected'
-                                      ? colors
-                                          .error
-                                      : raGold;
-
-                          return Container(
-                            width:
-                                double.infinity,
-                            padding:
-                                const EdgeInsets
-                                    .all(
-                              RaSpace
-                                  .md,
-                            ),
-                            decoration:
-                                BoxDecoration(
-                              color: colors
-                                  .surface,
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                17,
-                              ),
-                              border:
-                                  Border.all(
-                                color: color
-                                    .withValues(
-                                  alpha:
-                                      .22,
-                                ),
-                              ),
-                            ),
-                            child:
-                                Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      outcome ==
-                                              'approved'
-                                          ? Icons
-                                              .check_circle_outline_rounded
-                                          : outcome ==
-                                                  'rejected'
-                                              ? Icons
-                                                  .cancel_outlined
-                                              : Icons
-                                                  .schedule_outlined,
-                                      color:
-                                          color,
-                                    ),
-                                    const SizedBox(
-                                      width:
-                                          RaSpace
-                                              .sm,
-                                    ),
-                                    Expanded(
-                                      child:
-                                          Text(
-                                        outcome
-                                            .replaceAll(
-                                              '_',
-                                              ' ',
-                                            )
-                                            .toUpperCase(),
-                                        style: theme
-                                            .textTheme
-                                            .labelLarge
-                                            ?.copyWith(
-                                          color:
-                                              color,
-                                          fontWeight:
-                                              FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(
-                                  height:
-                                      RaSpace
-                                          .sm,
-                                ),
-                                Text(
-                                  'Rs. ${revision['previousTotal']} → Rs. ${revision['total']}',
-                                  style: theme
-                                      .textTheme
-                                      .titleMedium
-                                      ?.copyWith(
-                                    fontWeight:
-                                        FontWeight
-                                            .w900,
-                                  ),
-                                ),
-                                const SizedBox(
-                                  height: 5,
-                                ),
-                                Text(
-                                  '${revision['diagnosisAndWork']}',
-                                  style: theme
-                                      .textTheme
-                                      .bodyMedium,
-                                ),
-                                const SizedBox(
-                                  height: 4,
-                                ),
-                                Text(
-                                  'Reason: ${revision['changeReason'] ?? 'Not recorded for this older revision'}',
-                                  style: theme
-                                      .textTheme
-                                      .bodySmall,
-                                ),
-                                if (date !=
-                                    null) ...[
-                                  const SizedBox(
-                                    height:
-                                        4,
-                                  ),
-                                  Text(
-                                    date
-                                        .toString()
-                                        .split(
-                                          '.',
-                                        )
-                                        .first,
-                                    style: theme
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                      color: colors
-                                          .onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                                RevisionEvidencePhotos(
-                                  photos:
-                                      List<String>.from(
-                                    revision['evidencePhotoData']
-                                            as List? ??
-                                        [],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(
-                        height:
-                            RaSpace.sm,
-                      ),
-                    ],
-                  ],
-                );
-              },
-            );
-          },
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        12,
+      ),
+      decoration: BoxDecoration(
+        color: tone.withValues(
+          alpha: .06,
         ),
+        borderRadius:
+            BorderRadius.circular(
+          15,
+        ),
+        border: Border.all(
+          color: tone.withValues(
+            alpha: .14,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment
+                .start,
+        children: [
+          Icon(
+            icon,
+            color: tone,
+            size: 20,
+          ),
+          const SizedBox(
+            width: 9,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9.5,
+                    fontWeight:
+                        FontWeight
+                            .w700,
+                  ),
+                ),
+                const SizedBox(
+                  height: 3,
+                ),
+                Text(
+                  amount,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight:
+                        FontWeight
+                            .w800,
+                  ),
+                ),
+                const SizedBox(
+                  height: 4,
+                ),
+                Text(
+                  message,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8.2,
+                    height: 1.4,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaInvoiceRevisionEntry
+    extends StatelessWidget {
+  const _RaInvoiceRevisionEntry({
+    required this.revision,
+    required this.decision,
+  });
+
+  final Map<String, dynamic>
+      revision;
+
+  final Map<String, dynamic>?
+      decision;
+
+  @override
+  Widget build(BuildContext context) {
+    final outcome =
+        decision?['decision']
+                as String? ??
+            'not approved';
+
+    final color =
+        switch (outcome) {
+      'approved' =>
+        raSuccess,
+      'rejected' =>
+        raDanger,
+      _ =>
+        raGold,
+    };
+
+    final icon =
+        switch (outcome) {
+      'approved' =>
+        Icons.check_circle_outline_rounded,
+      'rejected' =>
+        Icons.cancel_outlined,
+      _ =>
+        Icons.schedule_outlined,
+    };
+
+    final timestamp =
+        decision?['createdAt']
+                as Timestamp? ??
+            revision['createdAt']
+                as Timestamp?;
+
+    final value =
+        timestamp
+            ?.toDate()
+            .toLocal();
+
+    final dateLabel =
+        value == null
+            ? 'Decision time unavailable'
+            : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+
+    final previous =
+        revision['previousTotal'] ??
+            0;
+
+    final total =
+        revision['total'] ??
+            0;
+
+    final work =
+        revision['diagnosisAndWork']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final reason =
+        revision['changeReason']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final photos =
+        List<String>.from(
+      revision['evidencePhotoData']
+              as List? ??
+          const [],
+    );
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment
+              .stretch,
+      children: [
+        _RaInvoiceApprovalEntry(
+          icon: icon,
+          title:
+              outcome.replaceAll(
+                '_',
+                ' ',
+              ).toUpperCase(),
+          amount:
+              'Rs. $previous → Rs. $total',
+          message: [
+            if (work.isNotEmpty)
+              work,
+            if (reason.isNotEmpty)
+              'Reason: $reason',
+            dateLabel,
+          ].join('\n'),
+          tone: color,
+        ),
+
+        if (photos.isNotEmpty) ...[
+          const SizedBox(
+            height: 7,
+          ),
+          RevisionEvidencePhotos(
+            photos: photos,
+          ),
+        ],
       ],
     );
   }
