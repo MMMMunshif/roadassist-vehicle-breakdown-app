@@ -2028,6 +2028,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
           child:
               DropdownButtonFormField<
                   String>(
+            isExpanded: true,
             initialValue:
                 partsPreference,
             decoration:
@@ -2045,24 +2046,32 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                 value: 'discuss',
                 child: Text(
                   'Discuss options with provider',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               DropdownMenuItem(
                 value: 'budget',
                 child: Text(
                   'Budget compatible',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               DropdownMenuItem(
                 value: 'branded',
                 child: Text(
                   'Branded aftermarket',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               DropdownMenuItem(
                 value: 'genuine',
                 child: Text(
                   'Genuine manufacturer parts',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
