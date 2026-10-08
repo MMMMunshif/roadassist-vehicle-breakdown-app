@@ -15,18 +15,21 @@ class NotificationSettingsScreen
 class _NotificationSettingsScreenState
     extends State<NotificationSettingsScreen> {
   bool busy = false;
-  String? result;
 
+  String? result;
   bool? enabledResult;
 
   Future<void> update(
     bool enable,
   ) async {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
 
     setState(() {
       busy = true;
       result = null;
+      enabledResult = null;
     });
 
     try {
@@ -43,7 +46,9 @@ class _NotificationSettingsScreenState
             .disableNotifications();
       }
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         enabledResult = enable;
@@ -53,7 +58,9 @@ class _NotificationSettingsScreenState
             : 'Push notifications are disabled for your account.';
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         enabledResult = null;
@@ -73,20 +80,22 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Push Notifications',
+          'Notification Settings',
           style:
               GoogleFonts.plusJakartaSans(
             fontSize: 19,
             fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
           ),
         ),
       ),
@@ -102,103 +111,94 @@ class _NotificationSettingsScreenState
         ),
         children: [
           const _RaNotificationHero(),
-
-          const SizedBox(height: 27),
-
-          Text(
-            'What you’ll receive',
-            style:
-                GoogleFonts.plusJakartaSans(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.35,
-              color: colors.onSurface,
-            ),
+          const SizedBox(height: 24),
+          const _RaNotificationHeading(
+            title:
+                'Important updates',
+            subtitle:
+                'RoadAssist notifications help you follow activity without keeping the app open.',
           ),
-
-          const SizedBox(height: 11),
-
-          const _RaNotificationFeatures(),
-
-          const SizedBox(height: 25),
-
-          Text(
-            'This device',
-            style:
-                GoogleFonts.plusJakartaSans(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.35,
-              color: colors.onSurface,
-            ),
+          const SizedBox(height: 10),
+          const _RaNotificationFeatureCard(
+            icon:
+                Icons.request_quote_outlined,
+            title:
+                'Provider offers',
+            subtitle:
+                'Know when a provider sends a quote or revised repair cost.',
           ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            signedIn
+          const SizedBox(height: 8),
+          const _RaNotificationFeatureCard(
+            icon:
+                Icons.route_outlined,
+            title:
+                'Service progress',
+            subtitle:
+                'Receive accepted, en-route, arrival and completion updates.',
+          ),
+          const SizedBox(height: 8),
+          const _RaNotificationFeatureCard(
+            icon: Icons
+                .chat_bubble_outline_rounded,
+            title:
+                'Messages',
+            subtitle:
+                'Know when your driver or provider sends a new message.',
+          ),
+          const SizedBox(height: 24),
+          _RaNotificationHeading(
+            title:
+                'This device',
+            subtitle: signedIn
                 ? 'Choose whether this device should receive RoadAssist push notifications.'
                 : 'Sign in before changing notification settings.',
-            style:
-                GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              height: 1.4,
-              color:
-                  colors.onSurfaceVariant,
-            ),
           ),
-
-          const SizedBox(height: 12),
-
+          const SizedBox(height: 10),
           _RaNotificationActionCard(
             icon: Icons
                 .notifications_active_outlined,
             title:
                 'Enable notifications',
             subtitle:
-                'Register this device for assistance, chat and service updates.',
-            tone: colors.primary,
-            buttonLabel:
-                'Enable on this device',
+                'Allow this device to receive important RoadAssist activity.',
+            tone:
+                colors.primary,
+            label:
+                'Enable Notifications',
             filled: true,
             enabled:
-                !busy && signedIn,
+                signedIn && !busy,
             onTap: () {
               update(true);
             },
           ),
-
-          const SizedBox(height: 10),
-
+          const SizedBox(height: 9),
           _RaNotificationActionCard(
             icon: Icons
                 .notifications_off_outlined,
             title:
                 'Disable notifications',
             subtitle:
-                'Stop push notifications associated with your account.',
+                'Stop push notifications associated with your RoadAssist account.',
             tone:
                 colors.onSurfaceVariant,
-            buttonLabel:
-                'Disable for my account',
+            label:
+                'Disable Notifications',
             filled: false,
             enabled:
-                !busy && signedIn,
+                signedIn && !busy,
             onTap: () {
               update(false);
             },
           ),
-
           if (busy) ...[
             const SizedBox(height: 15),
             const LinearProgressIndicator(
               minHeight: 3,
             ),
           ],
-
           if (result != null) ...[
             const SizedBox(height: 15),
-
             _RaNotificationResult(
               message: result!,
               success:
@@ -207,36 +207,32 @@ class _NotificationSettingsScreenState
                   enabledResult,
             ),
           ],
-
-          const SizedBox(height: 22),
-
+          const SizedBox(height: 19),
           Container(
-            padding: const EdgeInsets.all(
-              14,
-            ),
+            padding:
+                const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: colors.primary
                   .withValues(alpha: .06),
               borderRadius:
-                  BorderRadius.circular(17),
+                  BorderRadius.circular(15),
             ),
             child: Row(
               crossAxisAlignment:
                   CrossAxisAlignment.start,
               children: [
                 Icon(
-                  Icons
-                      .devices_outlined,
+                  Icons.devices_outlined,
+                  size: 18,
                   color: colors.primary,
-                  size: 19,
                 ),
-                const SizedBox(width: 9),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'If you use RoadAssist on multiple devices, enable notifications separately on each device.',
+                    'If you use RoadAssist on multiple devices, notification permission may need to be enabled separately on each device.',
                     style: GoogleFonts
                         .plusJakartaSans(
-                      fontSize: 10,
+                      fontSize: 8.3,
                       height: 1.45,
                       color: colors
                           .onSurfaceVariant,
@@ -263,7 +259,8 @@ class _RaNotificationHero
             Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -271,8 +268,8 @@ class _RaNotificationHero
               Alignment.bottomRight,
           colors: dark
               ? const [
-                  Color(0xFF0B477D),
-                  Color(0xFF08645D),
+                  Color(0xFF0A497F),
+                  Color(0xFF075A68),
                 ]
               : const [
                   Color(0xFF075BA8),
@@ -280,13 +277,13 @@ class _RaNotificationHero
                 ],
         ),
         borderRadius:
-            BorderRadius.circular(25),
+            BorderRadius.circular(23),
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 50,
+            height: 50,
             decoration:
                 BoxDecoration(
               color: Colors.white
@@ -301,16 +298,14 @@ class _RaNotificationHero
               size: 25,
             ),
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment:
                   CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Stay updated',
+                  'Stay informed',
                   style: GoogleFonts
                       .plusJakartaSans(
                     color: Colors.white,
@@ -319,18 +314,13 @@ class _RaNotificationHero
                         FontWeight.w800,
                   ),
                 ),
-
-                const SizedBox(height: 5),
-
+                const SizedBox(height: 4),
                 Text(
-                  'Receive important RoadAssist activity even when the app is in the background.',
+                  'Receive important RoadAssist activity while the app is in the background.',
                   style: GoogleFonts
                       .plusJakartaSans(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .80,
-                    ),
-                    fontSize: 10,
+                    color: Colors.white70,
+                    fontSize: 8.5,
                     height: 1.4,
                   ),
                 ),
@@ -343,47 +333,53 @@ class _RaNotificationHero
   }
 }
 
-class _RaNotificationFeatures
+class _RaNotificationHeading
     extends StatelessWidget {
-  const _RaNotificationFeatures();
+  const _RaNotificationHeading({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
-        _RaNotificationFeature(
-          icon: Icons
-              .request_quote_outlined,
-          title:
-              'Provider offers',
-          subtitle:
-              'Know when providers send prices or revisions.',
+        Text(
+          title,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 14.5,
+            fontWeight:
+                FontWeight.w800,
+          ),
         ),
-        SizedBox(height: 9),
-        _RaNotificationFeature(
-          icon:
-              Icons.route_outlined,
-          title:
-              'Service progress',
-          subtitle:
-              'Follow accepted, en-route, arrival and completion updates.',
-        ),
-        SizedBox(height: 9),
-        _RaNotificationFeature(
-          icon: Icons
-              .chat_bubble_outline_rounded,
-          title: 'Messages',
-          subtitle:
-              'Get notified when your provider or driver sends a message.',
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 8.3,
+            height: 1.4,
+            color:
+                colors.onSurfaceVariant,
+          ),
         ),
       ],
     );
   }
 }
 
-class _RaNotificationFeature
+class _RaNotificationFeatureCard
     extends StatelessWidget {
-  const _RaNotificationFeature({
+  const _RaNotificationFeatureCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -395,19 +391,22 @@ class _RaNotificationFeature
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark =
-        theme.brightness == Brightness.dark;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(13),
+      padding:
+          const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: dark
+        color: theme.brightness ==
+                Brightness.dark
             ? const Color(0xFF0D1D2B)
-            : Colors.white,
+            : colors.surface,
         borderRadius:
-            BorderRadius.circular(17),
+            BorderRadius.circular(16),
         border: Border.all(
           color: colors.outlineVariant
               .withValues(alpha: .45),
@@ -418,7 +417,8 @@ class _RaNotificationFeature
           Container(
             width: 39,
             height: 39,
-            decoration: BoxDecoration(
+            decoration:
+                BoxDecoration(
               color: colors.primary
                   .withValues(alpha: .08),
               borderRadius:
@@ -430,9 +430,7 @@ class _RaNotificationFeature
               color: colors.primary,
             ),
           ),
-
-          const SizedBox(width: 11),
-
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -442,20 +440,18 @@ class _RaNotificationFeature
                   title,
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 10.8,
+                    fontSize: 9.8,
                     fontWeight:
                         FontWeight.w700,
-                    color:
-                        colors.onSurface,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   subtitle,
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 8.8,
-                    height: 1.35,
+                    fontSize: 7.8,
+                    height: 1.4,
                     color: colors
                         .onSurfaceVariant,
                   ),
@@ -476,7 +472,7 @@ class _RaNotificationActionCard
     required this.title,
     required this.subtitle,
     required this.tone,
-    required this.buttonLabel,
+    required this.label,
     required this.filled,
     required this.enabled,
     required this.onTap,
@@ -486,7 +482,7 @@ class _RaNotificationActionCard
   final String title;
   final String subtitle;
   final Color tone;
-  final String buttonLabel;
+  final String label;
 
   final bool filled;
   final bool enabled;
@@ -499,28 +495,32 @@ class _RaNotificationActionCard
         Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding:
+          const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color:
             tone.withValues(alpha: .055),
         borderRadius:
-            BorderRadius.circular(19),
+            BorderRadius.circular(18),
         border: Border.all(
           color:
-              tone.withValues(alpha: .14),
+              tone.withValues(alpha: .15),
         ),
       ),
       child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
+                width: 41,
+                height: 41,
                 decoration:
                     BoxDecoration(
-                  color: tone
-                      .withValues(alpha: .10),
+                  color: tone.withValues(
+                    alpha: .10,
+                  ),
                   borderRadius:
                       BorderRadius.circular(
                     13,
@@ -532,9 +532,7 @@ class _RaNotificationActionCard
                   size: 20,
                 ),
               ),
-
-              const SizedBox(width: 11),
-
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -544,20 +542,18 @@ class _RaNotificationActionCard
                       title,
                       style: GoogleFonts
                           .plusJakartaSans(
-                        fontSize: 11.5,
+                        fontSize: 10,
                         fontWeight:
                             FontWeight.w700,
-                        color:
-                            colors.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       subtitle,
                       style: GoogleFonts
                           .plusJakartaSans(
-                        fontSize: 9,
-                        height: 1.35,
+                        fontSize: 7.8,
+                        height: 1.4,
                         color: colors
                             .onSurfaceVariant,
                       ),
@@ -567,27 +563,21 @@ class _RaNotificationActionCard
               ),
             ],
           ),
-
-          const SizedBox(height: 13),
-
-          SizedBox(
-            width: double.infinity,
-            child: filled
-                ? FilledButton.icon(
-                    onPressed:
-                        enabled ? onTap : null,
-                    icon: Icon(icon),
-                    label:
-                        Text(buttonLabel),
-                  )
-                : OutlinedButton.icon(
-                    onPressed:
-                        enabled ? onTap : null,
-                    icon: Icon(icon),
-                    label:
-                        Text(buttonLabel),
-                  ),
-          ),
+          const SizedBox(height: 12),
+          if (filled)
+            FilledButton.icon(
+              onPressed:
+                  enabled ? onTap : null,
+              icon: Icon(icon),
+              label: Text(label),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed:
+                  enabled ? onTap : null,
+              icon: Icon(icon),
+              label: Text(label),
+            ),
         ],
       ),
     );
@@ -618,15 +608,16 @@ class _RaNotificationResult
         : colors.error;
 
     return Container(
-      padding: const EdgeInsets.all(13),
+      padding:
+          const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color:
             tone.withValues(alpha: .07),
         borderRadius:
-            BorderRadius.circular(16),
+            BorderRadius.circular(15),
         border: Border.all(
           color:
-              tone.withValues(alpha: .16),
+              tone.withValues(alpha: .17),
         ),
       ),
       child: Row(
@@ -640,18 +631,18 @@ class _RaNotificationResult
                 : Icons
                     .error_outline_rounded,
             color: tone,
-            size: 19,
+            size: 18,
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 10,
+              style: GoogleFonts
+                  .plusJakartaSans(
+                fontSize: 8.3,
                 height: 1.4,
-                color:
-                    colors.onSurfaceVariant,
+                color: colors
+                    .onSurfaceVariant,
               ),
             ),
           ),

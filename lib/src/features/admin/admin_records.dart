@@ -1,68 +1,96 @@
 part of '../../screens.dart';
 
 class _AdminRecords extends StatefulWidget {
-  const _AdminRecords({super.key, required this.kind});
+  const _AdminRecords({
+    super.key,
+    required this.kind,
+  });
 
   final String kind;
 
   @override
-  State<_AdminRecords> createState() => _AdminRecordsState();
+  State<_AdminRecords> createState() =>
+      _AdminRecordsState();
 }
 
-class _AdminRecordsState extends State<_AdminRecords> {
+class _AdminRecordsState
+    extends State<_AdminRecords> {
   int limit = 50;
 
   String search = '';
 
   bool onlyAttention = false;
 
-  late Stream<QuerySnapshot<Map<String, dynamic>>> records;
+  late Stream<
+      QuerySnapshot<Map<String, dynamic>>> records;
 
   @override
   void initState() {
     super.initState();
+
     connect();
   }
 
   @override
-  void didUpdateWidget(covariant _AdminRecords old) {
-    super.didUpdateWidget(old);
+  void didUpdateWidget(
+    covariant _AdminRecords oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
 
-    if (old.kind != widget.kind) {
+    if (oldWidget.kind != widget.kind) {
       limit = 50;
       search = '';
       onlyAttention = false;
+
       connect();
     }
   }
 
   void connect() {
-    final db = FirebaseFirestore.instance;
+    final db =
+        FirebaseFirestore.instance;
 
-    Query<Map<String, dynamic>> query = switch (widget.kind) {
-      'providers' =>
-        db.collection('users').where('role', isEqualTo: 'provider'),
-
+    Query<Map<String, dynamic>> query =
+        switch (widget.kind) {
+      'providers' => db
+          .collection('users')
+          .where(
+            'role',
+            isEqualTo: 'provider',
+          ),
       'users' => db.collection('users'),
-
-      'complaints' => db.collectionGroup('disputes'),
-
-      'jobs' =>
-        db.collection('requests').orderBy('createdAt', descending: true),
-
-      _ => db.collection('adminAudit').orderBy('createdAt', descending: true),
+      'complaints' =>
+        db.collectionGroup('disputes'),
+      'jobs' => db
+          .collection('requests')
+          .orderBy(
+            'createdAt',
+            descending: true,
+          ),
+      _ => db
+          .collection('adminAudit')
+          .orderBy(
+            'createdAt',
+            descending: true,
+          ),
     };
 
-    records = query.limit(limit).snapshots();
+    records =
+        query.limit(limit).snapshots();
   }
 
   String get sectionTitle {
     return switch (widget.kind) {
-      'providers' => 'Provider accounts',
-      'users' => 'RoadAssist users',
-      'complaints' => 'Service complaints',
-      'jobs' => 'Assistance jobs',
-      _ => 'Administrative audit',
+      'providers' =>
+        'Provider accounts',
+      'users' =>
+        'RoadAssist users',
+      'complaints' =>
+        'Service complaints',
+      'jobs' =>
+        'Assistance jobs',
+      _ =>
+        'Administrative audit',
     };
   }
 
@@ -70,39 +98,67 @@ class _AdminRecordsState extends State<_AdminRecords> {
     return switch (widget.kind) {
       'providers' =>
         'Review provider accounts, verification status and service access.',
-      'users' => 'Search and review registered RoadAssist accounts.',
+      'users' =>
+        'Search and review registered RoadAssist accounts.',
       'complaints' =>
         'Review driver reports, provider responses and unresolved cases.',
       'jobs' =>
         'Monitor roadside assistance requests and active service progress.',
-      _ => 'Trace administrative actions, actors and recorded reasons.',
+      _ =>
+        'Trace administrative actions, actors and recorded reasons.',
     };
   }
 
   IconData get sectionIcon {
     return switch (widget.kind) {
-      'providers' => Icons.handyman_outlined,
-      'users' => Icons.people_outline_rounded,
-      'complaints' => Icons.support_agent_outlined,
-      'jobs' => Icons.route_outlined,
-      _ => Icons.history_rounded,
+      'providers' =>
+        Icons.handyman_outlined,
+      'users' =>
+        Icons.people_outline_rounded,
+      'complaints' =>
+        Icons.support_agent_outlined,
+      'jobs' =>
+        Icons.route_outlined,
+      _ =>
+        Icons.history_rounded,
+    };
+  }
+
+  String get searchHint {
+    return switch (widget.kind) {
+      'providers' =>
+        'Name, email, role or status',
+      'users' =>
+        'Name, email or role',
+      'complaints' =>
+        'Reason, description or status',
+      'jobs' =>
+        'Driver, provider, issue or status',
+      _ =>
+        'Actor, action, target or reason',
     };
   }
 
   String get attentionTitle {
     return switch (widget.kind) {
-      'jobs' => 'Only active jobs',
-      'providers' => 'Only pending verification',
-      'complaints' => 'Only unresolved driver reports',
+      'jobs' =>
+        'Only active jobs',
+      'providers' =>
+        'Only pending verification',
+      'complaints' =>
+        'Only unresolved reports',
       _ => '',
     };
   }
 
   String get attentionDescription {
     return switch (widget.kind) {
-      'jobs' => 'Show accepted, en route and arrived jobs only.',
-      'providers' => 'Focus on providers requiring verification review.',
-      'complaints' => 'Hide reports already marked as resolved.',
+      'jobs' =>
+        'Show accepted, en route and arrived jobs only.',
+      'providers' =>
+        'Focus on providers requiring verification review.',
+      'complaints' =>
+        'Hide reports already marked as resolved.',
       _ => '',
     };
   }
@@ -113,8 +169,12 @@ class _AdminRecordsState extends State<_AdminRecords> {
         widget.kind == 'providers';
   }
 
-  String searchableText(QueryDocumentSnapshot<Map<String, dynamic>> document) {
-    final data = document.data();
+  String searchableText(
+    QueryDocumentSnapshot<Map<String, dynamic>>
+        document,
+  ) {
+    final data =
+        document.data();
 
     return [
       document.id,
@@ -126,118 +186,204 @@ class _AdminRecordsState extends State<_AdminRecords> {
       data['reason'],
       data['description'],
       data['issue'],
+      ...(data['issues'] as List<dynamic>? ??
+          const []),
       data['target'],
       data['actor'],
       data['status'],
     ].join(' ').toLowerCase();
   }
 
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> filteredDocuments(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> source,
+  List<
+          QueryDocumentSnapshot<
+              Map<String, dynamic>>>
+      filteredDocuments(
+    List<
+            QueryDocumentSnapshot<
+                Map<String, dynamic>>>
+        source,
   ) {
-    return source.where((document) {
-      final data = document.data();
+    return source.where(
+      (document) {
+        final data =
+            document.data();
 
-      if (onlyAttention &&
-          widget.kind == 'jobs' &&
-          !const ['accepted', 'en_route', 'arrived'].contains(data['status'])) {
-        return false;
-      }
+        if (onlyAttention &&
+            widget.kind == 'jobs' &&
+            !const [
+              'accepted',
+              'en_route',
+              'arrived',
+            ].contains(data['status'])) {
+          return false;
+        }
 
-      if (onlyAttention &&
-          widget.kind == 'complaints' &&
-          data['status'] == 'resolved') {
-        return false;
-      }
+        if (onlyAttention &&
+            widget.kind ==
+                'complaints' &&
+            data['status'] ==
+                'resolved') {
+          return false;
+        }
 
-      return searchableText(document).contains(search);
-    }).toList();
+        return searchableText(document)
+            .contains(search);
+      },
+    ).toList();
   }
 
   void openRecord(
     BuildContext context,
-    QueryDocumentSnapshot<Map<String, dynamic>> document,
+    QueryDocumentSnapshot<Map<String, dynamic>>
+        document,
   ) {
-    if (widget.kind == 'users' || widget.kind == 'providers') {
-      push(context, _AdminAccountScreen(uid: document.id));
+    if (widget.kind == 'users' ||
+        widget.kind == 'providers') {
+      push(
+        context,
+        _AdminAccountScreen(
+          uid: document.id,
+        ),
+      );
 
       return;
     }
 
-    if (widget.kind == 'complaints') {
-      final requestReference = document.reference.parent.parent;
+    if (widget.kind ==
+        'complaints') {
+      final requestReference =
+          document.reference.parent.parent;
 
       if (requestReference == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
           const SnackBar(
-            content: Text('Unable to identify the related assistance request.'),
+            content: Text(
+              'Unable to identify the related assistance request.',
+            ),
           ),
         );
 
         return;
       }
 
-      push(context, _AdminComplaintScreen(requestId: requestReference.id));
+      push(
+        context,
+        _AdminComplaintScreen(
+          requestId:
+              requestReference.id,
+        ),
+      );
 
       return;
     }
 
     if (widget.kind == 'jobs') {
-      push(context, AdminJobMonitorScreen(requestId: document.id));
+      push(
+        context,
+        AdminJobMonitorScreen(
+          requestId: document.id,
+        ),
+      );
 
       return;
     }
 
-    push(context, _AdminAuditScreen(data: document.data()));
+    push(
+      context,
+      _AdminAuditScreen(
+        data: document.data(),
+      ),
+    );
   }
 
-  String recordTitle(QueryDocumentSnapshot<Map<String, dynamic>> document) {
-    final data = document.data();
+  String recordTitle(
+    QueryDocumentSnapshot<Map<String, dynamic>>
+        document,
+  ) {
+    final data =
+        document.data();
 
-    if (widget.kind == 'complaints') {
-      return data['driverName'] as String? ??
+    if (widget.kind ==
+        'complaints') {
+      return data['driverName']
+              as String? ??
           data['reason'] as String? ??
           'Driver report';
     }
 
     if (widget.kind == 'jobs') {
-      return data['driverName'] as String? ?? 'Assistance request';
+      return data['driverName']
+              as String? ??
+          'Assistance request';
     }
 
     if (widget.kind == 'audit') {
-      return data['kind']?.toString() ?? 'Administrative action';
+      return data['kind']
+              ?.toString() ??
+          'Administrative action';
     }
 
-    return data['displayName'] as String? ?? document.id;
+    return data['displayName']
+            as String? ??
+        document.id;
   }
 
-  String recordSubtitle(QueryDocumentSnapshot<Map<String, dynamic>> document) {
-    final data = document.data();
+  String recordSubtitle(
+    QueryDocumentSnapshot<Map<String, dynamic>>
+        document,
+  ) {
+    final data =
+        document.data();
 
-    if (widget.kind == 'complaints') {
-      final reason =
-          data['reason']?.toString().replaceAll('_', ' ') ?? 'Service problem';
+    if (widget.kind ==
+        'complaints') {
+      final reason = data['reason']
+              ?.toString()
+              .replaceAll('_', ' ') ??
+          'Service problem';
 
-      final description = data['description'] as String? ?? '';
+      final description =
+          data['description']
+                  as String? ??
+              '';
 
-      return description.trim().isEmpty ? reason : '$reason\n$description';
+      return description
+              .trim()
+              .isEmpty
+          ? reason
+          : '$reason\n$description';
     }
 
     if (widget.kind == 'jobs') {
-      final provider = data['providerName'] as String? ?? 'Unassigned provider';
+      final provider =
+          data['providerName']
+                  as String? ??
+              'Unassigned provider';
 
-      final issue = requestIssueLabel(data);
+      final issue =
+          requestIssueLabel(data);
 
       final location =
-          data['locationLabel'] as String? ?? 'Location not recorded';
+          data['locationLabel']
+                  as String? ??
+              data['location']
+                  as String? ??
+              'Location not recorded';
 
       return '$provider • $issue\n$location';
     }
 
     if (widget.kind == 'audit') {
-      final actor = data['actor']?.toString() ?? 'Unknown actor';
+      final actor =
+          data['actor']
+                  ?.toString() ??
+              'Unknown actor';
 
-      final reason = data['reason']?.toString() ?? 'No reason recorded';
+      final reason =
+          data['reason']
+                  ?.toString() ??
+              'No reason recorded';
 
       return '$actor\n$reason';
     }
@@ -247,18 +393,27 @@ class _AdminRecordsState extends State<_AdminRecords> {
 
   IconData recordIcon() {
     return switch (widget.kind) {
-      'jobs' => Icons.route_outlined,
-      'complaints' => Icons.support_agent_outlined,
-      _ => Icons.history_rounded,
+      'jobs' =>
+        Icons.route_outlined,
+      'complaints' =>
+        Icons.support_agent_outlined,
+      _ =>
+        Icons.history_rounded,
     };
   }
 
-  Color recordTone(BuildContext context, Map<String, dynamic> data) {
-    final colors = Theme.of(context).colorScheme;
+  Color recordTone(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) {
+    final colors =
+        Theme.of(context).colorScheme;
 
-    final status = data['status']?.toString() ?? '';
+    final status =
+        data['status']?.toString() ?? '';
 
-    if (widget.kind == 'complaints') {
+    if (widget.kind ==
+        'complaints') {
       return switch (status) {
         'resolved' => raSuccess,
         'under_review' => raGold,
@@ -269,8 +424,12 @@ class _AdminRecordsState extends State<_AdminRecords> {
     if (widget.kind == 'jobs') {
       return switch (status) {
         'completed' => raSuccess,
-        'cancelled' || 'rejected' => colors.error,
-        'en_route' || 'arrived' => colors.primary,
+        'cancelled' ||
+        'rejected' =>
+          colors.error,
+        'en_route' ||
+        'arrived' =>
+          colors.primary,
         _ => raGold,
       };
     }
@@ -278,15 +437,20 @@ class _AdminRecordsState extends State<_AdminRecords> {
     return colors.primary;
   }
 
-  String? formattedTime(Map<String, dynamic> data) {
+  String? formattedTime(
+    Map<String, dynamic> data,
+  ) {
     final timestamp =
-        (data['updatedAt'] as Timestamp?) ?? (data['createdAt'] as Timestamp?);
+        data['updatedAt'] as Timestamp? ??
+            data['createdAt']
+                as Timestamp?;
 
     if (timestamp == null) {
       return null;
     }
 
-    final value = timestamp.toDate().toLocal();
+    final value =
+        timestamp.toDate().toLocal();
 
     return '${value.day.toString().padLeft(2, '0')}/'
         '${value.month.toString().padLeft(2, '0')}/'
@@ -297,127 +461,129 @@ class _AdminRecordsState extends State<_AdminRecords> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
-    final colors = theme.colorScheme;
+    final colors =
+        theme.colorScheme;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            RaSpace.xl,
-            RaSpace.xl,
-            RaSpace.xl,
-            RaSpace.md,
+          padding:
+              const EdgeInsets.fromLTRB(
+            18,
+            18,
+            18,
+            13,
           ),
           child: Column(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Icon(sectionIcon, color: colors.onPrimaryContainer),
-                  ),
-
-                  const SizedBox(width: RaSpace.md),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          sectionTitle,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          sectionDescription,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              _AdminRecordsHeader(
+                icon: sectionIcon,
+                title: sectionTitle,
+                description:
+                    sectionDescription,
               ),
 
-              const SizedBox(height: RaSpace.lg),
+              const SizedBox(height: 15),
 
               TextField(
-                key: ValueKey(widget.kind),
+                key:
+                    ValueKey(widget.kind),
                 decoration: InputDecoration(
-                  labelText: 'Search loaded records',
-                  hintText: switch (widget.kind) {
-                    'providers' => 'Name, email, role or status',
-                    'users' => 'Name, email or role',
-                    'complaints' => 'Reason, description or status',
-                    'jobs' => 'Driver, provider, issue or status',
-                    _ => 'Actor, action, target or reason',
-                  },
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  labelText:
+                      'Search loaded records',
+                  hintText: searchHint,
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                  ),
                   suffixIcon: search.isEmpty
                       ? null
                       : IconButton(
-                          tooltip: 'Clear search',
+                          tooltip:
+                              'Clear search',
                           onPressed: () {
                             setState(() {
                               search = '';
                             });
                           },
-                          icon: const Icon(Icons.close_rounded),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                          ),
                         ),
                 ),
                 onChanged: (value) {
                   setState(() {
-                    search = value.toLowerCase().trim();
+                    search = value
+                        .toLowerCase()
+                        .trim();
                   });
                 },
               ),
 
               if (hasAttentionFilter) ...[
-                const SizedBox(height: RaSpace.md),
+                const SizedBox(height: 11),
 
                 Container(
                   decoration: BoxDecoration(
                     color: onlyAttention
-                        ? colors.primaryContainer.withValues(alpha: .25)
-                        : colors.surfaceContainerHighest.withValues(alpha: .32),
-                    borderRadius: BorderRadius.circular(16),
+                        ? colors.primary.withValues(
+                            alpha: .065,
+                          )
+                        : colors.surfaceContainerHighest
+                            .withValues(
+                            alpha: .25,
+                          ),
+                    borderRadius:
+                        BorderRadius.circular(16),
                     border: Border.all(
                       color: onlyAttention
-                          ? colors.primary.withValues(alpha: .24)
-                          : colors.outlineVariant.withValues(alpha: .5),
+                          ? colors.primary
+                              .withValues(
+                              alpha: .18,
+                            )
+                          : colors.outlineVariant
+                              .withValues(
+                              alpha: .40,
+                            ),
                     ),
                   ),
                   child: SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: RaSpace.md,
-                      vertical: 2,
+                    contentPadding:
+                        const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 1,
                     ),
                     secondary: Icon(
                       onlyAttention
-                          ? Icons.filter_alt_rounded
-                          : Icons.filter_alt_outlined,
+                          ? Icons
+                              .filter_alt_rounded
+                          : Icons
+                              .filter_alt_outlined,
                       color: onlyAttention
                           ? colors.primary
-                          : colors.onSurfaceVariant,
+                          : colors
+                              .onSurfaceVariant,
                     ),
                     title: Text(
                       attentionTitle,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 9.7,
+                        fontWeight:
+                            FontWeight.w700,
                       ),
                     ),
-                    subtitle: Text(attentionDescription),
+                    subtitle: Text(
+                      attentionDescription,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 7.8,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
                     value: onlyAttention,
                     onChanged: (value) {
                       setState(() {
@@ -431,18 +597,30 @@ class _AdminRecordsState extends State<_AdminRecords> {
           ),
         ),
 
-        Divider(height: 1, color: colors.outlineVariant.withValues(alpha: .5)),
+        Divider(
+          height: 1,
+          color: colors.outlineVariant
+              .withValues(alpha: .45),
+        ),
 
         Expanded(
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          child: StreamBuilder<
+              QuerySnapshot<
+                  Map<String, dynamic>>>(
             stream: records,
-            builder: (context, snapshot) {
+            builder: (
+              context,
+              snapshot,
+            ) {
               if (snapshot.hasError) {
                 return const Padding(
-                  padding: EdgeInsets.all(RaSpace.xl),
+                  padding:
+                      EdgeInsets.all(20),
                   child: EmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Unable to load records',
+                    icon:
+                        Icons.cloud_off_outlined,
+                    title:
+                        'Unable to load records',
                     message:
                         'Verify admin access, check your connection and try again.',
                   ),
@@ -450,88 +628,220 @@ class _AdminRecordsState extends State<_AdminRecords> {
               }
 
               if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(
+                  child:
+                      CircularProgressIndicator(),
+                );
               }
 
-              final loaded = snapshot.data!.docs;
+              final loaded =
+                  snapshot.data!.docs;
 
-              final docs = filteredDocuments(loaded);
+              final docs =
+                  filteredDocuments(loaded);
 
               return ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  RaSpace.xl,
-                  RaSpace.lg,
-                  RaSpace.xl,
-                  RaSpace.xxl,
+                physics:
+                    const BouncingScrollPhysics(),
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  18,
+                  15,
+                  18,
+                  28,
                 ),
                 children: [
                   _AdminRecordsSummary(
-                    loaded: loaded.length,
-                    matches: docs.length,
-                    filtered: onlyAttention || search.isNotEmpty,
+                    loaded:
+                        loaded.length,
+                    matches:
+                        docs.length,
+                    filtered:
+                        onlyAttention ||
+                            search.isNotEmpty,
                   ),
 
-                  const SizedBox(height: RaSpace.lg),
+                  const SizedBox(height: 14),
 
                   if (docs.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 40),
+                      padding:
+                          EdgeInsets.symmetric(
+                        vertical: 32,
+                      ),
                       child: EmptyState(
-                        icon: Icons.search_off_rounded,
-                        title: 'No matching records',
+                        icon:
+                            Icons.search_off_rounded,
+                        title:
+                            'No matching records',
                         message:
                             'Try another search term or change the current filter.',
                       ),
                     )
-                  else if (widget.kind == 'providers' || widget.kind == 'users')
-                    for (var index = 0; index < docs.length; index++) ...[
+                  else if (widget.kind ==
+                          'providers' ||
+                      widget.kind ==
+                          'users')
+                    for (var index = 0;
+                        index < docs.length;
+                        index++) ...[
                       _AdminUserRow(
-                        key: ValueKey(docs[index].id),
-                        uid: docs[index].id,
-                        data: docs[index].data(),
+                        key: ValueKey(
+                          docs[index].id,
+                        ),
+                        uid:
+                            docs[index].id,
+                        data:
+                            docs[index].data(),
                         pendingOnly:
-                            widget.kind == 'providers' && onlyAttention,
+                            widget.kind ==
+                                    'providers' &&
+                                onlyAttention,
                       ),
-
-                      if (index != docs.length - 1)
-                        const SizedBox(height: RaSpace.sm),
+                      if (index !=
+                          docs.length - 1)
+                        const SizedBox(
+                          height: 8,
+                        ),
                     ]
                   else
-                    for (var index = 0; index < docs.length; index++) ...[
+                    for (var index = 0;
+                        index < docs.length;
+                        index++) ...[
                       _AdminRecordCard(
-                        document: docs[index],
-                        kind: widget.kind,
-                        title: recordTitle(docs[index]),
-                        subtitle: recordSubtitle(docs[index]),
-                        icon: recordIcon(),
-                        tone: recordTone(context, docs[index].data()),
-                        time: formattedTime(docs[index].data()),
-                        onTap: () => openRecord(context, docs[index]),
+                        document:
+                            docs[index],
+                        kind:
+                            widget.kind,
+                        title:
+                            recordTitle(
+                          docs[index],
+                        ),
+                        subtitle:
+                            recordSubtitle(
+                          docs[index],
+                        ),
+                        icon:
+                            recordIcon(),
+                        tone:
+                            recordTone(
+                          context,
+                          docs[index]
+                              .data(),
+                        ),
+                        time:
+                            formattedTime(
+                          docs[index]
+                              .data(),
+                        ),
+                        onTap: () {
+                          openRecord(
+                            context,
+                            docs[index],
+                          );
+                        },
                       ),
-
-                      if (index != docs.length - 1)
-                        const SizedBox(height: RaSpace.sm),
+                      if (index !=
+                          docs.length - 1)
+                        const SizedBox(
+                          height: 8,
+                        ),
                     ],
 
-                  if (loaded.length == limit) ...[
-                    const SizedBox(height: RaSpace.xl),
+                  if (loaded.length ==
+                      limit) ...[
+                    const SizedBox(height: 17),
 
-                    Center(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            limit += 50;
-                            connect();
-                          });
-                        },
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Load 50 More Records'),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          limit += 50;
+                          connect();
+                        });
+                      },
+                      icon: const Icon(
+                        Icons
+                            .expand_more_rounded,
+                      ),
+                      label: Text(
+                        'Load 50 More · currently $limit',
                       ),
                     ),
                   ],
                 ],
               );
             },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminRecordsHeader extends StatelessWidget {
+  const _AdminRecordsHeader({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color:
+                colors.primary.withValues(
+              alpha: .075,
+            ),
+            borderRadius:
+                BorderRadius.circular(14),
+          ),
+          child: Icon(
+            icon,
+            color: colors.primary,
+            size: 21,
+          ),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  fontSize: 15.5,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  fontSize: 8.3,
+                  height: 1.4,
+                  color: colors
+                      .onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -552,39 +862,46 @@ class _AdminRecordsSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
+    final colors =
+        Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: RaSpace.md, vertical: 11),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .35),
-        borderRadius: BorderRadius.circular(14),
+        color: colors.surfaceContainerHighest
+            .withValues(alpha: .28),
+        borderRadius:
+            BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          Icon(Icons.storage_outlined, size: 18, color: colors.primary),
-
-          const SizedBox(width: RaSpace.sm),
-
+          Icon(
+            Icons.storage_outlined,
+            size: 17,
+            color: colors.primary,
+          ),
+          const SizedBox(width: 7),
           Expanded(
             child: Text(
               filtered
-                  ? '$loaded loaded • $matches matching current search/filter'
+                  ? '$loaded loaded • $matches match current search/filter'
                   : '$loaded records loaded',
-              style: theme.textTheme.bodySmall?.copyWith(
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 8.2,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-
           Tooltip(
             message:
-                'Search and filters apply only to the records currently loaded.',
+                'Search and filters apply only to currently loaded records.',
             child: Icon(
               Icons.info_outline_rounded,
-              size: 17,
+              size: 16,
               color: colors.onSurfaceVariant,
             ),
           ),
@@ -606,7 +923,8 @@ class _AdminRecordCard extends StatelessWidget {
     this.time,
   });
 
-  final QueryDocumentSnapshot<Map<String, dynamic>> document;
+  final QueryDocumentSnapshot<
+      Map<String, dynamic>> document;
 
   final String kind;
   final String title;
@@ -618,135 +936,179 @@ class _AdminRecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
-    final colors = theme.colorScheme;
+    final colors =
+        theme.colorScheme;
 
-    final data = document.data();
+    final data =
+        document.data();
 
     final status =
         data['status']?.toString() ??
-        (kind == 'audit' ? data['state']?.toString() ?? '' : 'open');
+            (kind == 'audit'
+                ? data['state']
+                        ?.toString() ??
+                    ''
+                : 'open');
 
     return Material(
-      color: colors.surface,
-      borderRadius: BorderRadius.circular(19),
-      clipBehavior: Clip.antiAlias,
+      color: theme.brightness ==
+              Brightness.dark
+          ? const Color(0xFF0D1D2B)
+          : colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.circular(18),
+        side: BorderSide(
+          color: colors.outlineVariant
+              .withValues(alpha: .45),
+        ),
+      ),
+      clipBehavior:
+          Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(RaSpace.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(
-              color: colors.outlineVariant.withValues(alpha: .6),
-            ),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.all(13),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 43,
+                height: 43,
                 decoration: BoxDecoration(
-                  color: tone.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(15),
+                  color:
+                      tone.withValues(alpha: .08),
+                  borderRadius:
+                      BorderRadius.circular(13),
                 ),
-                child: Icon(icon, color: tone),
+                child: Icon(
+                  icon,
+                  color: tone,
+                  size: 20,
+                ),
               ),
-
-              const SizedBox(width: RaSpace.md),
-
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             title,
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
+                            overflow:
+                                TextOverflow.ellipsis,
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 10,
+                              fontWeight:
+                                  FontWeight.w800,
                             ),
                           ),
                         ),
-
                         if (time != null) ...[
-                          const SizedBox(width: RaSpace.sm),
-
+                          const SizedBox(width: 8),
                           Text(
                             time!,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colors.onSurfaceVariant,
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 6.9,
+                              color: colors
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ],
                       ],
                     ),
-
-                    if (subtitle.trim().isNotEmpty) ...[
-                      const SizedBox(height: 5),
-
+                    if (subtitle
+                        .trim()
+                        .isNotEmpty) ...[
+                      const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        maxLines: kind == 'complaints' ? 3 : 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
+                        maxLines:
+                            kind == 'complaints'
+                                ? 3
+                                : 2,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 8,
                           height: 1.4,
+                          color: colors
+                              .onSurfaceVariant,
                         ),
                       ),
                     ],
-
-                    const SizedBox(height: RaSpace.md),
-
+                    const SizedBox(height: 9),
                     Row(
                       children: [
-                        if (kind != 'audit' && status.isNotEmpty)
-                          _AdminStatusBadge(status: status),
-
-                        if (kind == 'audit' && status.isNotEmpty)
+                        if (kind != 'audit' &&
+                            status.isNotEmpty)
+                          _AdminStatusBadge(
+                            status: status,
+                          ),
+                        if (kind == 'audit' &&
+                            status.isNotEmpty)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
+                            padding:
+                                const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 4,
                             ),
-                            decoration: BoxDecoration(
-                              color: tone.withValues(alpha: .08),
-                              borderRadius: BorderRadius.circular(999),
+                            decoration:
+                                BoxDecoration(
+                              color: tone.withValues(
+                                alpha: .07,
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(
+                                999,
+                              ),
                             ),
                             child: Text(
-                              status.replaceAll('_', ' ').toUpperCase(),
-                              style: theme.textTheme.labelSmall?.copyWith(
+                              status
+                                  .replaceAll('_', ' ')
+                                  .toUpperCase(),
+                              style: GoogleFonts
+                                  .plusJakartaSans(
+                                fontSize: 6.5,
+                                fontWeight:
+                                    FontWeight.w800,
                                 color: tone,
-                                fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
-
                         const Spacer(),
-
                         Text(
                           kind == 'jobs'
                               ? 'Monitor'
                               : kind == 'complaints'
-                              ? 'Review case'
-                              : 'View details',
-                          style: theme.textTheme.labelMedium?.copyWith(
+                                  ? 'Review'
+                                  : 'Details',
+                          style: GoogleFonts
+                              .plusJakartaSans(
+                            fontSize: 7.5,
+                            fontWeight:
+                                FontWeight.w700,
                             color: colors.primary,
-                            fontWeight: FontWeight.w800,
                           ),
                         ),
-
-                        const SizedBox(width: 3),
-
+                        const SizedBox(width: 2),
                         Icon(
-                          Icons.chevron_right_rounded,
-                          size: 20,
+                          Icons
+                              .chevron_right_rounded,
+                          size: 18,
                           color: colors.primary,
                         ),
                       ],

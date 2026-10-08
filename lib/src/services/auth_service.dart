@@ -298,6 +298,9 @@ class AuthService {
         message: 'This account is not registered as a $role.',
       );
     }
+    if (role == 'provider') {
+      await updateCurrentProfile({'online': false});
+    }
     _startBackgroundSetup(role);
     return credential;
   }

@@ -30,7 +30,9 @@ class _DriverShellState extends State<DriverShell> {
   }
 
   void _selectTab(int value) {
-    if (value == index) return;
+    if (value == index) {
+      return;
+    }
 
     setState(() {
       index = value;
@@ -40,7 +42,9 @@ class _DriverShellState extends State<DriverShell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
+
+    final dark =
+        theme.brightness == Brightness.dark;
 
     final pages = <Widget>[
       const DriverHomeScreen(),
@@ -53,7 +57,10 @@ class _DriverShellState extends State<DriverShell> {
 
     return PopScope(
       canPop: index == 0,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvokedWithResult: (
+        didPop,
+        result,
+      ) {
         if (!didPop && index != 0) {
           setState(() {
             index = 0;
@@ -68,7 +75,8 @@ class _DriverShellState extends State<DriverShell> {
           index: index,
           children: pages,
         ),
-        bottomNavigationBar: _DriverBottomNavigation(
+        bottomNavigationBar:
+            _DriverBottomNavigation(
           selectedIndex: index,
           chatInbox: chatInbox,
           onSelected: _selectTab,
@@ -79,10 +87,11 @@ class _DriverShellState extends State<DriverShell> {
 }
 
 // ============================================================
-// PREMIUM DRIVER NAVIGATION
+// DRIVER BOTTOM NAVIGATION
 // ============================================================
 
-class _DriverBottomNavigation extends StatelessWidget {
+class _DriverBottomNavigation
+    extends StatelessWidget {
   const _DriverBottomNavigation({
     required this.selectedIndex,
     required this.chatInbox,
@@ -90,266 +99,200 @@ class _DriverBottomNavigation extends StatelessWidget {
   });
 
   final int selectedIndex;
-  final ChatInboxController? chatInbox;
-  final ValueChanged<int> onSelected;
+
+  final ChatInboxController?
+      chatInbox;
+
+  final ValueChanged<int>
+      onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     final dark =
-        theme.brightness == Brightness.dark;
+        theme.brightness ==
+            Brightness.dark;
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        color: dark
-            ? const Color(0xFF07131E)
-            : const Color(0xFFF4F8FC),
-        padding: const EdgeInsets.fromLTRB(
-          12,
-          8,
-          12,
-          10,
-        ),
-        child: Container(
-          constraints: const BoxConstraints(
-            minHeight: 68,
+    return Material(
+      color: dark
+          ? const Color(0xFF07131E)
+          : const Color(0xFFF4F8FC),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding:
+              const EdgeInsets.fromLTRB(
+            12,
+            7,
+            12,
+            9,
           ),
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: dark
-                ? const Color(0xFF0D1D2B)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(
-              24,
-            ),
-            border: Border.all(
-              color: dark
-                  ? Colors.white.withValues(
-                      alpha: .075,
-                    )
-                  : const Color(
-                      0xFFDCE8F2,
-                    ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: dark ? .28 : .08,
-                ),
-                blurRadius: 28,
-                offset: const Offset(
-                  0,
-                  8,
-                ),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _DriverNavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon:
-                      Icons.home_rounded,
-                  label: 'Home',
-                  selected:
-                      selectedIndex == 0,
-                  onTap: () {
-                    onSelected(0);
-                  },
-                ),
-              ),
-
-              Expanded(
-                child: _DriverNavItem(
-                  icon:
-                      Icons.receipt_long_outlined,
-                  selectedIcon:
-                      Icons.receipt_long_rounded,
-                  label: 'Requests',
-                  selected:
-                      selectedIndex == 1,
-                  onTap: () {
-                    onSelected(1);
-                  },
-                ),
-              ),
-
-              Expanded(
-                child: _DriverMessagesNavItem(
-                  controller: chatInbox,
-                  selected:
-                      selectedIndex == 2,
-                  onTap: () {
-                    onSelected(2);
-                  },
-                ),
-              ),
-
-              Expanded(
-                child: _DriverNavItem(
-                  icon:
-                      Icons.person_outline_rounded,
-                  selectedIcon:
-                      Icons.person_rounded,
-                  label: 'Profile',
-                  selected:
-                      selectedIndex == 3,
-                  onTap: () {
-                    onSelected(3);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// STANDARD NAV ITEM
-// ============================================================
-
-class _DriverNavItem extends StatelessWidget {
-  const _DriverNavItem({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final IconData selectedIcon;
-
-  final String label;
-  final bool selected;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    final activeColor = dark
-        ? const Color(0xFF72BEFF)
-        : const Color(0xFF0963BA);
-
-    return Semantics(
-      selected: selected,
-      button: true,
-      label: label,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(
-          19,
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(
-            19,
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(
-              milliseconds: 200,
-            ),
-            curve: Curves.easeOutCubic,
-            constraints: const BoxConstraints(
-              minHeight: 56,
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 4,
-              vertical: 6,
-            ),
+          child: Container(
             decoration: BoxDecoration(
-              color: selected
-                  ? activeColor.withValues(
-                      alpha: dark ? .14 : .09,
+              color: dark
+                  ? const Color(
+                      0xFF0D1D2B,
                     )
-                  : Colors.transparent,
+                  : Colors.white,
               borderRadius:
                   BorderRadius.circular(
-                19,
+                22,
               ),
-            ),
-            child: Column(
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(
-                    milliseconds: 200,
+              border: Border.all(
+                color: dark
+                    ? Colors.white
+                        .withValues(
+                        alpha: .075,
+                      )
+                    : const Color(
+                        0xFFDCE8F2,
+                      ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withValues(
+                    alpha:
+                        dark ? .24 : .07,
                   ),
-                  curve: Curves.easeOutCubic,
-                  height: 28,
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? activeColor.withValues(
-                            alpha:
-                                dark ? .16 : .11,
-                          )
-                        : Colors.transparent,
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
-                    ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      selected
-                          ? selectedIcon
-                          : icon,
-                      size: 21,
-                      color: selected
-                          ? activeColor
-                          : colors
-                              .onSurfaceVariant
-                              .withValues(
-                            alpha: .74,
-                          ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    style:
-                        GoogleFonts.plusJakartaSans(
-                      fontSize: 9.8,
-                      height: 1.1,
-                      fontWeight: selected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: selected
-                          ? activeColor
-                          : colors
-                              .onSurfaceVariant
-                              .withValues(
-                            alpha: .78,
-                          ),
-                    ),
+                  blurRadius: 22,
+                  offset:
+                      const Offset(
+                    0,
+                    6,
                   ),
                 ),
               ],
             ),
+            clipBehavior: Clip.antiAlias,
+            child: SizedBox(
+              height: 68,
+              child: NavigationBarTheme(
+                data:
+                    NavigationBarThemeData(
+                  height: 68,
+                  backgroundColor:
+                      Colors.transparent,
+                  elevation: 0,
+                  indicatorColor: colors
+                      .primary
+                      .withValues(
+                    alpha:
+                        dark ? .18 : .10,
+                  ),
+                  labelTextStyle:
+                      WidgetStateProperty
+                          .resolveWith(
+                    (
+                      states,
+                    ) {
+                      final selected =
+                          states.contains(
+                        WidgetState
+                            .selected,
+                      );
+
+                      return TextStyle(
+                        fontSize: 11.5,
+                        height: 1.1,
+                        fontWeight:
+                            selected
+                                ? FontWeight
+                                    .w700
+                                : FontWeight
+                                    .w500,
+                        color: selected
+                            ? colors.primary
+                            : colors
+                                .onSurfaceVariant,
+                      );
+                    },
+                  ),
+                  iconTheme:
+                      WidgetStateProperty
+                          .resolveWith(
+                    (
+                      states,
+                    ) {
+                      final selected =
+                          states.contains(
+                        WidgetState
+                            .selected,
+                      );
+
+                      return IconThemeData(
+                        size: 22,
+                        color: selected
+                            ? colors.primary
+                            : colors
+                                .onSurfaceVariant,
+                      );
+                    },
+                  ),
+                ),
+                child: NavigationBar(
+                  selectedIndex:
+                      selectedIndex,
+                  onDestinationSelected:
+                      onSelected,
+                  destinations: [
+                    const NavigationDestination(
+                      icon: Icon(
+                        Icons
+                            .home_outlined,
+                      ),
+                      selectedIcon: Icon(
+                        Icons
+                            .home_rounded,
+                      ),
+                      label: 'Home',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(
+                        Icons
+                            .receipt_long_outlined,
+                      ),
+                      selectedIcon: Icon(
+                        Icons
+                            .receipt_long_rounded,
+                      ),
+                      label: 'Requests',
+                    ),
+                    NavigationDestination(
+                      icon:
+                          _DriverMessagesIcon(
+                        controller:
+                            chatInbox,
+                        selected: false,
+                      ),
+                      selectedIcon:
+                          _DriverMessagesIcon(
+                        controller:
+                            chatInbox,
+                        selected: true,
+                      ),
+                      label: 'Messages',
+                    ),
+                    const NavigationDestination(
+                      icon: Icon(
+                        Icons
+                            .person_outline_rounded,
+                      ),
+                      selectedIcon: Icon(
+                        Icons
+                            .person_rounded,
+                      ),
+                      label: 'Profile',
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -358,204 +301,84 @@ class _DriverNavItem extends StatelessWidget {
 }
 
 // ============================================================
-// MESSAGE TAB WITH LIVE UNREAD BADGE
+// MESSAGE ICON + LIVE UNREAD BADGE
 // ============================================================
 
-class _DriverMessagesNavItem
+class _DriverMessagesIcon
     extends StatelessWidget {
-  const _DriverMessagesNavItem({
+  const _DriverMessagesIcon({
     required this.controller,
     required this.selected,
-    required this.onTap,
   });
 
-  final ChatInboxController? controller;
-  final bool selected;
+  final ChatInboxController?
+      controller;
 
-  final VoidCallback onTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    final inbox = controller;
+    final inbox =
+        controller;
 
     if (inbox == null) {
-      return _DriverMessagesNavVisual(
+      return _DriverMessagesBadge(
         unread: 0,
         selected: selected,
-        onTap: onTap,
       );
     }
 
     return AnimatedBuilder(
       animation: inbox,
-      builder: (context, _) {
-        return _DriverMessagesNavVisual(
+      builder: (
+        context,
+        _,
+      ) {
+        return _DriverMessagesBadge(
           unread: inbox.unread,
           selected: selected,
-          onTap: onTap,
         );
       },
     );
   }
 }
 
-class _DriverMessagesNavVisual
+class _DriverMessagesBadge
     extends StatelessWidget {
-  const _DriverMessagesNavVisual({
+  const _DriverMessagesBadge({
     required this.unread,
     required this.selected,
-    required this.onTap,
   });
 
   final int unread;
   final bool selected;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    final activeColor = dark
-        ? const Color(0xFF72BEFF)
-        : const Color(0xFF0963BA);
-
-    return Semantics(
-      selected: selected,
-      button: true,
-      label: unread > 0
-          ? 'Messages, $unread unread'
-          : 'Messages',
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(
-          19,
+    return Badge(
+      isLabelVisible:
+          unread > 0,
+      backgroundColor:
+          const Color(
+        0xFFD8362A,
+      ),
+      textColor: Colors.white,
+      label: Text(
+        unread > 99
+            ? '99+'
+            : '$unread',
+        style: const TextStyle(
+          fontSize: 8,
+          fontWeight:
+              FontWeight.w700,
         ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(
-            19,
-          ),
-          child: AnimatedContainer(
-            duration: const Duration(
-              milliseconds: 200,
-            ),
-            curve: Curves.easeOutCubic,
-            constraints: const BoxConstraints(
-              minHeight: 56,
-            ),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 4,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: selected
-                  ? activeColor.withValues(
-                      alpha: dark ? .14 : .09,
-                    )
-                  : Colors.transparent,
-              borderRadius:
-                  BorderRadius.circular(
-                19,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment:
-                  MainAxisAlignment.center,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(
-                    milliseconds: 200,
-                  ),
-                  curve: Curves.easeOutCubic,
-                  height: 28,
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? activeColor.withValues(
-                            alpha:
-                                dark ? .16 : .11,
-                          )
-                        : Colors.transparent,
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
-                    ),
-                  ),
-                  child: Center(
-                    child: Badge(
-                      isLabelVisible:
-                          unread > 0,
-                      backgroundColor:
-                          const Color(
-                        0xFFD8362A,
-                      ),
-                      textColor: Colors.white,
-                      label: Text(
-                        unread > 99
-                            ? '99+'
-                            : '$unread',
-                        style:
-                            GoogleFonts.plusJakartaSans(
-                          fontSize: 8,
-                          fontWeight:
-                              FontWeight.w700,
-                        ),
-                      ),
-                      child: Icon(
-                        selected
-                            ? Icons
-                                .chat_bubble_rounded
-                            : Icons
-                                .chat_bubble_outline_rounded,
-                        size: 21,
-                        color: selected
-                            ? activeColor
-                            : colors
-                                .onSurfaceVariant
-                                .withValues(
-                              alpha: .74,
-                            ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    'Messages',
-                    maxLines: 1,
-                    style:
-                        GoogleFonts.plusJakartaSans(
-                      fontSize: 9.8,
-                      height: 1.1,
-                      fontWeight: selected
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: selected
-                          ? activeColor
-                          : colors
-                              .onSurfaceVariant
-                              .withValues(
-                            alpha: .78,
-                          ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      ),
+      child: Icon(
+        selected
+            ? Icons
+                .chat_bubble_rounded
+            : Icons
+                .chat_bubble_outline_rounded,
       ),
     );
   }

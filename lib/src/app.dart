@@ -39,7 +39,7 @@ const raPale = Color(0xFFE7F3FD); // light-blue icon surfaces
 const raCard = Color(0xFFF3F9FE); // light-blue cards
 
 // ============================================================
-// SPACING SCALE — an 4/8 grid. Use these instead of ad hoc
+// SPACING SCALE â€” an 4/8 grid. Use these instead of ad hoc
 // numbers for anything new or touched.
 // ============================================================
 class RaSpace {
@@ -60,7 +60,7 @@ class RaRadius {
 }
 
 // ============================================================
-// TYPE SCALE — one place for every recurring text role so
+// TYPE SCALE â€” one place for every recurring text role so
 // screens stop inventing their own TextStyle each time.
 // ============================================================
 class RaText {
@@ -276,7 +276,8 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
   Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
     valueListenable: AppThemeController.mode,
     builder: (context, themeMode, _) => MaterialApp(
-      title: 'RoadAssist',
+      title: const bool.fromEnvironment('ADMIN_PORTAL')
+          ? 'RoadAssist Admin' : 'RoadAssist',
       navigatorKey: navigationKey,
       navigatorObservers: [
         _NotificationNavigationObserver(() {

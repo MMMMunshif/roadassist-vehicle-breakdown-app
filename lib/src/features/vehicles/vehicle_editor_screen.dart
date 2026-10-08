@@ -15,41 +15,40 @@ class VehicleEditorScreen extends StatefulWidget {
 
 class _VehicleEditorScreenState
     extends State<VehicleEditorScreen> {
-  final form = GlobalKey<FormState>();
+  final form =
+      GlobalKey<FormState>();
 
   late final TextEditingController make;
   late final TextEditingController model;
   late final TextEditingController year;
   late final TextEditingController registration;
 
-  String type = 'Sedan / Hatchback';
-  String fuel = 'Petrol';
-  String transmission = 'Automatic';
+  String type =
+      'Sedan / Hatchback';
+
+  String fuel =
+      'Petrol';
+
+  String transmission =
+      'Automatic';
 
   bool saving = false;
   bool uploadingPhoto = false;
 
   String photoData = '';
 
-  bool get editing => widget.vehicle != null;
-
-  String get vehiclePreviewName {
-    return [
-      make.text.trim(),
-      model.text.trim(),
-      year.text.trim(),
-    ]
-        .where((value) => value.isNotEmpty)
-        .join(' ');
-  }
+  bool get editing =>
+      widget.vehicle != null;
 
   @override
   void initState() {
     super.initState();
 
-    final vehicle = widget.vehicle;
+    final vehicle =
+        widget.vehicle;
 
-    photoData = vehicle?.photoData ?? '';
+    photoData =
+        vehicle?.photoData ?? '';
 
     make = TextEditingController(
       text: vehicle?.make,
@@ -63,14 +62,23 @@ class _VehicleEditorScreenState
       text: vehicle?.year.toString(),
     );
 
-    registration = TextEditingController(
-      text: vehicle?.registration,
+    registration =
+        TextEditingController(
+      text:
+          vehicle?.registration,
     );
 
-    type = vehicle?.vehicleType ?? type;
-    fuel = vehicle?.fuelType ?? fuel;
+    type =
+        vehicle?.vehicleType ??
+            type;
+
+    fuel =
+        vehicle?.fuelType ??
+            fuel;
+
     transmission =
-        vehicle?.transmission ?? transmission;
+        vehicle?.transmission ??
+            transmission;
   }
 
   @override
@@ -79,160 +87,55 @@ class _VehicleEditorScreenState
     model.dispose();
     year.dispose();
     registration.dispose();
+
     super.dispose();
   }
 
-  Future<void> choosePhoto() async {
-    if (uploadingPhoto) return;
-
-    final source =
-        await showModalBottomSheet<ImageSource>(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final theme = Theme.of(sheetContext);
-        final colors = theme.colorScheme;
-        final dark =
-            theme.brightness == Brightness.dark;
-
-        return Container(
-          padding: const EdgeInsets.fromLTRB(
-            18,
-            12,
-            18,
-            24,
-          ),
-          decoration: BoxDecoration(
-            color: dark
-                ? const Color(0xFF0D1D2B)
-                : colors.surface,
-            borderRadius:
-                const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors
-                        .onSurfaceVariant
-                        .withValues(alpha: .24),
-                    borderRadius:
-                        BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 21),
-
-              Text(
-                'Vehicle photo',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.4,
-                  color: colors.onSurface,
-                ),
-              ),
-
-              const SizedBox(height: 5),
-
-              Text(
-                'Add a clear photo so your vehicle is easier to identify.',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10.5,
-                  height: 1.4,
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-
-              const SizedBox(height: 17),
-
-              _RaVehiclePhotoSource(
-                icon:
-                    Icons.photo_library_outlined,
-                title: 'Choose from gallery',
-                subtitle:
-                    'Use an existing vehicle photo',
-                onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    ImageSource.gallery,
-                  );
-                },
-              ),
-
-              const SizedBox(height: 9),
-
-              _RaVehiclePhotoSource(
-                icon:
-                    Icons.camera_alt_outlined,
-                title: 'Take a photo',
-                subtitle:
-                    'Capture your vehicle now',
-                onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    ImageSource.camera,
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (source == null || !mounted) return;
+  Future<void> addPhoto() async {
+    if (uploadingPhoto) {
+      return;
+    }
 
     setState(() {
       uploadingPhoto = true;
     });
 
     try {
-      final navigator =
-          Navigator.of(context);
+      final photo =
+          await ImagePicker().pickImage(
+        source:
+            ImageSource.gallery,
+        maxWidth: 1200,
+        imageQuality: 82,
+      );
 
-      final photo = source == ImageSource.camera
-          ? await navigator.push<XFile>(
-              MaterialPageRoute(
-                builder: (_) =>
-                    const CameraCaptureScreen(),
-              ),
-            )
-          : await ImagePicker().pickImage(
-              source: ImageSource.gallery,
-              imageQuality: 80,
-              maxWidth: 1200,
-            );
-
-      if (photo == null || !mounted) return;
+      if (photo == null) {
+        return;
+      }
 
       final encoded =
           await PhotoUploadService()
-              .prepareVehiclePhoto(photo);
+              .prepareVehiclePhoto(
+        photo,
+      );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         photoData = encoded;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
         const SnackBar(
           content: Text(
-            'Could not prepare the photo. Choose another image and try again.',
+            'Could not load the photo. Choose another image and try again.',
           ),
         ),
       );
@@ -246,11 +149,13 @@ class _VehicleEditorScreenState
   }
 
   Future<void> save() async {
-    FocusScope.of(context).unfocus();
+    FocusScope.of(context)
+        .unfocus();
 
-    if (!(form.currentState?.validate() ??
-            false) ||
-        saving) {
+    if (saving ||
+        !(form.currentState
+                ?.validate() ??
+            false)) {
       return;
     }
 
@@ -261,28 +166,39 @@ class _VehicleEditorScreenState
     try {
       await VehicleService().save(
         Vehicle(
-          id: widget.vehicle?.id ?? '',
-          make: make.text.trim(),
-          model: model.text.trim(),
+          id:
+              widget.vehicle?.id ?? '',
+          make:
+              make.text.trim(),
+          model:
+              model.text.trim(),
           year: int.parse(
             year.text.trim(),
           ),
-          vehicleType: type,
+          vehicleType:
+              type,
           registration:
               normalizeVehicleRegistration(
             registration.text,
           ),
-          fuelType: fuel,
-          transmission: transmission,
-          photoData: photoData,
+          fuelType:
+              fuel,
+          transmission:
+              transmission,
+          photoData:
+              photoData,
         ),
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       Navigator.pop(context);
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
@@ -290,7 +206,8 @@ class _VehicleEditorScreenState
           content: Text(
             'Could not save vehicle: $error',
           ),
-          backgroundColor: raDanger,
+          backgroundColor:
+              raDanger,
         ),
       );
     } finally {
@@ -304,8 +221,22 @@ class _VehicleEditorScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
+
+    final previewName = [
+      make.text.trim(),
+      model.text.trim(),
+      year.text.trim(),
+    ]
+        .where(
+          (value) =>
+              value.isNotEmpty,
+        )
+        .join(' ');
 
     return Scaffold(
       backgroundColor:
@@ -315,10 +246,11 @@ class _VehicleEditorScreenState
           editing
               ? 'Edit Vehicle'
               : 'Add Vehicle',
-          style: GoogleFonts.plusJakartaSans(
+          style:
+              GoogleFonts.plusJakartaSans(
             fontSize: 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
       ),
@@ -328,8 +260,6 @@ class _VehicleEditorScreenState
           keyboardDismissBehavior:
               ScrollViewKeyboardDismissBehavior
                   .onDrag,
-          physics:
-              const BouncingScrollPhysics(),
           padding:
               const EdgeInsets.fromLTRB(
             18,
@@ -339,136 +269,131 @@ class _VehicleEditorScreenState
           ),
           children: [
             _RaVehicleEditorHero(
-              editing: editing,
+              editing:
+                  editing,
             ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
 
-            _RaVehicleEditorSection(
-              icon:
-                  Icons.photo_camera_outlined,
-              title: 'Vehicle photo',
+            const _RaVehicleEditorHeading(
+              title:
+                  'Vehicle photo',
               subtitle:
-                  'Make the vehicle easier for a provider to recognize.',
+                  'Optional. A clear exterior photo can help identify the vehicle.',
+            ),
+
+            const SizedBox(height: 10),
+
+            _RaVehicleEditorSurface(
               child: Column(
                 crossAxisAlignment:
-                    CrossAxisAlignment.stretch,
+                    CrossAxisAlignment
+                        .stretch,
                 children: [
-                  Container(
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: colors
-                          .surfaceContainerHighest
-                          .withValues(alpha: .40),
-                      borderRadius:
-                          BorderRadius.circular(18),
-                    ),
-                    child: VehiclePhotoPreview(
-                      model:
-                          vehiclePreviewName.isEmpty
-                              ? 'Your vehicle'
-                              : vehiclePreviewName,
-                      photoData: photoData,
-                      height: 190,
-                    ),
+                  VehiclePhotoPreview(
+                    model:
+                        previewName.isEmpty
+                            ? 'Vehicle'
+                            : previewName,
+                    photoData:
+                        photoData,
+                    height: 180,
+                    compact: false,
                   ),
-
-                  const SizedBox(height: 12),
-
-                  FilledButton.tonalIcon(
-                    onPressed: saving ||
-                            uploadingPhoto
-                        ? null
-                        : choosePhoto,
+                  const SizedBox(height: 11),
+                  OutlinedButton.icon(
+                    onPressed:
+                        uploadingPhoto ||
+                                saving
+                            ? null
+                            : addPhoto,
                     icon: uploadingPhoto
-                        ? const SizedBox.square(
-                            dimension: 17,
+                        ? const SizedBox
+                            .square(
+                            dimension: 16,
                             child:
                                 CircularProgressIndicator(
-                              strokeWidth: 2,
+                              strokeWidth:
+                                  2,
                             ),
                           )
-                        : Icon(
-                            photoData.isEmpty
-                                ? Icons
-                                    .add_a_photo_outlined
-                                : Icons
-                                    .photo_camera_outlined,
+                        : const Icon(
+                            Icons
+                                .add_photo_alternate_outlined,
                           ),
                     label: Text(
-                      uploadingPhoto
-                          ? 'Preparing photo…'
-                          : photoData.isEmpty
-                              ? 'Add Vehicle Photo'
-                              : 'Change Vehicle Photo',
+                      photoData.isEmpty
+                          ? 'Add Vehicle Photo'
+                          : 'Change Photo',
                     ),
                   ),
-
-                  if (photoData.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-
+                  if (photoData.isNotEmpty)
                     TextButton.icon(
-                      style: TextButton.styleFrom(
-                        foregroundColor:
-                            colors.error,
-                      ),
-                      onPressed: saving ||
-                              uploadingPhoto
-                          ? null
-                          : () {
-                              setState(() {
-                                photoData = '';
-                              });
-                            },
+                      onPressed:
+                          saving
+                              ? null
+                              : () {
+                                  setState(() {
+                                    photoData =
+                                        '';
+                                  });
+                                },
                       icon: const Icon(
                         Icons
                             .delete_outline_rounded,
-                        size: 18,
                       ),
                       label: const Text(
-                        'Remove Saved Photo',
+                        'Remove Photo',
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 22),
 
-            _RaVehicleEditorSection(
-              icon: Icons.badge_outlined,
-              title: 'Vehicle identity',
+            const _RaVehicleEditorHeading(
+              title:
+                  'Vehicle details',
               subtitle:
-                  'Enter the information shown on your vehicle documents.',
+                  'Enter the information needed to identify your vehicle during roadside assistance.',
+            ),
+
+            const SizedBox(height: 10),
+
+            _RaVehicleEditorSurface(
               child: Column(
                 children: [
                   TextFormField(
                     controller: make,
                     enabled: !saving,
-                    maxLength: 40,
                     textCapitalization:
                         TextCapitalization.words,
                     textInputAction:
                         TextInputAction.next,
-                    onChanged: (_) {
-                      setState(() {});
-                    },
                     decoration:
                         const InputDecoration(
-                      labelText: 'Vehicle make',
-                      hintText: 'e.g. Toyota',
+                      labelText:
+                          'Vehicle make',
+                      hintText:
+                          'Toyota',
                       prefixIcon: Icon(
-                        Icons.factory_outlined,
+                        Icons
+                            .branding_watermark_outlined,
                       ),
                     ),
                     validator: (value) {
-                      return value
-                                  ?.trim()
-                                  .isEmpty ??
-                              true
-                          ? 'Enter vehicle make'
-                          : null;
+                      if (value == null ||
+                          value
+                              .trim()
+                              .isEmpty) {
+                        return 'Enter vehicle make';
+                      }
+
+                      return null;
+                    },
+                    onChanged: (_) {
+                      setState(() {});
                     },
                   ),
 
@@ -477,30 +402,33 @@ class _VehicleEditorScreenState
                   TextFormField(
                     controller: model,
                     enabled: !saving,
-                    maxLength: 40,
                     textCapitalization:
                         TextCapitalization.words,
                     textInputAction:
                         TextInputAction.next,
-                    onChanged: (_) {
-                      setState(() {});
-                    },
                     decoration:
                         const InputDecoration(
-                      labelText: 'Vehicle model',
-                      hintText: 'e.g. Corolla',
+                      labelText:
+                          'Model',
+                      hintText:
+                          'Aqua',
                       prefixIcon: Icon(
                         Icons
                             .directions_car_outlined,
                       ),
                     ),
                     validator: (value) {
-                      return value
-                                  ?.trim()
-                                  .isEmpty ??
-                              true
-                          ? 'Enter vehicle model'
-                          : null;
+                      if (value == null ||
+                          value
+                              .trim()
+                              .isEmpty) {
+                        return 'Enter vehicle model';
+                      }
+
+                      return null;
+                    },
+                    onChanged: (_) {
+                      setState(() {});
                     },
                   ),
 
@@ -509,28 +437,24 @@ class _VehicleEditorScreenState
                   TextFormField(
                     controller: year,
                     enabled: !saving,
+                    maxLength: 4,
                     keyboardType:
                         TextInputType.number,
-                    textInputAction:
-                        TextInputAction.next,
                     inputFormatters: [
                       FilteringTextInputFormatter
                           .digitsOnly,
-                      LengthLimitingTextInputFormatter(
-                        4,
-                      ),
                     ],
-                    onChanged: (_) {
-                      setState(() {});
-                    },
+                    textInputAction:
+                        TextInputAction.next,
                     decoration:
                         const InputDecoration(
                       labelText:
-                          'Manufacture year',
-                      hintText: 'e.g. 2022',
+                          'Model year',
+                      hintText:
+                          '2018',
                       prefixIcon: Icon(
                         Icons
-                            .calendar_today_outlined,
+                            .calendar_month_outlined,
                       ),
                     ),
                     validator: (value) {
@@ -550,12 +474,16 @@ class _VehicleEditorScreenState
 
                       return null;
                     },
+                    onChanged: (_) {
+                      setState(() {});
+                    },
                   ),
 
                   const SizedBox(height: 12),
 
                   TextFormField(
-                    controller: registration,
+                    controller:
+                        registration,
                     enabled: !saving,
                     maxLength: 16,
                     textCapitalization:
@@ -568,10 +496,10 @@ class _VehicleEditorScreenState
                       labelText:
                           'Registration number',
                       hintText:
-                          'e.g. WP CAB-1234',
+                          'CAA-1234',
                       prefixIcon: Icon(
                         Icons
-                            .confirmation_number_outlined,
+                            .pin_outlined,
                       ),
                     ),
                     validator:
@@ -581,20 +509,28 @@ class _VehicleEditorScreenState
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 22),
 
-            _RaVehicleEditorSection(
-              icon: Icons.tune_rounded,
-              title: 'Specifications',
+            const _RaVehicleEditorHeading(
+              title:
+                  'Vehicle configuration',
               subtitle:
-                  'Help providers prepare appropriate tools and equipment.',
+                  'These details can help providers prepare for your vehicle.',
+            ),
+
+            const SizedBox(height: 10),
+
+            _RaVehicleEditorSurface(
               child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment
+                        .stretch,
                 children: [
-                  _RaVehicleEditorChoice(
-                    label: 'Vehicle type',
-                    icon: Icons
-                        .directions_car_outlined,
-                    value: type,
+                  _RaVehicleChoice(
+                    label:
+                        'Vehicle type',
+                    value:
+                        type,
                     values: const [
                       'Sedan / Hatchback',
                       'SUV',
@@ -602,8 +538,12 @@ class _VehicleEditorScreenState
                       'Motorcycle',
                       'Other',
                     ],
-                    enabled: !saving,
-                    onChanged: (value) {
+                    enabled:
+                        !saving,
+                    icon: Icons
+                        .category_outlined,
+                    onChanged:
+                        (value) {
                       setState(() {
                         type = value;
                       });
@@ -612,11 +552,11 @@ class _VehicleEditorScreenState
 
                   const SizedBox(height: 12),
 
-                  _RaVehicleEditorChoice(
-                    label: 'Fuel type',
-                    icon: Icons
-                        .local_gas_station_outlined,
-                    value: fuel,
+                  _RaVehicleChoice(
+                    label:
+                        'Fuel type',
+                    value:
+                        fuel,
                     values: const [
                       'Petrol',
                       'Diesel',
@@ -624,8 +564,12 @@ class _VehicleEditorScreenState
                       'Electric',
                       'Other',
                     ],
-                    enabled: !saving,
-                    onChanged: (value) {
+                    enabled:
+                        !saving,
+                    icon: Icons
+                        .local_gas_station_outlined,
+                    onChanged:
+                        (value) {
                       setState(() {
                         fuel = value;
                       });
@@ -634,20 +578,25 @@ class _VehicleEditorScreenState
 
                   const SizedBox(height: 12),
 
-                  _RaVehicleEditorChoice(
-                    label: 'Transmission',
-                    icon: Icons
-                        .settings_input_component_outlined,
-                    value: transmission,
+                  _RaVehicleChoice(
+                    label:
+                        'Transmission',
+                    value:
+                        transmission,
                     values: const [
                       'Automatic',
                       'Manual',
                       'Other',
                     ],
-                    enabled: !saving,
-                    onChanged: (value) {
+                    enabled:
+                        !saving,
+                    icon:
+                        Icons.settings_outlined,
+                    onChanged:
+                        (value) {
                       setState(() {
-                        transmission = value;
+                        transmission =
+                            value;
                       });
                     },
                   ),
@@ -655,95 +604,36 @@ class _VehicleEditorScreenState
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
 
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: colors.primary
-                    .withValues(alpha: .07),
-                borderRadius:
-                    BorderRadius.circular(17),
-                border: Border.all(
-                  color: colors.primary
-                      .withValues(alpha: .12),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons
-                        .verified_user_outlined,
-                    size: 19,
-                    color: colors.primary,
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      'These details are reused when you create a roadside request, so keep them accurate.',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10,
-                        height: 1.45,
-                        color: colors
-                            .onSurfaceVariant,
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed:
+                    saving ? null : save,
+                icon: saving
+                    ? const SizedBox.square(
+                        dimension: 17,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(
+                        Icons
+                            .check_rounded,
                       ),
-                    ),
-                  ),
-                ],
+                label: Text(
+                  saving
+                      ? 'Saving Vehicle…'
+                      : editing
+                          ? 'Save Vehicle Changes'
+                          : 'Add Vehicle',
+                ),
               ),
             ),
           ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(
-            18,
-            9,
-            18,
-            13,
-          ),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            border: Border(
-              top: BorderSide(
-                color: colors.outlineVariant
-                    .withValues(alpha: .45),
-              ),
-            ),
-          ),
-          child: FilledButton.icon(
-            onPressed:
-                saving || uploadingPhoto
-                    ? null
-                    : save,
-            icon: saving
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child:
-                        CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    editing
-                        ? Icons.save_outlined
-                        : Icons
-                            .add_circle_outline_rounded,
-                  ),
-            label: Text(
-              saving
-                  ? 'Saving Vehicle…'
-                  : editing
-                      ? 'Save Changes'
-                      : 'Add Vehicle',
-            ),
-          ),
         ),
       ),
     );
@@ -765,16 +655,18 @@ class _RaVehicleEditorHero
             Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
+          begin:
+              Alignment.topLeft,
           end:
               Alignment.bottomRight,
           colors: dark
               ? const [
-                  Color(0xFF0B477C),
-                  Color(0xFF08645D),
+                  Color(0xFF0A497F),
+                  Color(0xFF075A68),
                 ]
               : const [
                   Color(0xFF075BA8),
@@ -782,14 +674,15 @@ class _RaVehicleEditorHero
                 ],
         ),
         borderRadius:
-            BorderRadius.circular(24),
+            BorderRadius.circular(23),
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
+            width: 51,
+            height: 51,
+            decoration:
+                BoxDecoration(
               color: Colors.white
                   .withValues(alpha: .13),
               borderRadius:
@@ -802,9 +695,7 @@ class _RaVehicleEditorHero
               size: 26,
             ),
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -813,26 +704,22 @@ class _RaVehicleEditorHero
                 Text(
                   editing
                       ? 'Update your vehicle'
-                      : 'Add your vehicle',
+                      : 'Add a vehicle',
                   style: GoogleFonts
                       .plusJakartaSans(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight:
                         FontWeight.w800,
-                    letterSpacing: -.4,
                   ),
                 ),
-
-                const SizedBox(height: 5),
-
+                const SizedBox(height: 4),
                 Text(
-                  'Accurate vehicle information helps roadside providers prepare before they arrive.',
+                  'Accurate vehicle details help make roadside requests faster and clearer.',
                   style: GoogleFonts
                       .plusJakartaSans(
-                    color: Colors.white
-                        .withValues(alpha: .80),
-                    fontSize: 10,
+                    color: Colors.white70,
+                    fontSize: 8.4,
                     height: 1.4,
                   ),
                 ),
@@ -845,244 +732,138 @@ class _RaVehicleEditorHero
   }
 }
 
-class _RaVehicleEditorSection
+class _RaVehicleEditorHeading
     extends StatelessWidget {
-  const _RaVehicleEditorSection({
-    required this.icon,
+  const _RaVehicleEditorHeading({
     required this.title,
     required this.subtitle,
-    required this.child,
   });
 
-  final IconData icon;
   final String title;
   final String subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(21),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .48),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 41,
-                height: 41,
-                decoration: BoxDecoration(
-                  color: colors.primary
-                      .withValues(alpha: .08),
-                  borderRadius:
-                      BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  icon,
-                  color: colors.primary,
-                  size: 20,
-                ),
-              ),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 12.5,
-                        fontWeight:
-                            FontWeight.w700,
-                        color:
-                            colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9.5,
-                        height: 1.4,
-                        color: colors
-                            .onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 17),
-
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _RaVehicleEditorChoice
-    extends StatelessWidget {
-  const _RaVehicleEditorChoice({
-    required this.label,
-    required this.icon,
-    required this.value,
-    required this.values,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  final String label;
-  final IconData icon;
-  final String value;
-  final List<String> values;
-  final bool enabled;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-      ),
-      items: values
-          .map(
-            (item) =>
-                DropdownMenuItem<String>(
-              value: item,
-              child: Text(item),
-            ),
-          )
-          .toList(),
-      onChanged: !enabled
-          ? null
-          : (selected) {
-              if (selected != null) {
-                onChanged(selected);
-              }
-            },
-    );
-  }
-}
-
-class _RaVehiclePhotoSource
-    extends StatelessWidget {
-  const _RaVehiclePhotoSource({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors =
         Theme.of(context).colorScheme;
 
-    return Material(
-      color: colors
-          .surfaceContainerHighest
-          .withValues(alpha: .36),
-      borderRadius:
-          BorderRadius.circular(17),
-      child: InkWell(
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 14.5,
+            fontWeight:
+                FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 8.3,
+            height: 1.4,
+            color:
+                colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaVehicleEditorSurface
+    extends StatelessWidget {
+  const _RaVehicleEditorSurface({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(0xFF0D1D2B)
+            : theme.colorScheme.surface,
         borderRadius:
-            BorderRadius.circular(17),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(13),
-          child: Row(
-            children: [
-              Container(
-                width: 39,
-                height: 39,
-                decoration: BoxDecoration(
-                  color: colors.primary
-                      .withValues(alpha: .08),
-                  borderRadius:
-                      BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: colors.primary,
-                  size: 19,
-                ),
-              ),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 11,
-                        fontWeight:
-                            FontWeight.w700,
-                        color:
-                            colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9,
-                        color: colors
-                            .onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Icon(
-                Icons.chevron_right_rounded,
-                color:
-                    colors.onSurfaceVariant,
-              ),
-            ],
+            BorderRadius.circular(18),
+        border: Border.all(
+          color: theme
+              .colorScheme
+              .outlineVariant
+              .withValues(
+            alpha: .45,
           ),
         ),
       ),
+      child: child,
+    );
+  }
+}
+
+class _RaVehicleChoice
+    extends StatelessWidget {
+  const _RaVehicleChoice({
+    required this.label,
+    required this.value,
+    required this.values,
+    required this.enabled,
+    required this.icon,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<String> values;
+  final bool enabled;
+  final IconData icon;
+  final ValueChanged<String>
+      onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+      ),
+      items: [
+        for (final option
+            in values)
+          DropdownMenuItem<String>(
+            value: option,
+            child: Text(
+              option,
+              maxLines: 1,
+              overflow:
+                  TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: !enabled
+          ? null
+          : (selected) {
+              if (selected != null) {
+                onChanged(
+                  selected,
+                );
+              }
+            },
     );
   }
 }

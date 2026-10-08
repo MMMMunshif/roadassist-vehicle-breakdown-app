@@ -19,49 +19,108 @@ class _AdminUserRow extends StatefulWidget {
 
 class _AdminUserRowState
     extends State<_AdminUserRow> {
-  late final review = FirebaseFirestore.instance
-      .collection('accountModeration')
-      .doc(widget.uid)
-      .snapshots();
+  late final Stream<
+      DocumentSnapshot<Map<String, dynamic>>> review =
+      FirebaseFirestore.instance
+          .collection('accountModeration')
+          .doc(widget.uid)
+          .snapshots();
+
+  String _friendly(
+    String value,
+  ) {
+    final cleaned =
+        value.replaceAll('_', ' ').trim();
+
+    if (cleaned.isEmpty) {
+      return 'Unknown';
+    }
+
+    return cleaned
+        .split(' ')
+        .where(
+          (part) => part.isNotEmpty,
+        )
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.substring(1)}',
+        )
+        .join(' ');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return StreamBuilder<
         DocumentSnapshot<Map<String, dynamic>>>(
       stream: review,
-      builder: (context, snapshot) {
+      builder: (
+        context,
+        snapshot,
+      ) {
         if (snapshot.hasError) {
           return Container(
-            padding: const EdgeInsets.all(
-              RaSpace.md,
-            ),
+            padding:
+                const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: colors.errorContainer
-                  .withValues(alpha: .30),
+              color: colors.error
+                  .withValues(alpha: .06),
               borderRadius:
-                  BorderRadius.circular(16),
+                  BorderRadius.circular(17),
+              border: Border.all(
+                color: colors.error
+                    .withValues(alpha: .18),
+              ),
             ),
-            child: const Text(
-              'Could not load account review.',
+            child: Row(
+              children: [
+                Icon(
+                  Icons
+                      .cloud_off_outlined,
+                  size: 19,
+                  color: colors.error,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'Could not load account review.',
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 8.6,
+                      fontWeight:
+                          FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
         }
 
         if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: RaSpace.sm,
+          return Container(
+            padding:
+                const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              color: colors
+                  .surfaceContainerHighest
+                  .withValues(alpha: .22),
+              borderRadius:
+                  BorderRadius.circular(17),
             ),
             child:
-                LinearProgressIndicator(),
+                const LinearProgressIndicator(),
           );
         }
 
         final moderation =
-            snapshot.data!.data() ?? {};
+            snapshot.data!.data() ??
+                <String, dynamic>{};
 
         final validUntil =
             (moderation['validUntil']
@@ -73,7 +132,7 @@ class _AdminUserRowState
                     ?.toString() ??
                 'pending';
 
-        final status =
+        final verificationStatus =
             verification == 'verified' &&
                     !(validUntil?.isAfter(
                           DateTime.now(),
@@ -83,18 +142,26 @@ class _AdminUserRowState
                 : verification;
 
         if (widget.pendingOnly &&
-            !status.startsWith('pending')) {
+            !verificationStatus
+                .startsWith('pending')) {
           return const SizedBox.shrink();
         }
 
         final name =
             widget.data['displayName']
-                    as String? ??
-                widget.uid;
+                    ?.toString()
+                    .trim() ??
+                '';
+
+        final resolvedName =
+            name.isEmpty
+                ? widget.uid
+                : name;
 
         final email =
             widget.data['email']
-                    ?.toString() ??
+                    ?.toString()
+                    .trim() ??
                 '';
 
         final role =
@@ -108,45 +175,100 @@ class _AdminUserRowState
                 'active';
 
         final flagged =
-            moderation['flagged'] == true;
+            moderation['flagged'] ==
+                true;
+
+        final attention =
+            flagged ||
+                accessStatus !=
+                    'active' ||
+                verificationStatus
+                    .startsWith(
+                  'pending',
+                ) ||
+                verificationStatus ==
+                    'rejected';
 
         return Material(
-          color: colors.surface,
-          borderRadius:
-              BorderRadius.circular(18),
+          color: theme.brightness ==
+                  Brightness.dark
+              ? const Color(0xFF0D1D2B)
+              : colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(18),
+            side: BorderSide(
+              color: attention
+                  ? (flagged
+                          ? colors.error
+                          : raGold)
+                      .withValues(
+                      alpha: .25,
+                    )
+                  : colors.outlineVariant
+                      .withValues(
+                      alpha: .45,
+                    ),
+            ),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => push(
-              context,
-              _AdminAccountScreen(
-                uid: widget.uid,
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(
-                RaSpace.md,
-              ),
-              decoration: BoxDecoration(
-                borderRadius:
-                    BorderRadius.circular(
-                  18,
+            onTap: () {
+              push(
+                context,
+                _AdminAccountScreen(
+                  uid: widget.uid,
                 ),
-                border: Border.all(
-                  color: colors
-                      .outlineVariant
-                      .withValues(alpha: .55),
-                ),
-              ),
+              );
+            },
+            child: Padding(
+              padding:
+                  const EdgeInsets.all(13),
               child: Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                  ProfileInitials(
-                    name: name,
-                    radius: 24,
+                  Stack(
+                    clipBehavior:
+                        Clip.none,
+                    children: [
+                      ProfileInitials(
+                        name: resolvedName,
+                        radius: 23,
+                      ),
+                      if (attention)
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration:
+                                BoxDecoration(
+                              color: flagged
+                                  ? colors.error
+                                  : raGold,
+                              shape:
+                                  BoxShape.circle,
+                              border: Border.all(
+                                color: theme
+                                            .brightness ==
+                                        Brightness
+                                            .dark
+                                    ? const Color(
+                                        0xFF0D1D2B,
+                                      )
+                                    : colors
+                                        .surface,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
 
-                  const SizedBox(
-                    width: RaSpace.md,
-                  ),
+                  const SizedBox(width: 11),
 
                   Expanded(
                     child: Column(
@@ -154,46 +276,61 @@ class _AdminUserRowState
                           CrossAxisAlignment
                               .start,
                       children: [
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow:
-                              TextOverflow
-                                  .ellipsis,
-                          style: theme
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                            fontWeight:
-                                FontWeight
-                                    .w900,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                resolvedName,
+                                maxLines: 1,
+                                overflow:
+                                    TextOverflow
+                                        .ellipsis,
+                                style: GoogleFonts
+                                    .plusJakartaSans(
+                                  fontSize: 10.5,
+                                  fontWeight:
+                                      FontWeight
+                                          .w800,
+                                ),
+                              ),
+                            ),
+                            if (attention)
+                              Tooltip(
+                                message:
+                                    'Account requires attention',
+                                child: Icon(
+                                  flagged
+                                      ? Icons
+                                          .flag_rounded
+                                      : Icons
+                                          .priority_high_rounded,
+                                  size: 17,
+                                  color: flagged
+                                      ? colors.error
+                                      : raGold,
+                                ),
+                              ),
+                          ],
                         ),
 
-                        if (email
-                            .isNotEmpty) ...[
-                          const SizedBox(
-                            height: 2,
-                          ),
+                        if (email.isNotEmpty) ...[
+                          const SizedBox(height: 3),
                           Text(
                             email,
                             maxLines: 1,
                             overflow:
                                 TextOverflow
                                     .ellipsis,
-                            style: theme
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 7.9,
                               color: colors
                                   .onSurfaceVariant,
                             ),
                           ),
                         ],
 
-                        const SizedBox(
-                          height: RaSpace.sm,
-                        ),
+                        const SizedBox(height: 8),
 
                         Wrap(
                           spacing: 6,
@@ -203,7 +340,8 @@ class _AdminUserRowState
                               status: role,
                             ),
                             _AdminStatusBadge(
-                              status: status,
+                              status:
+                                  verificationStatus,
                             ),
                             if (accessStatus !=
                                 'active')
@@ -218,19 +356,94 @@ class _AdminUserRowState
                               ),
                           ],
                         ),
+
+                        if (validUntil !=
+                                null &&
+                            verification ==
+                                'verified') ...[
+                          const SizedBox(height: 7),
+
+                          Row(
+                            children: [
+                              Icon(
+                                Icons
+                                    .verified_user_outlined,
+                                size: 13,
+                                color: colors
+                                    .onSurfaceVariant,
+                              ),
+                              const SizedBox(
+                                width: 4,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Verification valid until '
+                                  '${validUntil.day.toString().padLeft(2, '0')}/'
+                                  '${validUntil.month.toString().padLeft(2, '0')}/'
+                                  '${validUntil.year}',
+                                  maxLines: 1,
+                                  overflow:
+                                      TextOverflow
+                                          .ellipsis,
+                                  style: GoogleFonts
+                                      .plusJakartaSans(
+                                    fontSize: 7.2,
+                                    color: colors
+                                        .onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
 
-                  const SizedBox(
-                    width: RaSpace.sm,
-                  ),
+                  const SizedBox(width: 7),
 
-                  Icon(
-                    Icons
-                        .chevron_right_rounded,
-                    color: colors
-                        .onSurfaceVariant,
+                  Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
+                        decoration:
+                            BoxDecoration(
+                          color: colors
+                              .surfaceContainerHighest
+                              .withValues(
+                            alpha: .35,
+                          ),
+                          borderRadius:
+                              BorderRadius.circular(
+                            999,
+                          ),
+                        ),
+                        child: Text(
+                          _friendly(role),
+                          style: GoogleFonts
+                              .plusJakartaSans(
+                            fontSize: 6.5,
+                            fontWeight:
+                                FontWeight.w700,
+                            color: colors
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 9),
+                      Icon(
+                        Icons
+                            .chevron_right_rounded,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ],
                   ),
                 ],
               ),

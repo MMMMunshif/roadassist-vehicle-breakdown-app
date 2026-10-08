@@ -1,50 +1,105 @@
 part of '../../screens.dart';
 
+const _driverActiveRequestStatuses = <String>{
+  'searching',
+  'accepted',
+  'en_route',
+  'arrived',
+};
+
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({
+    super.key,
+  });
 
   @override
   State<HistoryScreen> createState() =>
       _HistoryScreenState();
 }
 
-class _HistoryScreenState
-    extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen> {
   int filter = 0;
 
-  static const activeStatuses = <String>{
-    'searching',
-    'accepted',
-    'en_route',
-    'arrived',
-  };
-
-  bool matchesFilter(String status) {
+  bool matchesFilter(
+    String status,
+  ) {
     return switch (filter) {
-      1 => activeStatuses.contains(status),
+      1 => _driverActiveRequestStatuses.contains(status),
       2 => status == 'completed',
       3 => status == 'cancelled',
       _ => true,
     };
   }
 
+  void openRequest(
+    QueryDocumentSnapshot<Map<String, dynamic>> request,
+  ) {
+    final data = request.data();
+
+    final status =
+        data['status'] as String? ??
+            'searching';
+
+    final draft =
+        requestDraftFromData(data);
+
+    if (status == 'searching') {
+      push(
+        context,
+        SearchingScreen(
+          draft: draft,
+          requestId: request.id,
+        ),
+      );
+
+      return;
+    }
+
+    if (const [
+      'accepted',
+      'en_route',
+      'arrived',
+    ].contains(status)) {
+      push(
+        context,
+        TrackingScreen(
+          draft: draft,
+          requestId: request.id,
+        ),
+      );
+
+      return;
+    }
+
+    push(
+      context,
+      RealtimeDriverRequestDetailsScreen(
+        requestId: request.id,
+        data: data,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        titleSpacing: 20,
+        titleSpacing: 18,
         title: Text(
           'Requests',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 19,
             fontWeight: FontWeight.w800,
-            letterSpacing: -.5,
           ),
         ),
         actions: [
@@ -60,28 +115,12 @@ class _HistoryScreenState
               Icons.notifications_none_rounded,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 5),
         ],
       ),
-      floatingActionButton: signedIn
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                push(
-                  context,
-                  const AssistanceTypeScreen(),
-                );
-              },
-              icon: const Icon(
-                Icons.add_road_rounded,
-              ),
-              label: const Text(
-                'New request',
-              ),
-            )
-          : null,
       body: !signedIn
           ? const Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(18),
               child: EmptyState(
                 icon: Icons.login_outlined,
                 title: 'Sign in required',
@@ -90,17 +129,19 @@ class _HistoryScreenState
               ),
             )
           : StreamBuilder<
-              QuerySnapshot<
-                  Map<String, dynamic>>>(
+              QuerySnapshot<Map<String, dynamic>>>(
               stream: RequestService()
                   .watchDriverRequests(),
-              builder: (context, snapshot) {
+              builder: (
+                context,
+                snapshot,
+              ) {
                 if (snapshot.hasError) {
                   return const Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: EdgeInsets.all(18),
                     child: EmptyState(
-                      icon:
-                          Icons.cloud_off_outlined,
+                      icon: Icons
+                          .cloud_off_outlined,
                       title:
                           'Unable to load requests',
                       message:
@@ -110,64 +151,86 @@ class _HistoryScreenState
                 }
 
                 if (!snapshot.hasData) {
-                  return const _PremiumDriverHistoryLoadingView();
+                  return const _RaHistoryLoading();
                 }
 
-                final allRequests =
-                    [...snapshot.data!.docs];
+                final all =
+                    snapshot.data!.docs.toList();
 
-                allRequests.sort((a, b) {
-                  final aTime =
-                      a.data()['createdAt']
-                          as Timestamp?;
+                all.sort(
+                  (
+                    first,
+                    second,
+                  ) {
+                    final firstTime =
+                        first.data()['createdAt']
+                            as Timestamp?;
 
-                  final bTime =
-                      b.data()['createdAt']
-                          as Timestamp?;
+                    final secondTime =
+                        second.data()['createdAt']
+                            as Timestamp?;
 
-                  if (aTime == null &&
-                      bTime == null) {
-                    return 0;
-                  }
+                    if (firstTime == null &&
+                        secondTime == null) {
+                      return 0;
+                    }
 
-                  if (aTime == null) return 1;
-                  if (bTime == null) return -1;
+                    if (firstTime == null) {
+                      return 1;
+                    }
 
-                  return bTime.compareTo(aTime);
-                });
+                    if (secondTime == null) {
+                      return -1;
+                    }
+
+                    return secondTime.compareTo(
+                      firstTime,
+                    );
+                  },
+                );
 
                 final activeCount =
-                    allRequests.where((request) {
-                  final status =
-                      request.data()['status']
-                              as String? ??
-                          '';
+                    all.where(
+                  (request) {
+                    final status =
+                        request.data()['status']
+                                as String? ??
+                            '';
 
-                  return activeStatuses.contains(
-                    status,
-                  );
-                }).length;
+                    return _driverActiveRequestStatuses
+                        .contains(status);
+                  },
+                ).length;
 
                 final completedCount =
-                    allRequests.where((request) {
-                  return request.data()['status'] ==
-                      'completed';
-                }).length;
+                    all.where(
+                  (request) {
+                    return request.data()['status'] ==
+                        'completed';
+                  },
+                ).length;
 
                 final cancelledCount =
-                    allRequests.where((request) {
-                  return request.data()['status'] ==
-                      'cancelled';
-                }).length;
+                    all.where(
+                  (request) {
+                    return request.data()['status'] ==
+                        'cancelled';
+                  },
+                ).length;
 
                 final filtered =
-                    allRequests.where((request) {
-                  return matchesFilter(
-                    request.data()['status']
-                            as String? ??
-                        '',
-                  );
-                }).toList();
+                    all.where(
+                  (request) {
+                    final status =
+                        request.data()['status']
+                                as String? ??
+                            '';
+
+                    return matchesFilter(
+                      status,
+                    );
+                  },
+                ).toList();
 
                 return ListView(
                   physics:
@@ -177,119 +240,155 @@ class _HistoryScreenState
                     18,
                     8,
                     18,
-                    100,
+                    34,
                   ),
                   children: [
-                    _PremiumDriverRequestsOverview(
-                      total:
-                          allRequests.length,
-                      active: activeCount,
+                    _RaHistoryHero(
+                      active:
+                          activeCount,
                       completed:
                           completedCount,
+                      total:
+                          all.length,
                     ),
 
-                    const SizedBox(height: 27),
+                    const SizedBox(height: 22),
 
-                    Text(
-                      'Your assistance',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 18,
-                        fontWeight:
-                            FontWeight.w800,
-                        letterSpacing: -.4,
-                        color:
-                            colors.onSurface,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+                            children: [
+                              Text(
+                                'Your assistance',
+                                style: GoogleFonts
+                                    .plusJakartaSans(
+                                  fontSize: 15,
+                                  fontWeight:
+                                      FontWeight
+                                          .w800,
+                                ),
+                              ),
+                              const SizedBox(
+                                height: 3,
+                              ),
+                              Text(
+                                'Track active roadside help and review previous requests.',
+                                style: GoogleFonts
+                                    .plusJakartaSans(
+                                  fontSize: 8.2,
+                                  color: colors
+                                      .onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip:
+                              'Start assistance',
+                          onPressed: () {
+                            push(
+                              context,
+                              const AssistanceTypeScreen(),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.add_road_rounded,
+                          ),
+                        ),
+                      ],
                     ),
 
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 13),
 
-                    Text(
-                      'Track current roadside help and revisit previous service requests.',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 11,
-                        height: 1.45,
-                        color: colors
-                            .onSurfaceVariant,
-                      ),
-                    ),
-
-                    const SizedBox(height: 17),
-
-                    _PremiumDriverRequestFilterBar(
+                    _RaHistoryFilters(
                       selected: filter,
-                      onSelected: (value) {
+                      onSelected: (
+                        value,
+                      ) {
                         setState(() {
                           filter = value;
                         });
                       },
                     ),
 
-                    const SizedBox(height: 17),
+                    const SizedBox(height: 15),
 
                     if (filtered.isEmpty)
-                      _PremiumDriverHistoryEmptyState(
+                      _RaHistoryEmpty(
                         filter: filter,
+                        onStart: filter == 0
+                            ? () {
+                                push(
+                                  context,
+                                  const AssistanceTypeScreen(),
+                                );
+                              }
+                            : null,
                       )
                     else
-                      for (var i = 0;
-                          i < filtered.length;
-                          i++) ...[
-                        _PremiumDriverHistoryCard(
-                          requestId:
-                              filtered[i].id,
-                          data:
-                              filtered[i].data(),
+                      for (var index = 0;
+                          index < filtered.length;
+                          index++) ...[
+                        _RaHistoryCard(
+                          request:
+                              filtered[index],
+                          onTap: () {
+                            openRequest(
+                              filtered[index],
+                            );
+                          },
                         ),
-                        if (i !=
+                        if (index !=
                             filtered.length - 1)
                           const SizedBox(
-                            height: 11,
+                            height: 9,
                           ),
                       ],
 
                     if (cancelledCount > 0 &&
                         filter == 0) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 17),
+
                       Container(
                         padding:
                             const EdgeInsets.all(
-                          13,
+                          11,
                         ),
-                        decoration: BoxDecoration(
+                        decoration:
+                            BoxDecoration(
                           color: colors
                               .surfaceContainerHighest
                               .withValues(
-                            alpha: .36,
+                            alpha: .28,
                           ),
                           borderRadius:
                               BorderRadius.circular(
-                            16,
+                            14,
                           ),
                         ),
                         child: Row(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
                           children: [
                             Icon(
-                              Icons.info_outline,
+                              Icons
+                                  .info_outline_rounded,
                               size: 17,
                               color: colors
                                   .onSurfaceVariant,
                             ),
                             const SizedBox(
-                              width: 9,
+                              width: 7,
                             ),
                             Expanded(
                               child: Text(
-                                'Cancelled requests remain available for your records.',
+                                'Cancelled requests remain available for reference.',
                                 style: GoogleFonts
                                     .plusJakartaSans(
-                                  fontSize: 10.5,
-                                  height: 1.4,
+                                  fontSize: 7.7,
                                   color: colors
                                       .onSurfaceVariant,
                                 ),
@@ -307,17 +406,16 @@ class _HistoryScreenState
   }
 }
 
-class _PremiumDriverRequestsOverview
-    extends StatelessWidget {
-  const _PremiumDriverRequestsOverview({
-    required this.total,
+class _RaHistoryHero extends StatelessWidget {
+  const _RaHistoryHero({
     required this.active,
     required this.completed,
+    required this.total,
   });
 
-  final int total;
   final int active;
   final int completed;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
@@ -325,32 +423,26 @@ class _PremiumDriverRequestsOverview
         Theme.of(context).brightness ==
             Brightness.dark;
 
-    final start = dark
-        ? const Color(0xFF0B477E)
-        : const Color(0xFF075BA8);
-
-    final end = dark
-        ? const Color(0xFF08645E)
-        : const Color(0xFF078F80);
-
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(25),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [start, end],
+          end:
+              Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF0A497F),
+                  Color(0xFF075A68),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078C7E),
+                ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color:
-                start.withValues(alpha: .20),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        borderRadius:
+            BorderRadius.circular(23),
       ),
       child: Column(
         crossAxisAlignment:
@@ -359,100 +451,87 @@ class _PremiumDriverRequestsOverview
           Row(
             children: [
               Container(
-                width: 39,
-                height: 39,
-                decoration: BoxDecoration(
+                width: 47,
+                height: 47,
+                decoration:
+                    BoxDecoration(
                   color: Colors.white
-                      .withValues(alpha: .12),
+                      .withValues(
+                    alpha: .13,
+                  ),
                   borderRadius:
-                      BorderRadius.circular(13),
+                      BorderRadius.circular(
+                    15,
+                  ),
                 ),
                 child: const Icon(
                   Icons
-                      .receipt_long_rounded,
-                  size: 20,
+                      .receipt_long_outlined,
                   color: Colors.white,
+                  size: 24,
                 ),
               ),
-
               const SizedBox(width: 11),
-
-              Text(
-                'REQUEST OVERVIEW',
-                style:
-                    GoogleFonts.plusJakartaSans(
-                  color: Colors.white
-                      .withValues(alpha: .76),
-                  fontSize: 9,
-                  letterSpacing: 1.15,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      active > 0
+                          ? '$active active ${active == 1 ? 'request' : 'requests'}'
+                          : 'No active requests',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight:
+                            FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      active > 0
+                          ? 'Your roadside assistance is still in progress.'
+                          : 'Your request history is ready when you need it.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        color:
+                            Colors.white70,
+                        fontSize: 8.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 17),
-
-          Text(
-            active > 0
-                ? '$active active ${active == 1 ? 'request' : 'requests'}'
-                : 'You’re all clear',
-            style:
-                GoogleFonts.plusJakartaSans(
-              color: Colors.white,
-              fontSize: 22,
-              height: 1.1,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.65,
-            ),
-          ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            active > 0
-                ? 'Your roadside assistance is still in progress.'
-                : 'No roadside assistance is currently active.',
-            style:
-                GoogleFonts.plusJakartaSans(
-              color: Colors.white
-                  .withValues(alpha: .80),
-              fontSize: 10.8,
-              height: 1.45,
-            ),
-          ),
-
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           Row(
             children: [
               Expanded(
                 child:
-                    _PremiumDriverRequestMetric(
-                  value: '$active',
+                    _RaHistoryMetric(
                   label: 'Active',
-                  icon:
-                      Icons.route_rounded,
+                  value: '$active',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Expanded(
                 child:
-                    _PremiumDriverRequestMetric(
-                  value: '$completed',
+                    _RaHistoryMetric(
                   label: 'Completed',
-                  icon: Icons
-                      .check_circle_outline_rounded,
+                  value: '$completed',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 7),
               Expanded(
                 child:
-                    _PremiumDriverRequestMetric(
-                  value: '$total',
+                    _RaHistoryMetric(
                   label: 'Total',
-                  icon: Icons
-                      .history_rounded,
+                  value: '$total',
                 ),
               ),
             ],
@@ -463,70 +542,49 @@ class _PremiumDriverRequestsOverview
   }
 }
 
-class _PremiumDriverRequestMetric
+class _RaHistoryMetric
     extends StatelessWidget {
-  const _PremiumDriverRequestMetric({
-    required this.value,
+  const _RaHistoryMetric({
     required this.label,
-    required this.icon,
+    required this.value,
   });
 
-  final String value;
   final String label;
-  final IconData icon;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints:
-          const BoxConstraints(minHeight: 78),
       padding:
           const EdgeInsets.symmetric(
-        horizontal: 6,
+        horizontal: 8,
         vertical: 10,
       ),
       decoration: BoxDecoration(
-        color:
-            Colors.white.withValues(alpha: .10),
+        color: Colors.white
+            .withValues(alpha: .11),
         borderRadius:
-            BorderRadius.circular(15),
-        border: Border.all(
-          color: Colors.white
-              .withValues(alpha: .10),
-        ),
+            BorderRadius.circular(13),
       ),
       child: Column(
-        mainAxisAlignment:
-            MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 17,
-          ),
-          const SizedBox(height: 4),
           Text(
             value,
             style:
                 GoogleFonts.plusJakartaSans(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              fontWeight:
+                  FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 1),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              maxLines: 1,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                color: Colors.white
-                    .withValues(alpha: .72),
-                fontSize: 8.8,
-                fontWeight: FontWeight.w500,
-              ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style:
+                GoogleFonts.plusJakartaSans(
+              color: Colors.white70,
+              fontSize: 6.8,
             ),
           ),
         ],
@@ -535,85 +593,52 @@ class _PremiumDriverRequestMetric
   }
 }
 
-class _PremiumDriverRequestFilterBar
+class _RaHistoryFilters
     extends StatelessWidget {
-  const _PremiumDriverRequestFilterBar({
+  const _RaHistoryFilters({
     required this.selected,
     required this.onSelected,
   });
 
   final int selected;
-  final ValueChanged<int> onSelected;
+  final ValueChanged<int>
+      onSelected;
 
   static const filters = [
     ('All', Icons.apps_rounded),
     ('Active', Icons.route_outlined),
     (
       'Completed',
-      Icons.check_circle_outline_rounded
+      Icons.check_circle_outline_rounded,
     ),
-    (
-      'Cancelled',
-      Icons.cancel_outlined
-    ),
+    ('Cancelled', Icons.cancel_outlined),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
-
     return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics:
-          const BouncingScrollPhysics(),
+      scrollDirection:
+          Axis.horizontal,
       child: Row(
         children: [
-          for (var i = 0;
-              i < filters.length;
-              i++) ...[
-            if (i != 0)
-              const SizedBox(width: 8),
-
+          for (var index = 0;
+              index < filters.length;
+              index++) ...[
+            if (index > 0)
+              const SizedBox(width: 6),
             ChoiceChip(
-              selected: selected == i,
-              onSelected: (_) {
-                onSelected(i);
-              },
               avatar: Icon(
-                filters[i].$2,
-                size: 16,
-                color: selected == i
-                    ? colors.onPrimary
-                    : colors
-                        .onSurfaceVariant,
+                filters[index].$2,
+                size: 15,
               ),
               label: Text(
-                filters[i].$1,
+                filters[index].$1,
               ),
-              labelStyle:
-                  GoogleFonts.plusJakartaSans(
-                color: selected == i
-                    ? colors.onPrimary
-                    : colors
-                        .onSurfaceVariant,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
-              selectedColor:
-                  colors.primary,
-              backgroundColor:
-                  colors.surface,
-              side: BorderSide(
-                color: selected == i
-                    ? colors.primary
-                    : colors.outlineVariant
-                        .withValues(
-                        alpha: .55,
-                      ),
-              ),
-              shape:
-                  const StadiumBorder(),
+              selected:
+                  selected == index,
+              onSelected: (_) {
+                onSelected(index);
+              },
             ),
           ],
         ],
@@ -622,280 +647,167 @@ class _PremiumDriverRequestFilterBar
   }
 }
 
-class _PremiumDriverHistoryCard
+class _RaHistoryCard
     extends StatelessWidget {
-  const _PremiumDriverHistoryCard({
-    required this.requestId,
-    required this.data,
+  const _RaHistoryCard({
+    required this.request,
+    required this.onTap,
   });
 
-  final String requestId;
-  final Map<String, dynamic> data;
+  final QueryDocumentSnapshot<
+      Map<String, dynamic>> request;
+
+  final VoidCallback onTap;
+
+  String statusLabel(
+    String status,
+  ) {
+    return switch (status) {
+      'searching' =>
+        'Searching',
+      'accepted' =>
+        'Accepted',
+      'en_route' =>
+        'En route',
+      'arrived' =>
+        'Provider arrived',
+      'completed' =>
+        'Completed',
+      'cancelled' =>
+        'Cancelled',
+      _ =>
+        status.replaceAll('_', ' '),
+    };
+  }
+
+  RaTone statusTone(
+    String status,
+  ) {
+    return switch (status) {
+      'completed' =>
+        RaTone.success,
+      'cancelled' =>
+        RaTone.danger,
+      'searching' =>
+        RaTone.warning,
+      _ => RaTone.info,
+    };
+  }
+
+  String dateLabel(
+    Timestamp? timestamp,
+  ) {
+    if (timestamp == null) {
+      return 'Date unavailable';
+    }
+
+    final value =
+        timestamp.toDate().toLocal();
+
+    return '${value.day.toString().padLeft(2, '0')}/'
+        '${value.month.toString().padLeft(2, '0')}/'
+        '${value.year}';
+  }
+
+  String? moneyLabel(
+    Map<String, dynamic> data,
+  ) {
+    final value =
+        data['finalCost'] as num? ??
+            data['estimatedCost'] as num?;
+
+    if (value == null ||
+        value <= 0) {
+      return null;
+    }
+
+    return 'Rs. ${value.toInt()}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final colors =
+        theme.colorScheme;
+
+    final data =
+        request.data();
 
     final status =
         data['status'] as String? ??
             'searching';
 
-    final active = const [
-      'searching',
-      'accepted',
-      'en_route',
-      'arrived',
-    ].contains(status);
-
-    final draft =
-        requestDraftFromData(data);
-
     final provider =
-        data['providerName'] as String? ??
-            (status == 'searching'
-                ? 'Finding a provider'
-                : 'Not assigned');
-
-    final statusLabel = switch (status) {
-      'searching' => 'Searching',
-      'accepted' => 'Accepted',
-      'en_route' => 'En route',
-      'arrived' => 'Arrived',
-      'completed' => 'Completed',
-      'cancelled' => 'Cancelled',
-      _ => status.replaceAll('_', ' '),
-    };
-
-    final tone = switch (status) {
-      'completed' => RaTone.success,
-      'cancelled' => RaTone.danger,
-      _ => RaTone.info,
-    };
-
-    final created =
-        (data['createdAt'] as Timestamp?)
-            ?.toDate()
-            .toLocal();
-
-    final date = created == null
-        ? 'Date unavailable'
-        : '${created.day.toString().padLeft(2, '0')}/${created.month.toString().padLeft(2, '0')}/${created.year}';
-
-    final registration =
-        data['registration']
-                as String? ??
+        data['providerName']
+                ?.toString()
+                .trim() ??
             '';
 
-    final vehicle =
-        data['modelYear'] as String? ??
-            data['vehicleType']
-                as String? ??
+    final location =
+        data['locationLabel']
+                ?.toString()
+                .trim() ??
+            data['location']
+                ?.toString()
+                .trim() ??
             '';
 
-    final rawCost =
-        data['finalCost'] ??
-            data['estimatedCost'];
-
-    final cost = rawCost is num
-        ? 'Rs. ${rawCost.toInt()}'
-        : 'Not quoted yet';
-
-    void continueRequest() {
-      if (status == 'searching') {
-        push(
-          context,
-          SearchingScreen(
-            draft: draft,
-            requestId: requestId,
-          ),
-        );
-
-        return;
-      }
-
-      push(
-        context,
-        TrackingScreen(
-          draft: draft,
-          requestId: requestId,
-        ),
-      );
-    }
-
-    Future<void>
-        cancelActiveRequest() async {
-      final confirmed =
-          await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            icon: Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: raDanger
-                    .withValues(alpha: .10),
-                borderRadius:
-                    BorderRadius.circular(17),
-              ),
-              child: const Icon(
-                Icons
-                    .warning_amber_rounded,
-                color: raDanger,
-              ),
-            ),
-            title: const Text(
-              'Cancel current request?',
-            ),
-            content: const Text(
-              'The active assistance request will stop and remain in your cancelled history.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(
-                    dialogContext,
-                    false,
-                  );
-                },
-                child: const Text(
-                  'Keep Request',
-                ),
-              ),
-              FilledButton(
-                style:
-                    FilledButton.styleFrom(
-                  backgroundColor:
-                      raDanger,
-                ),
-                onPressed: () {
-                  Navigator.pop(
-                    dialogContext,
-                    true,
-                  );
-                },
-                child: const Text(
-                  'Cancel Request',
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (confirmed != true ||
-          !context.mounted) {
-        return;
-      }
-
-      try {
-        await RequestService()
-            .cancelRequest(requestId);
-
-        if (!context.mounted) return;
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Assistance request cancelled.',
-            ),
-          ),
-        );
-      } catch (_) {
-        if (!context.mounted) return;
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Unable to cancel this request.',
-            ),
-          ),
-        );
-      }
-    }
+    final amount =
+        moneyLabel(data);
 
     return Material(
-      color: dark
+      color: theme.brightness ==
+              Brightness.dark
           ? const Color(0xFF0D1D2B)
-          : Colors.white,
-      borderRadius:
-          BorderRadius.circular(21),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          borderRadius:
-              BorderRadius.circular(21),
-          border: Border.all(
-            color: colors.outlineVariant
-                .withValues(alpha: .50),
-          ),
+          : colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.circular(18),
+        side: BorderSide(
+          color: colors.outlineVariant
+              .withValues(alpha: .45),
         ),
+      ),
+      clipBehavior:
+          Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
         child: Padding(
           padding:
-              const EdgeInsets.all(15),
+              const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment:
                 CrossAxisAlignment.start,
             children: [
               Row(
-                children: [
-                  Text(
-                    date.toUpperCase(),
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      color: colors
-                          .onSurfaceVariant,
-                      fontSize: 8.5,
-                      letterSpacing: .8,
-                      fontWeight:
-                          FontWeight.w600,
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  StatusPill(
-                    label: statusLabel,
-                    tone: tone,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 13),
-
-              Row(
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 45,
-                    height: 45,
+                    width: 43,
+                    height: 43,
                     decoration:
                         BoxDecoration(
                       color: colors.primary
                           .withValues(
-                        alpha: .09,
+                        alpha: .08,
                       ),
                       borderRadius:
-                          BorderRadius
-                              .circular(14),
+                          BorderRadius.circular(
+                        13,
+                      ),
                     ),
                     child: Icon(
                       Icons
                           .car_repair_outlined,
-                      color:
-                          colors.primary,
+                      color: colors.primary,
                       size: 21,
                     ),
                   ),
 
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
 
                   Expanded(
                     child: Column(
@@ -908,179 +820,129 @@ class _PremiumDriverHistoryCard
                             data,
                           ),
                           maxLines: 2,
-                          overflow: TextOverflow
-                              .ellipsis,
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 13.5,
-                            height: 1.3,
-                            fontWeight:
-                                FontWeight.w700,
-                            color: colors
-                                .onSurface,
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height: 4,
-                        ),
-
-                        Text(
-                          provider,
-                          maxLines: 1,
-                          overflow: TextOverflow
-                              .ellipsis,
+                          overflow:
+                              TextOverflow
+                                  .ellipsis,
                           style: GoogleFonts
                               .plusJakartaSans(
                             fontSize: 10.5,
-                            color: colors
-                                .onSurfaceVariant,
+                            fontWeight:
+                                FontWeight
+                                    .w800,
+                          ),
+                        ),
+
+                        const SizedBox(height: 5),
+
+                        StatusPill(
+                          label:
+                              statusLabel(
+                            status,
+                          ),
+                          tone:
+                              statusTone(
+                            status,
                           ),
                         ),
                       ],
                     ),
                   ),
+
+                  const SizedBox(width: 7),
+
+                  Text(
+                    dateLabel(
+                      data['createdAt']
+                          as Timestamp?,
+                    ),
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 7,
+                      color: colors
+                          .onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
 
-              const SizedBox(height: 14),
+              if (provider.isNotEmpty ||
+                  location.isNotEmpty) ...[
+                const SizedBox(height: 12),
 
-              Divider(
-                height: 1,
-                color: colors.outlineVariant
-                    .withValues(alpha: .40),
-              ),
-
-              const SizedBox(height: 12),
-
-              _PremiumRequestInfoRow(
-                icon:
-                    Icons.directions_car_outlined,
-                label: 'Vehicle',
-                value: vehicle.trim().isEmpty
-                    ? 'Not provided'
-                    : vehicle,
-              ),
-
-              if (registration
-                  .trim()
-                  .isNotEmpty)
-                _PremiumRequestInfoRow(
-                  icon: Icons
-                      .pin_outlined,
-                  label: 'Registration',
-                  value: registration,
+                Divider(
+                  height: 1,
+                  color: colors
+                      .outlineVariant
+                      .withValues(
+                    alpha: .35,
+                  ),
                 ),
 
-              _PremiumRequestInfoRow(
-                icon: Icons
-                    .location_on_outlined,
-                label: 'Location',
-                value:
-                    data['locationLabel']
-                            as String? ??
-                        data['location']
-                            as String? ??
-                        'Pinned location',
-              ),
+                const SizedBox(height: 10),
 
-              _PremiumRequestInfoRow(
-                icon:
-                    Icons.payments_outlined,
-                label: status == 'completed'
-                    ? 'Final cost'
-                    : 'Current estimate',
-                value: cost,
-                strong: true,
-              ),
+                if (provider.isNotEmpty)
+                  _RaHistoryLine(
+                    icon: Icons
+                        .engineering_outlined,
+                    text: provider,
+                  ),
 
-              if (data['driverRating'] !=
-                  null)
-                _PremiumRequestInfoRow(
-                  icon:
-                      Icons.star_rounded,
-                  label: 'Your rating',
-                  value:
-                      '${data['driverRating']} / 5',
-                ),
+                if (provider.isNotEmpty &&
+                    location.isNotEmpty)
+                  const SizedBox(height: 6),
 
-              const SizedBox(height: 12),
-
-              if (active) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child:
-                          FilledButton.icon(
-                        onPressed:
-                            continueRequest,
-                        icon: Icon(
-                          status ==
-                                  'searching'
-                              ? Icons
-                                  .search_rounded
-                              : Icons
-                                  .near_me_rounded,
-                        ),
-                        label: Text(
-                          status ==
-                                  'searching'
-                              ? 'Search'
-                              : 'Continue',
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    SizedBox(
-                      width: 52,
-                      height: 52,
-                      child:
-                          OutlinedButton(
-                        style: OutlinedButton
-                            .styleFrom(
-                          padding:
-                              EdgeInsets.zero,
-                          foregroundColor:
-                              raDanger,
-                        ),
-                        onPressed:
-                            cancelActiveRequest,
-                        child: const Icon(
-                          Icons
-                              .close_rounded,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
+                if (location.isNotEmpty)
+                  _RaHistoryLine(
+                    icon: Icons
+                        .location_on_outlined,
+                    text: location,
+                  ),
               ],
 
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    push(
-                      context,
-                      RealtimeDriverRequestDetailsScreen(
-                        requestId:
-                            requestId,
-                        data: data,
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  if (amount != null)
+                    Text(
+                      amount,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 9,
+                        fontWeight:
+                            FontWeight.w800,
+                        color:
+                            colors.primary,
                       ),
-                    );
-                  },
-                  icon: const Icon(
+                    ),
+
+                  const Spacer(),
+
+                  Text(
+                    _driverActiveRequestStatuses
+                            .contains(status)
+                        ? 'Resume'
+                        : 'View details',
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 7.5,
+                      fontWeight:
+                          FontWeight.w700,
+                      color:
+                          colors.primary,
+                    ),
+                  ),
+
+                  const SizedBox(width: 2),
+
+                  Icon(
                     Icons
-                        .receipt_long_outlined,
-                    size: 17,
+                        .chevron_right_rounded,
+                    size: 18,
+                    color:
+                        colors.primary,
                   ),
-                  label: const Text(
-                    'View Request Details',
-                  ),
-                ),
+                ],
               ),
             ],
           ),
@@ -1090,132 +952,116 @@ class _PremiumDriverHistoryCard
   }
 }
 
-class _PremiumRequestInfoRow
+class _RaHistoryLine
     extends StatelessWidget {
-  const _PremiumRequestInfoRow({
+  const _RaHistoryLine({
     required this.icon,
-    required this.label,
-    required this.value,
-    this.strong = false,
+    required this.text,
   });
 
   final IconData icon;
-  final String label;
-  final String value;
-  final bool strong;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     final colors =
         Theme.of(context).colorScheme;
 
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 5,
-      ),
-      child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            size: 15,
-            color:
-                colors.onSurfaceVariant,
-          ),
-
-          const SizedBox(width: 8),
-
-          SizedBox(
-            width: 84,
-            child: Text(
-              label,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 9.5,
-                color: colors
-                    .onSurfaceVariant,
-              ),
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 14,
+          color:
+              colors.onSurfaceVariant,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow:
+                TextOverflow.ellipsis,
+            style:
+                GoogleFonts.plusJakartaSans(
+              fontSize: 7.8,
+              color:
+                  colors.onSurfaceVariant,
             ),
           ),
-
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              maxLines: 2,
-              overflow:
-                  TextOverflow.ellipsis,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                color: strong
-                    ? colors.primary
-                    : colors.onSurface,
-                fontSize: 10.5,
-                height: 1.35,
-                fontWeight: strong
-                    ? FontWeight.w800
-                    : FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _PremiumDriverHistoryEmptyState
+class _RaHistoryEmpty
     extends StatelessWidget {
-  const _PremiumDriverHistoryEmptyState({
+  const _RaHistoryEmpty({
     required this.filter,
+    this.onStart,
   });
 
   final int filter;
+  final VoidCallback? onStart;
 
   @override
   Widget build(BuildContext context) {
-    final result = switch (filter) {
+    final data =
+        switch (filter) {
       1 => (
           Icons.route_outlined,
           'No active requests',
-          'You do not have roadside assistance in progress.'
+          'You do not have roadside assistance in progress.',
         ),
       2 => (
           Icons
               .check_circle_outline_rounded,
           'No completed requests',
-          'Completed services will appear here.'
+          'Completed roadside assistance will appear here.',
         ),
       3 => (
           Icons.cancel_outlined,
           'No cancelled requests',
-          'Cancelled requests will appear here.'
+          'Cancelled requests will appear here.',
         ),
       _ => (
-          Icons
-              .receipt_long_outlined,
+          Icons.receipt_long_outlined,
           'No requests yet',
-          'Your roadside assistance history will appear here.'
+          'Your roadside assistance requests will appear here.',
         ),
     };
 
-    return Padding(
-      padding:
-          const EdgeInsets.only(top: 16),
-      child: EmptyState(
-        icon: result.$1,
-        title: result.$2,
-        message: result.$3,
-      ),
+    return Column(
+      children: [
+        EmptyState(
+          icon: data.$1,
+          title: data.$2,
+          message: data.$3,
+        ),
+        if (onStart != null) ...[
+          const SizedBox(height: 13),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onStart,
+              icon: const Icon(
+                Icons.add_road_rounded,
+              ),
+              label: const Text(
+                'Start Assistance',
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
 
-class _PremiumDriverHistoryLoadingView
+class _RaHistoryLoading
     extends StatelessWidget {
-  const _PremiumDriverHistoryLoadingView();
+  const _RaHistoryLoading();
 
   @override
   Widget build(BuildContext context) {
@@ -1223,34 +1069,36 @@ class _PremiumDriverHistoryLoadingView
         Theme.of(context).colorScheme;
 
     return ListView(
-      padding: const EdgeInsets.all(18),
+      padding:
+          const EdgeInsets.all(18),
       children: [
         Container(
-          height: 190,
+          height: 165,
           decoration: BoxDecoration(
             color: colors
                 .surfaceContainerHighest,
             borderRadius:
-                BorderRadius.circular(25),
+                BorderRadius.circular(23),
           ),
         ),
-        const SizedBox(height: 25),
-        for (var i = 0;
-            i < 3;
-            i++) ...[
+        const SizedBox(height: 22),
+        for (var index = 0;
+            index < 3;
+            index++) ...[
           Container(
-            height: 210,
-            decoration: BoxDecoration(
+            height: 145,
+            decoration:
+                BoxDecoration(
               color: colors.surface,
               borderRadius:
-                  BorderRadius.circular(21),
+                  BorderRadius.circular(18),
               border: Border.all(
-                color:
-                    colors.outlineVariant,
+                color: colors
+                    .outlineVariant,
               ),
             ),
           ),
-          const SizedBox(height: 11),
+          const SizedBox(height: 9),
         ],
       ],
     );

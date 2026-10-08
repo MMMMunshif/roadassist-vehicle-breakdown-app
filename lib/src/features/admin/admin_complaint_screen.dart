@@ -9,16 +9,16 @@ class _AdminComplaintScreen
   final String requestId;
 
   @override
-  State<_AdminComplaintScreen>
-      createState() =>
-          _AdminComplaintScreenState();
+  State<_AdminComplaintScreen> createState() =>
+      _AdminComplaintScreenState();
 }
 
 class _AdminComplaintScreenState
     extends State<_AdminComplaintScreen> {
   String priority = 'normal';
 
-  DateTime dueAt = DateTime.now().add(
+  DateTime dueAt =
+      DateTime.now().add(
     const Duration(days: 2),
   );
 
@@ -60,7 +60,9 @@ class _AdminComplaintScreenState
         decision: reason,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
@@ -71,7 +73,9 @@ class _AdminComplaintScreenState
         ),
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
@@ -112,227 +116,182 @@ class _AdminComplaintScreenState
     };
   }
 
+  String friendlyStatus(
+    String value,
+  ) {
+    return value
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where(
+          (item) => item.isNotEmpty,
+        )
+        .map(
+          (item) =>
+              '${item[0].toUpperCase()}${item.substring(1)}',
+        )
+        .join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Complaint Review',
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
       body: ListView(
+        physics:
+            const BouncingScrollPhysics(),
         padding:
             const EdgeInsets.fromLTRB(
-          RaSpace.lg,
-          RaSpace.md,
-          RaSpace.lg,
-          RaSpace.xxxl,
+          18,
+          8,
+          18,
+          32,
         ),
         children: [
-          Container(
-            padding:
-                const EdgeInsets.all(
-              RaSpace.xl,
-            ),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin:
-                    Alignment.topLeft,
-                end:
-                    Alignment.bottomRight,
-                colors: [
-                  colors.primary,
-                  const Color(
-                    0xFF007D70,
-                  ),
-                ],
-              ),
-              borderRadius:
-                  BorderRadius.circular(
-                24,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration:
-                      BoxDecoration(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .14,
-                    ),
-                    borderRadius:
-                        BorderRadius
-                            .circular(16),
-                  ),
-                  child: const Icon(
-                    Icons
-                        .fact_check_outlined,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(
-                  height: RaSpace.lg,
-                ),
-                Text(
-                  'Case review',
-                  style: theme
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(
-                    color: Colors.white,
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Job ${widget.requestId}',
-                  style: theme
-                      .textTheme.bodyMedium
-                      ?.copyWith(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .82,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          _AdminComplaintHero(
+            requestId:
+                widget.requestId,
           ),
 
-          const SizedBox(
-            height: RaSpace.md,
+          const SizedBox(height: 12),
+
+          const _AdminComplaintNotice(
+            icon: Icons.gavel_outlined,
+            title:
+                'Evidence-based review',
+            message:
+                'Review the driver report, provider response and invoice evidence before deciding. Admin decisions are visible to participants but do not automatically process refunds.',
+            tone: raBlue,
           ),
 
-          Container(
-            padding:
-                const EdgeInsets.all(
-              RaSpace.md,
-            ),
-            decoration: BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest
-                  .withValues(alpha: .4),
-              borderRadius:
-                  BorderRadius.circular(
-                16,
-              ),
-            ),
-            child: const Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons
-                      .gavel_outlined,
-                  size: 19,
-                ),
-                SizedBox(
-                  width: RaSpace.sm,
-                ),
-                Expanded(
-                  child: Text(
-                    'Review the driver report, provider response and invoice evidence before deciding. Admin decisions are visible to participants but do not automatically process refunds.',
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 18),
 
-          const SizedBox(
-            height: RaSpace.xl,
-          ),
+          LayoutBuilder(
+            builder: (
+              context,
+              constraints,
+            ) {
+              final compact =
+                  constraints.maxWidth <
+                      480;
 
-          Row(
-            children: [
-              Expanded(
-                child:
-                    OutlinedButton.icon(
-                  onPressed: () => push(
+              final caseButton =
+                  OutlinedButton.icon(
+                onPressed: () {
+                  push(
                     context,
                     DisputeScreen(
                       requestId:
                           widget.requestId,
                     ),
-                  ),
-                  icon: const Icon(
-                    Icons
-                        .report_problem_outlined,
-                  ),
-                  label: const Text(
-                    'View Case Evidence',
-                  ),
+                  );
+                },
+                icon: const Icon(
+                  Icons
+                      .report_problem_outlined,
                 ),
-              ),
-              const SizedBox(
-                width: RaSpace.sm,
-              ),
-              Expanded(
-                child:
-                    OutlinedButton.icon(
-                  onPressed: () => push(
+                label: const Text(
+                  'Case Evidence',
+                ),
+              );
+
+              final invoiceButton =
+                  OutlinedButton.icon(
+                onPressed: () {
+                  push(
                     context,
                     InvoiceScreen(
                       requestId:
                           widget.requestId,
                     ),
-                  ),
-                  icon: const Icon(
-                    Icons
-                        .receipt_long_outlined,
-                  ),
-                  label: const Text(
-                    'View Invoice',
-                  ),
+                  );
+                },
+                icon: const Icon(
+                  Icons
+                      .receipt_long_outlined,
                 ),
-              ),
-            ],
+                label: const Text(
+                  'Invoice',
+                ),
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .stretch,
+                  children: [
+                    caseButton,
+                    const SizedBox(height: 8),
+                    invoiceButton,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: caseButton,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: invoiceButton,
+                  ),
+                ],
+              );
+            },
           ),
 
-          const SizedBox(
-            height: RaSpace.xxl,
+          const SizedBox(height: 24),
+
+          const _AdminComplaintHeading(
+            title:
+                'Current admin review',
+            subtitle:
+                'Current complaint ownership, priority, deadline and published decision.',
           ),
 
-          Text(
-            'Current admin review',
-            style: theme
-                .textTheme.titleLarge
-                ?.copyWith(
-              fontWeight:
-                  FontWeight.w900,
-            ),
-          ),
-
-          const SizedBox(
-            height: RaSpace.md,
-          ),
+          const SizedBox(height: 10),
 
           StreamBuilder<
-            DocumentSnapshot<
-              Map<String, dynamic>
-            >
-          >(
+              DocumentSnapshot<
+                  Map<String, dynamic>>>(
             stream: review,
             builder: (
               context,
               snapshot,
             ) {
               if (snapshot.hasError) {
-                return const InlineMessage(
-                  text:
-                      'Could not load admin review.',
-                  error: true,
+                return const _AdminComplaintNotice(
+                  icon: Icons
+                      .cloud_off_outlined,
+                  title:
+                      'Review unavailable',
+                  message:
+                      'Could not load the current admin complaint review.',
+                  tone:
+                      raDanger,
                 );
+              }
+
+              if (!snapshot.hasData) {
+                return const LinearProgressIndicator();
               }
 
               final data =
@@ -347,34 +306,25 @@ class _AdminComplaintScreenState
                   data?['dueAt']
                       as Timestamp?;
 
-              return Container(
-                padding:
-                    const EdgeInsets.all(
-                  RaSpace.lg,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: colors.surface,
-                  borderRadius:
-                      BorderRadius.circular(
-                    20,
-                  ),
-                  border: Border.all(
-                    color: colors
-                        .outlineVariant
-                        .withValues(
-                      alpha: .6,
-                    ),
-                  ),
-                ),
+              final decision =
+                  data?['decision']
+                          as String? ??
+                      '';
+
+              return _AdminComplaintSurface(
                 child: Column(
                   children: [
                     _AdminCaseRow(
                       label: 'Status',
                       value:
-                          data?['status']
-                                  as String? ??
-                              'Not assigned',
+                          friendlyStatus(
+                        data?['status']
+                                as String? ??
+                            'Not assigned',
+                      ),
+                    ),
+                    const Divider(
+                      height: 1,
                     ),
                     _AdminCaseRow(
                       label:
@@ -384,88 +334,68 @@ class _AdminComplaintScreenState
                                   as String? ??
                               'None',
                     ),
+                    const Divider(
+                      height: 1,
+                    ),
                     _AdminCaseRow(
                       label: 'Priority',
                       value:
-                          currentPriority,
+                          friendlyStatus(
+                        currentPriority,
+                      ),
                       valueColor:
                           priorityColor(
                         context,
                         currentPriority,
                       ),
                     ),
-                    if (due != null)
+                    if (due != null) ...[
+                      const Divider(
+                        height: 1,
+                      ),
                       _AdminCaseRow(
                         label:
                             'Follow-up deadline',
-                        value: due
-                            .toDate()
-                            .toLocal()
-                            .toString()
-                            .split(' ')
-                            .first,
+                        value:
+                            '${due.toDate().toLocal().day.toString().padLeft(2, '0')}/'
+                            '${due.toDate().toLocal().month.toString().padLeft(2, '0')}/'
+                            '${due.toDate().toLocal().year}',
                       ),
-                    if ((data?['decision']
-                                as String? ??
-                            '')
-                        .isNotEmpty)
+                    ],
+                    if (decision
+                        .trim()
+                        .isNotEmpty) ...[
+                      const Divider(
+                        height: 1,
+                      ),
                       _AdminCaseRow(
                         label:
                             'Public decision',
-                        value:
-                            data!['decision']
-                                as String,
+                        value: decision,
                       ),
+                    ],
                   ],
                 ),
               );
             },
           ),
 
-          const SizedBox(
-            height: RaSpace.xxl,
+          const SizedBox(height: 24),
+
+          const _AdminComplaintHeading(
+            title: 'Review controls',
+            subtitle:
+                'Set the next follow-up priority and deadline before recording a decision.',
           ),
 
-          Text(
-            'Review controls',
-            style: theme
-                .textTheme.titleLarge
-                ?.copyWith(
-              fontWeight:
-                  FontWeight.w900,
-            ),
-          ),
+          const SizedBox(height: 10),
 
-          const SizedBox(
-            height: RaSpace.md,
-          ),
-
-          Container(
-            padding:
-                const EdgeInsets.all(
-              RaSpace.lg,
-            ),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius:
-                  BorderRadius.circular(
-                20,
-              ),
-              border: Border.all(
-                color: colors.outlineVariant
-                    .withValues(
-                  alpha: .6,
-                ),
-              ),
-            ),
+          _AdminComplaintSurface(
             child: Column(
               crossAxisAlignment:
-                  CrossAxisAlignment
-                      .stretch,
+                  CrossAxisAlignment.stretch,
               children: [
-                DropdownButtonFormField<
-                  String
-                >(
+                DropdownButtonFormField<String>(
                   initialValue: priority,
                   decoration:
                       const InputDecoration(
@@ -486,29 +416,24 @@ class _AdminComplaintScreenState
                       DropdownMenuItem(
                         value: value,
                         child: Text(
-                          value
-                              .toUpperCase(),
+                          value.toUpperCase(),
                         ),
                       ),
                   ],
                   onChanged: busy
                       ? null
                       : (value) {
-                          if (value ==
-                              null) {
+                          if (value == null) {
                             return;
                           }
 
                           setState(() {
-                            priority =
-                                value;
+                            priority = value;
                           });
                         },
                 ),
 
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
+                const SizedBox(height: 12),
 
                 OutlinedButton.icon(
                   onPressed: busy
@@ -517,21 +442,19 @@ class _AdminComplaintScreenState
                           final picked =
                               await showDatePicker(
                             context: context,
-                            initialDate:
-                                dueAt,
+                            initialDate: dueAt,
                             firstDate:
                                 DateTime.now(),
-                            lastDate: DateTime
-                                .now()
-                                .add(
+                            lastDate:
+                                DateTime.now()
+                                    .add(
                               const Duration(
                                 days: 30,
                               ),
                             ),
                           );
 
-                          if (picked !=
-                                  null &&
+                          if (picked != null &&
                               mounted) {
                             setState(() {
                               dueAt =
@@ -549,52 +472,63 @@ class _AdminComplaintScreenState
                         .calendar_month_outlined,
                   ),
                   label: Text(
-                    'Follow-up deadline: ${dueLabel()}',
+                    'Follow-up deadline · ${dueLabel()}',
                   ),
                 ),
 
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
+                const SizedBox(height: 12),
 
-                const InlineMessage(
+                const _AdminComplaintNotice(
                   icon: Icons
                       .info_outline_rounded,
-                  text:
-                      'Starting review can reopen an existing resolved admin review. A reason is required for every decision.',
+                  title:
+                      'Decision reasons are required',
+                  message:
+                      'Starting review can reopen an existing resolved admin review. A reason is required for every recorded decision.',
+                  tone: raGold,
                 ),
               ],
             ),
           ),
 
-          const SizedBox(
-            height: RaSpace.md,
-          ),
+          const SizedBox(height: 14),
 
-          Wrap(
-            spacing: RaSpace.sm,
-            runSpacing: RaSpace.sm,
-            children: [
-              FilledButton.icon(
+          LayoutBuilder(
+            builder: (
+              context,
+              constraints,
+            ) {
+              final narrow =
+                  constraints.maxWidth <
+                      560;
+
+              final startReview =
+                  FilledButton.icon(
                 onPressed: busy
                     ? null
-                    : () => decide(
-                        'under_review',
-                      ),
+                    : () {
+                        decide(
+                          'under_review',
+                        );
+                      },
                 icon: const Icon(
                   Icons
                       .assignment_ind_outlined,
                 ),
                 label: const Text(
-                  'Assign to Me / Start Review',
+                  'Start Review',
                 ),
-              ),
-              OutlinedButton.icon(
+              );
+
+              final resolve =
+                  OutlinedButton.icon(
                 onPressed: busy
                     ? null
-                    : () => decide(
-                        'resolved',
-                      ),
+                    : () {
+                        decide(
+                          'resolved',
+                        );
+                      },
                 icon: const Icon(
                   Icons
                       .task_alt_rounded,
@@ -602,32 +536,64 @@ class _AdminComplaintScreenState
                 label: const Text(
                   'Record Resolution',
                 ),
-              ),
-              OutlinedButton.icon(
+              );
+
+              final dismiss =
+                  OutlinedButton.icon(
                 style:
                     OutlinedButton.styleFrom(
                   foregroundColor:
                       colors.error,
+                  side: BorderSide(
+                    color: colors.error
+                        .withValues(
+                      alpha: .45,
+                    ),
+                  ),
                 ),
                 onPressed: busy
                     ? null
-                    : () => decide(
-                        'dismissed',
-                      ),
+                    : () {
+                        decide(
+                          'dismissed',
+                        );
+                      },
                 icon: const Icon(
-                  Icons
-                      .cancel_outlined,
+                  Icons.cancel_outlined,
                 ),
                 label: const Text(
-                  'Dismiss with Reason',
+                  'Dismiss',
                 ),
-              ),
-            ],
+              );
+
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .stretch,
+                  children: [
+                    startReview,
+                    const SizedBox(height: 8),
+                    resolve,
+                    const SizedBox(height: 8),
+                    dismiss,
+                  ],
+                );
+              }
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  startReview,
+                  resolve,
+                  dismiss,
+                ],
+              );
+            },
           ),
 
-          const SizedBox(
-            height: RaSpace.xl,
-          ),
+          const SizedBox(height: 25),
 
           _AdminPrivateNotes(
             kind: 'complaint',
@@ -635,9 +601,7 @@ class _AdminComplaintScreenState
           ),
 
           if (busy) ...[
-            const SizedBox(
-              height: RaSpace.md,
-            ),
+            const SizedBox(height: 14),
             const LinearProgressIndicator(),
           ],
         ],
@@ -646,8 +610,243 @@ class _AdminComplaintScreenState
   }
 }
 
-class _AdminCaseRow
-    extends StatelessWidget {
+class _AdminComplaintHero extends StatelessWidget {
+  const _AdminComplaintHero({
+    required this.requestId,
+  });
+
+  final String requestId;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF0A497F),
+                  Color(0xFF075A68),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078C7E),
+                ],
+        ),
+        borderRadius:
+            BorderRadius.circular(23),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 49,
+            height: 49,
+            decoration: BoxDecoration(
+              color: Colors.white
+                  .withValues(alpha: .13),
+              borderRadius:
+                  BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.fact_check_outlined,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Case review',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight:
+                        FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'JOB $requestId',
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white70,
+                    fontSize: 7.7,
+                    fontWeight:
+                        FontWeight.w700,
+                    letterSpacing: .45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminComplaintHeading extends StatelessWidget {
+  const _AdminComplaintHeading({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 8.3,
+            height: 1.4,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminComplaintSurface extends StatelessWidget {
+  const _AdminComplaintSurface({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(0xFF0D1D2B)
+            : theme.colorScheme.surface,
+        borderRadius:
+            BorderRadius.circular(18),
+        border: Border.all(
+          color: theme
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: .45),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _AdminComplaintNotice extends StatelessWidget {
+  const _AdminComplaintNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.tone,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: .07),
+        borderRadius:
+            BorderRadius.circular(15),
+        border: Border.all(
+          color: tone.withValues(alpha: .17),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: tone,
+            size: 19,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9.3,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8.1,
+                    height: 1.45,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminCaseRow extends StatelessWidget {
   const _AdminCaseRow({
     required this.label,
     required this.value,
@@ -664,8 +863,7 @@ class _AdminCaseRow
         Theme.of(context).colorScheme;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         vertical: 9,
       ),
       child: Row(
@@ -675,28 +873,24 @@ class _AdminCaseRow
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context)
-                  .textTheme.bodySmall
-                  ?.copyWith(
-                color: colors
-                    .onSurfaceVariant,
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 8.1,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ),
-          const SizedBox(
-            width: RaSpace.md,
-          ),
+          const SizedBox(width: 12),
           Flexible(
             child: Text(
               value,
-              textAlign:
-                  TextAlign.right,
-              style: Theme.of(context)
-                  .textTheme.bodyMedium
-                  ?.copyWith(
+              textAlign: TextAlign.right,
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 9,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
                 color: valueColor,
-                fontWeight:
-                    FontWeight.w800,
               ),
             ),
           ),

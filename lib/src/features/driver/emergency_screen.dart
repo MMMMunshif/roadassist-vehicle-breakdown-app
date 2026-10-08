@@ -22,219 +22,158 @@ class EmergencyScreen extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor:
-          Colors.transparent,
-      builder: (sheetContext) {
-        final theme =
-            Theme.of(sheetContext);
-
+      showDragHandle: true,
+      builder: (
+        sheetContext,
+      ) {
         final colors =
-            theme.colorScheme;
-
-        final dark =
-            theme.brightness ==
-                Brightness.dark;
+            Theme.of(sheetContext)
+                .colorScheme;
 
         return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(
-              sheetContext,
-            ).viewInsets.bottom,
+          padding:
+              EdgeInsets.fromLTRB(
+            18,
+            0,
+            18,
+            MediaQuery.of(
+                      sheetContext,
+                    ).viewInsets.bottom +
+                18,
           ),
-          child: Container(
-            padding:
-                const EdgeInsets.fromLTRB(
-              18,
-              12,
-              18,
-              24,
-            ),
-            decoration: BoxDecoration(
-              color: dark
-                  ? const Color(
-                      0xFF0D1D2B,
-                    )
-                  : colors.surface,
-              borderRadius:
-                  const BorderRadius
-                      .vertical(
-                top:
-                    Radius.circular(28),
-              ),
-            ),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize:
-                    MainAxisSize.min,
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize:
+                  MainAxisSize.min,
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 47,
+                      height: 47,
                       decoration:
                           BoxDecoration(
-                        color: colors
-                            .onSurfaceVariant
+                        color: colors.error
                             .withValues(
-                          alpha: .24,
+                          alpha: .08,
                         ),
                         borderRadius:
                             BorderRadius
                                 .circular(
-                          999,
+                          15,
                         ),
+                      ),
+                      child: Icon(
+                        Icons
+                            .contact_emergency_outlined,
+                        color:
+                            colors.error,
                       ),
                     ),
-                  ),
-
-                  const SizedBox(
-                    height: 21,
-                  ),
-
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration:
-                            BoxDecoration(
-                          color: raDanger
-                              .withValues(
-                            alpha: .10,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                        children: [
+                          Text(
+                            'Emergency contact',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 16,
+                              fontWeight:
+                                  FontWeight
+                                      .w800,
+                            ),
                           ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            15,
+                          const SizedBox(
+                            height: 2,
                           ),
-                        ),
-                        child:
-                            const Icon(
-                          Icons
-                              .contact_emergency_outlined,
-                          color:
-                              raDanger,
-                        ),
-                      ),
-
-                      const SizedBox(
-                        width: 12,
-                      ),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                          children: [
-                            Text(
-                              'Emergency contact',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize: 18,
-                                fontWeight:
-                                    FontWeight
-                                        .w800,
-                                color: colors
-                                    .onSurface,
-                              ),
+                          Text(
+                            'Save a trusted contact for roadside situations.',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 8,
+                              color: colors
+                                  .onSurfaceVariant,
                             ),
-                            const SizedBox(
-                              height: 3,
-                            ),
-                            Text(
-                              'Add a trusted person you can call during roadside emergencies.',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize: 9.5,
-                                height: 1.4,
-                                color: colors
-                                    .onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(
-                    height: 20,
-                  ),
-
-                  TextFormField(
-                    initialValue:
-                        updatedContact,
-                    autofocus: true,
-                    keyboardType:
-                        TextInputType.phone,
-                    textInputAction:
-                        TextInputAction.done,
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Phone number',
-                      hintText:
-                          '077 123 4567',
-                      prefixIcon: Icon(
-                        Icons.phone_outlined,
+                          ),
+                        ],
                       ),
                     ),
-                    validator:
-                        validateSriLankaPhone,
-                    onChanged: (value) {
-                      updatedContact =
-                          value;
-                    },
-                    onFieldSubmitted:
-                        (_) {
-                      if (formKey
-                              .currentState
-                              ?.validate() ??
-                          false) {
-                        Navigator.pop(
-                          sheetContext,
-                          normalizeSriLankaPhone(
-                            updatedContact,
-                          ),
-                        );
-                      }
-                    },
+                  ],
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  initialValue:
+                      updatedContact,
+                  autofocus: true,
+                  keyboardType:
+                      TextInputType.phone,
+                  textInputAction:
+                      TextInputAction.done,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Phone number',
+                    hintText:
+                        '+94 77 123 4567',
+                    prefixIcon: Icon(
+                      Icons.phone_outlined,
+                    ),
                   ),
-
-                  const SizedBox(
-                    height: 18,
-                  ),
-
-                  FilledButton.icon(
-                    onPressed: () {
-                      if (!(formKey
-                              .currentState
-                              ?.validate() ??
-                          false)) {
-                        return;
-                      }
-
+                  validator:
+                      validateSriLankaPhone,
+                  onChanged: (
+                    value,
+                  ) {
+                    updatedContact =
+                        value;
+                  },
+                  onFieldSubmitted: (_) {
+                    if (formKey
+                            .currentState
+                            ?.validate() ??
+                        false) {
                       Navigator.pop(
                         sheetContext,
                         normalizeSriLankaPhone(
                           updatedContact,
                         ),
                       );
-                    },
-                    icon: const Icon(
-                      Icons.check_rounded,
-                    ),
-                    label: const Text(
-                      'Save Contact',
-                    ),
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (!(formKey
+                            .currentState
+                            ?.validate() ??
+                        false)) {
+                      return;
+                    }
+
+                    Navigator.pop(
+                      sheetContext,
+                      normalizeSriLankaPhone(
+                        updatedContact,
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.check_rounded,
                   ),
-                ],
-              ),
+                  label: const Text(
+                    'Save Contact',
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -253,7 +192,9 @@ class EmergencyScreen extends StatelessWidget {
         'emergencyContact': value,
       });
 
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
@@ -264,7 +205,9 @@ class EmergencyScreen extends StatelessWidget {
         ),
       );
     } catch (error) {
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
@@ -272,7 +215,8 @@ class EmergencyScreen extends StatelessWidget {
           content: Text(
             'Unable to save emergency contact: $error',
           ),
-          backgroundColor: raDanger,
+          backgroundColor:
+              raDanger,
         ),
       );
     }
@@ -280,8 +224,11 @@ class EmergencyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
       backgroundColor:
@@ -289,19 +236,23 @@ class EmergencyScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Emergency',
-          style: GoogleFonts.plusJakartaSans(
+          style:
+              GoogleFonts.plusJakartaSans(
             fontSize: 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
       ),
       body: !signedIn
           ? const Padding(
-              padding: EdgeInsets.all(20),
+              padding:
+                  EdgeInsets.all(18),
               child: EmptyState(
-                icon: Icons.login_outlined,
-                title: 'Sign in required',
+                icon:
+                    Icons.login_outlined,
+                title:
+                    'Sign in required',
                 message:
                     'Sign in as a driver to manage an emergency contact.',
               ),
@@ -311,15 +262,24 @@ class EmergencyScreen extends StatelessWidget {
                   Map<String, dynamic>>>(
               stream: AuthService()
                   .watchCurrentProfile(),
-              builder: (context, snapshot) {
+              builder: (
+                context,
+                snapshot,
+              ) {
                 if (snapshot.hasError) {
-                  return const EmptyState(
-                    icon:
-                        Icons.cloud_off_outlined,
-                    title:
-                        'Unable to load emergency details',
-                    message:
-                        'Check your connection and try again.',
+                  return const Padding(
+                    padding:
+                        EdgeInsets.all(
+                      18,
+                    ),
+                    child: EmptyState(
+                      icon: Icons
+                          .cloud_off_outlined,
+                      title:
+                          'Unable to load emergency information',
+                      message:
+                          'Check your connection and try again.',
+                    ),
                   );
                 }
 
@@ -332,11 +292,11 @@ class EmergencyScreen extends StatelessWidget {
 
                 final data =
                     snapshot.data!.data() ??
-                        {};
+                        <String, dynamic>{};
 
                 final contact =
                     data['emergencyContact']
-                            as String? ??
+                            ?.toString() ??
                         '';
 
                 final configured =
@@ -346,12 +306,12 @@ class EmergencyScreen extends StatelessWidget {
 
                 final location =
                     data['currentLocationLabel']
-                            as String? ??
-                        'Current location not available';
+                            ?.toString()
+                            .trim() ??
+                        '';
 
                 final hasLocation =
-                    location !=
-                        'Current location not available';
+                    location.isNotEmpty;
 
                 return ListView(
                   physics:
@@ -365,159 +325,297 @@ class EmergencyScreen extends StatelessWidget {
                   ),
                   children: [
                     const _RaEmergencyHero(),
-
-                    const SizedBox(
-                      height: 26,
-                    ),
-
+                    const SizedBox(height: 23),
                     const _RaEmergencyHeading(
                       title:
                           'Emergency services',
                       subtitle:
-                          'Use official emergency contacts when there is immediate danger.',
+                          'Use emergency services immediately if there is danger to life or safety.',
                     ),
-
-                    const SizedBox(
-                      height: 11,
-                    ),
-
-                    _RaEmergencyAction(
+                    const SizedBox(height: 10),
+                    _RaEmergencyActionCard(
                       icon:
-                          Icons.local_police_outlined,
+                          Icons.sos_rounded,
                       title:
                           'Police Emergency',
-                      number: '119',
-                      message:
-                          'For urgent police or public safety assistance.',
-                      tone: raDanger,
+                      subtitle:
+                          'Call 119 for immediate emergency assistance.',
+                      label:
+                          'Call 119',
+                      danger: true,
                       onTap: () {
                         showCallPrompt(
                           context,
                           name:
-                              'Police Emergency',
+                              'Emergency Services',
                           number: '119',
                         );
                       },
                     ),
-
-                    const SizedBox(
-                      height: 10,
-                    ),
-
-                    _RaEmergencyAction(
-                      icon:
-                          Icons.emergency_outlined,
-                      title:
-                          'Suwa Seriya Ambulance',
-                      number: '1990',
-                      message:
-                          'Emergency ambulance service.',
-                      tone:
-                          const Color(
-                        0xFFD8362A,
-                      ),
-                      onTap: () {
-                        showCallPrompt(
-                          context,
-                          name:
-                              'Suwa Seriya Ambulance',
-                          number: '1990',
-                        );
-                      },
-                    ),
-
-                    const SizedBox(
-                      height: 27,
-                    ),
-
+                    const SizedBox(height: 23),
                     const _RaEmergencyHeading(
                       title:
                           'Trusted contact',
                       subtitle:
-                          'Keep a personal contact ready for roadside situations.',
+                          'A personal contact you may need during roadside assistance.',
                     ),
-
-                    const SizedBox(
-                      height: 11,
-                    ),
-
-                    _RaEmergencyContactCard(
-                      contact: contact,
-                      configured:
-                          configured,
-                      onEdit: () {
-                        editContact(
-                          context,
-                          contact,
-                        );
-                      },
-                      onCall: configured
-                          ? () {
-                              showCallPrompt(
-                                context,
-                                name:
-                                    'Emergency Contact',
-                                number:
+                    const SizedBox(height: 10),
+                    _RaEmergencySurface(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 45,
+                                height: 45,
+                                decoration:
+                                    BoxDecoration(
+                                  color: colors
+                                      .primary
+                                      .withValues(
+                                    alpha: .08,
+                                  ),
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                    14,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons
+                                      .contact_emergency_outlined,
+                                  color: colors
+                                      .primary,
+                                ),
+                              ),
+                              const SizedBox(
+                                width: 10,
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      'Family Contact',
+                                      style: GoogleFonts
+                                          .plusJakartaSans(
+                                        fontSize:
+                                            10.5,
+                                        fontWeight:
+                                            FontWeight
+                                                .w800,
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      height: 2,
+                                    ),
+                                    Text(
+                                      configured
+                                          ? contact
+                                          : 'No emergency contact added',
+                                      style: GoogleFonts
+                                          .plusJakartaSans(
+                                        fontSize:
+                                            8,
+                                        color: colors
+                                            .onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip:
+                                    configured
+                                        ? 'Change contact'
+                                        : 'Add contact',
+                                onPressed: () {
+                                  editContact(
+                                    context,
                                     contact,
-                              );
-                            }
-                          : null,
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons
+                                      .edit_outlined,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(
+                            height: 12,
+                          ),
+                          FilledButton.icon(
+                            onPressed: configured
+                                ? () {
+                                    showCallPrompt(
+                                      context,
+                                      name:
+                                          'Family Contact',
+                                      number:
+                                          contact,
+                                    );
+                                  }
+                                : () {
+                                    editContact(
+                                      context,
+                                      contact,
+                                    );
+                                  },
+                            icon: Icon(
+                              configured
+                                  ? Icons
+                                      .call_rounded
+                                  : Icons
+                                      .person_add_alt_1_outlined,
+                            ),
+                            label: Text(
+                              configured
+                                  ? 'Call Emergency Contact'
+                                  : 'Add Emergency Contact',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-
-                    const SizedBox(
-                      height: 27,
-                    ),
-
+                    const SizedBox(height: 23),
                     const _RaEmergencyHeading(
                       title:
                           'Current location',
                       subtitle:
-                          'Share the saved location if someone needs to find you.',
+                          'Share the saved RoadAssist location when it is useful and accurate.',
                     ),
-
-                    const SizedBox(
-                      height: 11,
+                    const SizedBox(height: 10),
+                    _RaEmergencySurface(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+                            children: [
+                              Container(
+                                width: 43,
+                                height: 43,
+                                decoration:
+                                    BoxDecoration(
+                                  color: hasLocation
+                                      ? colors
+                                          .primary
+                                          .withValues(
+                                          alpha:
+                                              .08,
+                                        )
+                                      : colors
+                                          .surfaceContainerHighest,
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                    13,
+                                  ),
+                                ),
+                                child: Icon(
+                                  hasLocation
+                                      ? Icons
+                                          .location_on_rounded
+                                      : Icons
+                                          .location_off_outlined,
+                                  color: hasLocation
+                                      ? colors
+                                          .primary
+                                      : colors
+                                          .onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(
+                                width: 10,
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      hasLocation
+                                          ? location
+                                          : 'Current location not available',
+                                      style: GoogleFonts
+                                          .plusJakartaSans(
+                                        fontSize:
+                                            9.2,
+                                        fontWeight:
+                                            FontWeight
+                                                .w700,
+                                        height:
+                                            1.4,
+                                      ),
+                                    ),
+                                    if (!hasLocation) ...[
+                                      const SizedBox(
+                                        height: 3,
+                                      ),
+                                      Text(
+                                        'RoadAssist has no saved location to share from your profile.',
+                                        style: GoogleFonts
+                                            .plusJakartaSans(
+                                          fontSize:
+                                              7.6,
+                                          color: colors
+                                              .onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(
+                            height: 12,
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: hasLocation
+                                ? () {
+                                    copyLocation(
+                                      context,
+                                      location,
+                                    );
+                                  }
+                                : null,
+                            icon: const Icon(
+                              Icons
+                                  .content_copy_outlined,
+                            ),
+                            label: const Text(
+                              'Copy Location',
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-
-                    _RaEmergencyLocationCard(
-                      location: location,
-                      available:
-                          hasLocation,
-                      onCopy: hasLocation
-                          ? () {
-                              copyLocation(
-                                context,
-                                location,
-                              );
-                            }
-                          : null,
-                    ),
-
-                    const SizedBox(
-                      height: 18,
-                    ),
-
+                    const SizedBox(height: 18),
                     Container(
                       padding:
                           const EdgeInsets.all(
-                        14,
+                        12,
                       ),
-                      decoration:
-                          BoxDecoration(
+                      decoration: BoxDecoration(
                         color: raGold
                             .withValues(
-                          alpha: .09,
+                          alpha: .07,
                         ),
                         borderRadius:
-                            BorderRadius
-                                .circular(
-                          17,
-                        ),
-                        border: Border.all(
-                          color: raGold
-                              .withValues(
-                            alpha: .20,
-                          ),
+                            BorderRadius.circular(
+                          15,
                         ),
                       ),
                       child: Row(
@@ -529,17 +627,17 @@ class EmergencyScreen extends StatelessWidget {
                             Icons
                                 .warning_amber_rounded,
                             color: raGold,
-                            size: 20,
+                            size: 19,
                           ),
                           const SizedBox(
-                            width: 9,
+                            width: 8,
                           ),
                           Expanded(
                             child: Text(
-                              'If you are in immediate danger, move to a safe place if possible and contact emergency services before continuing with RoadAssist.',
+                              'Do not stay in moving traffic just to use the app. Move to a safer location when possible and contact emergency services first when there is immediate danger.',
                               style: GoogleFonts
                                   .plusJakartaSans(
-                                fontSize: 10,
+                                fontSize: 8,
                                 height: 1.45,
                                 color: colors
                                     .onSurfaceVariant,
@@ -564,36 +662,35 @@ class _RaEmergencyHero
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient:
+            const LinearGradient(
           begin: Alignment.topLeft,
           end:
               Alignment.bottomRight,
           colors: [
             Color(0xFFD8362A),
-            Color(0xFF9D2721),
+            Color(0xFFA92720),
           ],
         ),
         borderRadius:
-            BorderRadius.circular(25),
+            BorderRadius.circular(23),
       ),
       child: Stack(
         children: [
           Positioned(
             right: -20,
-            bottom: -32,
+            bottom: -28,
             child: Icon(
               Icons.sos_rounded,
-              size: 125,
+              size: 120,
               color: Colors.white
                   .withValues(alpha: .07),
             ),
           ),
-
-          Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+          Row(
             children: [
               Container(
                 width: 51,
@@ -613,39 +710,38 @@ class _RaEmergencyHero
                   Icons
                       .health_and_safety_outlined,
                   color: Colors.white,
-                  size: 25,
+                  size: 27,
                 ),
               ),
-
-              const SizedBox(height: 15),
-
-              Text(
-                'Emergency assistance',
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight:
-                      FontWeight.w800,
-                  letterSpacing: -.55,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              SizedBox(
-                width: 290,
-                child: Text(
-                  'Quick access to official emergency services, your trusted contact and saved location.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .82,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
+                  children: [
+                    Text(
+                      'Emergency assistance',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight:
+                            FontWeight.w800,
+                      ),
                     ),
-                    fontSize: 10.5,
-                    height: 1.45,
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'For immediate danger, contact emergency services before continuing with RoadAssist.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        color:
+                            Colors.white70,
+                        fontSize: 8.4,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -679,10 +775,9 @@ class _RaEmergencyHeading
           title,
           style:
               GoogleFonts.plusJakartaSans(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.35,
-            color: colors.onSurface,
+            fontSize: 14.5,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
         const SizedBox(height: 3),
@@ -690,7 +785,7 @@ class _RaEmergencyHeading
           subtitle,
           style:
               GoogleFonts.plusJakartaSans(
-            fontSize: 10,
+            fontSize: 8.3,
             height: 1.4,
             color:
                 colors.onSurfaceVariant,
@@ -701,66 +796,111 @@ class _RaEmergencyHeading
   }
 }
 
-class _RaEmergencyAction
+class _RaEmergencySurface
     extends StatelessWidget {
-  const _RaEmergencyAction({
+  const _RaEmergencySurface({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(0xFF0D1D2B)
+            : theme.colorScheme.surface,
+        borderRadius:
+            BorderRadius.circular(18),
+        border: Border.all(
+          color: theme
+              .colorScheme
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _RaEmergencyActionCard
+    extends StatelessWidget {
+  const _RaEmergencyActionCard({
     required this.icon,
     required this.title,
-    required this.number,
-    required this.message,
-    required this.tone,
+    required this.subtitle,
+    required this.label,
     required this.onTap,
+    this.danger = false,
   });
 
   final IconData icon;
   final String title;
-  final String number;
-  final String message;
-  final Color tone;
+  final String subtitle;
+  final String label;
   final VoidCallback onTap;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
     final colors =
         Theme.of(context).colorScheme;
 
+    final tone =
+        danger
+            ? colors.error
+            : colors.primary;
+
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding:
+          const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color:
-            tone.withValues(alpha: .065),
+            tone.withValues(alpha: .06),
         borderRadius:
-            BorderRadius.circular(20),
+            BorderRadius.circular(18),
         border: Border.all(
           color:
-              tone.withValues(alpha: .18),
+              tone.withValues(alpha: .20),
         ),
       ),
       child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 43,
+                height: 43,
                 decoration:
                     BoxDecoration(
-                  color: tone
-                      .withValues(alpha: .11),
+                  color: tone.withValues(
+                    alpha: .10,
+                  ),
                   borderRadius:
                       BorderRadius.circular(
-                    15,
+                    13,
                   ),
                 ),
                 child: Icon(
                   icon,
                   color: tone,
-                  size: 22,
+                  size: 21,
                 ),
               ),
-
-              const SizedBox(width: 12),
-
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -770,148 +910,18 @@ class _RaEmergencyAction
                       title,
                       style: GoogleFonts
                           .plusJakartaSans(
-                        fontSize: 12.5,
-                        fontWeight:
-                            FontWeight.w700,
-                        color:
-                            colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      message,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9.5,
-                        color: colors
-                            .onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Text(
-                number,
-                style:
-                    GoogleFonts.plusJakartaSans(
-                  color: tone,
-                  fontSize: 15,
-                  fontWeight:
-                      FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 13),
-
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              style:
-                  FilledButton.styleFrom(
-                backgroundColor: tone,
-                foregroundColor:
-                    Colors.white,
-              ),
-              onPressed: onTap,
-              icon:
-                  const Icon(Icons.call_rounded),
-              label: Text(
-                'Call $number',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RaEmergencyContactCard
-    extends StatelessWidget {
-  const _RaEmergencyContactCard({
-    required this.contact,
-    required this.configured,
-    required this.onEdit,
-    required this.onCall,
-  });
-
-  final String contact;
-  final bool configured;
-  final VoidCallback onEdit;
-  final VoidCallback? onCall;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .48),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration:
-                    BoxDecoration(
-                  color: colors.primary
-                      .withValues(alpha: .08),
-                  borderRadius:
-                      BorderRadius.circular(
-                    15,
-                  ),
-                ),
-                child: Icon(
-                  Icons
-                      .contact_emergency_outlined,
-                  color: colors.primary,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Emergency Contact',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.w700,
-                        color:
-                            colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      configured
-                          ? contact
-                          : 'No trusted contact added',
-                      style: GoogleFonts
-                          .plusJakartaSans(
                         fontSize: 10,
+                        fontWeight:
+                            FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 7.8,
+                        height: 1.4,
                         color: colors
                             .onSurfaceVariant,
                       ),
@@ -919,147 +929,21 @@ class _RaEmergencyContactCard
                   ],
                 ),
               ),
-
-              IconButton(
-                tooltip: configured
-                    ? 'Change contact'
-                    : 'Add contact',
-                onPressed: onEdit,
-                icon: const Icon(
-                  Icons.edit_outlined,
-                ),
-              ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonalIcon(
-              onPressed:
-                  configured
-                      ? onCall
-                      : onEdit,
-              icon: Icon(
-                configured
-                    ? Icons.call_rounded
-                    : Icons
-                        .person_add_alt_1_outlined,
-              ),
-              label: Text(
-                configured
-                    ? 'Call Emergency Contact'
-                    : 'Add Emergency Contact',
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RaEmergencyLocationCard
-    extends StatelessWidget {
-  const _RaEmergencyLocationCard({
-    required this.location,
-    required this.available,
-    required this.onCopy,
-  });
-
-  final String location;
-  final bool available;
-  final VoidCallback? onCopy;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .48),
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration:
-                    BoxDecoration(
-                  color: available
-                      ? colors.primary
-                          .withValues(
-                          alpha: .08,
-                        )
-                      : colors
-                          .surfaceContainerHighest,
-                  borderRadius:
-                      BorderRadius.circular(
-                    14,
-                  ),
-                ),
-                child: Icon(
-                  available
-                      ? Icons
-                          .location_on_rounded
-                      : Icons
-                          .location_off_outlined,
-                  color: available
-                      ? colors.primary
-                      : colors
-                          .onSurfaceVariant,
-                ),
-              ),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Text(
-                  location,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
-                    height: 1.45,
-                    fontWeight:
-                        FontWeight.w600,
-                    color: colors.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: onCopy,
-              icon: const Icon(
-                Icons
-                    .share_location_outlined,
-              ),
-              label: const Text(
-                'Copy / Share Location',
-              ),
-            ),
+          FilledButton.icon(
+            style: danger
+                ? FilledButton.styleFrom(
+                    backgroundColor:
+                        colors.error,
+                    foregroundColor:
+                        colors.onError,
+                  )
+                : null,
+            onPressed: onTap,
+            icon: Icon(icon),
+            label: Text(label),
           ),
         ],
       ),

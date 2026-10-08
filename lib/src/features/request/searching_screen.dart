@@ -15,149 +15,84 @@ class SearchingScreen extends StatefulWidget {
       _SearchingScreenState();
 }
 
-class _SearchingScreenState extends State<SearchingScreen>
+class _SearchingScreenState
+    extends State<SearchingScreen>
     with SingleTickerProviderStateMixin {
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  StreamSubscription<
+      DocumentSnapshot<Map<String, dynamic>>>?
       requestListener;
 
   Timer? providerResponseTimer;
 
-  late final AnimationController pulseController;
+  late final AnimationController
+      pulseController;
 
-  String requestStatus = 'searching';
+  String requestStatus =
+      'searching';
+
   String? requestError;
 
-  bool searchingAllProviders = false;
-  bool navigatingToTracking = false;
+  bool searchingAllProviders =
+      false;
+
+  bool navigatingToTracking =
+      false;
+
   bool cancelling = false;
 
+  bool expandingSearch = false;
+
   late String currentLocationLabel;
+
   late RequestDraft editableDraft;
 
-  bool get activelySearching => requestStatus == 'searching';
+  bool get activelySearching =>
+      requestStatus == 'searching';
 
   bool get preferredSearch =>
-      editableDraft.preferredProviderId.trim().isNotEmpty &&
+      editableDraft
+          .preferredProviderId
+          .trim()
+          .isNotEmpty &&
       !searchingAllProviders;
 
   @override
   void initState() {
     super.initState();
 
-    currentLocationLabel = widget.draft.location;
-    editableDraft = widget.draft;
+    editableDraft =
+        widget.draft;
 
-    pulseController = AnimationController(
+    currentLocationLabel =
+        widget.draft.location;
+
+    pulseController =
+        AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+      duration: const Duration(
+        milliseconds: 1500,
+      ),
+    )..repeat(
+            reverse: true,
+          );
 
     if (widget.requestId == null) {
-      requestStatus = 'not_submitted';
+      requestStatus =
+          'not_submitted';
+
       requestError =
           'This request is not connected to the live assistance system.';
+
       return;
     }
 
-    requestListener = RequestService()
-        .watchRequest(widget.requestId!)
-        .listen(
-      (snapshot) {
-        final data = snapshot.data();
-
-        if (!mounted) return;
-
-        if (data == null) {
-          setState(() {
-            requestError =
-                'This assistance request could not be found.';
-          });
-          return;
-        }
-
-        final status =
-            data['status'] as String? ?? 'searching';
-
-        final locationLabel =
-            data['locationLabel'] as String? ??
-                widget.draft.location;
-
-        final preferredProviderId =
-            data['preferredProviderId'] as String? ?? '';
-
-        if (status == 'searching' &&
-            preferredProviderId.isNotEmpty) {
-          _scheduleProviderTimeout(data);
-        } else {
-          providerResponseTimer?.cancel();
-          providerResponseTimer = null;
-        }
-
-        if (const [
-              'accepted',
-              'en_route',
-              'arrived',
-              'completed',
-            ].contains(status) &&
-            !navigatingToTracking) {
-          navigatingToTracking = true;
-
-          final latitude =
-              (data['latitude'] as num?)?.toDouble();
-
-          final longitude =
-              (data['longitude'] as num?)?.toDouble();
-
-          replace(
-            context,
-            TrackingScreen(
-              draft: editableDraft.copyWith(
-                location: locationLabel,
-                latitude: latitude,
-                longitude: longitude,
-                landmark:
-                    data['landmark'] as String? ??
-                        editableDraft.landmark,
-                locationAccuracyMeters:
-                    (data['locationAccuracyMeters'] as num?)
-                        ?.toDouble(),
-              ),
-              requestId: widget.requestId,
-            ),
-          );
-
-          return;
-        }
-
-        setState(() {
-          requestStatus = status;
-          currentLocationLabel = locationLabel;
-
-          editableDraft = editableDraft.copyWith(
-            description:
-                data['description'] as String? ??
-                    editableDraft.description,
-            notes:
-                data['notes'] as String? ??
-                    editableDraft.notes,
-            location: locationLabel,
-            landmark:
-                data['landmark'] as String? ??
-                    editableDraft.landmark,
-            vehiclePhotoUrls:
-                (data['vehiclePhotoUrls'] as List<dynamic>? ??
-                        const [])
-                    .whereType<String>()
-                    .toList(),
-          );
-
-          requestError = null;
-
-          searchingAllProviders =
-              widget.draft.preferredProviderId.isNotEmpty &&
-              preferredProviderId.isEmpty;
-        });
-      },
+    requestListener =
+        RequestService()
+            .watchRequest(
+      widget.requestId!,
+    )
+            .listen(
+      handleRequestUpdate,
       onError: (_) {
         if (!mounted) return;
 
@@ -172,120 +107,353 @@ class _SearchingScreenState extends State<SearchingScreen>
   @override
   void dispose() {
     requestListener?.cancel();
+
     providerResponseTimer?.cancel();
+
     pulseController.dispose();
 
     super.dispose();
   }
 
-  void _scheduleProviderTimeout(
+  void handleRequestUpdate(
+    DocumentSnapshot<
+            Map<String, dynamic>>
+        snapshot,
+  ) {
+    final data =
+        snapshot.data();
+
+    if (!mounted) return;
+
+    if (data == null) {
+      setState(() {
+        requestError =
+            'This assistance request could not be found.';
+      });
+
+      return;
+    }
+
+    final status =
+        data['status']
+                as String? ??
+            'searching';
+
+    final locationLabel =
+        data['locationLabel']
+                as String? ??
+            editableDraft.location;
+
+    final preferredProviderId =
+        data['preferredProviderId']
+                as String? ??
+            '';
+
+    if (status == 'searching' &&
+        preferredProviderId
+            .isNotEmpty) {
+      scheduleProviderTimeout(
+        data,
+      );
+    } else {
+      providerResponseTimer
+          ?.cancel();
+
+      providerResponseTimer =
+          null;
+    }
+
+    if (const [
+          'accepted',
+          'en_route',
+          'arrived',
+          'completed',
+        ].contains(
+          status,
+        ) &&
+        !navigatingToTracking) {
+      navigatingToTracking =
+          true;
+
+      final latitude =
+          (data['latitude']
+                  as num?)
+              ?.toDouble();
+
+      final longitude =
+          (data['longitude']
+                  as num?)
+              ?.toDouble();
+
+      final trackingDraft =
+          editableDraft.copyWith(
+        location:
+            locationLabel,
+        landmark:
+            data['landmark']
+                    as String? ??
+                editableDraft
+                    .landmark,
+        locationAccuracyMeters:
+            (data['locationAccuracyMeters']
+                    as num?)
+                ?.toDouble(),
+        latitude:
+            latitude,
+        longitude:
+            longitude,
+      );
+
+      replace(
+        context,
+        TrackingScreen(
+          draft:
+              trackingDraft,
+          requestId:
+              widget.requestId,
+        ),
+      );
+
+      return;
+    }
+
+    setState(() {
+      requestStatus = status;
+
+      currentLocationLabel =
+          locationLabel;
+
+      editableDraft =
+          editableDraft.copyWith(
+        description:
+            data['description']
+                    as String? ??
+                editableDraft
+                    .description,
+        notes:
+            data['notes']
+                    as String? ??
+                editableDraft
+                    .notes,
+        location:
+            locationLabel,
+        landmark:
+            data['landmark']
+                    as String? ??
+                editableDraft
+                    .landmark,
+        vehiclePhotoUrls:
+            (data['vehiclePhotoUrls']
+                        as List<dynamic>? ??
+                    const [])
+                .whereType<String>()
+                .toList(),
+      );
+
+      requestError = null;
+
+      searchingAllProviders =
+          widget.draft
+                  .preferredProviderId
+                  .isNotEmpty &&
+              preferredProviderId
+                  .isEmpty;
+    });
+  }
+
+  void scheduleProviderTimeout(
     Map<String, dynamic> data,
   ) {
-    if (providerResponseTimer != null ||
+    if (providerResponseTimer !=
+            null ||
         widget.requestId == null) {
       return;
     }
 
     const responseWindow =
-        Duration(seconds: 90);
+        Duration(
+      seconds: 90,
+    );
 
     final createdAt =
-        (data['createdAt'] as Timestamp?)?.toDate();
+        (data['createdAt']
+                as Timestamp?)
+            ?.toDate();
 
-    final elapsed = createdAt == null
-        ? Duration.zero
-        : DateTime.now().difference(createdAt);
+    final elapsed =
+        createdAt == null
+            ? Duration.zero
+            : DateTime.now()
+                .difference(
+                createdAt,
+              );
 
-    final remaining = elapsed >= responseWindow
-        ? Duration.zero
-        : responseWindow - elapsed;
+    final remaining =
+        elapsed >= responseWindow
+            ? Duration.zero
+            : responseWindow -
+                elapsed;
 
     providerResponseTimer =
-        Timer(remaining, () async {
-      providerResponseTimer = null;
+        Timer(
+      remaining,
+      () async {
+        providerResponseTimer =
+            null;
 
-      try {
-        await RequestService()
-            .expandProviderSearch(
-          widget.requestId!,
-        );
-      } catch (_) {
-        if (!mounted) return;
+        try {
+          await RequestService()
+              .expandProviderSearch(
+            widget.requestId!,
+          );
+        } catch (_) {
+          if (!mounted) return;
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Unable to expand the provider search yet.',
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Unable to expand the provider search yet.',
+              ),
             ),
-          ),
-        );
-      }
-    });
+          );
+        }
+      },
+    );
   }
 
-  Future<void> editPendingRequest() async {
+  Future<void>
+      expandSearchNow() async {
     if (widget.requestId == null ||
-        requestStatus != 'searching') {
+        expandingSearch ||
+        !activelySearching) {
+      return;
+    }
+
+    setState(() {
+      expandingSearch = true;
+    });
+
+    try {
+      await RequestService()
+          .expandProviderSearch(
+        widget.requestId!,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        searchingAllProviders =
+            true;
+      });
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Provider search expanded.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to expand the provider search right now.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          expandingSearch = false;
+        });
+      }
+    }
+  }
+
+  Future<void>
+      editPendingRequest() async {
+    if (widget.requestId == null ||
+        requestStatus !=
+            'searching') {
       return;
     }
 
     final descriptionController =
         TextEditingController(
-      text: editableDraft.description,
+      text:
+          editableDraft.description,
     );
 
     final notesController =
         TextEditingController(
-      text: editableDraft.notes,
+      text:
+          editableDraft.notes,
     );
 
     final locationController =
         TextEditingController(
-      text: editableDraft.location,
+      text:
+          editableDraft.location,
     );
 
     final landmarkController =
         TextEditingController(
-      text: editableDraft.landmark,
+      text:
+          editableDraft.landmark,
     );
 
     final photos =
         List<String>.from(
-      editableDraft.vehiclePhotoUrls,
+      editableDraft
+          .vehiclePhotoUrls,
     );
 
-    var latitude =
+    double latitude =
         editableDraft.latitude;
 
-    var longitude =
+    double longitude =
         editableDraft.longitude;
 
-    var accuracy =
-        editableDraft.locationAccuracyMeters;
+    double? accuracy =
+        editableDraft
+            .locationAccuracyMeters;
 
-    var locating = false;
-    var preparingPhoto = false;
+    bool locating = false;
+    bool preparingPhotos =
+        false;
 
     final updatedDraft =
-        await showModalBottomSheet<RequestDraft>(
+        await showModalBottomSheet<
+            RequestDraft>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
+      backgroundColor:
+          Colors.transparent,
       builder: (sheetContext) {
+        final theme =
+            Theme.of(sheetContext);
+
+        final colors =
+            theme.colorScheme;
+
+        final dark =
+            theme.brightness ==
+                Brightness.dark;
+
         return StatefulBuilder(
           builder: (
             context,
             setSheetState,
           ) {
-            final theme =
-                Theme.of(context);
-
-            final colors =
-                theme.colorScheme;
-
-            Future<void> refreshGps() async {
+            Future<void>
+                refreshGps() async {
               setSheetState(() {
                 locating = true;
               });
@@ -296,14 +464,16 @@ class _SearchingScreenState extends State<SearchingScreen>
                         .checkPermission();
 
                 if (permission ==
-                    LocationPermission.denied) {
+                    LocationPermission
+                        .denied) {
                   permission =
                       await Geolocator
                           .requestPermission();
                 }
 
                 if (permission ==
-                        LocationPermission.denied ||
+                        LocationPermission
+                            .denied ||
                     permission ==
                         LocationPermission
                             .deniedForever) {
@@ -318,21 +488,25 @@ class _SearchingScreenState extends State<SearchingScreen>
                   locationSettings:
                       const LocationSettings(
                     accuracy:
-                        LocationAccuracy.high,
+                        LocationAccuracy
+                            .high,
                   ),
                 );
 
                 latitude =
                     position.latitude;
+
                 longitude =
                     position.longitude;
+
                 accuracy =
                     position.accuracy;
 
                 locationController.text =
                     'Current GPS (${latitude.toStringAsFixed(5)}, ${longitude.toStringAsFixed(5)})';
               } catch (_) {
-                if (sheetContext.mounted) {
+                if (sheetContext
+                    .mounted) {
                   ScaffoldMessenger.of(
                     sheetContext,
                   ).showSnackBar(
@@ -344,7 +518,8 @@ class _SearchingScreenState extends State<SearchingScreen>
                   );
                 }
               } finally {
-                if (sheetContext.mounted) {
+                if (sheetContext
+                    .mounted) {
                   setSheetState(() {
                     locating = false;
                   });
@@ -352,14 +527,17 @@ class _SearchingScreenState extends State<SearchingScreen>
               }
             }
 
-            Future<void> addPhotos() async {
-              if (preparingPhoto ||
-                  photos.length >= 3) {
+            Future<void>
+                addPhotos() async {
+              if (preparingPhotos ||
+                  photos.length >=
+                      3) {
                 return;
               }
 
               setSheetState(() {
-                preparingPhoto = true;
+                preparingPhotos =
+                    true;
               });
 
               try {
@@ -368,11 +546,14 @@ class _SearchingScreenState extends State<SearchingScreen>
                         .pickMultiImage(
                   imageQuality: 75,
                   maxWidth: 1600,
-                  limit: 3 - photos.length,
+                  limit:
+                      3 - photos.length,
                 );
 
-                for (final photo in picked) {
-                  if (photos.length >= 3) {
+                for (final photo
+                    in picked) {
+                  if (photos.length >=
+                      3) {
                     break;
                   }
 
@@ -385,482 +566,560 @@ class _SearchingScreenState extends State<SearchingScreen>
                   if (!photos.contains(
                     encoded,
                   )) {
-                    photos.add(encoded);
+                    photos.add(
+                      encoded,
+                    );
                   }
                 }
               } finally {
-                if (sheetContext.mounted) {
+                if (sheetContext
+                    .mounted) {
                   setSheetState(() {
-                    preparingPhoto = false;
+                    preparingPhotos =
+                        false;
                   });
                 }
               }
             }
 
             return Padding(
-              padding: EdgeInsets.fromLTRB(
-                RaSpace.lg,
-                0,
-                RaSpace.lg,
-                MediaQuery.of(context)
-                        .viewInsets
-                        .bottom +
-                    RaSpace.lg,
+              padding:
+                  EdgeInsets.only(
+                bottom: MediaQuery.of(
+                  sheetContext,
+                ).viewInsets.bottom,
               ),
-              child: SingleChildScrollView(
+              child: Container(
+                constraints:
+                    BoxConstraints(
+                  maxHeight:
+                      MediaQuery.sizeOf(
+                            sheetContext,
+                          ).height *
+                          .92,
+                ),
+                decoration:
+                    BoxDecoration(
+                  color: dark
+                      ? const Color(
+                          0xFF0D1D2B,
+                        )
+                      : colors.surface,
+                  borderRadius:
+                      const BorderRadius
+                          .vertical(
+                    top:
+                        Radius.circular(
+                      28,
+                    ),
+                  ),
+                ),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration:
-                              BoxDecoration(
-                            color: colors
-                                .primaryContainer,
-                            borderRadius:
-                                BorderRadius.circular(
-                              16,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.edit_note_rounded,
-                            color: colors
-                                .onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(
-                          width: RaSpace.md,
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
-                            children: [
-                              Text(
-                                'Edit pending request',
-                                style: theme
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                  fontWeight:
-                                      FontWeight
-                                          .w900,
+                    Padding(
+                      padding:
+                          const EdgeInsets
+                              .fromLTRB(
+                        18,
+                        12,
+                        18,
+                        8,
+                      ),
+                      child: Column(
+                        children: [
+                          Center(
+                            child:
+                                Container(
+                              width: 42,
+                              height: 4,
+                              decoration:
+                                  BoxDecoration(
+                                color: colors
+                                    .onSurfaceVariant
+                                    .withValues(
+                                  alpha:
+                                      .24,
+                                ),
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                  999,
                                 ),
                               ),
-                              const SizedBox(
-                                height: 2,
+                            ),
+                          ),
+
+                          const SizedBox(
+                            height:
+                                18,
+                          ),
+
+                          Row(
+                            children: [
+                              Container(
+                                width:
+                                    46,
+                                height:
+                                    46,
+                                decoration:
+                                    BoxDecoration(
+                                  color: colors
+                                      .primary
+                                      .withValues(
+                                    alpha:
+                                        .09,
+                                  ),
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                    14,
+                                  ),
+                                ),
+                                child:
+                                    Icon(
+                                  Icons
+                                      .edit_note_rounded,
+                                  color: colors
+                                      .primary,
+                                ),
                               ),
-                              Text(
-                                'You can update these details until a provider accepts.',
-                                style: theme
-                                    .textTheme
-                                    .bodySmall,
+
+                              const SizedBox(
+                                width:
+                                    11,
+                              ),
+
+                              Expanded(
+                                child:
+                                    Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      'Edit pending request',
+                                      style: GoogleFonts
+                                          .plusJakartaSans(
+                                        fontSize:
+                                            17,
+                                        fontWeight:
+                                            FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      height:
+                                          3,
+                                    ),
+                                    Text(
+                                      'You can update these details until a provider accepts.',
+                                      style: GoogleFonts
+                                          .plusJakartaSans(
+                                        fontSize:
+                                            9,
+                                        color: colors
+                                            .onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(
-                      height: RaSpace.xl,
-                    ),
-
-                    TextField(
-                      controller:
-                          descriptionController,
-                      minLines: 3,
-                      maxLines: 5,
-                      maxLength: 500,
-                      textCapitalization:
-                          TextCapitalization
-                              .sentences,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Breakdown description',
-                        alignLabelWithHint:
-                            true,
-                        prefixIcon: Padding(
-                          padding:
-                              EdgeInsets.only(
-                            bottom: 55,
-                          ),
-                          child: Icon(
-                            Icons
-                                .description_outlined,
-                          ),
-                        ),
+                        ],
                       ),
                     ),
 
-                    const SizedBox(
-                      height: RaSpace.md,
-                    ),
-
-                    TextField(
-                      controller:
-                          locationController,
-                      maxLines: 2,
-                      decoration:
-                          InputDecoration(
-                        labelText:
-                            'Breakdown location',
-                        prefixIcon:
-                            const Icon(
-                          Icons.place_outlined,
+                    Expanded(
+                      child:
+                          SingleChildScrollView(
+                        padding:
+                            const EdgeInsets
+                                .fromLTRB(
+                          18,
+                          10,
+                          18,
+                          20,
                         ),
-                        suffixIcon:
-                            IconButton(
-                          tooltip:
-                              'Refresh GPS',
-                          onPressed:
-                              locating
-                                  ? null
-                                  : refreshGps,
-                          icon: locating
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(
-                                    strokeWidth:
-                                        2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons
-                                      .my_location_rounded,
-                                ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: RaSpace.md,
-                    ),
-
-                    TextField(
-                      controller:
-                          landmarkController,
-                      maxLength: 120,
-                      textCapitalization:
-                          TextCapitalization
-                              .words,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Nearby landmark',
-                        prefixIcon:
-                            Icon(
-                          Icons
-                              .signpost_outlined,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: RaSpace.md,
-                    ),
-
-                    TextField(
-                      controller:
-                          notesController,
-                      maxLines: 3,
-                      maxLength: 300,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Additional notes',
-                        alignLabelWithHint:
-                            true,
-                        prefixIcon: Padding(
-                          padding:
-                              EdgeInsets.only(
-                            bottom: 40,
-                          ),
-                          child: Icon(
-                            Icons
-                                .notes_outlined,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height: RaSpace.lg,
-                    ),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Photo evidence',
-                            style: theme
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                              fontWeight:
-                                  FontWeight
-                                      .w900,
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .stretch,
+                          children: [
+                            TextField(
+                              controller:
+                                  descriptionController,
+                              minLines:
+                                  3,
+                              maxLines:
+                                  5,
+                              maxLength:
+                                  500,
+                              textCapitalization:
+                                  TextCapitalization
+                                      .sentences,
+                              decoration:
+                                  const InputDecoration(
+                                labelText:
+                                    'Breakdown description',
+                                alignLabelWithHint:
+                                    true,
+                              ),
                             ),
-                          ),
-                        ),
-                        Text(
-                          '${photos.length}/3',
-                          style: theme
-                              .textTheme
-                              .labelMedium
-                              ?.copyWith(
-                            color:
-                                colors.primary,
-                            fontWeight:
-                                FontWeight
-                                    .w800,
-                          ),
-                        ),
-                      ],
-                    ),
 
-                    const SizedBox(
-                      height: RaSpace.sm,
-                    ),
+                            const SizedBox(
+                              height: 10,
+                            ),
 
-                    if (photos.isNotEmpty)
-                      SizedBox(
-                        height: 92,
-                        child:
-                            ListView.separated(
-                          scrollDirection:
-                              Axis.horizontal,
-                          itemCount:
-                              photos.length,
-                          separatorBuilder:
-                              (_, __) =>
-                                  const SizedBox(
-                            width:
-                                RaSpace.sm,
-                          ),
-                          itemBuilder:
-                              (
-                            context,
-                            index,
-                          ) {
-                            Widget photo;
+                            TextField(
+                              controller:
+                                  notesController,
+                              maxLines:
+                                  3,
+                              maxLength:
+                                  300,
+                              textCapitalization:
+                                  TextCapitalization
+                                      .sentences,
+                              decoration:
+                                  const InputDecoration(
+                                labelText:
+                                    'Additional notes',
+                                alignLabelWithHint:
+                                    true,
+                              ),
+                            ),
 
-                            try {
-                              photo =
-                                  Image.memory(
-                                base64Decode(
-                                  photos[index],
-                                ),
-                                width: 92,
-                                height: 92,
-                                fit: BoxFit
-                                    .cover,
-                              );
-                            } on FormatException {
-                              photo =
-                                  const Center(
-                                child: Icon(
+                            const SizedBox(
+                              height: 10,
+                            ),
+
+                            TextField(
+                              controller:
+                                  locationController,
+                              minLines:
+                                  1,
+                              maxLines:
+                                  2,
+                              decoration:
+                                  InputDecoration(
+                                labelText:
+                                    'Location',
+                                prefixIcon:
+                                    const Icon(
                                   Icons
-                                      .broken_image_outlined,
+                                      .location_on_outlined,
                                 ),
-                              );
-                            }
+                                suffixIcon:
+                                    IconButton(
+                                  tooltip:
+                                      'Refresh GPS',
+                                  onPressed:
+                                      locating
+                                          ? null
+                                          : refreshGps,
+                                  icon: locating
+                                      ? const SizedBox.square(
+                                          dimension:
+                                              16,
+                                          child:
+                                              CircularProgressIndicator(
+                                            strokeWidth:
+                                                2,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons
+                                              .my_location_rounded,
+                                        ),
+                                ),
+                              ),
+                            ),
 
-                            return Stack(
+                            const SizedBox(
+                              height: 10,
+                            ),
+
+                            TextField(
+                              controller:
+                                  landmarkController,
+                              maxLength:
+                                  120,
+                              decoration:
+                                  const InputDecoration(
+                                labelText:
+                                    'Landmark',
+                                prefixIcon:
+                                    Icon(
+                                  Icons
+                                      .signpost_outlined,
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(
+                              height: 17,
+                            ),
+
+                            Row(
                               children: [
-                                Container(
-                                  width: 92,
-                                  height: 92,
-                                  clipBehavior:
-                                      Clip
-                                          .antiAlias,
-                                  decoration:
-                                      BoxDecoration(
-                                    color: colors
-                                        .surfaceContainerHighest,
-                                    borderRadius:
-                                        BorderRadius
-                                            .circular(
-                                      14,
+                                Expanded(
+                                  child:
+                                      Text(
+                                    'Photo evidence',
+                                    style: GoogleFonts
+                                        .plusJakartaSans(
+                                      fontSize:
+                                          11,
+                                      fontWeight:
+                                          FontWeight.w700,
                                     ),
                                   ),
-                                  child:
-                                      photo,
                                 ),
-                                Positioned(
-                                  right: 3,
-                                  top: 3,
-                                  child:
-                                      IconButton
-                                          .filled(
-                                    visualDensity:
-                                        VisualDensity
-                                            .compact,
-                                    style: IconButton
-                                        .styleFrom(
-                                      backgroundColor:
-                                          Colors
-                                              .black
-                                              .withValues(
-                                        alpha:
-                                            .58,
-                                      ),
-                                      foregroundColor:
-                                          Colors
-                                              .white,
-                                    ),
-                                    icon:
-                                        const Icon(
-                                      Icons
-                                          .close_rounded,
-                                      size:
-                                          15,
-                                    ),
-                                    onPressed:
-                                        () {
-                                      setSheetState(
-                                        () {
-                                          photos.removeAt(
-                                            index,
-                                          );
-                                        },
-                                      );
-                                    },
+                                Text(
+                                  '${photos.length}/3',
+                                  style: GoogleFonts
+                                      .plusJakartaSans(
+                                    fontSize:
+                                        8.5,
+                                    color: colors
+                                        .primary,
+                                    fontWeight:
+                                        FontWeight.w700,
                                   ),
                                 ),
                               ],
-                            );
-                          },
-                        ),
-                      ),
+                            ),
 
-                    if (photos.isNotEmpty)
-                      const SizedBox(
-                        height: RaSpace.sm,
-                      ),
-
-                    OutlinedButton.icon(
-                      onPressed:
-                          preparingPhoto ||
-                                  photos.length >=
-                                      3
-                              ? null
-                              : addPhotos,
-                      icon: preparingPhoto
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth: 2,
+                            if (photos
+                                .isNotEmpty) ...[
+                              const SizedBox(
+                                height: 9,
                               ),
-                            )
-                          : const Icon(
-                              Icons
-                                  .add_a_photo_outlined,
+
+                              SizedBox(
+                                height:
+                                    90,
+                                child: ListView
+                                    .separated(
+                                  scrollDirection:
+                                      Axis.horizontal,
+                                  itemCount:
+                                      photos.length,
+                                  separatorBuilder:
+                                      (
+                                    context,
+                                    index,
+                                  ) =>
+                                          const SizedBox(
+                                    width:
+                                        7,
+                                  ),
+                                  itemBuilder:
+                                      (
+                                    context,
+                                    index,
+                                  ) {
+                                    Widget image;
+
+                                    try {
+                                      image = Image.memory(
+                                        base64Decode(
+                                          photos[index],
+                                        ),
+                                        width:
+                                            90,
+                                        height:
+                                            90,
+                                        fit:
+                                            BoxFit.cover,
+                                      );
+                                    } on FormatException {
+                                      image = Container(
+                                        width:
+                                            90,
+                                        height:
+                                            90,
+                                        alignment:
+                                            Alignment.center,
+                                        child:
+                                            const Icon(
+                                          Icons.broken_image_outlined,
+                                        ),
+                                      );
+                                    }
+
+                                    return Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(
+                                            13,
+                                          ),
+                                          child:
+                                              image,
+                                        ),
+                                        Positioned(
+                                          top:
+                                              2,
+                                          right:
+                                              2,
+                                          child:
+                                              IconButton.filled(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            iconSize:
+                                                13,
+                                            style:
+                                                IconButton.styleFrom(
+                                              minimumSize:
+                                                  const Size(
+                                                27,
+                                                27,
+                                              ),
+                                              backgroundColor:
+                                                  Colors.black.withValues(
+                                                alpha:
+                                                    .60,
+                                              ),
+                                              foregroundColor:
+                                                  Colors.white,
+                                            ),
+                                            onPressed:
+                                                () {
+                                              setSheetState(
+                                                () {
+                                                  photos.removeAt(
+                                                    index,
+                                                  );
+                                                },
+                                              );
+                                            },
+                                            icon:
+                                                const Icon(
+                                              Icons.close_rounded,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+
+                            const SizedBox(
+                              height: 10,
                             ),
-                      label: Text(
-                        photos.length >= 3
-                            ? 'Maximum 3 photos added'
-                            : 'Add Photos',
+
+                            OutlinedButton.icon(
+                              onPressed:
+                                  preparingPhotos ||
+                                          photos.length >=
+                                              3
+                                      ? null
+                                      : addPhotos,
+                              icon: preparingPhotos
+                                  ? const SizedBox.square(
+                                      dimension:
+                                          16,
+                                      child:
+                                          CircularProgressIndicator(
+                                        strokeWidth:
+                                            2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons
+                                          .add_a_photo_outlined,
+                                    ),
+                              label: const Text(
+                                'Add Photo',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: RaSpace.xl,
-                    ),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child:
-                              OutlinedButton(
-                            onPressed:
-                                () =>
-                                    Navigator.pop(
-                              sheetContext,
-                            ),
-                            child:
-                                const Text(
-                              'Cancel',
+                    Container(
+                      padding:
+                          const EdgeInsets
+                              .fromLTRB(
+                        18,
+                        8,
+                        18,
+                        14,
+                      ),
+                      decoration:
+                          BoxDecoration(
+                        border:
+                            Border(
+                          top:
+                              BorderSide(
+                            color: colors
+                                .outlineVariant
+                                .withValues(
+                              alpha:
+                                  .40,
                             ),
                           ),
                         ),
-                        const SizedBox(
-                          width: RaSpace.sm,
-                        ),
-                        Expanded(
-                          flex: 2,
-                          child:
-                              FilledButton.icon(
-                            onPressed: () {
-                              final location =
-                                  locationController
+                      ),
+                      child:
+                          FilledButton.icon(
+                        onPressed:
+                            () {
+                          final location =
+                              locationController
+                                  .text
+                                  .trim();
+
+                          if (location
+                              .isEmpty) {
+                            return;
+                          }
+
+                          Navigator.pop(
+                            sheetContext,
+                            editableDraft
+                                .copyWith(
+                              description:
+                                  descriptionController
                                       .text
-                                      .trim();
-
-                              if (location
-                                  .isEmpty) {
-                                return;
-                              }
-
-                              Navigator.pop(
-                                sheetContext,
-                                editableDraft
-                                    .copyWith(
-                                  description:
-                                      descriptionController
-                                          .text
-                                          .trim(),
-                                  notes:
-                                      notesController
-                                          .text
-                                          .trim(),
-                                  location:
-                                      location,
-                                  landmark:
-                                      landmarkController
-                                          .text
-                                          .trim(),
-                                  latitude:
-                                      latitude,
-                                  longitude:
-                                      longitude,
-                                  locationAccuracyMeters:
-                                      accuracy,
-                                  vehiclePhotoUrls:
-                                      photos,
-                                  photoAnnotations:
-                                      listEquals(
-                                    photos,
-                                    editableDraft
-                                        .vehiclePhotoUrls,
-                                  )
-                                          ? editableDraft
-                                              .photoAnnotations
-                                          : const [],
-                                ),
-                              );
-                            },
-                            icon: const Icon(
-                              Icons
-                                  .check_rounded,
+                                      .trim(),
+                              notes:
+                                  notesController
+                                      .text
+                                      .trim(),
+                              location:
+                                  location,
+                              landmark:
+                                  landmarkController
+                                      .text
+                                      .trim(),
+                              latitude:
+                                  latitude,
+                              longitude:
+                                  longitude,
+                              locationAccuracyMeters:
+                                  accuracy,
+                              vehiclePhotoUrls:
+                                  List<String>.from(
+                                photos,
+                              ),
                             ),
-                            label:
-                                const Text(
-                              'Save Changes',
-                            ),
-                          ),
+                          );
+                        },
+                        icon:
+                            const Icon(
+                          Icons
+                              .check_rounded,
                         ),
-                      ],
+                        label:
+                            const Text(
+                          'Save Changes',
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -895,7 +1154,9 @@ class _SearchingScreenState extends State<SearchingScreen>
       if (!mounted) return;
 
       setState(() {
-        editableDraft = updatedDraft;
+        editableDraft =
+            updatedDraft;
+
         currentLocationLabel =
             updatedDraft.location;
       });
@@ -922,30 +1183,39 @@ class _SearchingScreenState extends State<SearchingScreen>
     }
   }
 
-  Future<void> cancelRequest() async {
+  Future<void>
+      cancelRequest() async {
+    if (cancelling) return;
+
     final confirmed =
         await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
+      builder: (
+        dialogContext,
+      ) {
         final colors =
-            Theme.of(dialogContext)
-                .colorScheme;
+            Theme.of(
+          dialogContext,
+        ).colorScheme;
 
         return AlertDialog(
           icon: Container(
-            width: 52,
-            height: 52,
+            width: 54,
+            height: 54,
             decoration:
                 BoxDecoration(
-              color: colors.errorContainer,
+              color: colors.error
+                  .withValues(
+                alpha: .09,
+              ),
               borderRadius:
-                  BorderRadius.circular(
-                18,
+                  BorderRadius
+                      .circular(
+                17,
               ),
             ),
             child: Icon(
-              Icons
-                  .close_rounded,
+              Icons.close_rounded,
               color: colors.error,
             ),
           ),
@@ -953,15 +1223,16 @@ class _SearchingScreenState extends State<SearchingScreen>
             'Cancel assistance request?',
           ),
           content: const Text(
-            'Provider searching will stop and this request will move to your cancelled request history.',
+            'Provider searching will stop and this request will move to cancelled request history.',
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(
-                dialogContext,
-                false,
-              ),
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
               child: const Text(
                 'Keep Searching',
               ),
@@ -974,11 +1245,12 @@ class _SearchingScreenState extends State<SearchingScreen>
                 foregroundColor:
                     colors.onError,
               ),
-              onPressed: () =>
-                  Navigator.pop(
-                dialogContext,
-                true,
-              ),
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
               child: const Text(
                 'Cancel Request',
               ),
@@ -998,7 +1270,8 @@ class _SearchingScreenState extends State<SearchingScreen>
     });
 
     try {
-      if (widget.requestId != null) {
+      if (widget.requestId !=
+          null) {
         await RequestService()
             .cancelRequest(
           widget.requestId!,
@@ -1014,10 +1287,6 @@ class _SearchingScreenState extends State<SearchingScreen>
     } catch (_) {
       if (!mounted) return;
 
-      setState(() {
-        cancelling = false;
-      });
-
       ScaffoldMessenger.of(context)
           .showSnackBar(
         const SnackBar(
@@ -1026,15 +1295,23 @@ class _SearchingScreenState extends State<SearchingScreen>
           ),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          cancelling = false;
+        });
+      }
     }
   }
 
   String get searchTitle {
-    if (requestStatus == 'cancelled') {
+    if (requestStatus ==
+        'cancelled') {
       return 'Request cancelled';
     }
 
-    if (requestStatus == 'not_submitted') {
+    if (requestStatus ==
+        'not_submitted') {
       return 'Request not submitted';
     }
 
@@ -1054,7 +1331,8 @@ class _SearchingScreenState extends State<SearchingScreen>
       return requestError!;
     }
 
-    if (requestStatus == 'cancelled') {
+    if (requestStatus ==
+        'cancelled') {
       return 'This roadside assistance request is no longer active.';
     }
 
@@ -1064,157 +1342,678 @@ class _SearchingScreenState extends State<SearchingScreen>
     }
 
     if (searchingAllProviders) {
-      return '${editableDraft.provider.isEmpty ? 'The selected provider' : editableDraft.provider} was unavailable. RoadAssist is now checking other suitable providers.';
+      return 'RoadAssist is now checking other suitable available providers.';
     }
 
     if (preferredSearch) {
-      return 'Waiting for ${editableDraft.provider.isEmpty ? 'your selected provider' : editableDraft.provider} to review your request.';
+      final name =
+          editableDraft.provider
+                  .trim()
+                  .isEmpty
+              ? 'your selected provider'
+              : editableDraft.provider;
+
+      return 'Waiting for $name to review your request.';
     }
 
     return 'RoadAssist is sharing your request with suitable available providers.';
   }
 
-  RaTone get searchTone {
-    if (requestStatus == 'cancelled' ||
-        requestStatus ==
-            'not_submitted') {
-      return RaTone.danger;
-    }
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
 
-    return RaTone.info;
-  }
-
-  Widget _buildSearchVisual(
-    BuildContext context,
-  ) {
     final colors =
-        Theme.of(context).colorScheme;
+        theme.colorScheme;
 
-    return Center(
-      child: AnimatedBuilder(
-        animation: pulseController,
-        builder: (
-          context,
-          child,
-        ) {
-          final value =
-              pulseController.value;
+    return Scaffold(
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        automaticallyImplyLeading:
+            false,
+        title: Text(
+          'Finding Assistance',
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight:
+                FontWeight.w800,
+            letterSpacing: -.45,
+          ),
+        ),
+        actions: [
+          if (activelySearching)
+            IconButton(
+              tooltip:
+                  'Edit pending request',
+              onPressed:
+                  editPendingRequest,
+              icon: const Icon(
+                Icons
+                    .edit_outlined,
+              ),
+            ),
 
-          return SizedBox(
-            width: 190,
-            height: 190,
-            child: Stack(
-              alignment:
-                  Alignment.center,
-              children: [
-                Transform.scale(
-                  scale:
-                      .88 + value * .12,
-                  child: Container(
-                    width: 175,
-                    height: 175,
-                    decoration:
-                        BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.primary
-                          .withValues(
-                        alpha:
-                            .04 +
-                                value *
-                                    .035,
-                      ),
-                    ),
-                  ),
+          const SizedBox(
+            width: 4,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                physics:
+                    const BouncingScrollPhysics(),
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  18,
+                  8,
+                  18,
+                  28,
                 ),
+                children: [
+                  _RaSearchingHero(
+                    controller:
+                        pulseController,
+                    title:
+                        searchTitle,
+                    message:
+                        searchMessage,
+                    active:
+                        activelySearching,
+                    error:
+                        requestError !=
+                            null,
+                  ),
 
-                Transform.scale(
-                  scale:
-                      .92 + value * .07,
-                  child: Container(
-                    width: 128,
-                    height: 128,
-                    decoration:
-                        BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
+                  const SizedBox(
+                    height: 17,
+                  ),
+
+                  if (preferredSearch &&
+                      activelySearching)
+                    _RaPreferredProviderSearch(
+                      providerName:
+                          editableDraft
+                              .provider,
+                      expanding:
+                          expandingSearch,
+                      onExpand:
+                          expandSearchNow,
+                    ),
+
+                  if (preferredSearch &&
+                      activelySearching)
+                    const SizedBox(
+                      height: 13,
+                    ),
+
+                  _RaSearchRequestCard(
+                    issue:
+                        editableDraft
+                            .issue,
+                    priority:
+                        requestPriorityLabel(
+                      editableDraft
+                          .priority,
+                    ),
+                    location:
+                        currentLocationLabel,
+                    vehicle:
+                        editableDraft
+                            .modelYear,
+                    registration:
+                        editableDraft
+                            .registration,
+                  ),
+
+                  if (requestError !=
+                      null) ...[
+                    const SizedBox(
+                      height: 13,
+                    ),
+
+                    Container(
+                      padding:
+                          const EdgeInsets
+                              .all(
+                        13,
+                      ),
+                      decoration:
+                          BoxDecoration(
                         color: colors
-                            .primary
+                            .error
                             .withValues(
-                          alpha:
-                              .15 +
-                                  value *
-                                      .15,
+                          alpha: .07,
                         ),
-                        width: 2,
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          16,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment:
+                            CrossAxisAlignment
+                                .start,
+                        children: [
+                          Icon(
+                            Icons
+                                .cloud_off_outlined,
+                            color:
+                                colors.error,
+                            size: 19,
+                          ),
+
+                          const SizedBox(
+                            width: 9,
+                          ),
+
+                          Expanded(
+                            child: Text(
+                              requestError!,
+                              style: GoogleFonts
+                                  .plusJakartaSans(
+                                fontSize:
+                                    9.5,
+                                height:
+                                    1.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ),
+                  ],
 
-                Container(
-                  width: 86,
-                  height: 86,
-                  decoration:
-                      BoxDecoration(
-                    gradient:
-                        LinearGradient(
-                      begin: Alignment
-                          .topLeft,
-                      end: Alignment
-                          .bottomRight,
-                      colors: [
-                        colors.primary,
-                        const Color(
-                          0xFF007D70,
+                  if (activelySearching &&
+                      widget.requestId !=
+                          null) ...[
+                    const SizedBox(
+                      height: 27,
+                    ),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+                            children: [
+                              Text(
+                                'Provider offers',
+                                style: GoogleFonts
+                                    .plusJakartaSans(
+                                  fontSize:
+                                      17,
+                                  fontWeight:
+                                      FontWeight.w800,
+                                  letterSpacing:
+                                      -.35,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height:
+                                    3,
+                              ),
+
+                              Text(
+                                'Offers appear here as providers respond.',
+                                style: GoogleFonts
+                                    .plusJakartaSans(
+                                  fontSize:
+                                      9.5,
+                                  color: colors
+                                      .onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    shape:
-                        BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors
-                            .primary
-                            .withValues(
-                          alpha:
-                              .22,
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    QuoteOffers(
+                      requestId:
+                          widget.requestId!,
+                    ),
+                  ],
+
+                  const SizedBox(
+                    height: 20,
+                  ),
+
+                  Container(
+                    padding:
+                        const EdgeInsets.all(
+                      13,
+                    ),
+                    decoration:
+                        BoxDecoration(
+                      color: colors.primary
+                          .withValues(
+                        alpha: .055,
+                      ),
+                      borderRadius:
+                          BorderRadius
+                              .circular(
+                        16,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+                      children: [
+                        Icon(
+                          Icons
+                              .notifications_active_outlined,
+                          color:
+                              colors.primary,
+                          size: 19,
                         ),
-                        blurRadius:
-                            24,
-                        offset:
-                            const Offset(
-                          0,
-                          9,
+
+                        const SizedBox(
+                          width: 9,
+                        ),
+
+                        Expanded(
+                          child: Text(
+                            'You can leave this screen. RoadAssist notifications and the Requests tab will continue showing request updates.',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize:
+                                  9.5,
+                              height:
+                                  1.45,
+                              color: colors
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            _RaSearchBottomBar(
+              active:
+                  activelySearching,
+              cancelling:
+                  cancelling,
+              onCancel:
+                  cancelRequest,
+              onHome: () {
+                replace(
+                  context,
+                  const DriverShell(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RaSearchingHero
+    extends StatelessWidget {
+  const _RaSearchingHero({
+    required this.controller,
+    required this.title,
+    required this.message,
+    required this.active,
+    required this.error,
+  });
+
+  final AnimationController
+      controller;
+
+  final String title;
+  final String message;
+
+  final bool active;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    final tone = error
+        ? colors.error
+        : colors.primary;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        20,
+      ),
+      decoration: BoxDecoration(
+        color: tone.withValues(
+          alpha: .07,
+        ),
+        borderRadius:
+            BorderRadius.circular(
+          25,
+        ),
+        border: Border.all(
+          color: tone.withValues(
+            alpha: .16,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 135,
+            child:
+                AnimatedBuilder(
+              animation:
+                  controller,
+              builder: (
+                context,
+                child,
+              ) {
+                final pulse = active
+                    ? .84 +
+                        controller
+                                .value *
+                            .16
+                    : 1.0;
+
+                return Transform.scale(
+                  scale: pulse,
+                  child: Stack(
+                    alignment:
+                        Alignment.center,
+                    children: [
+                      Container(
+                        width: 125,
+                        height: 125,
+                        decoration:
+                            BoxDecoration(
+                          shape:
+                              BoxShape.circle,
+                          color: tone
+                              .withValues(
+                            alpha: .035,
+                          ),
+                          border:
+                              Border.all(
+                            color: tone
+                                .withValues(
+                              alpha: .09,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      Container(
+                        width: 86,
+                        height: 86,
+                        decoration:
+                            BoxDecoration(
+                          shape:
+                              BoxShape.circle,
+                          color: tone
+                              .withValues(
+                            alpha: .07,
+                          ),
+                        ),
+                      ),
+
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration:
+                            BoxDecoration(
+                          color: tone,
+                          shape:
+                              BoxShape.circle,
+                        ),
+                        child: Icon(
+                          error
+                              ? Icons
+                                  .cloud_off_outlined
+                              : active
+                                  ? Icons
+                                      .person_search_outlined
+                                  : Icons
+                                      .info_outline_rounded,
+                          color: Colors.white,
+                          size: 25,
                         ),
                       ),
                     ],
                   ),
-                  child: Icon(
-                    activelySearching
-                        ? Icons
-                            .location_searching_rounded
-                        : requestStatus ==
-                                'cancelled'
-                            ? Icons
-                                .close_rounded
-                            : Icons
-                                .info_outline_rounded,
-                    color:
-                        Colors.white,
-                    size: 38,
-                  ),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
+          ),
+
+          Text(
+            title,
+            textAlign:
+                TextAlign.center,
+            style: GoogleFonts
+                .plusJakartaSans(
+              fontSize: 18,
+              fontWeight:
+                  FontWeight.w800,
+              letterSpacing: -.4,
+            ),
+          ),
+
+          const SizedBox(
+            height: 6,
+          ),
+
+          Text(
+            message,
+            textAlign:
+                TextAlign.center,
+            style: GoogleFonts
+                .plusJakartaSans(
+              fontSize: 9.8,
+              height: 1.45,
+              color: colors
+                  .onSurfaceVariant,
+            ),
+          ),
+
+          if (active) ...[
+            const SizedBox(
+              height: 14,
+            ),
+
+            ClipRRect(
+              borderRadius:
+                  BorderRadius
+                      .circular(
+                999,
+              ),
+              child:
+                  const LinearProgressIndicator(
+                minHeight: 4,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
 
-  Widget _buildSummary(
-    BuildContext context,
-  ) {
+class _RaPreferredProviderSearch
+    extends StatelessWidget {
+  const _RaPreferredProviderSearch({
+    required this.providerName,
+    required this.expanding,
+    required this.onExpand,
+  });
+
+  final String providerName;
+  final bool expanding;
+
+  final VoidCallback onExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
+
+    final name =
+        providerName.trim().isEmpty
+            ? 'Selected provider'
+            : providerName;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(
+          18,
+        ),
+        border: Border.all(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              ProfileInitials(
+                name: name,
+                radius: 21,
+              ),
+
+              const SizedBox(
+                width: 10,
+              ),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
+                  children: [
+                    Text(
+                      name,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight:
+                            FontWeight
+                                .w700,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 3,
+                    ),
+
+                    Text(
+                      'Waiting for this provider to respond.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.8,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(
+            height: 11,
+          ),
+
+          SizedBox(
+            width:
+                double.infinity,
+            child:
+                OutlinedButton.icon(
+              onPressed:
+                  expanding
+                      ? null
+                      : onExpand,
+              icon: expanding
+                  ? const SizedBox
+                      .square(
+                      dimension: 16,
+                      child:
+                          CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(
+                      Icons
+                          .person_search_outlined,
+                    ),
+              label: const Text(
+                'Search Other Providers Now',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaSearchRequestCard
+    extends StatelessWidget {
+  const _RaSearchRequestCard({
+    required this.issue,
+    required this.priority,
+    required this.location,
+    required this.vehicle,
+    required this.registration,
+  });
+
+  final String issue;
+  final String priority;
+  final String location;
+  final String vehicle;
+  final String registration;
+
+  @override
+  Widget build(BuildContext context) {
     final theme =
         Theme.of(context);
 
@@ -1224,366 +2023,77 @@ class _SearchingScreenState extends State<SearchingScreen>
     return Container(
       padding:
           const EdgeInsets.all(
-        RaSpace.lg,
+        15,
       ),
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : Colors.white,
         borderRadius:
             BorderRadius.circular(
-          22,
+          20,
         ),
         border: Border.all(
           color: colors
               .outlineVariant
               .withValues(
-            alpha: .6,
+            alpha: .45,
           ),
         ),
       ),
       child: Column(
         children: [
           _RaSearchDetailRow(
-            icon:
-                Icons.car_repair_outlined,
-            label: 'Assistance',
-            value:
-                editableDraft.issue,
-          ),
-          const _RaSearchDivider(),
-          _RaSearchDetailRow(
-            icon:
-                Icons.location_on_outlined,
+            icon: Icons
+                .car_repair_outlined,
             label:
-                'Breakdown location',
-            value:
-                currentLocationLabel,
+                'Assistance',
+            value: issue,
           ),
-          if (editableDraft.landmark
-              .trim()
-              .isNotEmpty) ...[
-            const _RaSearchDivider(),
-            _RaSearchDetailRow(
-              icon:
-                  Icons.signpost_outlined,
-              label: 'Landmark',
-              value:
-                  editableDraft.landmark,
-            ),
-          ],
+
           const _RaSearchDivider(),
+
           _RaSearchDetailRow(
-            icon:
-                preferredSearch
-                    ? Icons
-                        .person_outline_rounded
-                    : Icons
-                        .compare_arrows_rounded,
+            icon: Icons
+                .priority_high_rounded,
             label:
-                'Search preference',
-            value: preferredSearch
-                ? editableDraft.provider
-                : 'Suitable available providers',
+                'Priority',
+            value: priority,
           ),
-          if (widget.requestId != null) ...[
-            const _RaSearchDivider(),
-            _RaSearchDetailRow(
-              icon:
-                  Icons.tag_rounded,
-              label: 'Request ID',
-              value:
-                  widget.requestId!,
-            ),
-          ],
+
+          const _RaSearchDivider(),
+
+          _RaSearchDetailRow(
+            icon: Icons
+                .directions_car_outlined,
+            label:
+                'Vehicle',
+            value: [
+              vehicle,
+              registration
+                  .toUpperCase(),
+            ]
+                .where(
+                  (value) => value
+                      .trim()
+                      .isNotEmpty,
+                )
+                .join(' • '),
+          ),
+
+          const _RaSearchDivider(),
+
+          _RaSearchDetailRow(
+            icon: Icons
+                .location_on_outlined,
+            label:
+                'Location',
+            value: location,
+          ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
-
-    return PopScope(
-      canPop: !activelySearching,
-      child: Scaffold(
-        backgroundColor:
-            theme.scaffoldBackgroundColor,
-
-        appBar: AppBar(
-          automaticallyImplyLeading:
-              !activelySearching,
-          title: const Text(
-            'Finding Assistance',
-          ),
-        ),
-
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding:
-                      const EdgeInsets
-                          .fromLTRB(
-                    RaSpace.lg,
-                    RaSpace.md,
-                    RaSpace.lg,
-                    RaSpace.xxl,
-                  ),
-                  children: [
-                    Align(
-                      alignment:
-                          Alignment.centerRight,
-                      child: StatusPill(
-                        label: requestStatus ==
-                                'cancelled'
-                            ? 'CANCELLED'
-                            : requestStatus ==
-                                    'not_submitted'
-                                ? 'NOT SUBMITTED'
-                                : searchingAllProviders
-                                    ? 'WIDER SEARCH'
-                                    : 'SEARCHING',
-                        tone:
-                            searchTone,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
-
-                    _buildSearchVisual(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
-
-                    Text(
-                      searchTitle,
-                      textAlign:
-                          TextAlign.center,
-                      style: theme
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight
-                                .w900,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.sm,
-                    ),
-
-                    Padding(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
-                        horizontal:
-                            RaSpace.md,
-                      ),
-                      child: Text(
-                        searchMessage,
-                        textAlign:
-                            TextAlign.center,
-                        style: theme
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(
-                          color: requestError !=
-                                  null
-                              ? colors.error
-                              : colors
-                                  .onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                    ),
-
-                    if (activelySearching) ...[
-                      const SizedBox(
-                        height:
-                            RaSpace.lg,
-                      ),
-                      ClipRRect(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          999,
-                        ),
-                        child:
-                            const LinearProgressIndicator(
-                          minHeight: 5,
-                        ),
-                      ),
-                    ],
-
-                    if (preferredSearch &&
-                        activelySearching) ...[
-                      const SizedBox(
-                        height:
-                            RaSpace.lg,
-                      ),
-                      Container(
-                        padding:
-                            const EdgeInsets
-                                .all(
-                          RaSpace.md,
-                        ),
-                        decoration:
-                            BoxDecoration(
-                          color: colors
-                              .primaryContainer
-                              .withValues(
-                            alpha: .34,
-                          ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            16,
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                          children: [
-                            Icon(
-                              Icons
-                                  .schedule_outlined,
-                              color: colors
-                                  .primary,
-                              size: 20,
-                            ),
-                            const SizedBox(
-                              width:
-                                  RaSpace.sm,
-                            ),
-                            Expanded(
-                              child: Text(
-                                'If your selected provider does not respond within 90 seconds, RoadAssist will automatically widen the search.',
-                                style: theme
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                  height:
-                                      1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    Text(
-                      'Your request',
-                      style: theme
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight
-                                .w900,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
-
-                    _buildSummary(
-                      context,
-                    ),
-
-                    if (widget.requestId !=
-                        null) ...[
-                      const SizedBox(
-                        height:
-                            RaSpace.xxl,
-                      ),
-
-                      Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .request_quote_outlined,
-                            color: colors
-                                .primary,
-                          ),
-                          const SizedBox(
-                            width:
-                                RaSpace.sm,
-                          ),
-                          Expanded(
-                            child: Text(
-                              'Provider offers',
-                              style: theme
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
-                                fontWeight:
-                                    FontWeight
-                                        .w900,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height:
-                            RaSpace.md,
-                      ),
-
-                      QuoteOffers(
-                        requestId:
-                            widget
-                                .requestId!,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              _RaSearchBottomBar(
-                searching:
-                    activelySearching,
-                cancelling:
-                    cancelling,
-                onEdit:
-                    editPendingRequest,
-                onCancel:
-                    cancelRequest,
-                onHome: () =>
-                    replace(
-                  context,
-                  const DriverShell(),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1598,74 +2108,65 @@ class _RaSearchDetailRow
   });
 
   final IconData icon;
+
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
-
     final colors =
-        theme.colorScheme;
+        Theme.of(context)
+            .colorScheme;
 
     return Padding(
       padding:
           const EdgeInsets.symmetric(
-        vertical: RaSpace.sm,
+        vertical: 10,
       ),
       child: Row(
         crossAxisAlignment:
-            CrossAxisAlignment.start,
+            CrossAxisAlignment
+                .start,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration:
-                BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest,
-              borderRadius:
-                  BorderRadius.circular(
-                13,
-              ),
-            ),
-            child: Icon(
-              icon,
-              color: colors.primary,
-              size: 20,
-            ),
+          Icon(
+            icon,
+            color:
+                colors.primary,
+            size: 18,
           ),
+
           const SizedBox(
-            width: RaSpace.md,
+            width: 10,
           ),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
               children: [
                 Text(
                   label,
-                  style: theme
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8.5,
                     color: colors
                         .onSurfaceVariant,
                   ),
                 ),
+
                 const SizedBox(
                   height: 3,
                 ),
+
                 Text(
                   value,
-                  style: theme
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 10.2,
+                    height: 1.4,
                     fontWeight:
-                        FontWeight.w700,
-                    height: 1.35,
+                        FontWeight.w600,
                   ),
                 ),
               ],
@@ -1683,15 +2184,18 @@ class _RaSearchDivider
 
   @override
   Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
     return Divider(
       height: 1,
-      indent: 52,
-      color: Theme.of(context)
-          .colorScheme
+      indent: 28,
+      color: colors
           .outlineVariant
           .withValues(
-            alpha: .5,
-          ),
+        alpha: .34,
+      ),
     );
   }
 }
@@ -1699,32 +2203,31 @@ class _RaSearchDivider
 class _RaSearchBottomBar
     extends StatelessWidget {
   const _RaSearchBottomBar({
-    required this.searching,
+    required this.active,
     required this.cancelling,
-    required this.onEdit,
     required this.onCancel,
     required this.onHome,
   });
 
-  final bool searching;
+  final bool active;
   final bool cancelling;
 
-  final VoidCallback onEdit;
   final VoidCallback onCancel;
   final VoidCallback onHome;
 
   @override
   Widget build(BuildContext context) {
     final colors =
-        Theme.of(context).colorScheme;
+        Theme.of(context)
+            .colorScheme;
 
     return Container(
       padding:
           const EdgeInsets.fromLTRB(
-        RaSpace.lg,
-        RaSpace.sm,
-        RaSpace.lg,
-        RaSpace.md,
+        18,
+        8,
+        18,
+        12,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
@@ -1733,98 +2236,51 @@ class _RaSearchBottomBar
             color: colors
                 .outlineVariant
                 .withValues(
-              alpha: .6,
+              alpha: .45,
             ),
           ),
         ),
       ),
       child: SafeArea(
         top: false,
-        child: searching
-            ? Row(
-                children: [
-                  Expanded(
-                    child:
-                        OutlinedButton.icon(
-                      onPressed:
-                          cancelling
-                              ? null
-                              : onEdit,
-                      icon:
-                          const Icon(
-                        Icons
-                            .edit_outlined,
-                      ),
-                      label:
-                          const Text(
-                        'Edit Request',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(
-                    width:
-                        RaSpace.sm,
-                  ),
-                  Expanded(
-                    child:
-                        OutlinedButton.icon(
-                      style:
-                          OutlinedButton
-                              .styleFrom(
-                        foregroundColor:
-                            colors.error,
-                        side:
-                            BorderSide(
-                          color: colors
-                              .error
-                              .withValues(
-                            alpha: .45,
-                          ),
+        child: active
+            ? OutlinedButton.icon(
+                style:
+                    OutlinedButton
+                        .styleFrom(
+                  foregroundColor:
+                      colors.error,
+                ),
+                onPressed:
+                    cancelling
+                        ? null
+                        : onCancel,
+                icon: cancelling
+                    ? const SizedBox
+                        .square(
+                        dimension: 16,
+                        child:
+                            CircularProgressIndicator(
+                          strokeWidth: 2,
                         ),
+                      )
+                    : const Icon(
+                        Icons
+                            .close_rounded,
                       ),
-                      onPressed:
-                          cancelling
-                              ? null
-                              : onCancel,
-                      icon: cancelling
-                          ? const SizedBox(
-                              width: 17,
-                              height:
-                                  17,
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth:
-                                    2,
-                              ),
-                            )
-                          : const Icon(
-                              Icons
-                                  .close_rounded,
-                            ),
-                      label:
-                          const Text(
-                        'Cancel',
-                      ),
-                    ),
-                  ),
-                ],
+                label: const Text(
+                  'Cancel Assistance Request',
+                ),
               )
-            : SizedBox(
-                width:
-                    double.infinity,
-                child:
-                    FilledButton.icon(
-                  onPressed:
-                      onHome,
-                  icon:
-                      const Icon(
-                    Icons
-                        .home_outlined,
-                  ),
-                  label:
-                      const Text(
-                    'Back to Home',
-                  ),
+            : FilledButton.icon(
+                onPressed:
+                    onHome,
+                icon: const Icon(
+                  Icons
+                      .home_outlined,
+                ),
+                label: const Text(
+                  'Return Home',
                 ),
               ),
       ),

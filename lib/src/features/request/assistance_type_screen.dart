@@ -1,13 +1,17 @@
 part of '../../screens.dart';
 
 class AssistanceTypeScreen extends StatefulWidget {
-  const AssistanceTypeScreen({super.key});
+  const AssistanceTypeScreen({
+    super.key,
+  });
 
   @override
-  State<AssistanceTypeScreen> createState() => _AssistanceTypeScreenState();
+  State<AssistanceTypeScreen> createState() =>
+      _AssistanceTypeScreenState();
 }
 
-class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
+class _AssistanceTypeScreenState
+    extends State<AssistanceTypeScreen> {
   final selected = <int>{};
 
   final draftStore = RequestDraftStore();
@@ -25,17 +29,17 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     ),
     (
       'Vehicle Towing',
-      'Choose this when your vehicle cannot be driven safely and needs recovery.',
+      'For a vehicle that cannot be driven safely and needs recovery.',
       Icons.fire_truck_outlined,
     ),
     (
       'Flat Tyre',
-      'Get help with a puncture, tyre damage or fitting your spare tyre.',
+      'Puncture, tyre damage or help fitting a spare tyre.',
       Icons.tire_repair_outlined,
     ),
     (
       'Battery Jumpstart',
-      'For a dead battery, starting issue or basic battery assistance.',
+      'Dead battery, starting problem or basic battery assistance.',
       Icons.battery_charging_full_rounded,
     ),
   ];
@@ -48,13 +52,13 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
 
   Future<void> loadSavedDraft() async {
     final draft = await draftStore.load();
-    final updatedAt = await draftStore.lastUpdated();
+    final updated = await draftStore.lastUpdated();
 
     if (!mounted) return;
 
     setState(() {
       savedDraft = draft;
-      savedAt = updatedAt;
+      savedAt = updated;
       loadingDraft = false;
     });
   }
@@ -70,18 +74,24 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Saved request draft removed.')),
+      const SnackBar(
+        content: Text(
+          'Saved request draft removed.',
+        ),
+      ),
     );
   }
 
-  String formatSavedTime(DateTime? value) {
+  String savedTime(DateTime? value) {
     if (value == null) {
       return 'Saved request available';
     }
 
-    final hour = value.hour.toString().padLeft(2, '0');
+    final hour =
+        value.hour.toString().padLeft(2, '0');
 
-    final minute = value.minute.toString().padLeft(2, '0');
+    final minute =
+        value.minute.toString().padLeft(2, '0');
 
     return 'Saved ${value.day}/${value.month}/${value.year} at $hour:$minute';
   }
@@ -92,15 +102,34 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     if (draft == null) return;
 
     if (draft.preferredProviderId.isNotEmpty) {
-      push(context, ReviewScreen(draft: draft));
-    } else if (!draft.location.startsWith('Select current GPS')) {
-      push(context, ProvidersScreen(draft: draft));
-    } else {
       push(
         context,
-        BreakdownDetailsScreen(issues: draft.issues, initialDraft: draft),
+        ReviewScreen(
+          draft: draft,
+        ),
       );
+      return;
     }
+
+    if (!draft.location.startsWith(
+      'Select current GPS',
+    )) {
+      push(
+        context,
+        ProvidersScreen(
+          draft: draft,
+        ),
+      );
+      return;
+    }
+
+    push(
+      context,
+      BreakdownDetailsScreen(
+        issues: draft.issues,
+        initialDraft: draft,
+      ),
+    );
   }
 
   void toggle(int index) {
@@ -116,173 +145,579 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
   void continueRequest() {
     if (selected.isEmpty) return;
 
-    final issues = selected.map((index) => items[index].$1).toList();
+    final issues = selected
+        .map(
+          (index) => items[index].$1,
+        )
+        .toList();
 
-    push(context, BreakdownDetailsScreen(issues: issues));
-  }
-
-  void startUnknownProblem() {
     push(
       context,
       BreakdownDetailsScreen(
-        issues: const ['General Mechanic'],
+        issues: issues,
+      ),
+    );
+  }
+
+  void unknownProblem() {
+    push(
+      context,
+      BreakdownDetailsScreen(
+        issues: const [
+          'General Mechanic',
+        ],
         initialDraft: RequestDraft(
-          issues: const ['General Mechanic'],
+          issues: const [
+            'General Mechanic',
+          ],
           vehicleType: 'Sedan / Hatchback',
           modelYear: '',
           registration: '',
-          description: 'I am not sure what the problem is. ',
+          description:
+              'I am not sure what the problem is. ',
         ),
       ),
     );
   }
 
-  Widget _buildProgressHeader(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final colors = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Scaffold(
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          'Request Assistance',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.45,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            Expanded(
+              child: ListView(
+                physics:
+                    const BouncingScrollPhysics(),
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  18,
+                  8,
+                  18,
+                  28,
+                ),
                 children: [
-                  Icon(
-                    Icons.looks_one_outlined,
-                    size: 16,
-                    color: colors.onPrimaryContainer,
+                  const _RaAssistProgress(),
+
+                  const SizedBox(
+                    height: 16,
                   ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'STEP 1 OF 4',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.onPrimaryContainer,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: .8,
+
+                  const _RaAssistHero(),
+
+                  if (loadingDraft) ...[
+                    const SizedBox(
+                      height: 14,
+                    ),
+                    Container(
+                      padding:
+                          const EdgeInsets.all(
+                        13,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.surface,
+                        borderRadius:
+                            BorderRadius.circular(
+                          17,
+                        ),
+                        border: Border.all(
+                          color: colors
+                              .outlineVariant
+                              .withValues(
+                            alpha: .45,
+                          ),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          SizedBox.square(
+                            dimension: 18,
+                            child:
+                                CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 10,
+                          ),
+                          Text(
+                            'Checking saved request…',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (savedDraft != null) ...[
+                    const SizedBox(
+                      height: 14,
+                    ),
+                    _RaAssistSavedDraft(
+                      draft: savedDraft!,
+                      savedLabel: savedTime(
+                        savedAt,
+                      ),
+                      onResume:
+                          resumeSavedRequest,
+                      onDelete:
+                          discardSavedDraft,
+                    ),
+                  ],
+
+                  const SizedBox(
+                    height: 18,
+                  ),
+
+                  Container(
+                    padding:
+                        const EdgeInsets.all(
+                      13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: raGold.withValues(
+                        alpha: .075,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(
+                        16,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons
+                              .health_and_safety_outlined,
+                          color: raGold,
+                          size: 19,
+                        ),
+                        const SizedBox(
+                          width: 9,
+                        ),
+                        Expanded(
+                          child: Text(
+                            'If you are in immediate danger, move to a safe place when possible and contact emergency services first.',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 9.5,
+                              height: 1.45,
+                              color: colors
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 26,
+                  ),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .start,
+                          children: [
+                            Text(
+                              'Choose assistance',
+                              style: GoogleFonts
+                                  .plusJakartaSans(
+                                fontSize: 17,
+                                fontWeight:
+                                    FontWeight.w800,
+                                letterSpacing: -.35,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 3,
+                            ),
+                            Text(
+                              'Select every issue that applies.',
+                              style: GoogleFonts
+                                  .plusJakartaSans(
+                                fontSize: 9.5,
+                                color: colors
+                                    .onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              selected.clear();
+                            });
+                          },
+                          child: const Text(
+                            'Clear',
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(
+                    height: 11,
+                  ),
+
+                  for (var index = 0;
+                      index < items.length;
+                      index++) ...[
+                    _RaAssistIssueCard(
+                      title: items[index].$1,
+                      description:
+                          items[index].$2,
+                      icon: items[index].$3,
+                      selected:
+                          selected.contains(
+                        index,
+                      ),
+                      onTap: () {
+                        toggle(index);
+                      },
+                    ),
+                    if (index !=
+                        items.length - 1)
+                      const SizedBox(
+                        height: 9,
+                      ),
+                  ],
+
+                  const SizedBox(
+                    height: 13,
+                  ),
+
+                  _RaAssistUnknownCard(
+                    onTap: unknownProblem,
+                  ),
+
+                  const SizedBox(
+                    height: 15,
+                  ),
+
+                  Container(
+                    padding:
+                        const EdgeInsets.all(
+                      13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.primary
+                          .withValues(
+                        alpha: .055,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(
+                        16,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons
+                              .request_quote_outlined,
+                          color: colors.primary,
+                          size: 19,
+                        ),
+                        const SizedBox(
+                          width: 9,
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Choosing a service does not confirm a price. Providers review the request and submit offers before assignment.',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 9.5,
+                              height: 1.45,
+                              color: colors
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
 
-            const Spacer(),
-
-            Text(
-              'Issue',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colors.primary,
-                fontWeight: FontWeight.w800,
+            Container(
+              padding:
+                  const EdgeInsets.fromLTRB(
+                18,
+                8,
+                18,
+                12,
+              ),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: colors
+                        .outlineVariant
+                        .withValues(
+                      alpha: .45,
+                    ),
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize:
+                      MainAxisSize.min,
+                  children: [
+                    if (selected.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons
+                                .check_circle_rounded,
+                            size: 16,
+                            color: colors.primary,
+                          ),
+                          const SizedBox(
+                            width: 6,
+                          ),
+                          Text(
+                            '${selected.length} ${selected.length == 1 ? 'issue' : 'issues'} selected',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 9.5,
+                              fontWeight:
+                                  FontWeight.w700,
+                              color:
+                                  colors.primary,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'Next: Details',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 8.5,
+                              color: colors
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(
+                        height: 7,
+                      ),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      child:
+                          FilledButton.icon(
+                        onPressed:
+                            selected.isEmpty
+                                ? null
+                                : continueRequest,
+                        icon: const Icon(
+                          Icons
+                              .arrow_forward_rounded,
+                        ),
+                        label: Text(
+                          selected.isEmpty
+                              ? 'Select an Issue'
+                              : 'Continue to Details',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
 
-        const SizedBox(height: RaSpace.sm),
+class _RaAssistProgress
+    extends StatelessWidget {
+  const _RaAssistProgress();
 
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 9,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: colors.primary
+                    .withValues(
+                  alpha: .08,
+                ),
+                borderRadius:
+                    BorderRadius.circular(
+                  999,
+                ),
+              ),
+              child: Text(
+                'STEP 1 OF 4',
+                style:
+                    GoogleFonts.plusJakartaSans(
+                  color: colors.primary,
+                  fontSize: 8,
+                  fontWeight:
+                      FontWeight.w700,
+                  letterSpacing: .8,
+                ),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              'Issue',
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 9,
+                fontWeight:
+                    FontWeight.w700,
+                color: colors.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
         ClipRRect(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius:
+              BorderRadius.circular(999),
           child: LinearProgressIndicator(
             value: .25,
-            minHeight: 6,
-            backgroundColor: colors.surfaceContainerHighest,
+            minHeight: 5,
+            backgroundColor: colors
+                .surfaceContainerHighest,
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildIntroHero(BuildContext context) {
-    final theme = Theme.of(context);
+class _RaAssistHero
+    extends StatelessWidget {
+  const _RaAssistHero();
 
-    final colors = theme.colorScheme;
-
-    final dark = theme.brightness == Brightness.dark;
-
-    final start = dark ? const Color(0xFF0B4C84) : colors.primary;
-
-    final end = dark ? const Color(0xFF08675E) : const Color(0xFF007D70);
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(RaSpace.xl),
+      padding: const EdgeInsets.all(19),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [start, end],
+          colors: dark
+              ? const [
+                  Color(0xFF0B477D),
+                  Color(0xFF08645D),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078C7E),
+                ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius:
+            BorderRadius.circular(25),
       ),
       child: Stack(
         children: [
           Positioned(
-            right: -20,
-            top: -25,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: .06),
+            right: -21,
+            bottom: -29,
+            child: Icon(
+              Icons.car_repair_outlined,
+              size: 125,
+              color: Colors.white
+                  .withValues(
+                alpha: .065,
               ),
             ),
           ),
-
-          Positioned(
-            right: 6,
-            bottom: -18,
-            child: Icon(
-              Icons.car_repair_outlined,
-              size: 115,
-              color: Colors.white.withValues(alpha: .07),
-            ),
-          ),
-
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 49,
+                height: 49,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(17),
+                  color: Colors.white
+                      .withValues(
+                    alpha: .13,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(
+                    15,
+                  ),
                 ),
                 child: const Icon(
                   Icons.add_road_outlined,
                   color: Colors.white,
-                  size: 27,
+                  size: 24,
                 ),
               ),
-
-              const SizedBox(height: RaSpace.lg),
-
+              const SizedBox(height: 15),
               Text(
                 'What happened?',
-                style: theme.textTheme.headlineMedium?.copyWith(
+                style:
+                    GoogleFonts.plusJakartaSans(
                   color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 26,
+                  fontSize: 22,
+                  fontWeight:
+                      FontWeight.w800,
+                  letterSpacing: -.65,
                 ),
               ),
-
               const SizedBox(height: 6),
-
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 300),
+              SizedBox(
+                width: 290,
                 child: Text(
-                  'Choose every issue that applies. RoadAssist will use these details to find suitable providers.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: .84),
+                  'Tell us what kind of roadside help you need. You can select more than one issue.',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white
+                        .withValues(
+                      alpha: .80,
+                    ),
+                    fontSize: 10,
                     height: 1.45,
                   ),
                 ),
@@ -293,597 +728,400 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
       ),
     );
   }
+}
 
-  Widget _buildDraftCard() {
-    final draft = savedDraft!;
+class _RaAssistIssueCard
+    extends StatelessWidget {
+  const _RaAssistIssueCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
 
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.secondaryContainer.withValues(alpha: .38),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.secondary.withValues(alpha: .20)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(RaSpace.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: colors.secondaryContainer,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.history_rounded,
-                    color: colors.onSecondaryContainer,
-                  ),
-                ),
-
-                const SizedBox(width: RaSpace.md),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Continue saved request',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        'You have an unfinished roadside assistance request.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-
-                IconButton(
-                  tooltip: 'Discard draft',
-                  onPressed: discardSavedDraft,
-                  icon: Icon(Icons.delete_outline_rounded, color: colors.error),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: RaSpace.md),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(RaSpace.md),
-              decoration: BoxDecoration(
-                color: colors.surface.withValues(alpha: .7),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    draft.issue,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        size: 15,
-                        color: colors.onSurfaceVariant,
-                      ),
-
-                      const SizedBox(width: 5),
-
-                      Expanded(
-                        child: Text(
-                          formatSavedTime(savedAt),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: RaSpace.md),
-
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: resumeSavedRequest,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Resume Request'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIssueCard(int index) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final item = items[index];
-
-    final isSelected = selected.contains(index);
-
-    return Semantics(
-      selected: isSelected,
-      button: true,
-      label: '${item.$1}. ${item.$2}',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colors.primaryContainer.withValues(alpha: .55)
-              : colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? colors.primary.withValues(alpha: .65)
-                : colors.outlineVariant.withValues(alpha: .65),
-            width: isSelected ? 1.5 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: colors.primary.withValues(alpha: .08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => toggle(index),
-            child: Padding(
-              padding: const EdgeInsets.all(RaSpace.lg),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colors.primary
-                          : colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                    child: Icon(
-                      item.$3,
-                      size: 27,
-                      color: isSelected
-                          ? colors.onPrimary
-                          : colors.onPrimaryContainer,
-                    ),
-                  ),
-
-                  const SizedBox(width: RaSpace.md),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.$1,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(width: RaSpace.sm),
-
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 160),
-                              child: Icon(
-                                isSelected
-                                    ? Icons.check_circle_rounded
-                                    : Icons.radio_button_unchecked_rounded,
-                                key: ValueKey(isSelected),
-                                color: isSelected
-                                    ? colors.primary
-                                    : colors.outline,
-                                size: 24,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 5),
-
-                        Text(
-                          item.$2,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            height: 1.4,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-
-                        const SizedBox(height: RaSpace.sm),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? colors.primary.withValues(alpha: .10)
-                                : colors.surfaceContainerHighest.withValues(
-                                    alpha: .6,
-                                  ),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.request_quote_outlined,
-                                size: 14,
-                                color: isSelected
-                                    ? colors.primary
-                                    : colors.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Provider quote required',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: isSelected
-                                      ? colors.primary
-                                      : colors.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUnknownProblemCard(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Material(
-      color: colors.tertiaryContainer.withValues(alpha: .36),
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: startUnknownProblem,
-        child: Container(
-          padding: const EdgeInsets.all(RaSpace.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colors.tertiary.withValues(alpha: .18)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colors.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.help_outline_rounded,
-                  color: colors.onTertiaryContainer,
-                ),
-              ),
-
-              const SizedBox(width: RaSpace.md),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Not sure what is wrong?',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: 3),
-
-                    Text(
-                      'Describe the symptoms instead. A provider can inspect the vehicle before repair work is approved.',
-                      style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: RaSpace.sm),
-
-              Icon(Icons.arrow_forward_rounded, color: colors.tertiary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final enabled = selected.isNotEmpty;
-
-    final count = selected.length;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        RaSpace.lg,
-        RaSpace.sm,
-        RaSpace.lg,
-        RaSpace.md,
-      ),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(
-          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .65)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .035),
-            blurRadius: 18,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (enabled) ...[
-              Row(
-                children: [
-                  Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 17,
-                    color: colors.primary,
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  Expanded(
-                    child: Text(
-                      '$count ${count == 1 ? 'issue' : 'issues'} selected',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-
-                  Text(
-                    'Next: Details',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: RaSpace.sm),
-            ],
-
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: enabled ? continueRequest : null,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: Text(
-                  enabled ? 'Continue' : 'Select an issue to continue',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  final String title;
+  final String description;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final colors = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+    final dark =
+        theme.brightness ==
+            Brightness.dark;
 
-      appBar: AppBar(title: const Text('Request Assistance')),
-
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(
-                  RaSpace.lg,
-                  RaSpace.sm,
-                  RaSpace.lg,
-                  RaSpace.xxl,
+    return Material(
+      color: selected
+          ? colors.primary.withValues(
+              alpha: .075,
+            )
+          : dark
+              ? const Color(
+                  0xFF0D1D2B,
+                )
+              : Colors.white,
+      borderRadius:
+          BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(
+            milliseconds: 170,
+          ),
+          padding: const EdgeInsets.all(
+            14,
+          ),
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(
+              20,
+            ),
+            border: Border.all(
+              color: selected
+                  ? colors.primary
+                      .withValues(
+                      alpha: .50,
+                    )
+                  : colors
+                      .outlineVariant
+                      .withValues(
+                      alpha: .45,
+                    ),
+              width:
+                  selected ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(
+                  milliseconds: 170,
                 ),
-                children: [
-                  _buildProgressHeader(context),
-
-                  const SizedBox(height: RaSpace.lg),
-
-                  _buildIntroHero(context),
-
-                  if (loadingDraft) ...[
-                    const SizedBox(height: RaSpace.lg),
-
-                    Container(
-                      padding: const EdgeInsets.all(RaSpace.md),
-                      decoration: BoxDecoration(
-                        color: colors.surface,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: colors.outlineVariant.withValues(alpha: .6),
+                width: 47,
+                height: 47,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? colors.primary
+                      : colors.primary
+                          .withValues(
+                          alpha: .08,
                         ),
-                      ),
-                      child: const Row(
-                        children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          SizedBox(width: RaSpace.md),
-                          Text('Checking for a saved request…'),
-                        ],
-                      ),
-                    ),
-                  ] else if (savedDraft != null) ...[
-                    const SizedBox(height: RaSpace.lg),
-                    _buildDraftCard(),
-                  ],
-
-                  const SizedBox(height: RaSpace.xl),
-
-                  const SafetyBox(),
-
-                  const SizedBox(height: RaSpace.xxl),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Choose assistance',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'You can select more than one issue.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      if (selected.isNotEmpty)
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              selected.clear();
-                            });
-                          },
-                          child: const Text('Clear'),
-                        ),
-                    ],
+                  borderRadius:
+                      BorderRadius.circular(
+                    15,
                   ),
-
-                  const SizedBox(height: RaSpace.md),
-
-                  for (var index = 0; index < items.length; index++) ...[
-                    _buildIssueCard(index),
-
-                    if (index != items.length - 1)
-                      const SizedBox(height: RaSpace.sm),
-                  ],
-
-                  const SizedBox(height: RaSpace.lg),
-
-                  _buildUnknownProblemCard(context),
-
-                  const SizedBox(height: RaSpace.lg),
-
-                  Container(
-                    padding: const EdgeInsets.all(RaSpace.md),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest.withValues(
-                        alpha: .40,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                child: Icon(
+                  icon,
+                  size: 22,
+                  color: selected
+                      ? colors.onPrimary
+                      : colors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          size: 19,
-                          color: colors.primary,
-                        ),
-                        const SizedBox(width: RaSpace.md),
                         Expanded(
                           child: Text(
-                            'Selecting a service does not confirm a price. Providers review your request and submit an offer before assignment.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              height: 1.4,
+                            title,
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 12.5,
+                              fontWeight:
+                                  FontWeight
+                                      .w700,
                             ),
                           ),
+                        ),
+                        Icon(
+                          selected
+                              ? Icons
+                                  .check_circle_rounded
+                              : Icons
+                                  .radio_button_unchecked_rounded,
+                          color: selected
+                              ? colors.primary
+                              : colors.outline,
+                          size: 21,
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 5),
+                    Text(
+                      description,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 9.5,
+                        height: 1.4,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RaAssistUnknownCard
+    extends StatelessWidget {
+  const _RaAssistUnknownCard({
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Material(
+      color: colors.secondary.withValues(
+        alpha: .06,
+      ),
+      borderRadius:
+          BorderRadius.circular(19),
+      child: InkWell(
+        borderRadius:
+            BorderRadius.circular(19),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(
+            14,
+          ),
+          decoration: BoxDecoration(
+            borderRadius:
+                BorderRadius.circular(
+              19,
+            ),
+            border: Border.all(
+              color: colors.secondary
+                  .withValues(
+                alpha: .15,
               ),
             ),
-
-            _buildBottomBar(),
-          ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.secondary
+                      .withValues(
+                    alpha: .10,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(
+                    14,
+                  ),
+                ),
+                child: Icon(
+                  Icons.help_outline_rounded,
+                  color: colors.secondary,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'I don’t know the problem',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight:
+                            FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Describe the symptoms and let a provider inspect the vehicle first.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 9,
+                        height: 1.4,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: colors.secondary,
+                size: 19,
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _RaAssistSavedDraft
+    extends StatelessWidget {
+  const _RaAssistSavedDraft({
+    required this.draft,
+    required this.savedLabel,
+    required this.onResume,
+    required this.onDelete,
+  });
+
+  final RequestDraft draft;
+  final String savedLabel;
+  final VoidCallback onResume;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: colors.secondary
+            .withValues(
+          alpha: .06,
+        ),
+        borderRadius:
+            BorderRadius.circular(19),
+        border: Border.all(
+          color: colors.secondary
+              .withValues(
+            alpha: .15,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colors.secondary
+                      .withValues(
+                    alpha: .09,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(
+                    13,
+                  ),
+                ),
+                child: Icon(
+                  Icons.history_rounded,
+                  color: colors.secondary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Continue saved request',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight:
+                            FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      savedLabel,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.5,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Discard draft',
+                onPressed: onDelete,
+                icon: Icon(
+                  Icons
+                      .delete_outline_rounded,
+                  color: colors.error,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(
+              11,
+            ),
+            decoration: BoxDecoration(
+              color: colors.surface
+                  .withValues(
+                alpha: .75,
+              ),
+              borderRadius:
+                  BorderRadius.circular(
+                14,
+              ),
+            ),
+            child: Text(
+              draft.issue,
+              maxLines: 2,
+              overflow:
+                  TextOverflow.ellipsis,
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 10,
+                fontWeight:
+                    FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: onResume,
+            icon: const Icon(
+              Icons.play_arrow_rounded,
+            ),
+            label: const Text(
+              'Resume Request',
+            ),
+          ),
+        ],
       ),
     );
   }

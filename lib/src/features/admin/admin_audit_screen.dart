@@ -1,9 +1,21 @@
 part of '../../screens.dart';
 
-/// Audit workspace tab; data/actions remain in the shared admin implementation.
+/// Audit workspace tab.
+///
+/// Querying, searching and record navigation are handled by
+/// the shared [_AdminRecords] implementation.
 class AdminAuditScreen extends StatelessWidget {
-  const AdminAuditScreen({super.key});
+  const AdminAuditScreen({
+    super.key,
+  });
+
   @override
-  Widget build(BuildContext context) =>
-      const _AdminRecords(key: ValueKey('audit'), kind: 'audit');
+  Widget build(BuildContext context) {
+    return const _AdminRecords(
+      key: ValueKey(
+        'audit',
+      ),
+      kind: 'audit',
+    );
+  }
 }

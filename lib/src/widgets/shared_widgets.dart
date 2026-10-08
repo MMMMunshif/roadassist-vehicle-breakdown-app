@@ -67,7 +67,7 @@ class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
               if (!_providerHasCurrentVerification(data) ||
                   _providerAvailabilityStatus(data) != 'Online') return false;
               final km = distance(data);
-              if (!hasLocation) return true;
+              if (!hasLocation) return false;
               if (km == null) return false;
               final radius = double.tryParse(
                 RegExp(r'\d+(?:\.\d+)?')
@@ -78,6 +78,12 @@ class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
             }).toList()
               ..sort((a, b) => (distance(a.data()) ?? double.infinity)
                   .compareTo(distance(b.data()) ?? double.infinity));
+            if (!hasLocation) {
+              return const InlineMessage(
+                icon: Icons.location_on_outlined,
+                text: 'Update your current location to find providers near you.',
+              );
+            }
             if (nearby.isEmpty) {
               return const InlineMessage(
                 icon: Icons.person_search_outlined,

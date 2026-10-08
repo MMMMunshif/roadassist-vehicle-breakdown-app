@@ -15,7 +15,8 @@ class BreakdownDetailsScreen extends StatefulWidget {
       _BreakdownDetailsScreenState();
 }
 
-class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
+class _BreakdownDetailsScreenState
+    extends State<BreakdownDetailsScreen> {
   final formKey = GlobalKey<FormState>();
 
   final modelController = TextEditingController();
@@ -24,22 +25,32 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   final notesController = TextEditingController();
   final customVehicleController = TextEditingController();
 
+  final SpeechToText speechToText = SpeechToText();
+
   String vehicle = 'Sedan / Hatchback';
   String? vehicleId;
+
   Map<String, dynamic>? vehicleSnapshot;
-
-  final List<String> vehiclePhotoUrls = [];
-  final List<BreakdownPhotoAnnotation> photoAnnotations = [];
-
-  bool uploadingVehiclePhoto = false;
-
-  final SpeechToText speechToText = SpeechToText();
-  bool listeningForDescription = false;
 
   String priority = 'normal';
   String partsPreference = 'discuss';
 
+  bool uploadingVehiclePhoto = false;
+  bool listeningForDescription = false;
+
   Timer? draftSaveDebounce;
+
+  final List<String> vehiclePhotoUrls = [];
+
+  final List<BreakdownPhotoAnnotation>
+      photoAnnotations = [];
+
+  static const Set<String> standardVehicleTypes = {
+    'Sedan / Hatchback',
+    'SUV',
+    'Van',
+    'Motorcycle',
+  };
 
   @override
   void initState() {
@@ -49,35 +60,39 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
 
     if (draft == null) {
       if (signedIn) {
-        loadDefaultVehicle();
+        unawaited(loadDefaultVehicle());
       }
+
       return;
     }
 
     vehicleId = draft.vehicleId;
     vehicleSnapshot = draft.vehicleSnapshot;
 
-    const standardTypes = {
-      'Sedan / Hatchback',
-      'SUV',
-      'Van',
-      'Motorcycle',
-    };
-
-    if (standardTypes.contains(draft.vehicleType)) {
+    if (standardVehicleTypes.contains(
+      draft.vehicleType,
+    )) {
       vehicle = draft.vehicleType;
     } else {
       vehicle = 'Other';
-      customVehicleController.text = draft.vehicleType;
+      customVehicleController.text =
+          draft.vehicleType;
     }
 
     modelController.text = draft.modelYear;
-    registrationController.text = draft.registration;
-    descriptionController.text = draft.description;
+
+    registrationController.text =
+        draft.registration;
+
+    descriptionController.text =
+        draft.description;
+
     notesController.text = draft.notes;
 
     priority = draft.priority;
-    partsPreference = draft.partsPreference;
+
+    partsPreference =
+        draft.partsPreference;
 
     vehiclePhotoUrls.addAll(
       draft.vehiclePhotoUrls,
@@ -92,7 +107,9 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   void dispose() {
     draftSaveDebounce?.cancel();
 
-    speechToText.stop();
+    unawaited(
+      speechToText.stop(),
+    );
 
     modelController.dispose();
     registrationController.dispose();
@@ -103,9 +120,29 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
   // VEHICLE
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+
+  Future<void> loadDefaultVehicle() async {
+    try {
+      final selected =
+          await VehicleService().loadDefault();
+
+      if (!mounted ||
+          selected == null ||
+          modelController.text.trim().isNotEmpty ||
+          registrationController.text
+              .trim()
+              .isNotEmpty) {
+        return;
+      }
+
+      applyVehicle(selected);
+    } catch (_) {
+      // Manual vehicle entry remains available.
+    }
+  }
 
   Future<void> selectSavedVehicle() async {
     final selected =
@@ -123,6 +160,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     }
 
     applyVehicle(selected);
+
     scheduleDraftSave();
   }
 
@@ -131,11 +169,19 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   ) {
     setState(() {
       vehicleId = selected.id;
-      vehicleSnapshot = selected.toJson();
 
-      vehicle = selected.vehicleType;
+      vehicleSnapshot =
+          selected.toJson();
 
-      if (vehicle == 'Other') {
+      if (standardVehicleTypes.contains(
+        selected.vehicleType,
+      )) {
+        vehicle = selected.vehicleType;
+
+        customVehicleController.clear();
+      } else {
+        vehicle = 'Other';
+
         customVehicleController.text =
             selected.vehicleType;
       }
@@ -148,33 +194,14 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     });
   }
 
-  Future<void> loadDefaultVehicle() async {
-    try {
-      final selected =
-          await VehicleService()
-              .loadDefault();
-
-      if (selected != null &&
-          mounted &&
-          modelController.text.isEmpty &&
-          registrationController
-              .text.isEmpty) {
-        applyVehicle(selected);
-      }
-    } catch (_) {
-      // Manual entry remains available.
-    }
-  }
-
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
   // DRAFT
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
 
   RequestDraft buildDraft() {
     final actualVehicleType =
         vehicle == 'Other'
-            ? customVehicleController
-                .text
+            ? customVehicleController.text
                 .trim()
             : vehicle;
 
@@ -192,8 +219,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                           .trim(),
                   'registration':
                       normalizeVehicleRegistration(
-                    registrationController
-                        .text,
+                    registrationController.text,
                   ),
                 },
       issues: widget.issues,
@@ -206,10 +232,8 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
         registrationController.text,
       ),
       description:
-          descriptionController.text
-              .trim(),
-      notes:
-          notesController.text.trim(),
+          descriptionController.text.trim(),
+      notes: notesController.text.trim(),
       priority: priority,
       partsPreference:
           partsPreference,
@@ -223,12 +247,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
           widget.initialDraft
               ?.locationAccuracyMeters,
       latitude:
-          widget.initialDraft
-                  ?.latitude ??
+          widget.initialDraft?.latitude ??
               6.9271,
       longitude:
-          widget.initialDraft
-                  ?.longitude ??
+          widget.initialDraft?.longitude ??
               79.8612,
       provider:
           widget.initialDraft?.provider ??
@@ -238,11 +260,11 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                   ?.preferredProviderId ??
               '',
       vehiclePhotoUrls:
-          List.unmodifiable(
+          List<String>.unmodifiable(
         vehiclePhotoUrls,
       ),
       photoAnnotations:
-          List.unmodifiable(
+          List<BreakdownPhotoAnnotation>.unmodifiable(
         photoAnnotations,
       ),
     );
@@ -251,23 +273,39 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   Future<void> saveDraft({
     bool showConfirmation = true,
   }) async {
-    await RequestDraftStore().save(
-      buildDraft(),
-    );
+    try {
+      await RequestDraftStore().save(
+        buildDraft(),
+      );
 
-    if (!mounted ||
-        !showConfirmation) {
-      return;
-    }
+      if (!mounted ||
+          !showConfirmation) {
+        return;
+      }
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Request saved as a draft.',
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Request saved as a draft.',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      if (!mounted ||
+          !showConfirmation) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not save draft: $error',
+          ),
+        ),
+      );
+    }
   }
 
   void scheduleDraftSave() {
@@ -277,38 +315,47 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
       const Duration(
         milliseconds: 600,
       ),
-      () => RequestDraftStore()
-          .save(buildDraft()),
+      () {
+        unawaited(
+          saveDraft(
+            showConfirmation: false,
+          ),
+        );
+      },
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // VOICE DESCRIPTION
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // SPEECH
+  // ===========================================================================
 
   Future<void>
       toggleDescriptionDictation() async {
     if (listeningForDescription) {
       await speechToText.stop();
 
-      if (mounted) {
-        setState(() {
-          listeningForDescription =
-              false;
-        });
+      if (!mounted) {
+        return;
       }
 
+      setState(() {
+        listeningForDescription = false;
+      });
+
       scheduleDraftSave();
+
       return;
     }
 
     final available =
         await speechToText.initialize(
       onStatus: (status) {
-        if (mounted &&
-            (status == 'done' ||
-                status ==
-                    'notListening')) {
+        if (!mounted) {
+          return;
+        }
+
+        if (status == 'done' ||
+            status == 'notListening') {
           setState(() {
             listeningForDescription =
                 false;
@@ -318,12 +365,14 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
         }
       },
       onError: (_) {
-        if (mounted) {
-          setState(() {
-            listeningForDescription =
-                false;
-          });
+        if (!mounted) {
+          return;
         }
+
+        setState(() {
+          listeningForDescription =
+              false;
+        });
       },
     );
 
@@ -370,223 +419,237 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
   // PHOTOS
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
 
-  Future<void>
-      addVehiclePhotos() async {
+  Future<ImageSource?>
+      choosePhotoSource() {
+    return showModalBottomSheet<
+        ImageSource>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor:
+          Colors.transparent,
+      builder: (sheetContext) {
+        final theme =
+            Theme.of(sheetContext);
+
+        final colors =
+            theme.colorScheme;
+
+        final dark =
+            theme.brightness ==
+                Brightness.dark;
+
+        final remaining =
+            3 - vehiclePhotoUrls.length;
+
+        return Container(
+          padding:
+              const EdgeInsets.fromLTRB(
+            18,
+            12,
+            18,
+            24,
+          ),
+          decoration: BoxDecoration(
+            color: dark
+                ? const Color(
+                    0xFF0D1D2B,
+                  )
+                : colors.surface,
+            borderRadius:
+                const BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+          ),
+          child: Column(
+            mainAxisSize:
+                MainAxisSize.min,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors
+                        .onSurfaceVariant
+                        .withValues(
+                      alpha: .24,
+                    ),
+                    borderRadius:
+                        BorderRadius.circular(
+                      999,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(
+                height: 20,
+              ),
+
+              Text(
+                'Add breakdown photos',
+                style:
+                    GoogleFonts.plusJakartaSans(
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.w800,
+                  color:
+                      colors.onSurface,
+                ),
+              ),
+
+              const SizedBox(
+                height: 4,
+              ),
+
+              Text(
+                '$remaining of 3 photo slots remaining',
+                style:
+                    GoogleFonts.plusJakartaSans(
+                  fontSize: 9.5,
+                  color: colors
+                      .onSurfaceVariant,
+                ),
+              ),
+
+              const SizedBox(
+                height: 16,
+              ),
+
+              _RaBreakdownPhotoSource(
+                icon: Icons
+                    .photo_library_outlined,
+                title:
+                    'Choose from gallery',
+                subtitle:
+                    'Select one or more existing photos',
+                onTap: () {
+                  Navigator.pop(
+                    sheetContext,
+                    ImageSource.gallery,
+                  );
+                },
+              ),
+
+              const SizedBox(
+                height: 8,
+              ),
+
+              _RaBreakdownPhotoSource(
+                icon: Icons
+                    .camera_alt_outlined,
+                title: 'Take a photo',
+                subtitle:
+                    'Capture the problem using your camera',
+                onTap: () {
+                  Navigator.pop(
+                    sheetContext,
+                    ImageSource.camera,
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> addVehiclePhotos() async {
     if (uploadingVehiclePhoto ||
         vehiclePhotoUrls.length >= 3) {
       return;
     }
 
-    final navigator =
-        Navigator.of(context);
+    final source =
+        await choosePhotoSource();
+
+    if (source == null || !mounted) {
+      return;
+    }
 
     final remainingSlots =
         3 - vehiclePhotoUrls.length;
-
-    final source =
-        await showModalBottomSheet<
-            ImageSource>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        final theme =
-            Theme.of(sheetContext);
-
-        return SafeArea(
-          child: Padding(
-            padding:
-                const EdgeInsets
-                    .fromLTRB(
-              RaSpace.lg,
-              0,
-              RaSpace.lg,
-              RaSpace.lg,
-            ),
-            child: Column(
-              mainAxisSize:
-                  MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .stretch,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration:
-                          BoxDecoration(
-                        color: theme
-                            .colorScheme
-                            .primaryContainer,
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          16,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons
-                            .add_a_photo_outlined,
-                        color: theme
-                            .colorScheme
-                            .onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(
-                      width:
-                          RaSpace.md,
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
-                        children: [
-                          Text(
-                            'Add breakdown evidence',
-                            style: theme
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(
-                              fontWeight:
-                                  FontWeight
-                                      .w900,
-                            ),
-                          ),
-                          const SizedBox(
-                            height: 2,
-                          ),
-                          Text(
-                            '$remainingSlots of 3 photo slots remaining',
-                            style: theme
-                                .textTheme
-                                .bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(
-                  height: RaSpace.lg,
-                ),
-                _RaBreakdownPhotoSource(
-                  icon: Icons
-                      .photo_library_outlined,
-                  title:
-                      'Choose from gallery',
-                  subtitle:
-                      'Select one or more existing photos',
-                  onTap: () {
-                    Navigator.pop(
-                      sheetContext,
-                      ImageSource.gallery,
-                    );
-                  },
-                ),
-                const SizedBox(
-                  height: RaSpace.sm,
-                ),
-                _RaBreakdownPhotoSource(
-                  icon: Icons
-                      .camera_alt_outlined,
-                  title:
-                      'Take a photo',
-                  subtitle:
-                      'Use your camera to capture the problem',
-                  onTap: () {
-                    Navigator.pop(
-                      sheetContext,
-                      ImageSource.camera,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (source == null ||
-        !mounted) {
-      return;
-    }
 
     setState(() {
       uploadingVehiclePhoto = true;
     });
 
     try {
-      final picker =
-          ImagePicker();
+      final picker = ImagePicker();
 
-      final List<XFile> photos;
+      final List<XFile> selectedPhotos;
 
       if (source ==
           ImageSource.gallery) {
-        photos =
+        selectedPhotos =
             await picker.pickMultiImage(
           imageQuality: 75,
           maxWidth: 1600,
           limit: remainingSlots,
         );
       } else {
-        final cameraPhoto =
-            await navigator.push<XFile>(
+        final captured =
+            await Navigator.of(context)
+                .push<XFile>(
           MaterialPageRoute(
             builder: (_) =>
                 const CameraCaptureScreen(),
           ),
         );
 
-        photos = cameraPhoto == null
+        selectedPhotos = captured == null
             ? <XFile>[]
-            : [cameraPhoto];
+            : <XFile>[
+                captured,
+              ];
       }
 
-      if (photos.isEmpty) {
+      if (selectedPhotos.isEmpty) {
         return;
       }
 
-      final preparedPhotos =
-          <String>[];
+      final prepared = <String>[];
 
-      for (final photo in photos) {
-        final photoData =
+      for (final photo
+          in selectedPhotos) {
+        if (prepared.length >=
+            remainingSlots) {
+          break;
+        }
+
+        final encoded =
             await PhotoUploadService()
                 .prepareVehiclePhoto(
           photo,
         );
 
-        if (!vehiclePhotoUrls
-                .contains(photoData) &&
-            !preparedPhotos
-                .contains(photoData)) {
-          preparedPhotos.add(
-            photoData,
-          );
+        if (vehiclePhotoUrls.contains(
+              encoded,
+            ) ||
+            prepared.contains(
+              encoded,
+            )) {
+          continue;
         }
 
-        if (preparedPhotos.length >=
-            remainingSlots) {
-          break;
-        }
+        prepared.add(encoded);
       }
 
       if (!mounted ||
-          preparedPhotos.isEmpty) {
+          prepared.isEmpty) {
         return;
       }
 
       setState(() {
         vehiclePhotoUrls.addAll(
-          preparedPhotos,
+          prepared,
         );
       });
 
@@ -594,41 +657,33 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
         showConfirmation: false,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
         SnackBar(
           content: Text(
-            preparedPhotos.length == 1
+            prepared.length == 1
                 ? 'Breakdown photo added.'
-                : '${preparedPhotos.length} breakdown photos added.',
+                : '${prepared.length} breakdown photos added.',
           ),
         ),
       );
-
-      if (photos.length >
-          preparedPhotos.length) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Duplicate photos were skipped.',
-            ),
-          ),
-        );
-      }
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          SnackBar(
-            content: Text(
-              'Photo upload failed: $error',
-            ),
-          ),
-        );
+      if (!mounted) {
+        return;
       }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            'Photo upload failed: $error',
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -640,7 +695,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   }
 
   BreakdownPhotoAnnotation?
-      _annotationForPhoto(
+      annotationForPhoto(
     int index,
   ) {
     for (final annotation
@@ -654,17 +709,21 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     return null;
   }
 
-  Future<void>
-      annotateVehiclePhoto(
+  Future<void> annotatePhoto(
     int index,
   ) async {
-    final existing =
-        _annotationForPhoto(index);
+    if (index < 0 ||
+        index >= vehiclePhotoUrls.length) {
+      return;
+    }
 
-    var markerX =
+    final existing =
+        annotationForPhoto(index);
+
+    double markerX =
         existing?.markerX ?? .5;
 
-    var markerY =
+    double markerY =
         existing?.markerY ?? .5;
 
     final noteController =
@@ -682,17 +741,36 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
             context,
             setDialogState,
           ) {
-            final theme =
-                Theme.of(context);
-
             final colors =
-                theme.colorScheme;
+                Theme.of(context)
+                    .colorScheme;
+
+            Widget image;
+
+            try {
+              image = Image.memory(
+                base64Decode(
+                  vehiclePhotoUrls[index],
+                ),
+                fit: BoxFit.cover,
+              );
+            } on FormatException {
+              image = Container(
+                color: colors
+                    .surfaceContainerHighest,
+                alignment:
+                    Alignment.center,
+                child: const Icon(
+                  Icons
+                      .broken_image_outlined,
+                ),
+              );
+            }
 
             return Dialog(
               insetPadding:
-                  const EdgeInsets
-                      .all(
-                RaSpace.lg,
+                  const EdgeInsets.all(
+                16,
               ),
               child: ConstrainedBox(
                 constraints:
@@ -702,77 +780,41 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                 child:
                     SingleChildScrollView(
                   padding:
-                      const EdgeInsets
-                          .all(
-                    RaSpace.lg,
+                      const EdgeInsets.all(
+                    18,
                   ),
                   child: Column(
                     crossAxisAlignment:
                         CrossAxisAlignment
                             .stretch,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration:
-                                BoxDecoration(
-                              color: colors
-                                  .errorContainer,
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                15,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons
-                                  .edit_location_alt_outlined,
-                              color: colors
-                                  .error,
-                            ),
-                          ),
-                          const SizedBox(
-                            width:
-                                RaSpace
-                                    .md,
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
-                              children: [
-                                Text(
-                                  'Mark the damaged area',
-                                  style: theme
-                                      .textTheme
-                                      .titleLarge
-                                      ?.copyWith(
-                                    fontWeight:
-                                        FontWeight
-                                            .w900,
-                                  ),
-                                ),
-                                const SizedBox(
-                                  height: 2,
-                                ),
-                                Text(
-                                  'Tap the photo to position the marker.',
-                                  style: theme
-                                      .textTheme
-                                      .bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      Text(
+                        'Mark the damaged area',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 18,
+                          fontWeight:
+                              FontWeight
+                                  .w800,
+                        ),
                       ),
 
                       const SizedBox(
-                        height:
-                            RaSpace.lg,
+                        height: 5,
+                      ),
+
+                      Text(
+                        'Tap directly on the area you want the provider to notice.',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 9.5,
+                          color: colors
+                              .onSurfaceVariant,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 15,
                       ),
 
                       AspectRatio(
@@ -794,9 +836,10 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                                             constraints
                                                 .maxWidth)
                                         .clamp(
-                                      0.0,
-                                      1.0,
-                                    );
+                                          0.0,
+                                          1.0,
+                                        )
+                                        .toDouble();
 
                                     markerY = (details
                                                 .localPosition
@@ -804,65 +847,41 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                                             constraints
                                                 .maxHeight)
                                         .clamp(
-                                      0.0,
-                                      1.0,
-                                    );
+                                          0.0,
+                                          1.0,
+                                        )
+                                        .toDouble();
                                   },
                                 );
                               },
-                              child:
-                                  ClipRRect(
+                              child: ClipRRect(
                                 borderRadius:
                                     BorderRadius
                                         .circular(
-                                  18,
+                                  17,
                                 ),
                                 child: Stack(
-                                  fit: StackFit
-                                      .expand,
+                                  fit:
+                                      StackFit
+                                          .expand,
                                   children: [
-                                    Image.memory(
-                                      base64Decode(
-                                        vehiclePhotoUrls[
-                                            index],
-                                      ),
-                                      fit: BoxFit
-                                          .cover,
-                                      errorBuilder:
-                                          (
-                                        _,
-                                        __,
-                                        ___,
-                                      ) {
-                                        return Container(
-                                          color: colors
-                                              .surfaceContainerHighest,
-                                          alignment:
-                                              Alignment.center,
-                                          child:
-                                              const Icon(
-                                            Icons
-                                                .broken_image_outlined,
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    image,
+
                                     Positioned(
                                       left: markerX *
                                               constraints
                                                   .maxWidth -
-                                          18,
+                                          15,
                                       top: markerY *
                                               constraints
                                                   .maxHeight -
-                                          34,
-                                      child:
-                                          Icon(
+                                          28,
+                                      child: Icon(
                                         Icons
                                             .location_on_rounded,
                                         color: colors
                                             .error,
-                                        size: 38,
+                                        size: 31,
                                         shadows:
                                             const [
                                           Shadow(
@@ -883,76 +902,31 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                       ),
 
                       const SizedBox(
-                        height:
-                            RaSpace.md,
-                      ),
-
-                      Container(
-                        padding:
-                            const EdgeInsets
-                                .all(
-                          RaSpace.sm,
-                        ),
-                        decoration:
-                            BoxDecoration(
-                          color: colors
-                              .primaryContainer
-                              .withValues(
-                            alpha: .35,
-                          ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            14,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons
-                                  .touch_app_outlined,
-                              size: 18,
-                              color: colors
-                                  .primary,
-                            ),
-                            const SizedBox(
-                              width:
-                                  RaSpace
-                                      .sm,
-                            ),
-                            const Expanded(
-                              child: Text(
-                                'Tap directly on the visible damaged area.',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(
-                        height:
-                            RaSpace.md,
+                        height: 13,
                       ),
 
                       TextField(
                         controller:
                             noteController,
                         maxLength: 120,
+                        minLines: 2,
                         maxLines: 3,
+                        textCapitalization:
+                            TextCapitalization
+                                .sentences,
                         decoration:
                             const InputDecoration(
                           labelText:
                               'Damage note',
                           hintText:
-                              'Example: Deep cut on rear-left tyre',
+                              'e.g. Deep cut on rear-left tyre',
                           alignLabelWithHint:
                               true,
                         ),
                       ),
 
                       const SizedBox(
-                        height:
-                            RaSpace.md,
+                        height: 12,
                       ),
 
                       Row(
@@ -960,8 +934,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                           Expanded(
                             child:
                                 OutlinedButton(
-                              onPressed:
-                                  () {
+                              onPressed: () {
                                 Navigator.pop(
                                   dialogContext,
                                 );
@@ -972,17 +945,16 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                               ),
                             ),
                           ),
+
                           const SizedBox(
-                            width:
-                                RaSpace
-                                    .sm,
+                            width: 8,
                           ),
+
                           Expanded(
                             flex: 2,
                             child:
                                 FilledButton.icon(
-                              onPressed:
-                                  () {
+                              onPressed: () {
                                 Navigator.pop(
                                   dialogContext,
                                   BreakdownPhotoAnnotation(
@@ -999,8 +971,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
                                   ),
                                 );
                               },
-                              icon:
-                                  const Icon(
+                              icon: const Icon(
                                 Icons
                                     .check_rounded,
                               ),
@@ -1048,12 +1019,17 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   void removeVehiclePhoto(
     int index,
   ) {
+    if (index < 0 ||
+        index >= vehiclePhotoUrls.length) {
+      return;
+    }
+
     setState(() {
       vehiclePhotoUrls.removeAt(
         index,
       );
 
-      final remaining =
+      final remainingAnnotations =
           photoAnnotations
               .where(
                 (item) =>
@@ -1081,23 +1057,28 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
 
       photoAnnotations
         ..clear()
-        ..addAll(remaining);
+        ..addAll(
+          remainingAnnotations,
+        );
     });
 
     scheduleDraftSave();
   }
 
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
   // NAVIGATION
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
 
-  Future<void> continueToLocation() async {
-    FocusScope.of(context)
-        .unfocus();
+  Future<void>
+      continueToLocation() async {
+    FocusScope.of(context).unfocus();
 
-    if (!(formKey.currentState
-            ?.validate() ??
-        false)) {
+    final valid =
+        formKey.currentState
+                ?.validate() ??
+            false;
+
+    if (!valid) {
       return;
     }
 
@@ -1107,7 +1088,9 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
       draft,
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     push(
       context,
@@ -1117,291 +1100,13 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
+  // ===========================================================================
+  // BUILD
+  // ===========================================================================
 
-  Widget _buildProgressHeader(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Container(
-              padding:
-                  const EdgeInsets
-                      .symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              decoration:
-                  BoxDecoration(
-                color: colors
-                    .primaryContainer,
-                borderRadius:
-                    BorderRadius.circular(
-                  999,
-                ),
-              ),
-              child: Row(
-                mainAxisSize:
-                    MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons
-                        .looks_two_outlined,
-                    size: 16,
-                    color: colors
-                        .onPrimaryContainer,
-                  ),
-                  const SizedBox(
-                    width: 5,
-                  ),
-                  Text(
-                    'STEP 2 OF 4',
-                    style: theme
-                        .textTheme
-                        .labelSmall
-                        ?.copyWith(
-                      color: colors
-                          .onPrimaryContainer,
-                      fontWeight:
-                          FontWeight.w900,
-                      letterSpacing: .8,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Spacer(),
-            Text(
-              'Details',
-              style: theme
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(
-                color: colors.primary,
-                fontWeight:
-                    FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(
-          height: RaSpace.sm,
-        ),
-        ClipRRect(
-          borderRadius:
-              BorderRadius.circular(
-            999,
-          ),
-          child:
-              LinearProgressIndicator(
-            value: .50,
-            minHeight: 6,
-            backgroundColor: colors
-                .surfaceContainerHighest,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeaderHero(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
-
-    return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.xl,
-      ),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(
-          24,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .6,
-          ),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration:
-                BoxDecoration(
-              color: colors
-                  .primaryContainer,
-              borderRadius:
-                  BorderRadius.circular(
-                18,
-              ),
-            ),
-            child: Icon(
-              Icons
-                  .assignment_outlined,
-              color: colors
-                  .onPrimaryContainer,
-              size: 28,
-            ),
-          ),
-          const SizedBox(
-            width: RaSpace.md,
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tell us about the breakdown',
-                  style: theme
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(
-                  height: 5,
-                ),
-                Text(
-                  'Accurate vehicle and symptom details help providers prepare a better offer before they arrive.',
-                  style: theme
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    height: 1.45,
-                    color: colors
-                        .onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIssueSummary(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        const _RaBreakdownSectionHeader(
-          icon:
-              Icons.car_repair_outlined,
-          title:
-              'Selected assistance',
-          subtitle:
-              'Services selected in the previous step.',
-        ),
-        const SizedBox(
-          height: RaSpace.md,
-        ),
-        Wrap(
-          spacing: RaSpace.sm,
-          runSpacing: RaSpace.sm,
-          children: [
-            for (final issue
-                in widget.issues)
-              Container(
-                padding:
-                    const EdgeInsets
-                        .symmetric(
-                  horizontal:
-                      RaSpace.md,
-                  vertical: 8,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: colors
-                      .primaryContainer
-                      .withValues(
-                    alpha: .55,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    999,
-                  ),
-                  border: Border.all(
-                    color: colors.primary
-                        .withValues(
-                      alpha: .15,
-                    ),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize:
-                      MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons
-                          .check_circle_outline_rounded,
-                      color:
-                          colors.primary,
-                      size: 17,
-                    ),
-                    const SizedBox(
-                      width: 6,
-                    ),
-                    Text(
-                      issue,
-                      style: theme
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(
-                        color:
-                            colors.primary,
-                        fontWeight:
-                            FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVehicleSection(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     final colors =
         theme.colorScheme;
@@ -1409,434 +1114,529 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     final previewPhoto =
         vehiclePhotoUrls.isNotEmpty
             ? vehiclePhotoUrls.first
-            : vehicleSnapshot?[
+            : (vehicleSnapshot?[
                         'photoData']
                     as String? ??
-                '';
+                '');
 
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
-      children: [
-        _RaBreakdownSectionHeader(
-          icon:
-              Icons.directions_car_outlined,
-          title:
-              'Vehicle information',
-          subtitle:
-              'Choose a saved vehicle or enter the details manually.',
-          action:
-              signedIn
-                  ? 'Choose saved'
-                  : null,
-          onAction:
-              signedIn
-                  ? selectSavedVehicle
-                  : null,
+    return Scaffold(
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text(
+          'Request Details',
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight:
+                FontWeight.w800,
+            letterSpacing: -.45,
+          ),
         ),
-
-        const SizedBox(
-          height: RaSpace.md,
-        ),
-
-        Container(
-          decoration:
-              BoxDecoration(
-            color: colors.surface,
-            borderRadius:
-                BorderRadius.circular(
-              20,
-            ),
-            border: Border.all(
-              color: colors
-                  .outlineVariant
-                  .withValues(
-                alpha: .6,
-              ),
+        actions: [
+          IconButton(
+            tooltip: 'Save draft',
+            onPressed: () {
+              unawaited(
+                saveDraft(),
+              );
+            },
+            icon: const Icon(
+              Icons
+                  .bookmark_border_rounded,
             ),
           ),
-          clipBehavior:
-              Clip.antiAlias,
-          child: Column(
-            children: [
-              if (modelController
-                      .text
-                      .trim()
-                      .isNotEmpty ||
-                  previewPhoto.isNotEmpty)
-                Container(
-                  width: double.infinity,
+          const SizedBox(
+            width: 4,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: Form(
+                key: formKey,
+                autovalidateMode:
+                    AutovalidateMode
+                        .onUserInteraction,
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior
+                          .onDrag,
+                  physics:
+                      const BouncingScrollPhysics(),
                   padding:
-                      const EdgeInsets
-                          .all(
-                    RaSpace.md,
+                      const EdgeInsets.fromLTRB(
+                    18,
+                    8,
+                    18,
+                    28,
                   ),
-                  color: colors
-                      .surfaceContainerHighest
-                      .withValues(
-                    alpha: .35,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 90,
-                        height: 68,
-                        clipBehavior:
-                            Clip.antiAlias,
-                        decoration:
-                            BoxDecoration(
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            14,
-                          ),
-                          color: colors
-                              .surfaceContainerHighest,
-                        ),
-                        child:
-                            VehiclePhotoPreview(
-                          model:
-                              modelController
-                                  .text,
-                          photoData:
-                              previewPhoto,
-                          height: 68,
-                          compact: true,
-                        ),
-                      ),
-                      const SizedBox(
-                        width:
-                            RaSpace.md,
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                          children: [
-                            if (vehicleId !=
-                                null)
-                              Container(
-                                margin:
-                                    const EdgeInsets
-                                        .only(
-                                  bottom: 5,
-                                ),
-                                padding:
-                                    const EdgeInsets
-                                        .symmetric(
-                                  horizontal:
-                                      8,
-                                  vertical: 3,
-                                ),
-                                decoration:
-                                    BoxDecoration(
-                                  color: colors
-                                      .primaryContainer,
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    999,
-                                  ),
-                                ),
-                                child:
-                                    Text(
-                                  'SAVED VEHICLE',
-                                  style: theme
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(
-                                    color: colors
-                                        .onPrimaryContainer,
-                                    fontWeight:
-                                        FontWeight
-                                            .w900,
-                                    letterSpacing:
-                                        .6,
-                                  ),
-                                ),
-                              ),
-                            Text(
-                              modelController
-                                      .text
-                                      .trim()
-                                      .isEmpty
-                                  ? 'Vehicle details'
-                                  : modelController
-                                      .text
-                                      .trim(),
-                              maxLines: 1,
-                              overflow:
-                                  TextOverflow
-                                      .ellipsis,
-                              style: theme
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                fontWeight:
-                                    FontWeight
-                                        .w900,
-                              ),
-                            ),
-                            const SizedBox(
-                              height: 3,
-                            ),
-                            Text(
-                              registrationController
-                                      .text
-                                      .trim()
-                                      .isEmpty
-                                  ? vehicle
-                                  : '${registrationController.text.trim().toUpperCase()} • $vehicle',
-                              maxLines: 1,
-                              overflow:
-                                  TextOverflow
-                                      .ellipsis,
-                              style: theme
-                                  .textTheme
-                                  .bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              Padding(
-                padding:
-                    const EdgeInsets
-                        .all(
-                  RaSpace.lg,
-                ),
-                child: Column(
                   children: [
-                    DropdownButtonFormField<
-                        String>(
-                      initialValue:
-                          vehicle,
-                      key:
-                          ValueKey(vehicle),
-                      isExpanded: true,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Vehicle type',
-                        prefixIcon:
-                            Icon(
-                          Icons
-                              .directions_car_outlined,
-                        ),
+                    const _RaBreakdownProgress(),
+
+                    const SizedBox(
+                      height: 16,
+                    ),
+
+                    _RaBreakdownHero(
+                      issues:
+                          widget.issues,
+                    ),
+
+                    const SizedBox(
+                      height: 26,
+                    ),
+
+                    _RaBreakdownSectionHeading(
+                      icon: Icons
+                          .directions_car_outlined,
+                      title:
+                          'Vehicle information',
+                      subtitle:
+                          'Choose a saved vehicle or enter the details manually.',
+                      action: signedIn
+                          ? 'Choose saved'
+                          : null,
+                      onAction: signedIn
+                          ? selectSavedVehicle
+                          : null,
+                    ),
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    _RaBreakdownSurface(
+                      child:
+                          _buildVehicleSection(
+                        context,
+                        previewPhoto,
                       ),
-                      items: const [
-                        'Sedan / Hatchback',
-                        'SUV',
-                        'Van',
-                        'Motorcycle',
-                        'Other',
-                      ]
-                          .map(
-                            (type) =>
-                                DropdownMenuItem<
-                                    String>(
-                              value:
-                                  type,
-                              child:
-                                  Text(
-                                type,
-                                maxLines:
-                                    1,
-                                overflow:
-                                    TextOverflow
-                                        .ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value ==
-                            null) {
-                          return;
-                        }
+                    ),
 
+                    const SizedBox(
+                      height: 26,
+                    ),
+
+                    const _RaBreakdownSectionHeading(
+                      icon: Icons
+                          .priority_high_rounded,
+                      title:
+                          'How urgent is it?',
+                      subtitle:
+                          'Choose the option that best describes your current situation.',
+                    ),
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    _RaBreakdownPriorityGrid(
+                      selected: priority,
+                      onSelected:
+                          (value) {
                         setState(() {
-                          vehicle =
-                              value;
-
-                          if (vehicle !=
-                              'Other') {
-                            customVehicleController
-                                .clear();
-                          }
-
-                          vehicleSnapshot =
-                              null;
-                          vehicleId =
-                              null;
+                          priority = value;
                         });
 
                         scheduleDraftSave();
                       },
                     ),
 
-                    if (vehicle ==
-                        'Other') ...[
+                    const SizedBox(
+                      height: 26,
+                    ),
+
+                    const _RaBreakdownSectionHeading(
+                      icon:
+                          Icons.notes_rounded,
+                      title:
+                          'Describe the symptoms',
+                      subtitle:
+                          'Tell the provider what happened and what you noticed.',
+                    ),
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    _buildDescriptionField(
+                      context,
+                    ),
+
+                    const SizedBox(
+                      height: 26,
+                    ),
+
+                    const _RaBreakdownSectionHeading(
+                      icon:
+                          Icons.settings_outlined,
+                      title:
+                          'Parts preference',
+                      subtitle:
+                          'The provider confirms compatibility, price, availability and warranty.',
+                    ),
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    _RaBreakdownSurface(
+                      child:
+                          _buildPartsPreference(),
+                    ),
+
+                    const SizedBox(
+                      height: 26,
+                    ),
+
+                    _RaBreakdownSectionHeading(
+                      icon: Icons
+                          .add_a_photo_outlined,
+                      title:
+                          'Photo evidence',
+                      subtitle:
+                          'Optional. Add visible damage and mark the exact area.',
+                      trailing:
+                          '${vehiclePhotoUrls.length}/3',
+                    ),
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    _RaBreakdownSurface(
+                      child:
+                          _buildPhotoSection(
+                        context,
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: 26,
+                    ),
+
+                    const _RaBreakdownSectionHeading(
+                      icon: Icons
+                          .sticky_note_2_outlined,
+                      title:
+                          'Additional notes',
+                      subtitle:
+                          'Optional information that may help the provider prepare.',
+                    ),
+
+                    const SizedBox(
+                      height: 11,
+                    ),
+
+                    TextFormField(
+                      controller:
+                          notesController,
+                      maxLines: 3,
+                      maxLength: 300,
+                      textCapitalization:
+                          TextCapitalization
+                              .sentences,
+                      decoration:
+                          const InputDecoration(
+                        labelText:
+                            'Anything else?',
+                        hintText:
+                            'Parking access, special vehicle details, tools required...',
+                        alignLabelWithHint:
+                            true,
+                      ),
+                      onChanged: (_) {
+                        scheduleDraftSave();
+                      },
+                    ),
+
+                    const SizedBox(
+                      height: 18,
+                    ),
+
+                    _buildSafetyNotice(
+                      context,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            _buildBottomActionBar(
+              context,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleSection(
+    BuildContext context,
+    String previewPhoto,
+  ) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        if (modelController.text
+                .trim()
+                .isNotEmpty ||
+            previewPhoto.isNotEmpty) ...[
+          Row(
+            children: [
+              Container(
+                width: 82,
+                height: 62,
+                clipBehavior:
+                    Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: colors
+                      .surfaceContainerHighest,
+                  borderRadius:
+                      BorderRadius.circular(
+                    14,
+                  ),
+                ),
+                child:
+                    VehiclePhotoPreview(
+                  model:
+                      modelController.text,
+                  photoData:
+                      previewPhoto,
+                  height: 62,
+                  compact: true,
+                ),
+              ),
+
+              const SizedBox(
+                width: 11,
+              ),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    if (vehicleId != null)
+                      Text(
+                        'SAVED VEHICLE',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 7.5,
+                          letterSpacing: .8,
+                          color: colors
+                              .primary,
+                          fontWeight:
+                              FontWeight
+                                  .w700,
+                        ),
+                      ),
+
+                    if (vehicleId != null)
                       const SizedBox(
-                        height:
-                            RaSpace.md,
+                        height: 3,
                       ),
-                      TextFormField(
-                        controller:
-                            customVehicleController,
-                        maxLength: 40,
-                        textCapitalization:
-                            TextCapitalization
-                                .words,
-                        textInputAction:
-                            TextInputAction
-                                .next,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'Other vehicle type',
-                          hintText:
-                              'Three Wheeler, Pickup Truck...',
-                          prefixIcon:
-                              Icon(
-                            Icons
-                                .commute_outlined,
-                          ),
-                        ),
-                        validator:
-                            (value) {
-                          return vehicle ==
-                                  'Other'
-                              ? validateCustomVehicleType(
-                                  value,
-                                )
-                              : null;
-                        },
-                        onChanged: (_) {
-                          setState(
-                            () {},
-                          );
-                          scheduleDraftSave();
-                        },
+
+                    Text(
+                      modelController.text
+                              .trim()
+                              .isEmpty
+                          ? 'Vehicle details'
+                          : modelController
+                              .text
+                              .trim(),
+                      maxLines: 1,
+                      overflow:
+                          TextOverflow
+                              .ellipsis,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight:
+                            FontWeight
+                                .w700,
                       ),
-                    ],
-
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
-
-                    TextFormField(
-                      controller:
-                          modelController,
-                      maxLength: 50,
-                      textCapitalization:
-                          TextCapitalization
-                              .words,
-                      textInputAction:
-                          TextInputAction
-                              .next,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Make, model & year',
-                        hintText:
-                            'Toyota Aqua 2018',
-                        prefixIcon:
-                            Icon(
-                          Icons
-                              .badge_outlined,
-                        ),
-                      ),
-                      validator:
-                          validateVehicleModelYear,
-                      onChanged: (_) {
-                        setState(() {
-                          vehicleSnapshot =
-                              null;
-                          vehicleId =
-                              null;
-                        });
-
-                        scheduleDraftSave();
-                      },
                     ),
 
                     const SizedBox(
-                      height:
-                          RaSpace.md,
+                      height: 3,
                     ),
 
-                    TextFormField(
-                      controller:
-                          registrationController,
-                      maxLength: 16,
-                      textCapitalization:
-                          TextCapitalization
-                              .characters,
-                      textInputAction:
-                          TextInputAction
-                              .next,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Registration number',
-                        hintText:
-                            'WP CAB - 1234',
-                        prefixIcon:
-                            Icon(
-                          Icons
-                              .pin_outlined,
-                        ),
+                    Text(
+                      registrationController
+                              .text
+                              .trim()
+                              .isEmpty
+                          ? vehicle
+                          : '${registrationController.text.trim().toUpperCase()} • $vehicle',
+                      maxLines: 1,
+                      overflow:
+                          TextOverflow
+                              .ellipsis,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.5,
+                        color: colors
+                            .onSurfaceVariant,
                       ),
-                      validator:
-                          validateVehicleRegistration,
-                      onChanged: (_) {
-                        setState(
-                          () {},
-                        );
-                        scheduleDraftSave();
-                      },
                     ),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildPrioritySection(
-    BuildContext context,
-  ) {
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
-      children: [
-        const _RaBreakdownSectionHeader(
-          icon:
-              Icons.priority_high_rounded,
-          title:
-              'How urgent is it?',
-          subtitle:
-              'Choose the option that best describes your current situation.',
-        ),
-        const SizedBox(
-          height: RaSpace.md,
-        ),
-        _RaBreakdownPrioritySelector(
-          selected: priority,
-          onSelected: (value) {
+          const SizedBox(
+            height: 16,
+          ),
+        ],
+
+        DropdownButtonFormField<String>(
+          initialValue: vehicle,
+          key: ValueKey(vehicle),
+          isExpanded: true,
+          decoration:
+              const InputDecoration(
+            labelText:
+                'Vehicle type',
+            prefixIcon: Icon(
+              Icons
+                  .directions_car_outlined,
+            ),
+          ),
+          items: const [
+            'Sedan / Hatchback',
+            'SUV',
+            'Van',
+            'Motorcycle',
+            'Other',
+          ]
+              .map(
+                (value) =>
+                    DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value == null) {
+              return;
+            }
+
             setState(() {
-              priority = value;
+              vehicle = value;
+
+              if (vehicle != 'Other') {
+                customVehicleController
+                    .clear();
+              }
+
+              vehicleId = null;
+              vehicleSnapshot = null;
             });
 
+            scheduleDraftSave();
+          },
+        ),
+
+        if (vehicle == 'Other') ...[
+          const SizedBox(
+            height: 11,
+          ),
+
+          TextFormField(
+            controller:
+                customVehicleController,
+            maxLength: 40,
+            textCapitalization:
+                TextCapitalization.words,
+            textInputAction:
+                TextInputAction.next,
+            decoration:
+                const InputDecoration(
+              labelText:
+                  'Other vehicle type',
+              hintText:
+                  'Three Wheeler, Pickup Truck...',
+              prefixIcon: Icon(
+                Icons.commute_outlined,
+              ),
+            ),
+            validator:
+                validateCustomVehicleType,
+            onChanged: (_) {
+              scheduleDraftSave();
+            },
+          ),
+        ],
+
+        const SizedBox(
+          height: 11,
+        ),
+
+        TextFormField(
+          controller:
+              modelController,
+          maxLength: 50,
+          textCapitalization:
+              TextCapitalization.words,
+          textInputAction:
+              TextInputAction.next,
+          decoration:
+              const InputDecoration(
+            labelText:
+                'Make, model & year',
+            hintText:
+                'Toyota Aqua 2018',
+            prefixIcon: Icon(
+              Icons.badge_outlined,
+            ),
+          ),
+          validator:
+              validateVehicleModelYear,
+          onChanged: (_) {
+            setState(() {
+              vehicleId = null;
+              vehicleSnapshot = null;
+            });
+
+            scheduleDraftSave();
+          },
+        ),
+
+        const SizedBox(
+          height: 11,
+        ),
+
+        TextFormField(
+          controller:
+              registrationController,
+          maxLength: 16,
+          textCapitalization:
+              TextCapitalization
+                  .characters,
+          textInputAction:
+              TextInputAction.next,
+          decoration:
+              const InputDecoration(
+            labelText:
+                'Registration number',
+            hintText:
+                'WP CAB-1234',
+            prefixIcon: Icon(
+              Icons.pin_outlined,
+            ),
+          ),
+          validator:
+              validateVehicleRegistration,
+          onChanged: (_) {
             scheduleDraftSave();
           },
         ),
@@ -1844,30 +1644,16 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
     );
   }
 
-  Widget _buildDescriptionSection(
+  Widget _buildDescriptionField(
     BuildContext context,
   ) {
-    final theme =
-        Theme.of(context);
-
     final colors =
-        theme.colorScheme;
+        Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment:
           CrossAxisAlignment.stretch,
       children: [
-        const _RaBreakdownSectionHeader(
-          icon:
-              Icons.notes_rounded,
-          title:
-              'Describe the symptoms',
-          subtitle:
-              'Tell the provider what you noticed before or when the problem started.',
-        ),
-        const SizedBox(
-          height: RaSpace.md,
-        ),
         TextFormField(
           controller:
               descriptionController,
@@ -1875,13 +1661,11 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
           maxLines: 6,
           maxLength: 500,
           textCapitalization:
-              TextCapitalization.sentences,
-          textInputAction:
-              TextInputAction.newline,
+              TextCapitalization
+                  .sentences,
           validator:
               validateBreakdownDescription,
           onChanged: (_) {
-            setState(() {});
             scheduleDraftSave();
           },
           decoration:
@@ -1889,23 +1673,12 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
             labelText:
                 'What happened?',
             hintText:
-                'Example: The engine stopped while driving and now makes a clicking sound when I try to start.',
+                'Example: Engine stopped while driving and now makes a clicking sound.',
             alignLabelWithHint:
                 true,
-            prefixIcon: const Padding(
-              padding:
-                  EdgeInsets.only(
-                bottom: 75,
-              ),
-              child: Icon(
-                Icons
-                    .description_outlined,
-              ),
-            ),
             suffixIcon: Padding(
               padding:
-                  const EdgeInsets
-                      .only(
+                  const EdgeInsets.only(
                 bottom: 72,
                 right: 4,
               ),
@@ -1933,472 +1706,340 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
           ),
         ),
 
-        if (listeningForDescription)
+        if (listeningForDescription) ...[
+          const SizedBox(
+            height: 8,
+          ),
+
           Container(
-            margin:
-                const EdgeInsets.only(
-              top: RaSpace.sm,
-            ),
             padding:
                 const EdgeInsets.all(
-              RaSpace.md,
+              12,
             ),
-            decoration:
-                BoxDecoration(
-              color: colors
-                  .errorContainer
+            decoration: BoxDecoration(
+              color: colors.error
                   .withValues(
-                alpha: .35,
+                alpha: .07,
               ),
               borderRadius:
                   BorderRadius.circular(
-                14,
+                15,
               ),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.mic_rounded,
-                  color:
-                      colors.error,
-                  size: 19,
+                  color: colors.error,
+                  size: 18,
                 ),
+
                 const SizedBox(
-                  width: RaSpace.sm,
+                  width: 8,
                 ),
+
                 Expanded(
                   child: Text(
-                    'Listening… speak naturally and describe the symptoms.',
-                    style: theme
-                        .textTheme
-                        .bodySmall,
+                    'Listening… describe the symptoms naturally.',
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 9.5,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+        ],
       ],
     );
   }
 
-  Widget _buildPartsSection(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
-
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
-      children: [
-        const _RaBreakdownSectionHeader(
-          icon:
-              Icons.settings_outlined,
-          title:
-              'Parts preference',
-          subtitle:
-              'This is a preference only. The provider still needs to confirm compatibility, availability, price and warranty.',
+  Widget _buildPartsPreference() {
+    return DropdownButtonFormField<String>(
+      initialValue:
+          partsPreference,
+      decoration:
+          const InputDecoration(
+        labelText:
+            'Replacement parts',
+        prefixIcon: Icon(
+          Icons
+              .build_circle_outlined,
         ),
-
-        const SizedBox(
-          height: RaSpace.md,
+      ),
+      items: const [
+        DropdownMenuItem<String>(
+          value: 'discuss',
+          child: Text(
+            'Discuss options with provider',
+          ),
         ),
-
-        Container(
-          padding:
-              const EdgeInsets.all(
-            RaSpace.md,
+        DropdownMenuItem<String>(
+          value: 'budget',
+          child: Text(
+            'Budget compatible',
           ),
-          decoration:
-              BoxDecoration(
-            color: colors.surface,
-            borderRadius:
-                BorderRadius.circular(
-              18,
-            ),
-            border: Border.all(
-              color: colors
-                  .outlineVariant
-                  .withValues(
-                alpha: .6,
-              ),
-            ),
+        ),
+        DropdownMenuItem<String>(
+          value: 'branded',
+          child: Text(
+            'Branded aftermarket',
           ),
-          child:
-              DropdownButtonFormField<
-                  String>(
-            initialValue:
-                partsPreference,
-            decoration:
-                const InputDecoration(
-              labelText:
-                  'Replacement parts',
-              prefixIcon:
-                  Icon(
-                Icons
-                    .build_circle_outlined,
-              ),
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'discuss',
-                child: Text(
-                  'Discuss options with provider',
-                ),
-              ),
-              DropdownMenuItem(
-                value: 'budget',
-                child: Text(
-                  'Budget compatible',
-                ),
-              ),
-              DropdownMenuItem(
-                value: 'branded',
-                child: Text(
-                  'Branded aftermarket',
-                ),
-              ),
-              DropdownMenuItem(
-                value: 'genuine',
-                child: Text(
-                  'Genuine manufacturer parts',
-                ),
-              ),
-            ],
-            onChanged: (value) {
-              setState(() {
-                partsPreference =
-                    value ??
-                        'discuss';
-              });
-
-              scheduleDraftSave();
-            },
+        ),
+        DropdownMenuItem<String>(
+          value: 'genuine',
+          child: Text(
+            'Genuine manufacturer parts',
           ),
         ),
       ],
+      onChanged: (value) {
+        if (value == null) {
+          return;
+        }
+
+        setState(() {
+          partsPreference = value;
+        });
+
+        scheduleDraftSave();
+      },
     );
   }
 
   Widget _buildPhotoSection(
     BuildContext context,
   ) {
-    final theme =
-        Theme.of(context);
-
     final colors =
-        theme.colorScheme;
+        Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment:
           CrossAxisAlignment.stretch,
       children: [
-        _RaBreakdownSectionHeader(
-          icon:
-              Icons.add_a_photo_outlined,
-          title:
-              'Photo evidence',
-          subtitle:
-              'Optional, but useful for visible tyre, body, battery or mechanical damage.',
-          trailing:
-              '${vehiclePhotoUrls.length}/3',
-        ),
-
-        const SizedBox(
-          height: RaSpace.md,
-        ),
-
-        Container(
-          padding:
-              const EdgeInsets.all(
-            RaSpace.lg,
-          ),
-          decoration:
-              BoxDecoration(
-            color: colors.surface,
-            borderRadius:
-                BorderRadius.circular(
-              20,
+        if (vehiclePhotoUrls.isEmpty)
+          Container(
+            padding:
+                const EdgeInsets.all(
+              18,
             ),
-            border: Border.all(
+            decoration: BoxDecoration(
               color: colors
-                  .outlineVariant
+                  .surfaceContainerHighest
                   .withValues(
-                alpha: .6,
+                alpha: .32,
+              ),
+              borderRadius:
+                  BorderRadius.circular(
+                16,
               ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment
-                    .stretch,
-            children: [
-              if (vehiclePhotoUrls
-                  .isEmpty)
+            child: Column(
+              children: [
                 Container(
-                  padding:
-                      const EdgeInsets
-                          .all(
-                    RaSpace.lg,
-                  ),
+                  width: 57,
+                  height: 57,
                   decoration:
                       BoxDecoration(
-                    color: colors
-                        .surfaceContainerHighest
+                    color: colors.primary
                         .withValues(
-                      alpha: .4,
+                      alpha: .08,
                     ),
                     borderRadius:
-                        BorderRadius
-                            .circular(
-                      16,
+                        BorderRadius.circular(
+                      18,
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 58,
-                        height: 58,
-                        decoration:
-                            BoxDecoration(
-                          color: colors
-                              .primaryContainer,
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            18,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons
-                              .photo_camera_back_outlined,
-                          color: colors
-                              .onPrimaryContainer,
-                          size: 29,
-                        ),
-                      ),
-                      const SizedBox(
-                        height:
-                            RaSpace.md,
-                      ),
-                      Text(
-                        'Add photos of the problem',
-                        style: theme
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                          fontWeight:
-                              FontWeight
-                                  .w900,
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 4,
-                      ),
-                      Text(
-                        'You can add up to 3 photos and mark the exact damaged area.',
-                        textAlign:
-                            TextAlign.center,
-                        style: theme
-                            .textTheme
-                            .bodySmall,
-                      ),
-                    ],
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 118,
-                  child:
-                      ListView.separated(
-                    scrollDirection:
-                        Axis.horizontal,
-                    itemCount:
-                        vehiclePhotoUrls
-                            .length,
-                    separatorBuilder:
-                        (_, __) =>
-                            const SizedBox(
-                      width:
-                          RaSpace.sm,
-                    ),
-                    itemBuilder: (
-                      context,
-                      index,
-                    ) {
-                      return _RaBreakdownPhotoCard(
-                        photoData:
-                            vehiclePhotoUrls[
-                                index],
-                        annotation:
-                            _annotationForPhoto(
-                          index,
-                        ),
-                        onTap: () =>
-                            annotateVehiclePhoto(
-                          index,
-                        ),
-                        onRemove: () =>
-                            removeVehiclePhoto(
-                          index,
-                        ),
-                      );
-                    },
+                  child: Icon(
+                    Icons
+                        .photo_camera_back_outlined,
+                    color: colors.primary,
+                    size: 27,
                   ),
                 ),
 
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              SizedBox(
-                width:
-                    double.infinity,
-                child:
-                    OutlinedButton.icon(
-                  onPressed:
-                      uploadingVehiclePhoto ||
-                              vehiclePhotoUrls
-                                      .length >=
-                                  3
-                          ? null
-                          : addVehiclePhotos,
-                  icon:
-                      uploadingVehiclePhoto
-                          ? const SizedBox(
-                              width:
-                                  18,
-                              height:
-                                  18,
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth:
-                                    2,
-                              ),
-                            )
-                          : const Icon(
-                              Icons
-                                  .add_a_photo_outlined,
-                            ),
-                  label: Text(
-                    uploadingVehiclePhoto
-                        ? 'Preparing photo…'
-                        : vehiclePhotoUrls
-                                    .length >=
-                                3
-                            ? 'Maximum 3 photos added'
-                            : 'Add Photo',
-                  ),
-                ),
-              ),
-
-              if (vehiclePhotoUrls
-                  .isNotEmpty) ...[
                 const SizedBox(
-                  height: RaSpace.sm,
+                  height: 11,
                 ),
-                Row(
-                  children: [
-                    Icon(
-                      Icons
-                          .edit_location_alt_outlined,
-                      size: 17,
-                      color:
-                          colors.primary,
-                    ),
-                    const SizedBox(
-                      width: 6,
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Tap any photo to mark the damaged area and add a note.',
-                        style: theme
-                            .textTheme
-                            .bodySmall,
-                      ),
-                    ),
-                  ],
+
+                Text(
+                  'Add photos of the problem',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 11.5,
+                    fontWeight:
+                        FontWeight
+                            .w700,
+                  ),
+                ),
+
+                const SizedBox(
+                  height: 4,
+                ),
+
+                Text(
+                  'Up to 3 photos. Tap a photo after adding it to mark the damaged area.',
+                  textAlign:
+                      TextAlign.center,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9,
+                    height: 1.4,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
                 ),
               ],
-            ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 116,
+            child: ListView.separated(
+              scrollDirection:
+                  Axis.horizontal,
+              itemCount:
+                  vehiclePhotoUrls.length,
+              separatorBuilder:
+                  (context, index) {
+                return const SizedBox(
+                  width: 8,
+                );
+              },
+              itemBuilder:
+                  (context, index) {
+                return _RaBreakdownPhotoCard(
+                  data:
+                      vehiclePhotoUrls[index],
+                  annotation:
+                      annotationForPhoto(
+                    index,
+                  ),
+                  onTap: () {
+                    unawaited(
+                      annotatePhoto(
+                        index,
+                      ),
+                    );
+                  },
+                  onRemove: () {
+                    removeVehiclePhoto(
+                      index,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+        const SizedBox(
+          height: 12,
+        ),
+
+        OutlinedButton.icon(
+          onPressed:
+              uploadingVehiclePhoto ||
+                      vehiclePhotoUrls
+                              .length >=
+                          3
+                  ? null
+                  : addVehiclePhotos,
+          icon: uploadingVehiclePhoto
+              ? const SizedBox.square(
+                  dimension: 17,
+                  child:
+                      CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Icon(
+                  Icons
+                      .add_a_photo_outlined,
+                ),
+          label: Text(
+            uploadingVehiclePhoto
+                ? 'Preparing Photos…'
+                : vehiclePhotoUrls.length >=
+                        3
+                    ? 'Maximum 3 Photos Added'
+                    : 'Add Photo',
           ),
         ),
       ],
     );
   }
 
-  Widget _buildNotesSection(
+  Widget _buildSafetyNotice(
     BuildContext context,
   ) {
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
-      children: [
-        const _RaBreakdownSectionHeader(
-          icon:
-              Icons.sticky_note_2_outlined,
-          title:
-              'Additional notes',
-          subtitle:
-              'Optional information that may help the provider prepare.',
-        ),
+    final colors =
+        Theme.of(context).colorScheme;
 
-        const SizedBox(
-          height: RaSpace.md,
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        13,
+      ),
+      decoration: BoxDecoration(
+        color: raGold.withValues(
+          alpha: .075,
         ),
+        borderRadius:
+            BorderRadius.circular(
+          16,
+        ),
+        border: Border.all(
+          color: raGold.withValues(
+            alpha: .14,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons
+                .health_and_safety_outlined,
+            size: 19,
+            color: raGold,
+          ),
 
-        TextFormField(
-          controller:
-              notesController,
-          maxLines: 3,
-          maxLength: 300,
-          textCapitalization:
-              TextCapitalization.sentences,
-          decoration:
-              const InputDecoration(
-            labelText:
-                'Additional notes',
-            hintText:
-                'Example: Vehicle is parked inside a basement car park.',
-            alignLabelWithHint:
-                true,
-            prefixIcon: Padding(
-              padding:
-                  EdgeInsets.only(
-                bottom: 45,
-              ),
-              child: Icon(
-                Icons
-                    .notes_outlined,
+          const SizedBox(
+            width: 9,
+          ),
+
+          Expanded(
+            child: Text(
+              'Do not inspect or photograph the vehicle from an unsafe traffic position. Move to safety first whenever possible.',
+              style: GoogleFonts
+                  .plusJakartaSans(
+                fontSize: 9.5,
+                height: 1.45,
+                color: colors
+                    .onSurfaceVariant,
               ),
             ),
           ),
-          onChanged: (_) {
-            setState(() {});
-            scheduleDraftSave();
-          },
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildBottomBar(
+  Widget _buildBottomActionBar(
     BuildContext context,
   ) {
-    final theme =
-        Theme.of(context);
-
     final colors =
-        theme.colorScheme;
+        Theme.of(context).colorScheme;
 
     return Container(
       padding:
           const EdgeInsets.fromLTRB(
-        RaSpace.lg,
-        RaSpace.sm,
-        RaSpace.lg,
-        RaSpace.md,
+        18,
+        8,
+        18,
+        12,
       ),
       decoration: BoxDecoration(
         color: colors.surface,
@@ -2407,34 +2048,22 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
             color: colors
                 .outlineVariant
                 .withValues(
-              alpha: .65,
+              alpha: .45,
             ),
           ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black
-                .withValues(
-              alpha: .035,
-            ),
-            blurRadius: 18,
-            offset:
-                const Offset(
-              0,
-              -5,
-            ),
-          ),
-        ],
       ),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
             IconButton.filledTonal(
-              tooltip:
-                  'Save draft',
-              onPressed: () =>
+              tooltip: 'Save draft',
+              onPressed: () {
+                unawaited(
                   saveDraft(),
+                );
+              },
               icon: const Icon(
                 Icons
                     .bookmark_add_outlined,
@@ -2442,7 +2071,7 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
             ),
 
             const SizedBox(
-              width: RaSpace.sm,
+              width: 8,
             ),
 
             Expanded(
@@ -2464,166 +2093,259 @@ class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
       ),
     );
   }
+}
+
+// =============================================================================
+// PROGRESS
+// =============================================================================
+
+class _RaBreakdownProgress
+    extends StatelessWidget {
+  const _RaBreakdownProgress();
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
-
-      appBar: AppBar(
-        title:
-            const Text(
-          'Request Details',
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Save draft',
-            onPressed: () =>
-                saveDraft(),
-            icon: const Icon(
-              Icons
-                  .bookmark_border_rounded,
-            ),
-          ),
-          const SizedBox(
-            width: RaSpace.sm,
-          ),
-        ],
-      ),
-
-      body: SafeArea(
-        top: false,
-        child: Column(
+    return Column(
+      children: [
+        Row(
           children: [
-            Expanded(
-              child: Form(
-                key: formKey,
-                autovalidateMode:
-                    AutovalidateMode
-                        .onUserInteraction,
-                child: ListView(
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior
-                          .onDrag,
-                  padding:
-                      const EdgeInsets
-                          .fromLTRB(
-                    RaSpace.lg,
-                    RaSpace.sm,
-                    RaSpace.lg,
-                    RaSpace.xxl,
-                  ),
-                  children: [
-                    _buildProgressHeader(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
-
-                    _buildHeaderHero(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildIssueSummary(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildVehicleSection(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildPrioritySection(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildDescriptionSection(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildPartsSection(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildPhotoSection(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xxl,
-                    ),
-
-                    _buildNotesSection(
-                      context,
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.xl,
-                    ),
-
-                    const SafetyBox(),
-                  ],
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 9,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: colors.primary
+                    .withValues(
+                  alpha: .08,
+                ),
+                borderRadius:
+                    BorderRadius.circular(
+                  999,
+                ),
+              ),
+              child: Text(
+                'STEP 2 OF 4',
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  color: colors.primary,
+                  fontSize: 8,
+                  fontWeight:
+                      FontWeight.w700,
+                  letterSpacing: .8,
                 ),
               ),
             ),
 
-            _buildBottomBar(
-              context,
+            const Spacer(),
+
+            Text(
+              'Details',
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 9,
+                color: colors.primary,
+                fontWeight:
+                    FontWeight.w700,
+              ),
             ),
           ],
         ),
+
+        const SizedBox(
+          height: 7,
+        ),
+
+        ClipRRect(
+          borderRadius:
+              BorderRadius.circular(
+            999,
+          ),
+          child:
+              LinearProgressIndicator(
+            value: .50,
+            minHeight: 5,
+            backgroundColor: colors
+                .surfaceContainerHighest,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// HERO
+// =============================================================================
+
+class _RaBreakdownHero
+    extends StatelessWidget {
+  const _RaBreakdownHero({
+    required this.issues,
+  });
+
+  final List<String> issues;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        18,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF0B477D),
+                  Color(0xFF08645D),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078C7E),
+                ],
+        ),
+        borderRadius:
+            BorderRadius.circular(
+          24,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -25,
+            bottom: -31,
+            child: Icon(
+              Icons
+                  .engineering_outlined,
+              size: 125,
+              color: Colors.white
+                  .withValues(
+                alpha: .055,
+              ),
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tell us about the vehicle',
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight:
+                      FontWeight.w800,
+                  letterSpacing: -.45,
+                ),
+              ),
+
+              const SizedBox(
+                height: 5,
+              ),
+
+              Text(
+                'These details help providers understand the problem before they send an offer.',
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  color: Colors.white
+                      .withValues(
+                    alpha: .80,
+                  ),
+                  fontSize: 10,
+                  height: 1.4,
+                ),
+              ),
+
+              const SizedBox(
+                height: 13,
+              ),
+
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final issue
+                      in issues)
+                    Container(
+                      padding:
+                          const EdgeInsets
+                              .symmetric(
+                        horizontal: 8,
+                        vertical: 5,
+                      ),
+                      decoration:
+                          BoxDecoration(
+                        color: Colors.white
+                            .withValues(
+                          alpha: .13,
+                        ),
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          999,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize:
+                            MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons
+                                .check_circle_outline_rounded,
+                            color:
+                                Colors.white,
+                            size: 13,
+                          ),
+
+                          const SizedBox(
+                            width: 4,
+                          ),
+
+                          Text(
+                            issue,
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              color:
+                                  Colors.white,
+                              fontSize: 8.5,
+                              fontWeight:
+                                  FontWeight
+                                      .w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
 // =============================================================================
-// UI HELPERS
+// SECTION HEADING
 // =============================================================================
 
-class _RaBreakdownSectionHeader
+class _RaBreakdownSectionHeading
     extends StatelessWidget {
-  const _RaBreakdownSectionHeader({
+  const _RaBreakdownSectionHeading({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -2633,6 +2355,7 @@ class _RaBreakdownSectionHeader
   });
 
   final IconData icon;
+
   final String title;
   final String subtitle;
 
@@ -2642,41 +2365,36 @@ class _RaBreakdownSectionHeader
   final String? trailing;
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
+  Widget build(BuildContext context) {
     final colors =
-        theme.colorScheme;
+        Theme.of(context).colorScheme;
 
     return Row(
       crossAxisAlignment:
           CrossAxisAlignment.start,
       children: [
         Container(
-          width: 42,
-          height: 42,
-          decoration:
-              BoxDecoration(
-            color: colors
-                .primaryContainer,
+          width: 39,
+          height: 39,
+          decoration: BoxDecoration(
+            color: colors.primary
+                .withValues(
+              alpha: .08,
+            ),
             borderRadius:
                 BorderRadius.circular(
-              14,
+              12,
             ),
           ),
           child: Icon(
             icon,
-            size: 21,
-            color: colors
-                .onPrimaryContainer,
+            color: colors.primary,
+            size: 19,
           ),
         ),
 
         const SizedBox(
-          width: RaSpace.md,
+          width: 10,
         ),
 
         Expanded(
@@ -2689,52 +2407,32 @@ class _RaBreakdownSectionHeader
                   Expanded(
                     child: Text(
                       title,
-                      style: theme
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 13,
                         fontWeight:
-                            FontWeight.w900,
+                            FontWeight
+                                .w800,
                       ),
                     ),
                   ),
 
-                  if (trailing !=
-                      null)
-                    Container(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: colors
-                            .surfaceContainerHighest,
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          999,
-                        ),
-                      ),
-                      child: Text(
-                        trailing!,
-                        style: theme
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(
-                          fontWeight:
-                              FontWeight
-                                  .w800,
-                        ),
+                  if (trailing != null)
+                    Text(
+                      trailing!,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.5,
+                        fontWeight:
+                            FontWeight
+                                .w700,
+                        color:
+                            colors.primary,
                       ),
                     ),
 
-                  if (action !=
-                          null &&
-                      onAction !=
-                          null)
+                  if (action != null &&
+                      onAction != null)
                     TextButton(
                       onPressed:
                           onAction,
@@ -2750,13 +2448,12 @@ class _RaBreakdownSectionHeader
 
               Text(
                 subtitle,
-                style: theme
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  fontSize: 9.3,
+                  height: 1.4,
                   color: colors
                       .onSurfaceVariant,
-                  height: 1.4,
                 ),
               ),
             ],
@@ -2767,43 +2464,17 @@ class _RaBreakdownSectionHeader
   }
 }
 
-class _RaBreakdownPrioritySelector
+// =============================================================================
+// SURFACE
+// =============================================================================
+
+class _RaBreakdownSurface
     extends StatelessWidget {
-  const _RaBreakdownPrioritySelector({
-    required this.selected,
-    required this.onSelected,
+  const _RaBreakdownSurface({
+    required this.child,
   });
 
-  final String selected;
-  final ValueChanged<String>
-      onSelected;
-
-  static const items = [
-    (
-      'normal',
-      'Normal',
-      'Safe location, no immediate danger',
-      Icons.schedule_rounded,
-    ),
-    (
-      'urgent',
-      'Urgent',
-      'Need assistance as soon as possible',
-      Icons.speed_rounded,
-    ),
-    (
-      'road_blocking',
-      'Blocking road',
-      'Vehicle is obstructing traffic',
-      Icons.traffic_rounded,
-    ),
-    (
-      'safety_risk',
-      'Safety risk',
-      'Driver or passengers may be unsafe',
-      Icons.warning_amber_rounded,
-    ),
-  ];
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -2813,62 +2484,132 @@ class _RaBreakdownPrioritySelector
     final colors =
         theme.colorScheme;
 
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        15,
+      ),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(
+          20,
+        ),
+        border: Border.all(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+// =============================================================================
+// PRIORITY
+// =============================================================================
+
+class _RaBreakdownPriorityGrid
+    extends StatelessWidget {
+  const _RaBreakdownPriorityGrid({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String selected;
+
+  final ValueChanged<String>
+      onSelected;
+
+  static const items = [
+    (
+      'normal',
+      'Normal',
+      'Safe location',
+      Icons.schedule_rounded,
+    ),
+    (
+      'urgent',
+      'Urgent',
+      'Need help soon',
+      Icons.speed_rounded,
+    ),
+    (
+      'road_blocking',
+      'Blocking road',
+      'Obstructing traffic',
+      Icons.traffic_rounded,
+    ),
+    (
+      'safety_risk',
+      'Safety risk',
+      'People may be unsafe',
+      Icons.warning_amber_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
     return LayoutBuilder(
       builder: (
         context,
         constraints,
       ) {
-        final width =
+        final cardWidth =
             (constraints.maxWidth -
-                    RaSpace.sm) /
+                    8) /
                 2;
 
         return Wrap(
-          spacing: RaSpace.sm,
-          runSpacing: RaSpace.sm,
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            for (final item
-                in items)
+            for (final item in items)
               SizedBox(
-                width: width,
+                width: cardWidth,
                 child: Material(
                   color: selected ==
                           item.$1
-                      ? colors
-                          .primaryContainer
+                      ? colors.primary
                           .withValues(
-                          alpha: .55,
+                          alpha: .07,
                         )
                       : colors.surface,
                   borderRadius:
-                      BorderRadius
-                          .circular(
+                      BorderRadius.circular(
                     18,
                   ),
                   clipBehavior:
                       Clip.antiAlias,
                   child: InkWell(
-                    onTap: () =>
-                        onSelected(
-                      item.$1,
-                    ),
+                    onTap: () {
+                      onSelected(
+                        item.$1,
+                      );
+                    },
                     child: Container(
                       constraints:
                           const BoxConstraints(
-                        minHeight: 145,
+                        minHeight: 122,
                       ),
                       padding:
                           const EdgeInsets
                               .all(
-                        RaSpace.md,
+                        12,
                       ),
                       decoration:
                           BoxDecoration(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          18,
-                        ),
                         border:
                             Border.all(
                           color: selected ==
@@ -2877,18 +2618,19 @@ class _RaBreakdownPrioritySelector
                                   .primary
                                   .withValues(
                                   alpha:
-                                      .5,
+                                      .42,
                                 )
                               : colors
                                   .outlineVariant
                                   .withValues(
                                   alpha:
-                                      .6,
+                                      .43,
                                 ),
-                          width: selected ==
-                                  item.$1
-                              ? 1.5
-                              : 1,
+                        ),
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          18,
                         ),
                       ),
                       child: Column(
@@ -2899,8 +2641,8 @@ class _RaBreakdownPrioritySelector
                           Row(
                             children: [
                               Container(
-                                width: 38,
-                                height: 38,
+                                width: 36,
+                                height: 36,
                                 decoration:
                                     BoxDecoration(
                                   color: selected ==
@@ -2908,27 +2650,31 @@ class _RaBreakdownPrioritySelector
                                       ? colors
                                           .primary
                                       : colors
-                                          .surfaceContainerHighest,
+                                          .primary
+                                          .withValues(
+                                          alpha:
+                                              .08,
+                                        ),
                                   borderRadius:
                                       BorderRadius
                                           .circular(
-                                    12,
+                                    11,
                                   ),
                                 ),
-                                child:
-                                    Icon(
+                                child: Icon(
                                   item.$4,
+                                  size: 18,
                                   color: selected ==
                                           item.$1
                                       ? colors
                                           .onPrimary
                                       : colors
                                           .primary,
-                                  size:
-                                      20,
                                 ),
                               ),
+
                               const Spacer(),
+
                               Icon(
                                 selected ==
                                         item.$1
@@ -2936,42 +2682,43 @@ class _RaBreakdownPrioritySelector
                                         .check_circle_rounded
                                     : Icons
                                         .radio_button_unchecked_rounded,
+                                size: 19,
                                 color: selected ==
                                         item.$1
                                     ? colors
                                         .primary
                                     : colors
                                         .outline,
-                                size: 21,
                               ),
                             ],
                           ),
+
                           const SizedBox(
-                            height:
-                                RaSpace.md,
+                            height: 10,
                           ),
+
                           Text(
                             item.$2,
-                            style: theme
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 10.5,
                               fontWeight:
                                   FontWeight
-                                      .w900,
+                                      .w700,
                             ),
                           ),
+
                           const SizedBox(
                             height: 3,
                           ),
+
                           Text(
                             item.$3,
-                            style: theme
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                              height:
-                                  1.35,
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 8.5,
+                              color: colors
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -2987,6 +2734,10 @@ class _RaBreakdownPrioritySelector
   }
 }
 
+// =============================================================================
+// PHOTO SOURCE
+// =============================================================================
+
 class _RaBreakdownPhotoSource
     extends StatelessWidget {
   const _RaBreakdownPhotoSource({
@@ -2997,71 +2748,66 @@ class _RaBreakdownPhotoSource
   });
 
   final IconData icon;
+
   final String title;
   final String subtitle;
+
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
-
     final colors =
-        theme.colorScheme;
+        Theme.of(context).colorScheme;
 
     return Material(
-      color: colors.surface,
+      color: colors
+          .surfaceContainerHighest
+          .withValues(
+        alpha: .34,
+      ),
       borderRadius:
           BorderRadius.circular(
-        18,
+        17,
       ),
-      clipBehavior:
-          Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Container(
+        borderRadius:
+            BorderRadius.circular(
+          17,
+        ),
+        child: Padding(
           padding:
               const EdgeInsets.all(
-            RaSpace.md,
-          ),
-          decoration:
-              BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(
-              18,
-            ),
-            border: Border.all(
-              color: colors
-                  .outlineVariant
-                  .withValues(
-                alpha: .6,
-              ),
-            ),
+            13,
           ),
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 39,
+                height: 39,
                 decoration:
                     BoxDecoration(
-                  color: colors
-                      .primaryContainer,
+                  color: colors.primary
+                      .withValues(
+                    alpha: .08,
+                  ),
                   borderRadius:
-                      BorderRadius
-                          .circular(
-                    14,
+                      BorderRadius.circular(
+                    12,
                   ),
                 ),
                 child: Icon(
                   icon,
-                  color: colors
-                      .onPrimaryContainer,
+                  color:
+                      colors.primary,
+                  size: 19,
                 ),
               ),
+
               const SizedBox(
-                width: RaSpace.md,
+                width: 11,
               ),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment:
@@ -3070,27 +2816,32 @@ class _RaBreakdownPhotoSource
                   children: [
                     Text(
                       title,
-                      style: theme
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 10.8,
                         fontWeight:
                             FontWeight
-                                .w800,
+                                .w700,
                       ),
                     ),
+
                     const SizedBox(
-                      height: 2,
+                      height: 3,
                     ),
+
                     Text(
                       subtitle,
-                      style: theme
-                          .textTheme
-                          .bodySmall,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.7,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
+
               Icon(
                 Icons
                     .chevron_right_rounded,
@@ -3105,39 +2856,46 @@ class _RaBreakdownPhotoSource
   }
 }
 
+// =============================================================================
+// PHOTO CARD
+// =============================================================================
+
 class _RaBreakdownPhotoCard
     extends StatelessWidget {
   const _RaBreakdownPhotoCard({
-    required this.photoData,
+    required this.data,
     required this.annotation,
     required this.onTap,
     required this.onRemove,
   });
 
-  final String photoData;
+  final String data;
 
   final BreakdownPhotoAnnotation?
       annotation;
 
   final VoidCallback onTap;
+
   final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
     final colors =
-        Theme.of(context)
-            .colorScheme;
+        Theme.of(context).colorScheme;
 
-    Widget photo;
+    Widget preview;
 
     try {
-      photo = Image.memory(
-        base64Decode(photoData),
-        width: 118,
-        height: 118,
+      preview = Image.memory(
+        base64Decode(data),
+        width: 116,
+        height: 116,
         fit: BoxFit.cover,
-        errorBuilder:
-            (_, __, ___) {
+        errorBuilder: (
+          context,
+          error,
+          stackTrace,
+        ) {
           return Container(
             color: colors
                 .surfaceContainerHighest,
@@ -3151,13 +2909,14 @@ class _RaBreakdownPhotoCard
         },
       );
     } on FormatException {
-      photo = Container(
+      preview = Container(
         color: colors
             .surfaceContainerHighest,
         alignment:
             Alignment.center,
         child: const Icon(
-          Icons.broken_image_outlined,
+          Icons
+              .broken_image_outlined,
         ),
       );
     }
@@ -3165,37 +2924,44 @@ class _RaBreakdownPhotoCard
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        width: 118,
-        height: 118,
+        width: 116,
+        height: 116,
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Positioned.fill(
               child: ClipRRect(
                 borderRadius:
-                    BorderRadius
-                        .circular(
+                    BorderRadius.circular(
                   16,
                 ),
-                child: photo,
+                child: preview,
               ),
             ),
 
             if (annotation != null)
               Positioned(
-                left: annotation!
+                left: (annotation!
                             .markerX *
-                        102 -
-                    3,
-                top: annotation!
+                        100)
+                    .clamp(
+                      0.0,
+                      91.0,
+                    )
+                    .toDouble(),
+                top: (annotation!
                             .markerY *
-                        92 -
-                    7,
+                        88)
+                    .clamp(
+                      0.0,
+                      80.0,
+                    )
+                    .toDouble(),
                 child: Icon(
                   Icons
                       .location_on_rounded,
-                  color:
-                      colors.error,
-                  size: 25,
+                  color: colors.error,
+                  size: 24,
                   shadows: const [
                     Shadow(
                       color:
@@ -3214,7 +2980,7 @@ class _RaBreakdownPhotoCard
                     const EdgeInsets
                         .symmetric(
                   horizontal: 7,
-                  vertical: 5,
+                  vertical: 4,
                 ),
                 decoration:
                     BoxDecoration(
@@ -3235,7 +3001,7 @@ class _RaBreakdownPhotoCard
                     Icon(
                       Icons
                           .edit_location_alt_outlined,
-                      size: 13,
+                      size: 12,
                       color:
                           Colors.white,
                     ),
@@ -3247,7 +3013,7 @@ class _RaBreakdownPhotoCard
                       style: TextStyle(
                         color:
                             Colors.white,
-                        fontSize: 10,
+                        fontSize: 8.5,
                         fontWeight:
                             FontWeight
                                 .w700,
@@ -3263,27 +3029,28 @@ class _RaBreakdownPhotoCard
               right: 4,
               child:
                   IconButton.filled(
-                tooltip:
-                    'Remove photo',
+                tooltip: 'Remove',
                 visualDensity:
-                    VisualDensity
-                        .compact,
-                style: IconButton
-                    .styleFrom(
+                    VisualDensity.compact,
+                iconSize: 14,
+                style:
+                    IconButton.styleFrom(
+                  minimumSize:
+                      const Size(
+                    30,
+                    30,
+                  ),
                   backgroundColor:
                       Colors.black
                           .withValues(
-                    alpha: .60,
+                    alpha: .62,
                   ),
                   foregroundColor:
                       Colors.white,
                 ),
-                onPressed:
-                    onRemove,
+                onPressed: onRemove,
                 icon: const Icon(
-                  Icons
-                      .close_rounded,
-                  size: 16,
+                  Icons.close_rounded,
                 ),
               ),
             ),

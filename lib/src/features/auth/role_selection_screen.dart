@@ -8,151 +8,103 @@ class RoleSelectionScreen
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Choose Account Type',
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight:
+                FontWeight.w800,
+          ),
         ),
       ),
       body: SafeArea(
         child: ListView(
+          physics:
+              const BouncingScrollPhysics(),
           padding:
               const EdgeInsets.fromLTRB(
-            RaSpace.lg,
-            RaSpace.sm,
-            RaSpace.lg,
-            RaSpace.xxxl,
+            18,
+            6,
+            18,
+            30,
           ),
           children: [
-            Container(
-              padding: const EdgeInsets.all(
-                RaSpace.xl,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end:
-                      Alignment.bottomRight,
-                  colors: [
-                    colors.primary,
-                    const Color(0xFF007D70),
-                  ],
-                ),
-                borderRadius:
-                    BorderRadius.circular(24),
-              ),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: Colors.white
-                          .withValues(alpha: .14),
-                      borderRadius:
-                          BorderRadius.circular(
-                        18,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons
-                          .shield_outlined,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(
-                    height: RaSpace.lg,
-                  ),
-                  Text(
-                    'How will you use RoadAssist?',
-                    style: theme
-                        .textTheme.headlineSmall
-                        ?.copyWith(
-                      color: Colors.white,
-                      fontWeight:
-                          FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Choose the account type that matches what you need today.',
-                    style: theme
-                        .textTheme.bodyMedium
-                        ?.copyWith(
-                      color: Colors.white
-                          .withValues(
-                        alpha: .84,
-                      ),
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const _AuthWordmark(),
 
-            const SizedBox(
-              height: RaSpace.xxl,
-            ),
+            const SizedBox(height: 21),
 
-            _RoleSelectionCard(
+            const _RoleSelectionHero(),
+
+            const SizedBox(height: 22),
+
+            _AuthRoleCard(
               icon: Icons
                   .directions_car_filled_outlined,
               title: 'Driver',
-              badge: 'GET ASSISTANCE',
+              eyebrow:
+                  'NEED ROADSIDE HELP',
               description:
-                  'Request roadside help, manage saved vehicles, compare provider quotes and follow your active assistance.',
+                  'Request roadside assistance, manage your vehicles and follow your active service.',
               highlights: const [
-                'Multiple saved vehicles',
-                'Provider quote comparison',
-                'Live assistance updates',
+                'Save and manage vehicles',
+                'Compare provider offers',
+                'Track roadside assistance',
               ],
               buttonLabel:
                   'Continue as Driver',
-              onTap: () => push(
-                context,
-                const LoginScreen(
-                  isProvider: false,
-                ),
-              ),
+              tone:
+                  colors.primary,
+              onTap: () {
+                push(
+                  context,
+                  const LoginScreen(
+                    isProvider: false,
+                  ),
+                );
+              },
             ),
 
-            const SizedBox(
-              height: RaSpace.md,
-            ),
+            const SizedBox(height: 12),
 
-            _RoleSelectionCard(
+            _AuthRoleCard(
               icon: Icons
                   .home_repair_service_outlined,
               title: 'Service Provider',
-              badge: 'PROFESSIONAL PORTAL',
+              eyebrow:
+                  'PROFESSIONAL PORTAL',
               description:
-                  'Receive matching roadside requests, send itemized quotes and manage active service jobs.',
+                  'Receive matching roadside requests, submit quotes and manage active service jobs.',
               highlights: const [
                 'Provider verification',
-                'Request & quote management',
-                'Active job workflow',
+                'Manage matching requests',
+                'Track active jobs',
               ],
               buttonLabel:
                   'Continue as Provider',
-              onTap: () => push(
-                context,
-                const LoginScreen(
-                  isProvider: true,
-                ),
-              ),
+              tone:
+                  const Color(0xFF078F80),
+              onTap: () {
+                push(
+                  context,
+                  const LoginScreen(
+                    isProvider: true,
+                  ),
+                );
+              },
             ),
 
-            const SizedBox(
-              height: RaSpace.xxl,
-            ),
+            const SizedBox(height: 26),
 
             Row(
               children: [
@@ -162,24 +114,20 @@ class RoleSelectionScreen
                         colors.outlineVariant,
                   ),
                 ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: RaSpace.md,
-                  ),
-                  child: Text(
-                    'EMERGENCY ACCESS',
-                    style: theme
-                        .textTheme.labelSmall
-                        ?.copyWith(
-                      color: colors
-                          .onSurfaceVariant,
-                      fontWeight:
-                          FontWeight.w800,
-                      letterSpacing: .8,
-                    ),
+                const SizedBox(width: 10),
+                Text(
+                  'EMERGENCY ACCESS',
+                  style:
+                      GoogleFonts.plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight:
+                        FontWeight.w700,
+                    letterSpacing: .8,
+                    color: colors
+                        .onSurfaceVariant,
                   ),
                 ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Divider(
                     color:
@@ -189,73 +137,113 @@ class RoleSelectionScreen
               ],
             ),
 
-            const SizedBox(
-              height: RaSpace.md,
-            ),
+            const SizedBox(height: 13),
 
             Container(
-              padding: const EdgeInsets.all(
-                RaSpace.md,
-              ),
+              padding:
+                  const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: colors.errorContainer
-                    .withValues(alpha: .24),
+                color: colors.error
+                    .withValues(alpha: .055),
                 borderRadius:
-                    BorderRadius.circular(17),
+                    BorderRadius.circular(18),
                 border: Border.all(
                   color: colors.error
-                      .withValues(alpha: .20),
+                      .withValues(alpha: .17),
                 ),
               ),
               child: Column(
                 children: [
                   Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons
-                            .emergency_outlined,
-                        color: colors.error,
+                      Container(
+                        width: 43,
+                        height: 43,
+                        decoration:
+                            BoxDecoration(
+                          color: colors.error
+                              .withValues(
+                            alpha: .09,
+                          ),
+                          borderRadius:
+                              BorderRadius
+                                  .circular(
+                            13,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons
+                              .emergency_outlined,
+                          color:
+                              colors.error,
+                        ),
                       ),
                       const SizedBox(
-                        width: RaSpace.sm,
+                        width: 10,
                       ),
                       Expanded(
-                        child: Text(
-                          'Need urgent roadside access without signing in?',
-                          style: theme
-                              .textTheme.titleSmall
-                              ?.copyWith(
-                            fontWeight:
-                                FontWeight.w900,
-                          ),
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .start,
+                          children: [
+                            Text(
+                              'Need urgent access?',
+                              style: GoogleFonts
+                                  .plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight:
+                                    FontWeight
+                                        .w800,
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 2,
+                            ),
+                            Text(
+                              'Continue to limited driver emergency access without signing in.',
+                              style: GoogleFonts
+                                  .plusJakartaSans(
+                                fontSize: 11,
+                                height: 1.4,
+                                color: colors
+                                    .onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(
-                    height: RaSpace.sm,
-                  ),
+
+                  const SizedBox(height: 12),
+
                   SizedBox(
                     width: double.infinity,
-                    child:
-                        OutlinedButton.icon(
-                      style: OutlinedButton
-                          .styleFrom(
+                    child: OutlinedButton.icon(
+                      style:
+                          OutlinedButton.styleFrom(
                         foregroundColor:
                             colors.error,
+                        side: BorderSide(
+                          color: colors.error
+                              .withValues(
+                            alpha: .35,
+                          ),
+                        ),
                       ),
-                      onPressed: () => replace(
-                        context,
-                        const DriverShell(),
-                      ),
+                      onPressed: () {
+                        replace(
+                          context,
+                          const DriverShell(),
+                        );
+                      },
                       icon: const Icon(
                         Icons
                             .emergency_outlined,
                       ),
                       label: const Text(
-                        'Continue with Emergency Guest Access',
+                        'Emergency Guest Access',
                       ),
                     ),
                   ),
@@ -263,15 +251,14 @@ class RoleSelectionScreen
               ),
             ),
 
-            const SizedBox(
-              height: RaSpace.lg,
-            ),
+            const SizedBox(height: 18),
 
             Text(
-              'By continuing, you agree to use RoadAssist responsibly.',
+              'Choose the account type that matches how you use RoadAssist.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 10.5,
                 color:
                     colors.onSurfaceVariant,
               ),
@@ -283,41 +270,141 @@ class RoleSelectionScreen
   }
 }
 
-class _RoleSelectionCard
+class _RoleSelectionHero
     extends StatelessWidget {
-  const _RoleSelectionCard({
+  const _RoleSelectionHero();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin:
+              Alignment.topLeft,
+          end:
+              Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF07508B),
+                  Color(0xFF076864),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078F80),
+                ],
+        ),
+        borderRadius:
+            BorderRadius.circular(23),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration:
+                BoxDecoration(
+              color: Colors.white
+                  .withValues(alpha: .13),
+              borderRadius:
+                  BorderRadius.circular(
+                16,
+              ),
+            ),
+            child: const Icon(
+              Icons
+                  .account_circle_outlined,
+              color: Colors.white,
+              size: 27,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'How will you use RoadAssist?',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight:
+                        FontWeight.w800,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Select a driver or provider account to continue.',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white
+                        .withValues(
+                      alpha: .78,
+                    ),
+                    fontSize: 11.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthRoleCard
+    extends StatelessWidget {
+  const _AuthRoleCard({
     required this.icon,
     required this.title,
-    required this.badge,
+    required this.eyebrow,
     required this.description,
     required this.highlights,
     required this.buttonLabel,
+    required this.tone,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String badge;
+  final String eyebrow;
   final String description;
   final List<String> highlights;
   final String buttonLabel;
+  final Color tone;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(
-        RaSpace.xl,
-      ),
+      padding:
+          const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(22),
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(0xFF0D1D2B)
+            : colors.surface,
+        borderRadius:
+            BorderRadius.circular(21),
         border: Border.all(
           color: colors.outlineVariant
-              .withValues(alpha: .65),
+              .withValues(alpha: .50),
         ),
       ),
       child: Column(
@@ -327,46 +414,51 @@ class _RoleSelectionCard
           Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color:
-                      colors.primaryContainer,
+                width: 50,
+                height: 50,
+                decoration:
+                    BoxDecoration(
+                  color: tone.withValues(
+                    alpha: .09,
+                  ),
                   borderRadius:
-                      BorderRadius.circular(18),
+                      BorderRadius.circular(
+                    15,
+                  ),
                 ),
                 child: Icon(
                   icon,
-                  color:
-                      colors.onPrimaryContainer,
-                  size: 28,
+                  color: tone,
+                  size: 25,
                 ),
               ),
-              const SizedBox(width: RaSpace.md),
+
+              const SizedBox(width: 11),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
                   children: [
                     Text(
-                      badge,
-                      style: theme
-                          .textTheme.labelSmall
-                          ?.copyWith(
-                        color: colors.primary,
+                      eyebrow,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 10,
+                        letterSpacing: .65,
                         fontWeight:
-                            FontWeight.w900,
-                        letterSpacing: .6,
+                            FontWeight.w700,
+                        color: tone,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       title,
-                      style: theme
-                          .textTheme.titleLarge
-                          ?.copyWith(
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 18,
                         fontWeight:
-                            FontWeight.w900,
+                            FontWeight.w800,
                       ),
                     ),
                   ],
@@ -374,59 +466,87 @@ class _RoleSelectionCard
               ),
             ],
           ),
-          const SizedBox(height: RaSpace.lg),
+
+          const SizedBox(height: 13),
+
           Text(
             description,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(
+            style:
+                GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              height: 1.5,
               color:
                   colors.onSurfaceVariant,
-              height: 1.45,
             ),
           ),
-          const SizedBox(height: RaSpace.lg),
-          for (final item in highlights)
+
+          const SizedBox(height: 13),
+
+          for (final item
+              in highlights)
             Padding(
-              padding: const EdgeInsets.only(
-                bottom: 8,
+              padding:
+                  const EdgeInsets.only(
+                bottom: 7,
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
+                    width: 23,
+                    height: 23,
+                    decoration:
+                        BoxDecoration(
                       color: raSuccess
-                          .withValues(alpha: .10),
+                          .withValues(
+                        alpha: .09,
+                      ),
                       borderRadius:
-                          BorderRadius.circular(8),
+                          BorderRadius
+                              .circular(
+                        7,
+                      ),
                     ),
                     child: const Icon(
                       Icons.check_rounded,
-                      size: 15,
                       color: raSuccess,
+                      size: 14,
                     ),
                   ),
-                  const SizedBox(
-                    width: RaSpace.sm,
-                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       item,
-                      style:
-                          theme.textTheme.bodySmall,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight:
+                            FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          const SizedBox(height: RaSpace.md),
-          FilledButton.icon(
-            onPressed: onTap,
-            icon: const Icon(
-              Icons.arrow_forward_rounded,
+
+          const SizedBox(height: 9),
+
+          SizedBox(
+            height: 49,
+            child: FilledButton.icon(
+              style:
+                  FilledButton.styleFrom(
+                backgroundColor: tone,
+                foregroundColor:
+                    Colors.white,
+              ),
+              onPressed: onTap,
+              icon: const Icon(
+                Icons
+                    .arrow_forward_rounded,
+              ),
+              label:
+                  Text(buttonLabel),
             ),
-            label: Text(buttonLabel),
           ),
         ],
       ),

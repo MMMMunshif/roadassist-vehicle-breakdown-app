@@ -1,6 +1,7 @@
 part of '../../screens.dart';
 
-class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
+class RealtimeDriverRequestDetailsScreen
+    extends StatelessWidget {
   const RealtimeDriverRequestDetailsScreen({
     super.key,
     required this.requestId,
@@ -10,100 +11,73 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
   final String requestId;
   final Map<String, dynamic> data;
 
-  String get status => data['status'] as String? ?? 'searching';
+  String formatMoney(
+    num value,
+  ) {
+    final amount =
+        value.toInt().abs().toString();
 
-  String get provider =>
-      data['providerName'] as String? ?? 'Not assigned';
+    final buffer =
+        StringBuffer();
 
-  String get providerPhone =>
-      data['providerPhone'] as String? ?? '';
-
-  bool get providerAssigned =>
-      (data['providerId'] as String? ?? '').trim().isNotEmpty;
-
-  int money(String key) => (data[key] as num?)?.toInt() ?? 0;
-
-  String formatMoney(int value) {
-    final digits = value.abs().toString();
-    final buffer = StringBuffer();
-
-    for (var index = 0; index < digits.length; index++) {
-      if (index > 0 && (digits.length - index) % 3 == 0) {
+    for (var index = 0;
+        index < amount.length;
+        index++) {
+      if (index > 0 &&
+          (amount.length - index) %
+                  3 ==
+              0) {
         buffer.write(',');
       }
 
-      buffer.write(digits[index]);
+      buffer.write(
+        amount[index],
+      );
     }
 
     return 'Rs. ${value < 0 ? '-' : ''}${buffer.toString()}';
   }
 
-  String statusLabel() {
-    return switch (status) {
-      'searching' => 'Searching',
-      'accepted' => 'Accepted',
-      'en_route' => 'En route',
-      'arrived' => 'Provider arrived',
-      'completed' => 'Completed',
-      'cancelled' => 'Cancelled',
-      _ => status.replaceAll('_', ' '),
-    };
-  }
-
-  String statusDescription() {
+  String statusLabel(
+    String status,
+  ) {
     return switch (status) {
       'searching' =>
-        'RoadAssist is looking for an available service provider.',
+        'Searching',
       'accepted' =>
-        'A provider has accepted your roadside assistance request.',
+        'Accepted',
       'en_route' =>
-        'Your assigned provider is travelling to your location.',
+        'En route',
       'arrived' =>
-        data['completionState'] == 'pending'
-            ? 'The provider has completed work and is waiting for your review.'
-            : 'Your provider has reached your breakdown location.',
+        'Provider arrived',
       'completed' =>
-        'Your roadside assistance request has been completed.',
+        'Completed',
       'cancelled' =>
-        'This roadside assistance request is no longer active.',
-      _ => 'View the latest information for this assistance request.',
+        'Cancelled',
+      _ =>
+        status.replaceAll('_', ' '),
     };
   }
 
-  RaTone statusTone() {
+  RaTone statusTone(
+    String status,
+  ) {
     return switch (status) {
-      'completed' => RaTone.success,
-      'cancelled' => RaTone.danger,
-      'arrived' => RaTone.success,
+      'completed' =>
+        RaTone.success,
+      'cancelled' =>
+        RaTone.danger,
+      'searching' =>
+        RaTone.warning,
+      'arrived' =>
+        RaTone.success,
       _ => RaTone.info,
     };
   }
 
-  Color statusColor(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return switch (status) {
-      'completed' => raSuccess,
-      'cancelled' => colors.error,
-      'arrived' => raSuccess,
-      'en_route' => const Color(0xFF167DE4),
-      _ => colors.primary,
-    };
-  }
-
-  IconData statusIcon() {
-    return switch (status) {
-      'searching' => Icons.person_search_rounded,
-      'accepted' => Icons.handshake_outlined,
-      'en_route' => Icons.navigation_rounded,
-      'arrived' => Icons.location_on_rounded,
-      'completed' => Icons.task_alt_rounded,
-      'cancelled' => Icons.close_rounded,
-      _ => Icons.car_repair_outlined,
-    };
-  }
-
-  int timelineIndex() {
+  int timelineIndex(
+    String status,
+  ) {
     return switch (status) {
       'accepted' => 0,
       'en_route' => 1,
@@ -113,144 +87,163 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
     };
   }
 
-  void showReceipt(BuildContext context) {
-    push(
-      context,
-      InvoiceScreen(requestId: requestId),
-    );
-  }
-
-  Future<void> rateService(BuildContext context) async {
+  Future<void> rateService(
+    BuildContext context,
+    Map<String, dynamic> job,
+  ) async {
     var selectedRating =
-        (data['driverRating'] as num?)?.toInt() ?? 0;
+        (job['driverRating']
+                    as num?)
+                ?.toInt() ??
+            0;
 
-    final rating = await showModalBottomSheet<int>(
+    final rating =
+        await showModalBottomSheet<int>(
       context: context,
+      showDragHandle: true,
       useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
+      builder: (
+        sheetContext,
+      ) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final theme = Theme.of(context);
-            final colors = theme.colorScheme;
-            final dark = theme.brightness == Brightness.dark;
+          builder: (
+            context,
+            setSheetState,
+          ) {
+            final colors =
+                Theme.of(context)
+                    .colorScheme;
 
-            return Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              decoration: BoxDecoration(
-                color: dark
-                    ? const Color(0xFF0D1D2B)
-                    : colors.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
+            return Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(
+                18,
+                0,
+                18,
+                18,
               ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize:
+                    MainAxisSize.min,
                 children: [
                   Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colors.onSurfaceVariant.withValues(
-                        alpha: .24,
+                    width: 56,
+                    height: 56,
+                    decoration:
+                        BoxDecoration(
+                      color: raGold
+                          .withValues(
+                        alpha: .10,
                       ),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-
-                  const SizedBox(height: 23),
-
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: raGold.withValues(alpha: .12),
-                      borderRadius: BorderRadius.circular(19),
+                      borderRadius:
+                          BorderRadius.circular(
+                        18,
+                      ),
                     ),
                     child: const Icon(
                       Icons.star_rounded,
                       color: raGold,
-                      size: 31,
+                      size: 29,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Text(
+                    'Rate your service',
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 17,
+                      fontWeight:
+                          FontWeight.w800,
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Text(
+                    'How was your roadside assistance experience?',
+                    textAlign:
+                        TextAlign.center,
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 8.5,
+                      color: colors
+                          .onSurfaceVariant,
                     ),
                   ),
 
                   const SizedBox(height: 15),
 
-                  Text(
-                    'Rate your service',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -.45,
-                      color: colors.onSurface,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  Text(
-                    'How was your RoadAssist experience?',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-
-                  const SizedBox(height: 19),
-
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        5,
-                        (index) => IconButton(
+                  Row(
+                    mainAxisAlignment:
+                        MainAxisAlignment
+                            .center,
+                    children:
+                        List.generate(
+                      5,
+                      (
+                        index,
+                      ) {
+                        return IconButton(
                           onPressed: () {
-                            setSheetState(() {
-                              selectedRating = index + 1;
-                            });
+                            setSheetState(
+                              () {
+                                selectedRating =
+                                    index + 1;
+                              },
+                            );
                           },
                           icon: Icon(
-                            index < selectedRating
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
+                            index <
+                                    selectedRating
+                                ? Icons
+                                    .star_rounded
+                                : Icons
+                                    .star_outline_rounded,
                             color: raGold,
-                            size: 35,
+                            size: 34,
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
 
-                  if (selectedRating > 0) ...[
-                    const SizedBox(height: 5),
+                  if (selectedRating >
+                      0) ...[
                     Text(
-                      '$selectedRating / 5',
-                      style: GoogleFonts.plusJakartaSans(
+                      '$selectedRating of 5',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8,
+                        fontWeight:
+                            FontWeight.w700,
                         color: raGold,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 15),
 
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: selectedRating == 0
-                          ? null
-                          : () {
-                              Navigator.pop(
-                                sheetContext,
-                                selectedRating,
-                              );
-                            },
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('Submit Rating'),
+                    child:
+                        FilledButton.icon(
+                      onPressed:
+                          selectedRating == 0
+                              ? null
+                              : () {
+                                  Navigator.pop(
+                                    sheetContext,
+                                    selectedRating,
+                                  );
+                                },
+                      icon: const Icon(
+                        Icons.check_rounded,
+                      ),
+                      label: const Text(
+                        'Submit Rating',
+                      ),
                     ),
                   ),
                 ],
@@ -261,29 +254,37 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
       },
     );
 
-    if (rating == null || !context.mounted) return;
+    if (rating == null ||
+        !context.mounted) {
+      return;
+    }
 
     try {
-      await RequestService().submitDriverRating(
+      await RequestService()
+          .submitDriverRating(
         requestId,
         rating,
       );
 
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
             'Thank you for your $rating-star rating.',
           ),
         ),
       );
-
-      Navigator.pop(context);
     } catch (_) {
-      if (!context.mounted) return;
+      if (!context.mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Unable to save rating. Try again.',
@@ -295,417 +296,771 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    final latitude =
-        (data['latitude'] as num?)?.toDouble();
-
-    final longitude =
-        (data['longitude'] as num?)?.toDouble();
-
-    final hasCoordinates =
-        latitude != null && longitude != null;
-
-    final serviceFee = money('serviceFee');
-    final travelFee = money('dispatchFee');
-    final extraFee = money('extraFee');
-    final quotedTotal = money('estimatedCost');
-
-    final finalTotal = data['finalCost'] == null
-        ? quotedTotal
-        : money('finalCost');
-
-    final location =
-        data['locationLabel'] as String? ??
-        data['location'] as String? ??
-        'Location not recorded';
-
-    final vehicle =
-        data['modelYear'] as String? ??
-        data['vehicleType'] as String? ??
-        'Not provided';
-
-    final registration =
-        data['registration'] as String? ?? 'Not provided';
-
-    final issue = requestIssueLabel(data);
-
-    final description =
-        data['description'] as String? ?? '';
-
-    final quoteNotes =
-        data['quoteNotes'] as String? ?? '';
-
-    final providerDistance =
-        (data['providerDistanceKm'] as num?)?.toDouble();
+    final theme =
+        Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'Request Details',
-          style: GoogleFonts.plusJakartaSans(
+          style:
+              GoogleFonts.plusJakartaSans(
             fontSize: 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
       ),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          18,
-          9,
-          18,
-          32,
-        ),
-        children: [
-          _RaDriverRequestStatusHero(
-            label: statusLabel(),
-            description: statusDescription(),
-            icon: statusIcon(),
-            tone: statusColor(context),
-          ),
-
-          const SizedBox(height: 14),
-
-          if (hasCoordinates)
-            Container(
-              height: 210,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: colors.outlineVariant.withValues(
-                    alpha: .50,
-                  ),
-                ),
+      body: StreamBuilder<
+          DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('requests')
+            .doc(requestId)
+            .snapshots(),
+        builder: (
+          context,
+          snapshot,
+        ) {
+          if (snapshot.hasError) {
+            return const Padding(
+              padding:
+                  EdgeInsets.all(18),
+              child: EmptyState(
+                icon:
+                    Icons.cloud_off_outlined,
+                title:
+                    'Unable to load request',
+                message:
+                    'Check your connection and try again.',
               ),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(
+              child:
+                  CircularProgressIndicator(),
+            );
+          }
+
+          final current =
+              snapshot.data!.data() ??
+                  data;
+
+          if (!snapshot.data!.exists &&
+              current.isEmpty) {
+            return const Padding(
+              padding:
+                  EdgeInsets.all(18),
+              child: EmptyState(
+                icon:
+                    Icons.search_off_outlined,
+                title:
+                    'Request not found',
+                message:
+                    'This assistance request is no longer available.',
+              ),
+            );
+          }
+
+          return _RaRealtimeRequestBody(
+            requestId:
+                requestId,
+            data:
+                current,
+            formatMoney:
+                formatMoney,
+            statusLabel:
+                statusLabel,
+            statusTone:
+                statusTone,
+            timelineIndex:
+                timelineIndex,
+            onRate: () {
+              rateService(
+                context,
+                current,
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RaRealtimeRequestBody
+    extends StatelessWidget {
+  const _RaRealtimeRequestBody({
+    required this.requestId,
+    required this.data,
+    required this.formatMoney,
+    required this.statusLabel,
+    required this.statusTone,
+    required this.timelineIndex,
+    required this.onRate,
+  });
+
+  final String requestId;
+  final Map<String, dynamic> data;
+
+  final String Function(num)
+      formatMoney;
+
+  final String Function(String)
+      statusLabel;
+
+  final RaTone Function(String)
+      statusTone;
+
+  final int Function(String)
+      timelineIndex;
+
+  final VoidCallback onRate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
+
+    final status =
+        data['status'] as String? ??
+            'searching';
+
+    final provider =
+        data['providerName']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final providerId =
+        data['providerId']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final providerPhone =
+        data['providerPhone']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final providerAssigned =
+        providerId.isNotEmpty;
+
+    final latitude =
+        (data['latitude'] as num?)
+            ?.toDouble();
+
+    final longitude =
+        (data['longitude'] as num?)
+            ?.toDouble();
+
+    final location =
+        data['locationLabel']
+                ?.toString()
+                .trim() ??
+            data['location']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final registration =
+        data['registration']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final vehicleParts = [
+      data['vehicleType']
+          ?.toString()
+          .trim(),
+      data['modelYear']
+          ?.toString()
+          .trim(),
+    ]
+        .whereType<String>()
+        .where(
+          (value) =>
+              value.isNotEmpty,
+        )
+        .toList();
+
+    final vehicle =
+        vehicleParts.isEmpty
+            ? 'Not recorded'
+            : vehicleParts.join(' • ');
+
+    final description =
+        data['description']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final quoteNotes =
+        data['quoteNotes']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final cancellationReason =
+        data['cancellationReason']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final serviceFee =
+        data['serviceFee'] as num?;
+
+    final dispatchFee =
+        data['dispatchFee'] as num?;
+
+    final extraFee =
+        data['extraFee'] as num?;
+
+    final estimatedCost =
+        data['estimatedCost'] as num?;
+
+    final finalCost =
+        data['finalCost'] as num?;
+
+    final total =
+        finalCost ?? estimatedCost;
+
+    final providerDistance =
+        (data['providerDistanceKm']
+                as num?)
+            ?.toDouble();
+
+    return ListView(
+      physics:
+          const BouncingScrollPhysics(),
+      padding:
+          const EdgeInsets.fromLTRB(
+        18,
+        8,
+        18,
+        34,
+      ),
+      children: [
+        _RaRealtimeHero(
+          status:
+              status,
+          label:
+              statusLabel(status),
+          tone:
+              statusTone(status),
+        ),
+
+        if (status == 'cancelled' &&
+            cancellationReason
+                .isNotEmpty) ...[
+          const SizedBox(height: 12),
+
+          _RaRealtimeNotice(
+            icon: Icons
+                .info_outline_rounded,
+            title:
+                'Cancellation information',
+            message:
+                cancellationReason,
+            tone:
+                colors.error,
+          ),
+        ],
+
+        if (latitude != null &&
+            longitude != null) ...[
+          const SizedBox(height: 15),
+
+          ClipRRect(
+            borderRadius:
+                BorderRadius.circular(18),
+            child: SizedBox(
+              height: 210,
               child: MapMock(
                 position: LatLng(
                   latitude,
                   longitude,
                 ),
               ),
-            )
-          else
-            _RaDriverRequestNoMap(
-              location: location,
             ),
-
-          if (providerAssigned) ...[
-            const SizedBox(height: 14),
-
-            _RaDriverProviderCard(
-              name: provider,
-              phone: providerPhone,
-              requestId: requestId,
-            ),
-          ],
-
-          const SizedBox(height: 27),
-
-          const _RaDriverDetailsSectionHeading(
-            title: 'Request information',
-            subtitle:
-                'Vehicle, assistance and breakdown details',
           ),
+        ],
 
-          const SizedBox(height: 11),
+        if (providerAssigned) ...[
+          const SizedBox(height: 15),
 
-          _RaDriverDetailsCard(
-            children: [
-              _RaDriverDetailRow(
-                icon: Icons.tag_rounded,
-                label: 'Request ID',
-                value: requestId,
-              ),
-              _RaDriverDetailRow(
-                icon: Icons.car_repair_outlined,
-                label: 'Assistance',
-                value: issue,
-              ),
-              _RaDriverDetailRow(
-                icon: Icons.directions_car_outlined,
-                label: 'Vehicle',
-                value: vehicle,
-              ),
-              _RaDriverDetailRow(
-                icon: Icons.pin_outlined,
-                label: 'Registration',
-                value: registration,
-              ),
-              _RaDriverDetailRow(
-                icon: Icons.location_on_outlined,
-                label: 'Location',
-                value: location,
-              ),
-              if (description.trim().isNotEmpty)
-                _RaDriverDetailRow(
-                  icon: Icons.description_outlined,
-                  label: 'Description',
-                  value: description,
+          _RaRealtimeProviderCard(
+            name:
+                provider.isEmpty
+                    ? 'Service Provider'
+                    : provider,
+            phone:
+                providerPhone,
+            onCall:
+                providerPhone.isEmpty
+                    ? null
+                    : () {
+                        showCallPrompt(
+                          context,
+                          name: provider.isEmpty
+                              ? 'Service Provider'
+                              : provider,
+                          number:
+                              providerPhone,
+                        );
+                      },
+            onChat: () {
+              push(
+                context,
+                ChatScreen(
+                  requestId:
+                      requestId,
+                  peerName:
+                      provider.isEmpty
+                          ? 'Service Provider'
+                          : provider,
+                  peerPhone:
+                      providerPhone,
                 ),
+              );
+            },
+          ),
+        ],
+
+        const SizedBox(height: 23),
+
+        const _RaRealtimeHeading(
+          title:
+              'Request information',
+          subtitle:
+              'Details recorded for this roadside assistance request.',
+        ),
+
+        const SizedBox(height: 10),
+
+        _RaRealtimeSurface(
+          child: Column(
+            children: [
+              _RaRealtimeRow(
+                label:
+                    'Assistance',
+                value:
+                    requestIssueLabel(
+                  data,
+                ),
+              ),
+              const Divider(
+                height: 1,
+              ),
+              _RaRealtimeRow(
+                label:
+                    'Vehicle',
+                value:
+                    vehicle,
+              ),
+              const Divider(
+                height: 1,
+              ),
+              _RaRealtimeRow(
+                label:
+                    'Registration',
+                value:
+                    registration.isEmpty
+                        ? 'Not recorded'
+                        : registration,
+              ),
+              const Divider(
+                height: 1,
+              ),
+              _RaRealtimeRow(
+                label:
+                    'Location',
+                value:
+                    location.isEmpty
+                        ? 'Not recorded'
+                        : location,
+              ),
+              if (description.isNotEmpty) ...[
+                const Divider(
+                  height: 1,
+                ),
+                _RaRealtimeRow(
+                  label:
+                      'Description',
+                  value:
+                      description,
+                ),
+              ],
             ],
           ),
+        ),
 
-          if (providerAssigned) ...[
-            const SizedBox(height: 27),
+        if (providerAssigned &&
+            (serviceFee != null ||
+                dispatchFee != null ||
+                extraFee != null ||
+                total != null ||
+                quoteNotes.isNotEmpty ||
+                providerDistance !=
+                    null)) ...[
+          const SizedBox(height: 23),
 
-            const _RaDriverDetailsSectionHeading(
-              title: 'Price summary',
-              subtitle:
-                  'Charges recorded for the selected service',
-            ),
+          const _RaRealtimeHeading(
+            title:
+                'Price summary',
+            subtitle:
+                'Only amounts recorded against this request are shown.',
+          ),
 
-            const SizedBox(height: 11),
+          const SizedBox(height: 10),
 
-            _RaDriverDetailsCard(
+          _RaRealtimeSurface(
+            child: Column(
               children: [
-                _RaDriverDetailRow(
-                  icon: Icons.build_outlined,
-                  label: 'Service / labour',
-                  value: formatMoney(serviceFee),
-                ),
-                _RaDriverDetailRow(
-                  icon: Icons.route_outlined,
-                  label: 'Travel',
-                  value: formatMoney(travelFee),
-                ),
-                _RaDriverDetailRow(
-                  icon: Icons.add_card_outlined,
-                  label: 'Other charges',
-                  value: formatMoney(extraFee),
-                ),
-                if (providerDistance != null)
-                  _RaDriverDetailRow(
-                    icon: Icons.near_me_outlined,
-                    label: 'Provider distance',
+                if (serviceFee != null)
+                  _RaRealtimeRow(
+                    label:
+                        'Service / labour',
+                    value:
+                        formatMoney(
+                      serviceFee,
+                    ),
+                  ),
+
+                if (serviceFee != null &&
+                    dispatchFee != null)
+                  const Divider(
+                    height: 1,
+                  ),
+
+                if (dispatchFee != null)
+                  _RaRealtimeRow(
+                    label:
+                        'Travel / dispatch',
+                    value:
+                        formatMoney(
+                      dispatchFee,
+                    ),
+                  ),
+
+                if ((serviceFee != null ||
+                        dispatchFee != null) &&
+                    extraFee != null)
+                  const Divider(
+                    height: 1,
+                  ),
+
+                if (extraFee != null)
+                  _RaRealtimeRow(
+                    label:
+                        'Other charges',
+                    value:
+                        formatMoney(
+                      extraFee,
+                    ),
+                  ),
+
+                if (providerDistance !=
+                    null) ...[
+                  const Divider(
+                    height: 1,
+                  ),
+                  _RaRealtimeRow(
+                    label:
+                        'Recorded provider distance',
                     value:
                         '${providerDistance.toStringAsFixed(1)} km',
                   ),
-                if (quoteNotes.trim().isNotEmpty)
-                  _RaDriverDetailRow(
-                    icon: Icons.notes_outlined,
-                    label: 'Quote notes',
-                    value: quoteNotes,
+                ],
+
+                if (quoteNotes.isNotEmpty) ...[
+                  const Divider(
+                    height: 1,
                   ),
-                _RaDriverDetailRow(
-                  icon: Icons.payments_outlined,
-                  label: data['finalCost'] == null
-                      ? 'Quoted total'
-                      : 'Final total',
-                  value: formatMoney(finalTotal),
-                  strong: true,
-                ),
-              ],
-            ),
-          ],
-
-          if (const [
-            'accepted',
-            'en_route',
-            'arrived',
-            'completed',
-          ].contains(status)) ...[
-            const SizedBox(height: 27),
-
-            const _RaDriverDetailsSectionHeading(
-              title: 'Service progress',
-              subtitle:
-                  'Follow the current roadside assistance stage',
-            ),
-
-            const SizedBox(height: 11),
-
-            _RaDriverDetailsCard(
-              padding: const EdgeInsets.all(17),
-              children: [
-                StatusTimeline(
-                  statuses: const [
-                    'Accepted',
-                    'En Route',
-                    'Arrived',
-                    'Completed',
-                  ],
-                  current: timelineIndex(),
-                ),
-              ],
-            ),
-          ],
-
-          if (status == 'completed') ...[
-            const SizedBox(height: 27),
-
-            const _RaDriverDetailsSectionHeading(
-              title: 'Service warranty',
-              subtitle:
-                  'Coverage recorded with the approved service',
-            ),
-
-            const SizedBox(height: 11),
-
-            _RaDriverDetailsCard(
-              padding: const EdgeInsets.all(17),
-              children: [
-                ServiceWarranty(
-                  requestId: requestId,
-                  job: data,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 22),
-
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      showReceipt(context);
-                    },
-                    icon: const Icon(
-                      Icons.receipt_long_outlined,
-                    ),
-                    label: const Text('Receipt'),
+                  _RaRealtimeRow(
+                    label:
+                        'Quote notes',
+                    value:
+                        quoteNotes,
                   ),
-                ),
+                ],
 
-                const SizedBox(width: 9),
-
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      rateService(context);
-                    },
-                    icon: const Icon(
-                      Icons.star_outline_rounded,
-                    ),
-                    label: Text(
-                      data['driverRating'] == null
-                          ? 'Rate'
-                          : 'Update Rating',
-                    ),
+                if (total != null) ...[
+                  const Divider(
+                    height: 1,
                   ),
-                ),
+                  _RaRealtimeRow(
+                    label:
+                        finalCost != null
+                            ? 'Final total'
+                            : 'Quoted total',
+                    value:
+                        formatMoney(
+                      total,
+                    ),
+                    strong:
+                        true,
+                  ),
+                ],
               ],
             ),
+          ),
+        ],
 
-            const SizedBox(height: 8),
+        if (const [
+          'accepted',
+          'en_route',
+          'arrived',
+          'completed',
+        ].contains(status)) ...[
+          const SizedBox(height: 23),
 
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: colors.error,
-                ),
+          const _RaRealtimeHeading(
+            title:
+                'Request progress',
+            subtitle:
+                'Current roadside assistance stage.',
+          ),
+
+          const SizedBox(height: 10),
+
+          _RaRealtimeSurface(
+            child: StatusTimeline(
+              statuses: const [
+                'Accepted',
+                'En Route',
+                'Arrived',
+                'Completed',
+              ],
+              current:
+                  timelineIndex(
+                status,
+              ),
+            ),
+          ),
+        ],
+
+        if (status ==
+            'completed') ...[
+          const SizedBox(height: 23),
+
+          LayoutBuilder(
+            builder: (
+              context,
+              constraints,
+            ) {
+              final compact =
+                  constraints.maxWidth <
+                      390;
+
+              final receipt =
+                  OutlinedButton.icon(
                 onPressed: () {
                   push(
                     context,
-                    DisputeScreen(
-                      requestId: requestId,
+                    InvoiceScreen(
+                      requestId:
+                          requestId,
                     ),
                   );
                 },
                 icon: const Icon(
-                  Icons.report_problem_outlined,
+                  Icons
+                      .receipt_long_outlined,
                 ),
-                label: const Text(
-                  'Report a Problem',
+                label:
+                    const Text('Receipt'),
+              );
+
+              final rating =
+                  FilledButton.icon(
+                onPressed:
+                    onRate,
+                icon: const Icon(
+                  Icons
+                      .star_outline_rounded,
                 ),
+                label: Text(
+                  data['driverRating'] ==
+                          null
+                      ? 'Rate Service'
+                      : 'Update Rating',
+                ),
+              );
+
+              if (compact) {
+                return Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .stretch,
+                  children: [
+                    receipt,
+                    const SizedBox(height: 8),
+                    rating,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: receipt,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: rating,
+                  ),
+                ],
+              );
+            },
+          ),
+
+          const SizedBox(height: 8),
+
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              style:
+                  TextButton.styleFrom(
+                foregroundColor:
+                    colors.error,
+              ),
+              onPressed: () {
+                push(
+                  context,
+                  DisputeScreen(
+                    requestId:
+                        requestId,
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons
+                    .report_problem_outlined,
+              ),
+              label: const Text(
+                'Report a Problem',
               ),
             ),
-          ],
+          ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _RaDriverRequestStatusHero extends StatelessWidget {
-  const _RaDriverRequestStatusHero({
+class _RaRealtimeHero
+    extends StatelessWidget {
+  const _RaRealtimeHero({
+    required this.status,
     required this.label,
-    required this.description,
-    required this.icon,
     required this.tone,
   });
 
+  final String status;
   final String label;
-  final String description;
-  final IconData icon;
-  final Color tone;
+  final RaTone tone;
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness == Brightness.dark;
+    final colors =
+        Theme.of(context).colorScheme;
 
-    final end = tone == raSuccess
-        ? const Color(0xFF087469)
-        : tone == raDanger
-            ? const Color(0xFF9F2A24)
-            : dark
-                ? const Color(0xFF075C79)
-                : const Color(0xFF087C73);
+    final completed =
+        status == 'completed';
+
+    final cancelled =
+        status == 'cancelled';
+
+    final start = cancelled
+        ? colors.error
+        : completed
+            ? raSuccess
+            : colors.primary;
+
+    final end = cancelled
+        ? const Color(0xFF9C2922)
+        : completed
+            ? const Color(0xFF087064)
+            : const Color(0xFF087E75);
 
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [tone, end],
+          begin:
+              Alignment.topLeft,
+          end:
+              Alignment.bottomRight,
+          colors: [
+            start,
+            end,
+          ],
         ),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: tone.withValues(alpha: .18),
-            blurRadius: 24,
-            offset: const Offset(0, 11),
-          ),
-        ],
+        borderRadius:
+            BorderRadius.circular(23),
       ),
       child: Row(
         children: [
           Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .14),
-              borderRadius: BorderRadius.circular(17),
+            width: 50,
+            height: 50,
+            decoration:
+                BoxDecoration(
+              color: Colors.white
+                  .withValues(alpha: .13),
+              borderRadius:
+                  BorderRadius.circular(16),
             ),
             child: Icon(
-              icon,
+              completed
+                  ? Icons
+                      .task_alt_rounded
+                  : cancelled
+                      ? Icons
+                          .close_rounded
+                      : Icons
+                          .car_repair_outlined,
               color: Colors.white,
-              size: 27,
+              size: 26,
             ),
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts
+                      .plusJakartaSans(
                     color: Colors.white,
                     fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.4,
+                    fontWeight:
+                        FontWeight.w800,
                   ),
                 ),
-
-                const SizedBox(height: 5),
-
+                const SizedBox(height: 4),
                 Text(
-                  description,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white.withValues(alpha: .80),
-                    fontSize: 10.5,
-                    height: 1.45,
+                  completed
+                      ? 'Your roadside assistance has been completed.'
+                      : cancelled
+                          ? 'This roadside assistance request was cancelled.'
+                          : 'Latest information for your roadside assistance request.',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white70,
+                    fontSize: 8.2,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -717,122 +1072,94 @@ class _RaDriverRequestStatusHero extends StatelessWidget {
   }
 }
 
-class _RaDriverProviderCard extends StatelessWidget {
-  const _RaDriverProviderCard({
+class _RaRealtimeProviderCard
+    extends StatelessWidget {
+  const _RaRealtimeProviderCard({
     required this.name,
     required this.phone,
-    required this.requestId,
+    required this.onCall,
+    required this.onChat,
   });
 
   final String name;
   final String phone;
-  final String requestId;
+  final VoidCallback? onCall;
+  final VoidCallback onChat;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding:
+          const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: dark
+        color: theme.brightness ==
+                Brightness.dark
             ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+            : colors.surface,
+        borderRadius:
+            BorderRadius.circular(18),
         border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .48),
+          color: colors.outlineVariant
+              .withValues(alpha: .45),
         ),
       ),
       child: Row(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              ProfileInitials(
-                name: name,
-                radius: 25,
-              ),
-              Positioned(
-                right: -1,
-                bottom: -1,
-                child: Container(
-                  width: 13,
-                  height: 13,
-                  decoration: BoxDecoration(
-                    color: raSuccess,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: dark
-                          ? const Color(0xFF0D1D2B)
-                          : Colors.white,
-                      width: 2.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          ProfileInitials(
+            name: name,
+            radius: 23,
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   name,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: colors.onSurface,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 10.3,
+                    fontWeight:
+                        FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   'Assigned service provider',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.5,
-                    color: colors.onSurfaceVariant,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 7.5,
+                    color: colors
+                        .onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-
-          IconButton(
-            tooltip: 'Message',
-            onPressed: () {
-              push(
-                context,
-                ChatScreen(
-                  requestId: requestId,
-                  peerName: name,
-                  peerPhone: phone,
-                ),
-              );
-            },
-            icon: const Icon(
-              Icons.chat_bubble_outline_rounded,
-            ),
-          ),
-
-          IconButton(
+          IconButton.filledTonal(
             tooltip: 'Call',
-            onPressed: phone.trim().isEmpty
-                ? null
-                : () {
-                    showCallPrompt(
-                      context,
-                      name: name,
-                      number: phone,
-                    );
-                  },
+            onPressed: onCall,
             icon: const Icon(
               Icons.call_outlined,
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
+            tooltip: 'Message',
+            onPressed: onChat,
+            icon: const Icon(
+              Icons
+                  .chat_bubble_outline_rounded,
             ),
           ),
         ],
@@ -841,8 +1168,9 @@ class _RaDriverProviderCard extends StatelessWidget {
   }
 }
 
-class _RaDriverDetailsSectionHeading extends StatelessWidget {
-  const _RaDriverDetailsSectionHeading({
+class _RaRealtimeHeading
+    extends StatelessWidget {
+  const _RaRealtimeHeading({
     required this.title,
     required this.subtitle,
   });
@@ -852,26 +1180,31 @@ class _RaDriverDetailsSectionHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors =
+        Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.35,
-            color: colors.onSurface,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 14.5,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 10.5,
-            color: colors.onSurfaceVariant,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 8.2,
+            height: 1.4,
+            color:
+                colors.onSurfaceVariant,
           ),
         ),
       ],
@@ -879,121 +1212,97 @@ class _RaDriverDetailsSectionHeading extends StatelessWidget {
   }
 }
 
-class _RaDriverDetailsCard extends StatelessWidget {
-  const _RaDriverDetailsCard({
-    required this.children,
-    this.padding = const EdgeInsets.symmetric(
-      horizontal: 15,
-    ),
+class _RaRealtimeSurface
+    extends StatelessWidget {
+  const _RaRealtimeSurface({
+    required this.child,
   });
 
-  final List<Widget> children;
-  final EdgeInsetsGeometry padding;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
+    final theme =
+        Theme.of(context);
 
     return Container(
-      padding: padding,
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: dark
+        color: theme.brightness ==
+                Brightness.dark
             ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+            : theme.colorScheme.surface,
+        borderRadius:
+            BorderRadius.circular(18),
         border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .48),
+          color: theme
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: .45),
         ),
       ),
-      child: Column(
-        children: [
-          for (var index = 0;
-              index < children.length;
-              index++) ...[
-            children[index],
-            if (index != children.length - 1)
-              Divider(
-                height: 1,
-                color: colors.outlineVariant.withValues(
-                  alpha: .38,
-                ),
-              ),
-          ],
-        ],
-      ),
+      child: child,
     );
   }
 }
 
-class _RaDriverDetailRow extends StatelessWidget {
-  const _RaDriverDetailRow({
-    required this.icon,
+class _RaRealtimeRow
+    extends StatelessWidget {
+  const _RaRealtimeRow({
     required this.label,
     required this.value,
     this.strong = false,
   });
 
-  final IconData icon;
   final String label;
   final String value;
   final bool strong;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors =
+        Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 12,
+      padding:
+          const EdgeInsets.symmetric(
+        vertical: 9,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: .08),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(
-              icon,
-              size: 17,
-              color: colors.primary,
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts
+                  .plusJakartaSans(
+                fontSize: 8,
+                color: colors
+                    .onSurfaceVariant,
+              ),
             ),
           ),
-
-          const SizedBox(width: 11),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  value,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: strong ? 12.5 : 11,
-                    height: 1.4,
-                    fontWeight:
-                        strong ? FontWeight.w800 : FontWeight.w600,
-                    color: strong
-                        ? colors.primary
-                        : colors.onSurface,
-                  ),
-                ),
-              ],
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign:
+                  TextAlign.right,
+              style: GoogleFonts
+                  .plusJakartaSans(
+                fontSize:
+                    strong ? 10 : 8.8,
+                height: 1.4,
+                fontWeight: strong
+                    ? FontWeight.w800
+                    : FontWeight.w700,
+                color: strong
+                    ? colors.primary
+                    : null,
+              ),
             ),
           ),
         ],
@@ -1002,49 +1311,74 @@ class _RaDriverDetailRow extends StatelessWidget {
   }
 }
 
-class _RaDriverRequestNoMap extends StatelessWidget {
-  const _RaDriverRequestNoMap({
-    required this.location,
+class _RaRealtimeNotice
+    extends StatelessWidget {
+  const _RaRealtimeNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.tone,
   });
 
-  final String location;
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color tone;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colors =
+        Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding:
+          const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
+        color:
+            tone.withValues(alpha: .07),
+        borderRadius:
+            BorderRadius.circular(15),
         border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: .48),
+          color:
+              tone.withValues(alpha: .17),
         ),
       ),
       child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 43,
-            height: 43,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: .08),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              Icons.location_off_outlined,
-              color: colors.primary,
-            ),
+          Icon(
+            icon,
+            size: 18,
+            color: tone,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              location,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10.5,
-                height: 1.4,
-                color: colors.onSurfaceVariant,
-              ),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9.1,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 7.9,
+                    height: 1.4,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

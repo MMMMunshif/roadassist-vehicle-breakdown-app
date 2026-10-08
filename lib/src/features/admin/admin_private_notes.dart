@@ -18,26 +18,30 @@ class _AdminPrivateNotesState
     extends State<_AdminPrivateNotes> {
   bool busy = false;
 
-  late final notes = FirebaseFirestore.instance
-      .collection('adminNotes')
-      .where(
-        'kind',
-        isEqualTo: widget.kind,
-      )
-      .where(
-        'target',
-        isEqualTo: widget.target,
-      )
-      .limit(50)
-      .snapshots();
+  late final Stream<
+      QuerySnapshot<Map<String, dynamic>>> notes =
+      FirebaseFirestore.instance
+          .collection('adminNotes')
+          .where(
+            'kind',
+            isEqualTo: widget.kind,
+          )
+          .where(
+            'target',
+            isEqualTo: widget.target,
+          )
+          .limit(50)
+          .snapshots();
 
   Future<void> add() async {
-    final text = await _adminReason(
+    final text =
+        await _adminReason(
       context,
       'Private admin note',
     );
 
-    if (text == null || !mounted) {
+    if (text == null ||
+        !mounted) {
       return;
     }
 
@@ -46,20 +50,38 @@ class _AdminPrivateNotesState
     });
 
     try {
-      await AdminService().addPrivateNote(
+      await AdminService()
+          .addPrivateNote(
         widget.kind,
         widget.target,
         text,
       );
-    } catch (_) {
-      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Private admin note saved.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
             'Could not save private note.',
           ),
-          backgroundColor: raDanger,
+          backgroundColor:
+              raDanger,
         ),
       );
     } finally {
@@ -73,127 +95,217 @@ class _AdminPrivateNotesState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: colors.surface,
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : colors.surface,
         borderRadius:
-            BorderRadius.circular(20),
+            BorderRadius.circular(19),
         border: Border.all(
           color: colors.outlineVariant
-              .withValues(alpha: .55),
+              .withValues(
+            alpha: .45,
+          ),
         ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment:
             CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius:
-                      BorderRadius.circular(13),
-                ),
-                child: Icon(
-                  Icons.note_alt_outlined,
-                  color:
-                      colors.onPrimaryContainer,
-                  size: 21,
-                ),
-              ),
-              const SizedBox(
-                width: RaSpace.md,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Private admin notes',
-                      style: theme
-                          .textTheme.titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
+          Padding(
+            padding:
+                const EdgeInsets.all(15),
+            child: Row(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration:
+                      BoxDecoration(
+                    color: colors.primary
+                        .withValues(
+                      alpha: .08,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Visible only to administrators. Saved notes cannot be edited.',
-                      style: theme
-                          .textTheme.bodySmall
-                          ?.copyWith(
-                        color: colors
-                            .onSurfaceVariant,
-                      ),
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
                     ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: RaSpace.md),
-
-          OutlinedButton.icon(
-            onPressed:
-                busy ? null : add,
-            icon: busy
-                ? const SizedBox.square(
-                    dimension: 17,
-                    child:
-                        CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(
-                    Icons.add_comment_outlined,
                   ),
-            label: Text(
-              busy
-                  ? 'Saving Note…'
-                  : 'Add Private Note',
+                  child: Icon(
+                    Icons.note_alt_outlined,
+                    color:
+                        colors.primary,
+                    size: 20,
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Private admin notes',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w800,
+                        ),
+                      ),
+
+                      const SizedBox(
+                        height: 3,
+                      ),
+
+                      Text(
+                        'Visible only to administrators. Saved notes are append-only and cannot be edited from this workspace.',
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize: 8,
+                          height: 1.4,
+                          color: colors
+                              .onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: RaSpace.md),
+          Container(
+            margin:
+                const EdgeInsets.symmetric(
+              horizontal: 15,
+            ),
+            padding:
+                const EdgeInsets.all(11),
+            decoration:
+                BoxDecoration(
+              color: raGold
+                  .withValues(
+                alpha: .06,
+              ),
+              borderRadius:
+                  BorderRadius.circular(
+                14,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons
+                      .privacy_tip_outlined,
+                  color: raGold,
+                  size: 17,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    'Use notes for internal operational context only. Avoid unnecessary identity, medical, payment-card or other highly sensitive information.',
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      fontSize: 7.7,
+                      height: 1.4,
+                      color: colors
+                          .onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(
+              horizontal: 15,
+            ),
+            child: OutlinedButton.icon(
+              onPressed:
+                  busy ? null : add,
+              icon: busy
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child:
+                          CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(
+                      Icons
+                          .add_comment_outlined,
+                    ),
+              label: Text(
+                busy
+                    ? 'Saving Note…'
+                    : 'Add Private Note',
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Divider(
+            height: 1,
+            color: colors.outlineVariant
+                .withValues(
+              alpha: .40,
+            ),
+          ),
 
           StreamBuilder<
-              QuerySnapshot<Map<String, dynamic>>>(
+              QuerySnapshot<
+                  Map<String, dynamic>>>(
             stream: notes,
-            builder: (context, snapshot) {
+            builder: (
+              context,
+              snapshot,
+            ) {
               if (snapshot.hasError) {
-                return Container(
-                  padding: const EdgeInsets.all(
-                    RaSpace.md,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors.errorContainer
-                        .withValues(alpha: .35),
-                    borderRadius:
-                        BorderRadius.circular(14),
-                  ),
-                  child: const Text(
-                    'Could not load private notes.',
+                return const Padding(
+                  padding:
+                      EdgeInsets.all(15),
+                  child:
+                      _RaAdminPrivateNotesMessage(
+                    icon: Icons
+                        .cloud_off_outlined,
+                    title:
+                        'Unable to load notes',
+                    message:
+                        'Check administrator permission and connection.',
+                    tone:
+                        raDanger,
                   ),
                 );
               }
 
               if (!snapshot.hasData) {
                 return const Padding(
-                  padding: EdgeInsets.all(
-                    RaSpace.lg,
-                  ),
+                  padding:
+                      EdgeInsets.all(20),
                   child: Center(
                     child:
                         CircularProgressIndicator(),
@@ -202,74 +314,85 @@ class _AdminPrivateNotesState
               }
 
               final entries =
-                  snapshot.data!.docs.toList();
+                  snapshot.data!.docs
+                      .toList();
 
-              entries.sort((a, b) {
-                final aTime =
-                    a.data()['createdAt']
-                        as Timestamp?;
+              entries.sort(
+                (
+                  first,
+                  second,
+                ) {
+                  final firstTime =
+                      first.data()[
+                              'createdAt']
+                          as Timestamp?;
 
-                final bTime =
-                    b.data()['createdAt']
-                        as Timestamp?;
+                  final secondTime =
+                      second.data()[
+                              'createdAt']
+                          as Timestamp?;
 
-                if (aTime == null &&
-                    bTime == null) {
-                  return 0;
-                }
+                  if (firstTime == null &&
+                      secondTime == null) {
+                    return 0;
+                  }
 
-                if (aTime == null) return 1;
-                if (bTime == null) return -1;
+                  if (firstTime == null) {
+                    return 1;
+                  }
 
-                return bTime.compareTo(aTime);
-              });
+                  if (secondTime == null) {
+                    return -1;
+                  }
+
+                  return secondTime
+                      .compareTo(
+                    firstTime,
+                  );
+                },
+              );
 
               if (entries.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(
-                    RaSpace.lg,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colors
-                        .surfaceContainerHighest
-                        .withValues(alpha: .30),
-                    borderRadius:
-                        BorderRadius.circular(15),
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(
-                        Icons
-                            .speaker_notes_off_outlined,
-                      ),
-                      SizedBox(
-                        height: RaSpace.sm,
-                      ),
-                      Text(
-                        'No private notes recorded.',
-                        textAlign:
-                            TextAlign.center,
-                      ),
-                    ],
-                  ),
+                return const Padding(
+                  padding:
+                      EdgeInsets.all(18),
+                  child:
+                      _RaAdminPrivateNotesEmpty(),
                 );
               }
 
-              return Column(
-                children: [
-                  for (var index = 0;
-                      index <
-                          entries.length;
-                      index++) ...[
-                    _AdminPrivateNoteTile(
-                      data:
-                          entries[index].data(),
-                    ),
-                    if (index !=
-                        entries.length - 1)
-                      const Divider(),
+              return Padding(
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  15,
+                  7,
+                  15,
+                  15,
+                ),
+                child: Column(
+                  children: [
+                    for (var index = 0;
+                        index <
+                            entries.length;
+                        index++) ...[
+                      _RaAdminPrivateNoteTile(
+                        data:
+                            entries[index]
+                                .data(),
+                      ),
+                      if (index !=
+                          entries.length - 1)
+                        Divider(
+                          height: 1,
+                          color: colors
+                              .outlineVariant
+                              .withValues(
+                            alpha: .35,
+                          ),
+                        ),
+                    ],
                   ],
-                ],
+                ),
               );
             },
           ),
@@ -279,21 +402,39 @@ class _AdminPrivateNotesState
   }
 }
 
-class _AdminPrivateNoteTile
+class _RaAdminPrivateNoteTile
     extends StatelessWidget {
-  const _AdminPrivateNoteTile({
+  const _RaAdminPrivateNoteTile({
     required this.data,
   });
 
   final Map<String, dynamic> data;
 
+  String _date(
+    Timestamp? timestamp,
+  ) {
+    if (timestamp == null) {
+      return 'Time not recorded';
+    }
+
+    final value =
+        timestamp.toDate().toLocal();
+
+    return '${value.day.toString().padLeft(2, '0')}/'
+        '${value.month.toString().padLeft(2, '0')}/'
+        '${value.year} • '
+        '${value.hour.toString().padLeft(2, '0')}:'
+        '${value.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final colors =
+        Theme.of(context).colorScheme;
 
     final text =
-        data['text'] as String? ?? '';
+        data['text']?.toString() ??
+            '';
 
     final actor =
         data['actor']?.toString() ??
@@ -302,16 +443,10 @@ class _AdminPrivateNoteTile
     final timestamp =
         data['createdAt'] as Timestamp?;
 
-    final date = timestamp == null
-        ? 'Time not recorded'
-        : timestamp
-            .toDate()
-            .toLocal()
-            .toString();
-
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: RaSpace.md,
+      padding:
+          const EdgeInsets.symmetric(
+        vertical: 12,
       ),
       child: Row(
         crossAxisAlignment:
@@ -320,41 +455,223 @@ class _AdminPrivateNoteTile
           Container(
             width: 36,
             height: 36,
-            decoration: BoxDecoration(
+            decoration:
+                BoxDecoration(
               color: colors
-                  .surfaceContainerHighest,
+                  .surfaceContainerHighest
+                  .withValues(
+                alpha: .40,
+              ),
               borderRadius:
-                  BorderRadius.circular(11),
+                  BorderRadius.circular(
+                11,
+              ),
             ),
             child: Icon(
               Icons.lock_outline_rounded,
-              size: 18,
-              color:
-                  colors.onSurfaceVariant,
+              size: 17,
+              color: colors
+                  .onSurfaceVariant,
             ),
           ),
-          const SizedBox(
-            width: RaSpace.md,
-          ),
+
+          const SizedBox(width: 10),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
                   CrossAxisAlignment.start,
               children: [
                 Text(
-                  text,
-                  style: theme
-                      .textTheme.bodyMedium
-                      ?.copyWith(
-                    height: 1.45,
+                  text.trim().isEmpty
+                      ? 'Empty note'
+                      : text,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9,
+                    height: 1.5,
+                    fontWeight:
+                        FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 6),
+
+                const SizedBox(height: 7),
+
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _RaAdminPrivateNoteMeta(
+                      icon: Icons
+                          .admin_panel_settings_outlined,
+                      text: actor,
+                    ),
+                    _RaAdminPrivateNoteMeta(
+                      icon: Icons
+                          .schedule_outlined,
+                      text:
+                          _date(timestamp),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaAdminPrivateNoteMeta
+    extends StatelessWidget {
+  const _RaAdminPrivateNoteMeta({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 7,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: colors
+            .surfaceContainerHighest
+            .withValues(
+          alpha: .30,
+        ),
+        borderRadius:
+            BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize:
+            MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 11,
+            color:
+                colors.onSurfaceVariant,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style:
+                GoogleFonts.plusJakartaSans(
+              fontSize: 6.8,
+              color:
+                  colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaAdminPrivateNotesEmpty
+    extends StatelessWidget {
+  const _RaAdminPrivateNotesEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        Icon(
+          Icons
+              .speaker_notes_off_outlined,
+          size: 28,
+          color:
+              colors.onSurfaceVariant,
+        ),
+        const SizedBox(height: 7),
+        Text(
+          'No private notes recorded.',
+          textAlign: TextAlign.center,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 8.5,
+            color:
+                colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaAdminPrivateNotesMessage
+    extends StatelessWidget {
+  const _RaAdminPrivateNotesMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.tone,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color:
+            tone.withValues(alpha: .07),
+        borderRadius:
+            BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: tone,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
                 Text(
-                  '$actor • $date',
-                  style: theme
-                      .textTheme.labelSmall
-                      ?.copyWith(
+                  title,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  message,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 7.7,
+                    height: 1.4,
                     color: colors
                         .onSurfaceVariant,
                   ),

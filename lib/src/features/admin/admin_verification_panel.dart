@@ -16,7 +16,8 @@ class _AdminVerificationPanel
 
 class _AdminVerificationPanelState
     extends State<_AdminVerificationPanel> {
-  final checks = <String>{};
+  final checks =
+      <String>{};
 
   int? displayedRevision;
 
@@ -26,7 +27,9 @@ class _AdminVerificationPanelState
 
   DateTime validUntil =
       DateTime.now().add(
-    const Duration(days: 365),
+    const Duration(
+      days: 365,
+    ),
   );
 
   static const checklist = {
@@ -40,7 +43,7 @@ class _AdminVerificationPanelState
         'Contact and address details checked',
   };
 
-  Future<void> act(
+  Future<void> _act(
     Map<String, dynamic> application,
     String action,
   ) async {
@@ -50,8 +53,8 @@ class _AdminVerificationPanelState
       action == 'verified'
           ? 'Approval reason (visible to provider)'
           : action == 'pending'
-          ? 'Documents or corrections required'
-          : 'Rejection reason',
+              ? 'Documents or corrections required'
+              : 'Rejection reason',
     );
 
     if (reason == null ||
@@ -65,59 +68,81 @@ class _AdminVerificationPanelState
     });
 
     try {
-      await AdminService().moderate(
+      final revision =
+          (application['revision']
+                  as num?)
+              ?.toInt();
+
+      if (action ==
+              'verified' &&
+          revision == null) {
+        throw StateError(
+          'Application revision missing',
+        );
+      }
+
+      await AdminService()
+          .moderate(
         widget.uid,
-        verification: action,
-        reason: reason,
+        verification:
+            action,
+        reason:
+            reason,
         verificationRevision:
             action == 'verified'
-            ? application['revision']
-                  as int
-            : null,
+                ? revision
+                : null,
         validUntil:
             action == 'verified'
-            ? validUntil
-            : null,
+                ? validUntil
+                : null,
         verificationChecks:
             action == 'verified'
-            ? checks.toList()
-            : null,
+                ? checks.toList()
+                : null,
       );
 
-      if (action == 'verified') {
+      if (action ==
+          'verified') {
         try {
           await AdminService()
               .sendApprovalEmail(
             widget.uid,
           );
 
-          if (mounted) {
-            setState(() {
-              message =
-                  'Approved. Verification email accepted by the email service.';
-            });
+          if (!mounted) {
+            return;
           }
+
+          setState(() {
+            message =
+                'Provider approved. The approval email was accepted by the email service.';
+          });
         } catch (_) {
-          if (mounted) {
-            setState(() {
-              message =
-                  'Approval saved; email delivery failed. Retry the approval email after checking the email service.';
-            });
+          if (!mounted) {
+            return;
           }
+
+          setState(() {
+            message =
+                'Provider approval was saved, but the approval email could not be delivered. You can retry the email below.';
+          });
         }
       } else if (mounted) {
         setState(() {
           message =
-              'Decision saved. The provider can see the result in the app.';
+              'Decision saved. The provider can see the updated verification result in the app.';
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          message =
-              'Decision could not be saved. Check permissions and application revision.';
-        });
+      if (!mounted) {
+        return;
       }
+
+      setState(() {
+        message =
+            'Decision could not be saved. Check your admin permission and the current application revision.';
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -127,78 +152,266 @@ class _AdminVerificationPanelState
     }
   }
 
+  Future<void>
+      _retryApprovalEmail() async {
+    if (busy) {
+      return;
+    }
+
+    setState(() {
+      busy = true;
+      message = null;
+    });
+
+    try {
+      await AdminService()
+          .sendApprovalEmail(
+        widget.uid,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        message =
+            'Approval email accepted, or it was already sent for this approval.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        message =
+            'Approval email is currently unavailable. Verification state was not changed.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          busy = false;
+        });
+      }
+    }
+  }
+
+  String _friendlyLabel(
+    String value,
+  ) {
+    const labels = {
+      'legalName':
+          'Legal name',
+      'nicNumber':
+          'NIC number',
+      'address':
+          'Address',
+      'businessName':
+          'Business name',
+      'emergencyPhone':
+          'Emergency phone',
+      'experienceYears':
+          'Experience',
+      'services':
+          'Services',
+      'vehicleTypes':
+          'Supported vehicles',
+      'revision':
+          'Application revision',
+      'providerType':
+          'Provider type',
+      'available24Hours':
+          '24-hour service',
+      'businessPhone':
+          'Service phone',
+      'businessRegistration':
+          'Business registration',
+      'workHistory':
+          'Work history',
+      'qualification':
+          'Qualification',
+      'trainingInstitute':
+          'Training institute',
+      'qualificationYear':
+          'Qualification year',
+      'specializations':
+          'Specializations',
+      'coverageAreas':
+          'Coverage areas',
+      'radiusKm':
+          'Service radius',
+      'startTime':
+          'Start time',
+      'endTime':
+          'End time',
+      'towRegistration':
+          'Recovery vehicle',
+      'towCapacityKg':
+          'Recovery capacity',
+      'insuranceDetails':
+          'Insurance / permits',
+      'languages':
+          'Languages',
+      'workDays':
+          'Working days',
+      'tools':
+          'Tools / equipment',
+    };
+
+    return labels[value] ??
+        value
+            .replaceAll(
+              '_',
+              ' ',
+            )
+            .trim();
+  }
+
+  String _valueText(
+    Object? value,
+  ) {
+    if (value == null) {
+      return 'Not provided';
+    }
+
+    if (value is bool) {
+      return value
+          ? 'Yes'
+          : 'No';
+    }
+
+    if (value is List) {
+      if (value.isEmpty) {
+        return 'Not provided';
+      }
+
+      return value.join(
+        ', ',
+      );
+    }
+
+    final text =
+        value.toString().trim();
+
+    return text.isEmpty
+        ? 'Not provided'
+        : text;
+  }
+
+  Future<void>
+      _selectValidityDate() async {
+    final now =
+        DateTime.now();
+
+    final date =
+        await showDatePicker(
+      context: context,
+      initialDate:
+          validUntil.isAfter(now)
+              ? validUntil
+              : now.add(
+                  const Duration(
+                    days: 365,
+                  ),
+                ),
+      firstDate:
+          now.add(
+        const Duration(
+          days: 1,
+        ),
+      ),
+      lastDate:
+          now.add(
+        const Duration(
+          days: 366,
+        ),
+      ),
+    );
+
+    if (date == null ||
+        !mounted) {
+      return;
+    }
+
+    setState(() {
+      validUntil = date;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return StreamBuilder<
-      DocumentSnapshot<
-        Map<String, dynamic>
-      >
-    >(
-      stream: FirebaseFirestore.instance
+        DocumentSnapshot<
+            Map<String, dynamic>>>(
+      stream: FirebaseFirestore
+          .instance
           .collection(
             'providerApplications',
           )
-          .doc(widget.uid)
+          .doc(
+            widget.uid,
+          )
           .snapshots(),
       builder: (
         context,
         snapshot,
       ) {
         if (snapshot.hasError) {
-          return const InlineMessage(
-            icon: Icons.lock_outline,
-            text:
+          return const _RaAdminVerificationNotice(
+            icon:
+                Icons.lock_outline_rounded,
+            title:
+                'Verification documents unavailable',
+            message:
                 'Document access requires provider reviewer or super-admin permission.',
-            error: true,
+            tone:
+                raDanger,
           );
         }
 
         if (!snapshot.hasData) {
-          return const LinearProgressIndicator();
+          return const Padding(
+            padding:
+                EdgeInsets.symmetric(
+              vertical: 20,
+            ),
+            child:
+                LinearProgressIndicator(),
+          );
         }
 
         final application =
-            snapshot.data!.data();
+            snapshot.data?.data();
 
-        if (application == null) {
-          return Container(
-            padding:
-                const EdgeInsets.all(
-              RaSpace.lg,
-            ),
-            decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius:
-                  BorderRadius.circular(
-                20,
-              ),
-              border: Border.all(
-                color: colors
-                    .outlineVariant
-                    .withValues(
-                  alpha: .6,
-                ),
-              ),
-            ),
-            child: const InlineMessage(
-              icon: Icons
-                  .description_outlined,
-              text:
-                  'No verification application has been submitted. Ask this provider to submit their documents before approval.',
-            ),
+        if (application ==
+            null) {
+          return const _RaAdminVerificationNotice(
+            icon:
+                Icons.description_outlined,
+            title:
+                'No application submitted',
+            message:
+                'Ask this provider to submit their verification documents before an approval decision can be made.',
+            tone:
+                raBlue,
           );
         }
 
         final revision =
-            application['revision']
-                as int;
+            (application['revision']
+                    as num?)
+                ?.toInt() ??
+            0;
 
         if (displayedRevision !=
             revision) {
           checks.clear();
+
           displayedRevision =
               revision;
         }
@@ -208,489 +421,1020 @@ class _AdminVerificationPanelState
                 'professionalDetails'];
 
         final documents =
-            application['documents'];
+            application[
+                'documents'];
 
-        return Container(
-          padding: const EdgeInsets.all(
-            RaSpace.xl,
-          ),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius:
-                BorderRadius.circular(
-              22,
+        final applicationFields =
+            <String>[
+          'legalName',
+          'nicNumber',
+          'address',
+          'businessName',
+          'emergencyPhone',
+          'experienceYears',
+          'services',
+          'vehicleTypes',
+          'revision',
+        ];
+
+        return Column(
+          crossAxisAlignment:
+              CrossAxisAlignment
+                  .stretch,
+          children: [
+            _RaAdminVerificationHero(
+              revision:
+                  revision,
+              providerName:
+                  application[
+                          'legalName']
+                      ?.toString(),
             ),
-            border: Border.all(
-              color: colors.outlineVariant
-                  .withValues(
-                alpha: .6,
-              ),
+
+            const SizedBox(
+              height: 12,
             ),
-          ),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
-            children: [
-              Row(
+
+            const _RaAdminVerificationNotice(
+              icon: Icons
+                  .privacy_tip_outlined,
+              title:
+                  'Private review material',
+              message:
+                  'Identity documents are private. Do not copy document contents into public notes, reports or participant messages.',
+              tone:
+                  raGold,
+            ),
+
+            const SizedBox(
+              height: 20,
+            ),
+
+            const _RaAdminVerificationHeading(
+              title:
+                  'Application information',
+              subtitle:
+                  'Identity, service and vehicle information submitted by the provider.',
+            ),
+
+            const SizedBox(
+              height: 10,
+            ),
+
+            _RaAdminVerificationSurface(
+              child: Column(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration:
-                        BoxDecoration(
-                      color: colors
-                          .primaryContainer,
-                      borderRadius:
-                          BorderRadius
-                              .circular(15),
-                    ),
-                    child: Icon(
-                      Icons
-                          .verified_user_outlined,
-                      color: colors
-                          .onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(
-                    width: RaSpace.md,
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                      children: [
-                        Text(
-                          'Private verification application',
-                          style: theme
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(
-                            fontWeight:
-                                FontWeight
-                                    .w900,
-                          ),
-                        ),
-                        const SizedBox(
-                          height: 3,
-                        ),
-                        Text(
-                          'Revision $revision',
-                          style: theme
-                              .textTheme
-                              .bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                  for (var index = 0;
+                      index <
+                          applicationFields
+                              .length;
+                      index++) ...[
+                    if (index >
+                        0)
+                      const Divider(
+                        height: 1,
+                      ),
 
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              Container(
-                padding:
-                    const EdgeInsets.all(
-                  RaSpace.md,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: raGoldPale,
-                  borderRadius:
-                      BorderRadius.circular(
-                    15,
-                  ),
-                ),
-                child: const Row(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons
-                          .privacy_tip_outlined,
-                      color: raGold,
-                    ),
-                    SizedBox(
-                      width: RaSpace.sm,
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Identity documents are private review material. Do not copy document content into public notes, reports or participant messages.',
+                    _RaAdminVerificationRow(
+                      label:
+                          _friendlyLabel(
+                        applicationFields[
+                            index],
+                      ),
+                      value:
+                          _valueText(
+                        application[
+                            applicationFields[
+                                index]],
                       ),
                     ),
                   ],
-                ),
+                ],
+              ),
+            ),
+
+            if (professional
+                is Map) ...[
+              const SizedBox(
+                height: 20,
+              ),
+
+              const _RaAdminVerificationHeading(
+                title:
+                    'Professional capability',
+                subtitle:
+                    'Experience, qualifications, coverage and equipment declared by the provider.',
               ),
 
               const SizedBox(
-                height: RaSpace.xl,
+                height: 10,
               ),
 
-              Text(
-                'Application information',
-                style: theme
-                    .textTheme.titleMedium
-                    ?.copyWith(
-                  fontWeight:
-                      FontWeight.w900,
-                ),
-              ),
-
-              const SizedBox(
-                height: RaSpace.sm,
-              ),
-
-              for (final key in [
-                'legalName',
-                'nicNumber',
-                'address',
-                'businessName',
-                'emergencyPhone',
-                'experienceYears',
-                'services',
-                'vehicleTypes',
-                'revision',
-              ])
-                _AdminVerificationRow(
-                  label: key,
-                  value:
-                      '${application[key] ?? ''}',
-                ),
-
-              if (professional is Map) ...[
-                const SizedBox(
-                  height: RaSpace.xl,
-                ),
-                Text(
-                  'Work experience & capability',
-                  style: theme
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(
-                  height: RaSpace.sm,
-                ),
-                for (final entry
-                    in professional.entries)
-                  _AdminVerificationRow(
-                    label:
-                        entry.key.toString(),
-                    value:
-                        entry.value.toString(),
-                  ),
-              ],
-
-              if (documents is Map) ...[
-                const SizedBox(
-                  height: RaSpace.xl,
-                ),
-                Text(
-                  'Submitted documents',
-                  style: theme
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(
-                  height: RaSpace.sm,
-                ),
-                for (final entry
-                    in documents.entries)
-                  Container(
-                    margin:
-                        const EdgeInsets.only(
-                      bottom: RaSpace.sm,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color: colors
-                          .surfaceContainerHighest
-                          .withValues(
-                        alpha: .32,
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(16),
-                    ),
-                    child: ExpansionTile(
-                      leading: const Icon(
-                        Icons
-                            .description_outlined,
-                      ),
-                      title: Text(
-                        '${entry.key}',
-                      ),
-                      children: [
-                        Padding(
-                          padding:
-                              const EdgeInsets.all(
-                            RaSpace.md,
-                          ),
-                          child:
-                              _privateDocumentPreview(
-                            entry.value
-                                as String,
-                            280,
-                          ),
+              _RaAdminVerificationSurface(
+                child: Column(
+                  children: [
+                    for (var index = 0;
+                        index <
+                            professional
+                                .entries
+                                .length;
+                        index++) ...[
+                      if (index >
+                          0)
+                        const Divider(
+                          height: 1,
                         ),
-                      ],
-                    ),
-                  ),
-              ],
 
-              const SizedBox(
-                height: RaSpace.xl,
-              ),
+                      Builder(
+                        builder:
+                            (context) {
+                          final entry =
+                              professional
+                                  .entries
+                                  .elementAt(
+                            index,
+                          );
 
-              Text(
-                'Reviewer checklist',
-                style: theme
-                    .textTheme.titleMedium
-                    ?.copyWith(
-                  fontWeight:
-                      FontWeight.w900,
+                          return _RaAdminVerificationRow(
+                            label:
+                                _friendlyLabel(
+                              entry.key
+                                  .toString(),
+                            ),
+                            value:
+                                _valueText(
+                              entry.value,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
                 ),
               ),
+            ],
 
+            if (documents
+                is Map) ...[
               const SizedBox(
-                height: 4,
+                height: 20,
               ),
 
-              Text(
-                '${checks.length}/${checklist.length} checks completed',
-                style:
-                    theme.textTheme.bodySmall,
+              _RaAdminVerificationHeading(
+                title:
+                    'Submitted documents',
+                subtitle:
+                    '${documents.length} private ${documents.length == 1 ? 'document' : 'documents'} available for reviewer inspection.',
               ),
 
               const SizedBox(
-                height: RaSpace.sm,
+                height: 10,
               ),
 
               for (final entry
-                  in checklist.entries)
-                CheckboxListTile(
-                  contentPadding:
-                      EdgeInsets.zero,
-                  controlAffinity:
-                      ListTileControlAffinity
-                          .leading,
-                  title: Text(
-                    entry.value,
+                  in documents.entries) ...[
+                _RaAdminVerificationDocument(
+                  label:
+                      _friendlyLabel(
+                    entry.key
+                        .toString(),
                   ),
-                  value: checks.contains(
-                    entry.key,
-                  ),
-                  onChanged: busy
-                      ? null
-                      : (selected) {
-                          setState(() {
-                            if (selected ==
-                                true) {
-                              checks.add(
-                                entry.key,
-                              );
-                            } else {
-                              checks.remove(
-                                entry.key,
-                              );
-                            }
-                          });
-                        },
+                  document:
+                      entry.value,
                 ),
-
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              OutlinedButton.icon(
-                onPressed: busy
-                    ? null
-                    : () async {
-                        final date =
-                            await showDatePicker(
-                          context: context,
-                          initialDate:
-                              validUntil,
-                          firstDate:
-                              DateTime.now()
-                                  .add(
-                            const Duration(
-                              days: 1,
-                            ),
-                          ),
-                          lastDate:
-                              DateTime.now()
-                                  .add(
-                            const Duration(
-                              days: 366,
-                            ),
-                          ),
-                        );
-
-                        if (date !=
-                                null &&
-                            mounted) {
-                          setState(() {
-                            validUntil =
-                                date;
-                          });
-                        }
-                      },
-                icon: const Icon(
-                  Icons
-                      .event_available_outlined,
-                ),
-                label: Text(
-                  'Verification valid until ${validUntil.toLocal().toString().split(' ').first}',
-                ),
-              ),
-
-              const SizedBox(
-                height: RaSpace.lg,
-              ),
-
-              Wrap(
-                spacing: RaSpace.sm,
-                runSpacing: RaSpace.sm,
-                children: [
-                  FilledButton.icon(
-                    onPressed:
-                        busy ||
-                            professional
-                                is! Map ||
-                            checks.length !=
-                                checklist.length
-                        ? null
-                        : () => act(
-                            application,
-                            'verified',
-                          ),
-                    icon: const Icon(
-                      Icons
-                          .verified_outlined,
-                    ),
-                    label: const Text(
-                      'Approve Provider',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: busy
-                        ? null
-                        : () => act(
-                            application,
-                            'pending',
-                          ),
-                    icon: const Icon(
-                      Icons
-                          .edit_note_outlined,
-                    ),
-                    label: const Text(
-                      'Request Corrections',
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    style:
-                        OutlinedButton
-                            .styleFrom(
-                      foregroundColor:
-                          colors.error,
-                    ),
-                    onPressed: busy
-                        ? null
-                        : () => act(
-                            application,
-                            'rejected',
-                          ),
-                    icon: const Icon(
-                      Icons
-                          .cancel_outlined,
-                    ),
-                    label: const Text(
-                      'Reject',
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            setState(() {
-                              busy = true;
-                            });
-
-                            try {
-                              await AdminService()
-                                  .sendApprovalEmail(
-                                widget.uid,
-                              );
-
-                              if (mounted) {
-                                setState(() {
-                                  message =
-                                      'Approval email accepted, or already sent for this approval.';
-                                });
-                              }
-                            } catch (_) {
-                              if (mounted) {
-                                setState(() {
-                                  message =
-                                      'Email unavailable. Verification state remains unchanged.';
-                                });
-                              }
-                            } finally {
-                              if (mounted) {
-                                setState(() {
-                                  busy =
-                                      false;
-                                });
-                              }
-                            }
-                          },
-                    icon: const Icon(
-                      Icons
-                          .forward_to_inbox_outlined,
-                    ),
-                    label: const Text(
-                      'Retry Approval Email',
-                    ),
-                  ),
-                ],
-              ),
-
-              if (busy) ...[
                 const SizedBox(
-                  height: RaSpace.md,
-                ),
-                const LinearProgressIndicator(),
-              ],
-
-              if (message != null) ...[
-                const SizedBox(
-                  height: RaSpace.md,
-                ),
-                InlineMessage(
-                  text: message!,
+                  height: 8,
                 ),
               ],
             ],
-          ),
+
+            const SizedBox(
+              height: 20,
+            ),
+
+            _RaAdminVerificationChecklistHeader(
+              completed:
+                  checks.length,
+              total:
+                  checklist.length,
+            ),
+
+            const SizedBox(
+              height: 10,
+            ),
+
+            _RaAdminVerificationSurface(
+              child: Column(
+                children: [
+                  for (final entry
+                      in checklist.entries)
+                    CheckboxListTile(
+                      contentPadding:
+                          EdgeInsets.zero,
+                      controlAffinity:
+                          ListTileControlAffinity
+                              .leading,
+                      value:
+                          checks.contains(
+                        entry.key,
+                      ),
+                      onChanged: busy
+                          ? null
+                          : (selected) {
+                              setState(
+                                () {
+                                  if (selected ==
+                                      true) {
+                                    checks.add(
+                                      entry.key,
+                                    );
+                                  } else {
+                                    checks.remove(
+                                      entry.key,
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                      title: Text(
+                        entry.value,
+                        style: GoogleFonts
+                            .plusJakartaSans(
+                          fontSize:
+                              9.5,
+                          height:
+                              1.35,
+                          fontWeight:
+                              FontWeight
+                                  .w600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(
+              height: 12,
+            ),
+
+            OutlinedButton.icon(
+              onPressed: busy
+                  ? null
+                  : _selectValidityDate,
+              icon: const Icon(
+                Icons
+                    .event_available_outlined,
+              ),
+              label: Text(
+                'Valid until ${validUntil.day.toString().padLeft(2, '0')}/${validUntil.month.toString().padLeft(2, '0')}/${validUntil.year}',
+              ),
+            ),
+
+            const SizedBox(
+              height: 16,
+            ),
+
+            LayoutBuilder(
+              builder: (
+                context,
+                constraints,
+              ) {
+                final compact =
+                    constraints.maxWidth <
+                        620;
+
+                final approve =
+                    FilledButton.icon(
+                  onPressed: busy ||
+                          professional
+                              is! Map ||
+                          checks.length !=
+                              checklist
+                                  .length
+                      ? null
+                      : () {
+                          _act(
+                            application,
+                            'verified',
+                          );
+                        },
+                  icon: const Icon(
+                    Icons
+                        .verified_outlined,
+                  ),
+                  label:
+                      const Text(
+                    'Approve Provider',
+                  ),
+                );
+
+                final corrections =
+                    OutlinedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () {
+                          _act(
+                            application,
+                            'pending',
+                          );
+                        },
+                  icon: const Icon(
+                    Icons
+                        .edit_note_outlined,
+                  ),
+                  label:
+                      const Text(
+                    'Request Corrections',
+                  ),
+                );
+
+                final reject =
+                    OutlinedButton.icon(
+                  style:
+                      OutlinedButton
+                          .styleFrom(
+                    foregroundColor:
+                        colors.error,
+                    side:
+                        BorderSide(
+                      color: colors
+                          .error
+                          .withValues(
+                        alpha: .55,
+                      ),
+                    ),
+                  ),
+                  onPressed: busy
+                      ? null
+                      : () {
+                          _act(
+                            application,
+                            'rejected',
+                          );
+                        },
+                  icon: const Icon(
+                    Icons
+                        .cancel_outlined,
+                  ),
+                  label:
+                      const Text(
+                    'Reject',
+                  ),
+                );
+
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .stretch,
+                    children: [
+                      approve,
+                      const SizedBox(
+                        height: 8,
+                      ),
+                      corrections,
+                      const SizedBox(
+                        height: 8,
+                      ),
+                      reject,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child:
+                          approve,
+                    ),
+                    const SizedBox(
+                      width: 8,
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child:
+                          corrections,
+                    ),
+                    const SizedBox(
+                      width: 8,
+                    ),
+                    Expanded(
+                      child:
+                          reject,
+                    ),
+                  ],
+                );
+              },
+            ),
+
+            const SizedBox(
+              height: 8,
+            ),
+
+            Align(
+              alignment:
+                  Alignment.centerLeft,
+              child:
+                  TextButton.icon(
+                onPressed: busy
+                    ? null
+                    : _retryApprovalEmail,
+                icon: const Icon(
+                  Icons
+                      .forward_to_inbox_outlined,
+                ),
+                label: const Text(
+                  'Retry Approval Email',
+                ),
+              ),
+            ),
+
+            if (busy) ...[
+              const SizedBox(
+                height: 10,
+              ),
+              const LinearProgressIndicator(),
+            ],
+
+            if (message !=
+                null) ...[
+              const SizedBox(
+                height: 10,
+              ),
+              _RaAdminVerificationNotice(
+                icon: Icons
+                    .info_outline_rounded,
+                title:
+                    'Review update',
+                message:
+                    message!,
+                tone:
+                    colors.primary,
+              ),
+            ],
+          ],
         );
       },
     );
   }
 }
 
-class _AdminVerificationRow
+class _RaAdminVerificationHero
     extends StatelessWidget {
-  const _AdminVerificationRow({
+  const _RaAdminVerificationHero({
+    required this.revision,
+    required this.providerName,
+  });
+
+  final int revision;
+  final String? providerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context)
+                .brightness ==
+            Brightness.dark;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(
+        18,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin:
+              Alignment.topLeft,
+          end:
+              Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(
+                    0xFF0A497F,
+                  ),
+                  Color(
+                    0xFF075A68,
+                  ),
+                ]
+              : const [
+                  Color(
+                    0xFF075BA8,
+                  ),
+                  Color(
+                    0xFF078C7E,
+                  ),
+                ],
+        ),
+        borderRadius:
+            BorderRadius.circular(
+          22,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration:
+                BoxDecoration(
+              color: Colors.white
+                  .withValues(
+                alpha: .13,
+              ),
+              borderRadius:
+                  BorderRadius.circular(
+                16,
+              ),
+            ),
+            child: const Icon(
+              Icons
+                  .verified_user_outlined,
+              color:
+                  Colors.white,
+              size: 26,
+            ),
+          ),
+
+          const SizedBox(
+            width: 12,
+          ),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              children: [
+                Text(
+                  'Provider verification',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color:
+                        Colors.white,
+                    fontSize: 17,
+                    fontWeight:
+                        FontWeight
+                            .w800,
+                    letterSpacing:
+                        -.3,
+                  ),
+                ),
+
+                if (providerName !=
+                        null &&
+                    providerName!
+                        .trim()
+                        .isNotEmpty) ...[
+                  const SizedBox(
+                    height: 3,
+                  ),
+                  Text(
+                    providerName!,
+                    style: GoogleFonts
+                        .plusJakartaSans(
+                      color: Colors
+                          .white70,
+                      fontSize:
+                          9,
+                    ),
+                  ),
+                ],
+
+                const SizedBox(
+                  height: 7,
+                ),
+
+                Text(
+                  'Review private identity and service-capability evidence before making a decision.',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    color: Colors.white
+                        .withValues(
+                      alpha: .72,
+                    ),
+                    fontSize: 8.6,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Container(
+            padding:
+                const EdgeInsets
+                    .symmetric(
+              horizontal: 9,
+              vertical: 6,
+            ),
+            decoration:
+                BoxDecoration(
+              color: Colors.white
+                  .withValues(
+                alpha: .13,
+              ),
+              borderRadius:
+                  BorderRadius.circular(
+                999,
+              ),
+            ),
+            child: Text(
+              'REV $revision',
+              style: GoogleFonts
+                  .plusJakartaSans(
+                color:
+                    Colors.white,
+                fontSize: 7.5,
+                fontWeight:
+                    FontWeight.w800,
+                letterSpacing:
+                    .5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaAdminVerificationHeading
+    extends StatelessWidget {
+  const _RaAdminVerificationHeading({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight:
+                FontWeight.w800,
+          ),
+        ),
+        const SizedBox(
+          height: 3,
+        ),
+        Text(
+          subtitle,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 8.6,
+            height: 1.4,
+            color: colors
+                .onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaAdminVerificationSurface
+    extends StatelessWidget {
+  const _RaAdminVerificationSurface({
+    required this.child,
+  });
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : theme.colorScheme
+                .surface,
+        borderRadius:
+            BorderRadius.circular(
+          18,
+        ),
+        border: Border.all(
+          color: theme
+              .colorScheme
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _RaAdminVerificationNotice
+    extends StatelessWidget {
+  const _RaAdminVerificationNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.tone,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding:
+          const EdgeInsets.all(
+        13,
+      ),
+      decoration: BoxDecoration(
+        color: tone.withValues(
+          alpha: .07,
+        ),
+        borderRadius:
+            BorderRadius.circular(
+          16,
+        ),
+        border: Border.all(
+          color: tone.withValues(
+            alpha: .18,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            color: tone,
+            size: 20,
+          ),
+          const SizedBox(
+            width: 9,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 10,
+                    fontWeight:
+                        FontWeight
+                            .w700,
+                  ),
+                ),
+                const SizedBox(
+                  height: 3,
+                ),
+                Text(
+                  message,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8.5,
+                    height: 1.45,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaAdminVerificationChecklistHeader
+    extends StatelessWidget {
+  const _RaAdminVerificationChecklistHeader({
+    required this.completed,
+    required this.total,
+  });
+
+  final int completed;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context)
+            .colorScheme;
+
+    final progress =
+        total == 0
+            ? 0.0
+            : completed /
+                total;
+
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Reviewer checklist',
+                style: GoogleFonts
+                    .plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              '$completed/$total',
+              style: GoogleFonts
+                  .plusJakartaSans(
+                fontSize: 9,
+                fontWeight:
+                    FontWeight.w800,
+                color:
+                    colors.primary,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(
+          height: 7,
+        ),
+
+        ClipRRect(
+          borderRadius:
+              BorderRadius.circular(
+            999,
+          ),
+          child:
+              LinearProgressIndicator(
+            value: progress,
+            minHeight: 5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaAdminVerificationDocument
+    extends StatelessWidget {
+  const _RaAdminVerificationDocument({
+    required this.label,
+    required this.document,
+  });
+
+  final String label;
+  final Object? document;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
+
+    return Container(
+      decoration:
+          BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : colors.surface,
+        borderRadius:
+            BorderRadius.circular(
+          17,
+        ),
+        border: Border.all(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      clipBehavior:
+          Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Container(
+          width: 39,
+          height: 39,
+          decoration:
+              BoxDecoration(
+            color: colors
+                .primary
+                .withValues(
+              alpha: .075,
+            ),
+            borderRadius:
+                BorderRadius
+                    .circular(
+              12,
+            ),
+          ),
+          child: Icon(
+            Icons
+                .description_outlined,
+            color: colors.primary,
+            size: 19,
+          ),
+        ),
+        title: Text(
+          label,
+          style: GoogleFonts
+              .plusJakartaSans(
+            fontSize: 9.7,
+            fontWeight:
+                FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(
+          'Private verification evidence',
+          style: GoogleFonts
+              .plusJakartaSans(
+            fontSize: 7.8,
+            color: colors
+                .onSurfaceVariant,
+          ),
+        ),
+        children: [
+          Padding(
+            padding:
+                const EdgeInsets.all(
+              12,
+            ),
+            child: document
+                        is String &&
+                    (document as String)
+                        .trim()
+                        .isNotEmpty
+                ? _privateDocumentPreview(
+                    document as String,
+                    280,
+                  )
+                : const _RaAdminVerificationNotice(
+                    icon: Icons
+                        .broken_image_outlined,
+                    title:
+                        'Document unavailable',
+                    message:
+                        'The stored verification document could not be displayed.',
+                    tone:
+                        raDanger,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaAdminVerificationRow
+    extends StatelessWidget {
+  const _RaAdminVerificationRow({
     required this.label,
     required this.value,
   });
@@ -701,42 +1445,96 @@ class _AdminVerificationRow
   @override
   Widget build(BuildContext context) {
     final colors =
-        Theme.of(context).colorScheme;
+        Theme.of(context)
+            .colorScheme;
 
     return Padding(
       padding:
-          const EdgeInsets.symmetric(
-        vertical: 7,
+          const EdgeInsets
+              .symmetric(
+        vertical: 9,
       ),
-      child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 145,
-            child: Text(
-              label
-                  .replaceAll('_', ' '),
-              style: Theme.of(context)
-                  .textTheme.bodySmall
-                  ?.copyWith(
-                color: colors
-                    .onSurfaceVariant,
+      child: LayoutBuilder(
+        builder: (
+          context,
+          constraints,
+        ) {
+          if (constraints.maxWidth <
+              430) {
+            return Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment
+                      .start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 7.8,
+                    fontWeight:
+                        FontWeight
+                            .w700,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(
+                  height: 4,
+                ),
+                Text(
+                  value,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9.3,
+                    height: 1.45,
+                    fontWeight:
+                        FontWeight
+                            .w600,
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment:
+                CrossAxisAlignment
+                    .start,
+            children: [
+              SizedBox(
+                width: 175,
+                child: Text(
+                  label,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 8,
+                    fontWeight:
+                        FontWeight
+                            .w700,
+                    color: colors
+                        .onSurfaceVariant,
+                  ),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context)
-                  .textTheme.bodyMedium
-                  ?.copyWith(
-                fontWeight:
-                    FontWeight.w700,
+              const SizedBox(
+                width: 12,
               ),
-            ),
-          ),
-        ],
+              Expanded(
+                child: Text(
+                  value,
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 9.4,
+                    height: 1.45,
+                    fontWeight:
+                        FontWeight
+                            .w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

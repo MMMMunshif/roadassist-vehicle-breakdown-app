@@ -318,6 +318,8 @@ class RequestService {
           ProviderAvailability.status(
                 provider.data() ?? {},
                 DateTime.now(),
+                locationUpdatedAt:
+                    (provider.data()?['locationUpdatedAt'] as Timestamp?)?.toDate(),
                 overrideUntil:
                     (provider.data()?['hoursOverrideUntil'] as Timestamp?)
                         ?.toDate(),

@@ -8,11 +8,15 @@ class DriverRequestDetailsScreen
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     final dark =
-        theme.brightness == Brightness.dark;
+        theme.brightness ==
+            Brightness.dark;
 
     return Scaffold(
       backgroundColor:
@@ -20,10 +24,11 @@ class DriverRequestDetailsScreen
       appBar: AppBar(
         title: Text(
           'Request Details',
-          style: GoogleFonts.plusJakartaSans(
+          style:
+              GoogleFonts.plusJakartaSans(
             fontSize: 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.4,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
       ),
@@ -34,50 +39,48 @@ class DriverRequestDetailsScreen
                 const BouncingScrollPhysics(),
             padding:
                 const EdgeInsets.fromLTRB(
-              20,
-              24,
-              20,
+              18,
+              14,
+              18,
               32,
             ),
             child: ConstrainedBox(
               constraints:
                   const BoxConstraints(
-                maxWidth: 430,
+                maxWidth: 520,
               ),
               child: Column(
                 children: [
                   Container(
                     width: double.infinity,
                     padding:
-                        const EdgeInsets.fromLTRB(
+                        const EdgeInsets.all(
                       20,
-                      28,
-                      20,
-                      23,
                     ),
-                    decoration: BoxDecoration(
+                    decoration:
+                        BoxDecoration(
                       color: dark
                           ? const Color(
                               0xFF0D1D2B,
                             )
-                          : Colors.white,
+                          : colors.surface,
                       borderRadius:
                           BorderRadius.circular(
-                        26,
+                        24,
                       ),
                       border: Border.all(
                         color: colors
                             .outlineVariant
                             .withValues(
-                          alpha: .48,
+                          alpha: .45,
                         ),
                       ),
                     ),
                     child: Column(
                       children: [
                         Container(
-                          width: 72,
-                          height: 72,
+                          width: 70,
+                          height: 70,
                           decoration:
                               BoxDecoration(
                             gradient:
@@ -89,31 +92,30 @@ class DriverRequestDetailsScreen
                               colors: [
                                 colors.primary
                                     .withValues(
-                                  alpha: .18,
+                                  alpha: .16,
                                 ),
                                 const Color(
                                   0xFF078F80,
                                 ).withValues(
-                                  alpha: .12,
+                                  alpha: .10,
                                 ),
                               ],
                             ),
                             borderRadius:
                                 BorderRadius
                                     .circular(
-                              23,
+                              22,
                             ),
                           ),
                           child: Icon(
                             Icons
                                 .receipt_long_rounded,
-                            color:
-                                colors.primary,
-                            size: 32,
+                            color: colors.primary,
+                            size: 31,
                           ),
                         ),
 
-                        const SizedBox(height: 19),
+                        const SizedBox(height: 18),
 
                         Text(
                           'Choose a request',
@@ -121,64 +123,62 @@ class DriverRequestDetailsScreen
                               TextAlign.center,
                           style: GoogleFonts
                               .plusJakartaSans(
-                            fontSize: 22,
+                            fontSize: 21,
                             fontWeight:
-                                FontWeight.w800,
-                            letterSpacing: -.6,
-                            color:
-                                colors.onSurface,
+                                FontWeight
+                                    .w800,
                           ),
                         ),
 
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 7),
 
                         Text(
-                          'Open one of your assistance requests to see live status, provider details, agreed pricing, invoices and service options.',
+                          'Open one of your assistance requests to view live status, provider details, pricing, invoices and service options.',
                           textAlign:
                               TextAlign.center,
                           style: GoogleFonts
                               .plusJakartaSans(
-                            fontSize: 11,
-                            height: 1.55,
+                            fontSize: 8.7,
+                            height: 1.5,
                             color: colors
                                 .onSurfaceVariant,
                           ),
                         ),
 
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 20),
 
-                        const _DriverRequestEntryFeature(
-                          icon: Icons
-                              .near_me_outlined,
+                        const _RaRequestEntryFeature(
+                          icon:
+                              Icons.near_me_outlined,
                           title:
                               'Live service tracking',
                           description:
                               'Follow accepted, en-route and arrived jobs.',
                         ),
 
-                        const SizedBox(height: 9),
+                        const SizedBox(height: 8),
 
-                        const _DriverRequestEntryFeature(
-                          icon: Icons
-                              .payments_outlined,
+                        const _RaRequestEntryFeature(
+                          icon:
+                              Icons.payments_outlined,
                           title:
                               'Quotes & invoices',
                           description:
-                              'Review approved service prices and receipts.',
+                              'Review recorded service prices and receipts.',
                         ),
 
-                        const SizedBox(height: 9),
+                        const SizedBox(height: 8),
 
-                        const _DriverRequestEntryFeature(
-                          icon: Icons
-                              .history_rounded,
+                        const _RaRequestEntryFeature(
+                          icon:
+                              Icons.history_rounded,
                           title:
                               'Service history',
                           description:
                               'Access completed and cancelled requests.',
                         ),
 
-                        const SizedBox(height: 23),
+                        const SizedBox(height: 21),
 
                         SizedBox(
                           width: double.infinity,
@@ -200,7 +200,7 @@ class DriverRequestDetailsScreen
                           ),
                         ),
 
-                        const SizedBox(height: 9),
+                        const SizedBox(height: 8),
 
                         SizedBox(
                           width: double.infinity,
@@ -225,7 +225,7 @@ class DriverRequestDetailsScreen
                     ),
                   ),
 
-                  const SizedBox(height: 15),
+                  const SizedBox(height: 14),
 
                   TextButton.icon(
                     onPressed: () {
@@ -236,7 +236,6 @@ class DriverRequestDetailsScreen
                     },
                     icon: const Icon(
                       Icons.home_outlined,
-                      size: 18,
                     ),
                     label: const Text(
                       'Return to Home',
@@ -252,9 +251,9 @@ class DriverRequestDetailsScreen
   }
 }
 
-class _DriverRequestEntryFeature
+class _RaRequestEntryFeature
     extends StatelessWidget {
-  const _DriverRequestEntryFeature({
+  const _RaRequestEntryFeature({
     required this.icon,
     required this.title,
     required this.description,
@@ -270,13 +269,14 @@ class _DriverRequestEntryFeature
         Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding:
+          const EdgeInsets.all(11),
       decoration: BoxDecoration(
         color: colors
             .surfaceContainerHighest
-            .withValues(alpha: .32),
+            .withValues(alpha: .28),
         borderRadius:
-            BorderRadius.circular(16),
+            BorderRadius.circular(15),
       ),
       child: Row(
         children: [
@@ -285,9 +285,9 @@ class _DriverRequestEntryFeature
             height: 37,
             decoration: BoxDecoration(
               color: colors.primary
-                  .withValues(alpha: .09),
+                  .withValues(alpha: .08),
               borderRadius:
-                  BorderRadius.circular(12),
+                  BorderRadius.circular(11),
             ),
             child: Icon(
               icon,
@@ -295,9 +295,7 @@ class _DriverRequestEntryFeature
               color: colors.primary,
             ),
           ),
-
-          const SizedBox(width: 11),
-
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -307,18 +305,17 @@ class _DriverRequestEntryFeature
                   title,
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 11,
+                    fontSize: 9.5,
                     fontWeight:
                         FontWeight.w700,
-                    color: colors.onSurface,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   description,
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 9.5,
+                    fontSize: 7.6,
                     height: 1.35,
                     color: colors
                         .onSurfaceVariant,

@@ -4,74 +4,118 @@ class ProviderProfileScreen extends StatefulWidget {
   const ProviderProfileScreen({super.key});
 
   @override
-  State<ProviderProfileScreen> createState() => _ProviderProfileScreenState();
+  State<ProviderProfileScreen> createState() =>
+      _ProviderProfileScreenState();
 }
 
-class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
-  bool accepting = true;
+class _ProviderProfileScreenState
+    extends State<ProviderProfileScreen> {
+  bool accepting = false;
+  bool profileLoaded = false;
+  bool uploadingPhoto = false;
+  bool changingAvailability = false;
 
-  String workingHours = 'Mon - Fri, 08:00 AM - 06:00 PM';
-
-  String serviceRadius = '15 km from current location';
-
-  String providerName = 'Service Provider';
-
+  String workingHours = '';
+  String serviceRadius = '';
+  String providerName = '';
   String providerPhone = '';
 
-  List<String> services = const [
+  String? photoData;
+
+  List<String> services = [];
+
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+      profileSubscription;
+
+  static const availableServices = [
     'Vehicle Towing',
     'Battery Jumpstart',
     'Flat Tyre',
     'General Mechanic',
   ];
 
-  String? photoData;
+  static const workingHourOptions = [
+    'Mon - Fri, 08:00 AM - 06:00 PM',
+    'Daily, 08:00 AM - 08:00 PM',
+    '24 hours, 7 days a week',
+  ];
 
-  bool uploadingPhoto = false;
-  bool profileLoaded = false;
-
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-  profileSubscription;
+  static const serviceRadiusOptions = [
+    '5 km from current location',
+    '15 km from current location',
+    '30 km from current location',
+  ];
 
   @override
   void initState() {
     super.initState();
 
-    if (signedIn) {
-      profileSubscription = AuthService().watchCurrentProfile().listen((
-        snapshot,
-      ) {
+    if (!signedIn) {
+      profileLoaded = true;
+      return;
+    }
+
+    profileSubscription =
+        AuthService().watchCurrentProfile().listen(
+      (snapshot) {
         final data = snapshot.data();
 
-        if (!mounted || data == null) {
+        if (!mounted) return;
+
+        if (data == null) {
+          setState(() {
+            profileLoaded = true;
+          });
+
           return;
         }
 
+        final savedServices =
+            (data['services'] as List<dynamic>? ??
+                    const [])
+                .whereType<String>()
+                .where(
+                  (service) =>
+                      service.trim().isNotEmpty,
+                )
+                .toList();
+
         setState(() {
-          providerName = data['displayName'] as String? ?? providerName;
+          providerName =
+              data['displayName'] as String? ??
+                  providerName;
 
-          providerPhone = data['phone'] as String? ?? providerPhone;
+          providerPhone =
+              data['phone'] as String? ??
+                  providerPhone;
 
-          photoData = data['photoData'] as String?;
+          photoData =
+              data['photoData'] as String?;
 
-          accepting = data['online'] as bool? ?? accepting;
+          accepting =
+              data['online'] == true;
 
-          workingHours = data['workingHours'] as String? ?? workingHours;
+          workingHours =
+              data['workingHours'] as String? ??
+                  '';
 
-          serviceRadius = data['serviceRadius'] as String? ?? serviceRadius;
+          serviceRadius =
+              data['serviceRadius'] as String? ??
+                  '';
 
-          final savedServices = data['services'] as List<dynamic>?;
-
-          if (savedServices != null && savedServices.isNotEmpty) {
-            services = savedServices.whereType<String>().toList();
-          }
+          services = savedServices;
 
           profileLoaded = true;
         });
-      });
-    } else {
-      profileLoaded = true;
-    }
+      },
+      onError: (_) {
+        if (!mounted) return;
+
+        setState(() {
+          profileLoaded = true;
+        });
+      },
+    );
   }
 
   @override
@@ -81,47 +125,45 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   Future<void> changeProviderPhoto() async {
+    if (uploadingPhoto) return;
+
     final navigator = Navigator.of(context);
 
-    final source = await showModalBottomSheet<ImageSource>(
+    final source =
+        await showModalBottomSheet<ImageSource>(
       context: context,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              RaSpace.lg,
-              0,
-              RaSpace.lg,
-              RaSpace.lg,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                _PhotoSourceTile(
-                  icon: Icons.photo_library_outlined,
-                  label: 'Choose from gallery',
-                  source: ImageSource.gallery,
-                ),
-                _PhotoSourceTile(
-                  icon: Icons.camera_alt_outlined,
-                  label: 'Take a photo',
-                  source: ImageSource.camera,
-                ),
-              ],
-            ),
+        return const SafeArea(
+          child: Wrap(
+            children: [
+              _PhotoSourceTile(
+                icon:
+                    Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                source: ImageSource.gallery,
+              ),
+              _PhotoSourceTile(
+                icon:
+                    Icons.camera_alt_outlined,
+                label: 'Take a photo',
+                source: ImageSource.camera,
+              ),
+            ],
           ),
         );
       },
     );
 
-    if (source == null || !mounted) {
-      return;
-    }
+    if (source == null || !mounted) return;
 
     final photo = source == ImageSource.camera
         ? await navigator.push<XFile>(
-            MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+            MaterialPageRoute(
+              builder: (_) =>
+                  const CameraCaptureScreen(),
+            ),
           )
         : await ImagePicker().pickImage(
             source: ImageSource.gallery,
@@ -129,18 +171,20 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
             maxWidth: 1200,
           );
 
-    if (photo == null || !mounted) {
-      return;
-    }
+    if (photo == null || !mounted) return;
 
     setState(() {
       uploadingPhoto = true;
     });
 
     try {
-      final encoded = await PhotoUploadService().prepareProfilePhoto(photo);
+      final encoded =
+          await PhotoUploadService()
+              .prepareProfilePhoto(photo);
 
-      await AuthService().updateCurrentProfile({'photoData': encoded});
+      await AuthService().updateCurrentProfile({
+        'photoData': encoded,
+      });
 
       await AuthService().syncProviderDirectory();
 
@@ -150,15 +194,23 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
         photoData = encoded;
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Provider photo updated.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Provider photo updated.',
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Photo update failed: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Photo update failed: $error',
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -169,80 +221,102 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 
   Future<void> editProviderProfile() async {
-    final formKey = GlobalKey<FormState>();
+    final formKey =
+        GlobalKey<FormState>();
 
-    final nameController = TextEditingController(text: providerName);
+    final nameController =
+        TextEditingController(
+      text: providerName,
+    );
 
-    final phoneController = TextEditingController(text: providerPhone);
+    final phoneController =
+        TextEditingController(
+      text: providerPhone,
+    );
 
-    final saved = await showModalBottomSheet<bool>(
+    final saved =
+        await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            RaSpace.lg,
-            0,
-            RaSpace.lg,
-            MediaQuery.of(sheetContext).viewInsets.bottom + RaSpace.lg,
+      builder: (dialogContext) {
+        return AlertDialog(
+          icon: const Icon(
+            Icons.person_outline_rounded,
           ),
-          child: Form(
+          title: const Text(
+            'Edit Provider Profile',
+          ),
+          content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Edit provider profile',
-                  style: Theme.of(
-                    sheetContext,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-                ),
-
-                const SizedBox(height: RaSpace.lg),
-
                 TextFormField(
                   controller: nameController,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Business / provider name',
-                    prefixIcon: Icon(Icons.business_outlined),
+                  textCapitalization:
+                      TextCapitalization.words,
+                  maxLength: 100,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Business / provider name',
+                    prefixIcon: Icon(
+                      Icons.business_outlined,
+                    ),
                   ),
                   validator: (value) {
-                    return (value?.trim().length ?? 0) < 2
-                        ? 'Enter a valid provider name'
-                        : null;
+                    final name =
+                        value?.trim() ?? '';
+
+                    if (name.length < 2) {
+                      return 'Enter a valid provider name';
+                    }
+
+                    return null;
                   },
                 ),
-
-                const SizedBox(height: RaSpace.md),
-
+                const SizedBox(height: 10),
                 TextFormField(
                   controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone number',
-                    prefixIcon: Icon(Icons.phone_outlined),
+                  keyboardType:
+                      TextInputType.phone,
+                  decoration:
+                      const InputDecoration(
+                    labelText:
+                        'Phone number',
+                    prefixIcon: Icon(
+                      Icons.phone_outlined,
+                    ),
                   ),
-                  validator: validateSriLankaPhone,
-                ),
-
-                const SizedBox(height: RaSpace.lg),
-
-                FilledButton.icon(
-                  onPressed: () {
-                    if (formKey.currentState?.validate() ?? false) {
-                      Navigator.pop(sheetContext, true);
-                    }
-                  },
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('Save Profile'),
+                  validator:
+                      validateSriLankaPhone,
                 ),
               ],
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState
+                        ?.validate() ??
+                    false) {
+                  Navigator.pop(
+                    dialogContext,
+                    true,
+                  );
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
         );
       },
     );
@@ -253,229 +327,318 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       return;
     }
 
-    final name = nameController.text.trim();
+    final name =
+        nameController.text.trim();
 
-    final phone = normalizeSriLankaPhone(phoneController.text);
+    final phone =
+        normalizeSriLankaPhone(
+      phoneController.text,
+    );
 
     nameController.dispose();
     phoneController.dispose();
 
-    if (name.isEmpty || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name and phone number are required.')),
-      );
-      return;
-    }
-
-    await AuthService().updateCurrentProfile({
-      'displayName': name,
-      'phone': phone,
-    });
-
-    await AuthService().syncProviderDirectory();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Provider profile updated.')));
-  }
-
-  Future<void> editSettings() async {
-    var hours = workingHours;
-    var radius = serviceRadius;
-
-    final saved = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  RaSpace.lg,
-                  0,
-                  RaSpace.lg,
-                  RaSpace.lg,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Availability settings',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.lg),
-
-                    DropdownButtonFormField<String>(
-                      initialValue: hours,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Working hours',
-                        prefixIcon: Icon(Icons.schedule_outlined),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Mon - Fri, 08:00 AM - 06:00 PM',
-                          child: Text('Weekdays · 8 AM–6 PM'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Daily, 08:00 AM - 08:00 PM',
-                          child: Text('Daily · 8 AM–8 PM'),
-                        ),
-                        DropdownMenuItem(
-                          value: '24 hours, 7 days a week',
-                          child: Text('24 hours · Every day'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setSheetState(() {
-                          hours = value ?? hours;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: RaSpace.md),
-
-                    DropdownButtonFormField<String>(
-                      initialValue: radius,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Service radius',
-                        prefixIcon: Icon(Icons.radar_outlined),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: '5 km from current location',
-                          child: Text('5 km'),
-                        ),
-                        DropdownMenuItem(
-                          value: '15 km from current location',
-                          child: Text('15 km'),
-                        ),
-                        DropdownMenuItem(
-                          value: '30 km from current location',
-                          child: Text('30 km'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setSheetState(() {
-                          radius = value ?? radius;
-                        });
-                      },
-                    ),
-
-                    const SizedBox(height: RaSpace.lg),
-
-                    FilledButton.icon(
-                      onPressed: () => Navigator.pop(sheetContext, true),
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('Save Settings'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (saved != true || !mounted) {
-      return;
-    }
-
-    if (signedIn) {
+    try {
       await AuthService().updateCurrentProfile({
-        'workingHours': hours,
-        'serviceRadius': radius,
+        'displayName': name,
+        'phone': phone,
       });
 
       await AuthService().syncProviderDirectory();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Provider profile updated.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to update provider profile.',
+          ),
+        ),
+      );
     }
-
-    if (!mounted) return;
-
-    setState(() {
-      workingHours = hours;
-      serviceRadius = radius;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Availability settings updated.')),
-    );
   }
 
-  Future<void> editServices() async {
-    const availableServices = [
-      'Vehicle Towing',
-      'Battery Jumpstart',
-      'Flat Tyre',
-      'General Mechanic',
-    ];
+  Future<void> editSettings() async {
+    String? selectedHours =
+        workingHourOptions.contains(
+          workingHours,
+        )
+            ? workingHours
+            : null;
 
-    final selected = services.toSet();
+    String? selectedRadius =
+        serviceRadiusOptions.contains(
+          serviceRadius,
+        )
+            ? serviceRadius
+            : null;
 
-    final saved = await showModalBottomSheet<bool>(
+    final saved =
+        await showDialog<bool>(
       context: context,
-      showDragHandle: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(
-                RaSpace.lg,
-                0,
-                RaSpace.lg,
-                RaSpace.lg,
+          builder: (
+            context,
+            setDialogState,
+          ) {
+            return AlertDialog(
+              icon: const Icon(
+                Icons.schedule_outlined,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              title: const Text(
+                'Availability Settings',
+              ),
+              content: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
                 children: [
-                  Text(
-                    'Services offered',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
+                  DropdownButtonFormField<
+                      String>(
+                    initialValue:
+                        selectedHours,
+                    isExpanded: true,
+                    decoration:
+                        const InputDecoration(
+                      labelText:
+                          'Working Hours',
+                      prefixIcon: Icon(
+                        Icons
+                            .schedule_outlined,
+                      ),
                     ),
+                    items: const [
+                      DropdownMenuItem(
+                        value:
+                            'Mon - Fri, 08:00 AM - 06:00 PM',
+                        child: Text(
+                          'Weekdays · 8 AM–6 PM',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            'Daily, 08:00 AM - 08:00 PM',
+                        child: Text(
+                          'Daily · 8 AM–8 PM',
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            '24 hours, 7 days a week',
+                        child: Text(
+                          '24 hours · Every day',
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedHours = value;
+                      });
+                    },
                   ),
-
-                  const SizedBox(height: RaSpace.md),
-
-                  for (final service in availableServices)
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: Icon(serviceIcon(service)),
-                      title: Text(service),
-                      value: selected.contains(service),
-                      onChanged: (checked) {
-                        setSheetState(() {
-                          if (checked == true) {
-                            selected.add(service);
-                          } else {
-                            selected.remove(service);
-                          }
-                        });
-                      },
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<
+                      String>(
+                    initialValue:
+                        selectedRadius,
+                    isExpanded: true,
+                    decoration:
+                        const InputDecoration(
+                      labelText:
+                          'Service Radius',
+                      prefixIcon: Icon(
+                        Icons.radar_outlined,
+                      ),
                     ),
-
-                  const SizedBox(height: RaSpace.md),
-
-                  FilledButton.icon(
-                    onPressed: selected.isEmpty
-                        ? null
-                        : () => Navigator.pop(sheetContext, true),
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text('Save Services'),
+                    items: const [
+                      DropdownMenuItem(
+                        value:
+                            '5 km from current location',
+                        child: Text('5 km'),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            '15 km from current location',
+                        child: Text('15 km'),
+                      ),
+                      DropdownMenuItem(
+                        value:
+                            '30 km from current location',
+                        child: Text('30 km'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedRadius =
+                            value;
+                      });
+                    },
                   ),
                 ],
               ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      dialogContext,
+                      false,
+                    );
+                  },
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed:
+                      selectedHours == null ||
+                              selectedRadius ==
+                                  null
+                          ? null
+                          : () {
+                              Navigator.pop(
+                                dialogContext,
+                                true,
+                              );
+                            },
+                  child:
+                      const Text('Save Settings'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (saved != true ||
+        !mounted ||
+        selectedHours == null ||
+        selectedRadius == null) {
+      return;
+    }
+
+    try {
+      await AuthService().updateCurrentProfile({
+        'workingHours': selectedHours,
+        'serviceRadius': selectedRadius,
+      });
+
+      await AuthService().syncProviderDirectory();
+
+      if (!mounted) return;
+
+      setState(() {
+        workingHours = selectedHours!;
+        serviceRadius = selectedRadius!;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Availability settings updated.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to update availability settings.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> editServices() async {
+    final selected =
+        services.toSet();
+
+    final saved =
+        await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (
+            context,
+            setDialogState,
+          ) {
+            return AlertDialog(
+              icon: const Icon(
+                Icons
+                    .home_repair_service_outlined,
+              ),
+              title: const Text(
+                'Services Offered',
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize:
+                      MainAxisSize.min,
+                  children: [
+                    for (final service
+                        in availableServices)
+                      CheckboxListTile(
+                        contentPadding:
+                            EdgeInsets.zero,
+                        controlAffinity:
+                            ListTileControlAffinity
+                                .trailing,
+                        title: Text(service),
+                        value: selected
+                            .contains(service),
+                        onChanged: (checked) {
+                          setDialogState(() {
+                            if (checked ==
+                                true) {
+                              selected.add(
+                                service,
+                              );
+                            } else {
+                              selected.remove(
+                                service,
+                              );
+                            }
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(
+                      dialogContext,
+                      false,
+                    );
+                  },
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: selected.isEmpty
+                      ? null
+                      : () {
+                          Navigator.pop(
+                            dialogContext,
+                            true,
+                          );
+                        },
+                  child:
+                      const Text('Save Services'),
+                ),
+              ],
             );
           },
         );
@@ -486,10 +649,15 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       return;
     }
 
-    final updated = availableServices.where(selected.contains).toList();
+    final updated =
+        availableServices
+            .where(selected.contains)
+            .toList();
 
     try {
-      await AuthService().updateCurrentProfile({'services': updated});
+      await AuthService().updateCurrentProfile({
+        'services': updated,
+      });
 
       await AuthService().syncProviderDirectory();
 
@@ -500,424 +668,620 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Services updated successfully.')),
+        const SnackBar(
+          content: Text(
+            'Services updated successfully.',
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to update services.')),
+        const SnackBar(
+          content: Text(
+            'Unable to update services.',
+          ),
+        ),
       );
     }
   }
 
-  IconData serviceIcon(String service) {
+  Future<void> changeAvailability(
+    bool value,
+  ) async {
+    if (changingAvailability) return;
+
+    final previous =
+        accepting;
+
+    setState(() {
+      accepting = value;
+      changingAvailability = true;
+    });
+
+    try {
+      await AuthService().setProviderOnline(
+        value,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        accepting = previous;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to update availability.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          changingAvailability =
+              false;
+        });
+      }
+    }
+  }
+
+  IconData serviceIcon(
+    String service,
+  ) {
     return switch (service) {
-      'Vehicle Towing' => Icons.fire_truck_outlined,
-      'Battery Jumpstart' => Icons.battery_charging_full,
-      'Flat Tyre' => Icons.tire_repair,
-      _ => Icons.car_repair,
+      'Vehicle Towing' =>
+        Icons.fire_truck_outlined,
+      'Battery Jumpstart' =>
+        Icons.battery_charging_full_rounded,
+      'Flat Tyre' =>
+        Icons.tire_repair_outlined,
+      'General Mechanic' =>
+        Icons.car_repair_outlined,
+      _ =>
+        Icons.home_repair_service_outlined,
     };
   }
 
-  Widget _profileImage(String name) {
-    if (photoData == null || photoData!.isEmpty) {
-      return ProfileInitials(name: name, radius: 44);
+  Widget _profileAvatar(
+    String name,
+  ) {
+    final value =
+        photoData;
+
+    if (value == null ||
+        value.trim().isEmpty) {
+      return ProfileInitials(
+        name: name,
+        radius: 41,
+      );
     }
 
     try {
+      final clean = value.contains(',')
+          ? value.split(',').last
+          : value;
+
       return CircleAvatar(
-        radius: 44,
-        backgroundImage: MemoryImage(base64Decode(photoData!)),
+        radius: 41,
+        backgroundImage: MemoryImage(
+          base64Decode(clean),
+        ),
       );
-    } on FormatException {
-      return ProfileInitials(name: name, radius: 44);
+    } catch (_) {
+      return ProfileInitials(
+        name: name,
+        radius: 41,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
 
-    final colors = theme.colorScheme;
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('Provider Profile'),
+        automaticallyImplyLeading:
+            false,
+        titleSpacing: 18,
+        title: Text(
+          'Provider Profile',
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight:
+                FontWeight.w800,
+            letterSpacing: -.45,
+          ),
+        ),
         actions: [
           IconButton(
-            tooltip: 'Availability settings',
-            onPressed: editSettings,
-            icon: const Icon(Icons.tune_rounded),
+            tooltip:
+                'Availability settings',
+            onPressed: profileLoaded
+                ? editSettings
+                : null,
+            icon: const Icon(
+              Icons.tune_rounded,
+            ),
           ),
-          const SizedBox(width: RaSpace.sm),
+          const SizedBox(width: 4),
         ],
       ),
+      body: !signedIn
+          ? const Padding(
+              padding:
+                  EdgeInsets.all(20),
+              child: EmptyState(
+                icon:
+                    Icons.login_outlined,
+                title:
+                    'Sign in required',
+                message:
+                    'Sign in to manage your provider profile.',
+              ),
+            )
+          : !profileLoaded
+              ? const Center(
+                  child:
+                      CircularProgressIndicator(),
+                )
+              : StreamBuilder<
+                  DocumentSnapshot<
+                      Map<String, dynamic>>>(
+                  stream: AuthService()
+                      .watchCurrentProfile(),
+                  builder: (
+                    context,
+                    snapshot,
+                  ) {
+                    final data =
+                        snapshot.data?.data() ??
+                            <String, dynamic>{};
 
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          RaSpace.lg,
-          RaSpace.md,
-          RaSpace.lg,
-          RaSpace.xxxl,
+                    final name =
+                        data['displayName']
+                                as String? ??
+                            providerName;
+
+                    final phone =
+                        data['phone']
+                                as String? ??
+                            providerPhone;
+
+                    final email =
+                        data['email']
+                                as String? ??
+                            FirebaseAuth.instance
+                                .currentUser
+                                ?.email ??
+                            '';
+
+                    final displayName =
+                        name.trim().isEmpty
+                            ? 'Service Provider'
+                            : name;
+
+                    return ListView(
+                      physics:
+                          const BouncingScrollPhysics(),
+                      padding:
+                          const EdgeInsets
+                              .fromLTRB(
+                        18,
+                        8,
+                        18,
+                        32,
+                      ),
+                      children: [
+                        _RaProviderProfileHero(
+                          name:
+                              displayName,
+                          phone:
+                              phone,
+                          email:
+                              email,
+                          accepting:
+                              accepting,
+                          avatar:
+                              _profileAvatar(
+                            displayName,
+                          ),
+                          uploadingPhoto:
+                              uploadingPhoto,
+                          onPhotoTap:
+                              changeProviderPhoto,
+                          onEditTap:
+                              editProviderProfile,
+                        ),
+
+                        const SizedBox(
+                          height: 16,
+                        ),
+
+                        _RaProviderAvailabilityCard(
+                          accepting:
+                              accepting,
+                          busy:
+                              changingAvailability,
+                          onChanged:
+                              changeAvailability,
+                          workingHours:
+                              workingHours,
+                          serviceRadius:
+                              serviceRadius,
+                          onEdit:
+                              editSettings,
+                        ),
+
+                        const SizedBox(
+                          height: 25,
+                        ),
+
+                        const _RaProviderProfileSectionHeading(
+                          title:
+                              'Driver ratings',
+                          subtitle:
+                              'Ratings submitted after completed RoadAssist jobs.',
+                        ),
+
+                        const SizedBox(
+                          height: 10,
+                        ),
+
+                        const _ProviderRatingSummary(),
+
+                        const SizedBox(
+                          height: 25,
+                        ),
+
+                        _RaProviderProfileSectionHeading(
+                          title:
+                              'Services offered',
+                          subtitle:
+                              services.isEmpty
+                                  ? 'No services are configured yet.'
+                                  : 'These services are used when matching new driver requests.',
+                          action:
+                              'Edit',
+                          onAction:
+                              editServices,
+                        ),
+
+                        const SizedBox(
+                          height: 10,
+                        ),
+
+                        if (services.isEmpty)
+                          const EmptyState(
+                            icon: Icons
+                                .home_repair_service_outlined,
+                            title:
+                                'No services configured',
+                            message:
+                                'Add at least one roadside service to receive matching requests.',
+                          )
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final service
+                                  in services)
+                                _RaProviderProfileServiceChip(
+                                  icon:
+                                      serviceIcon(
+                                    service,
+                                  ),
+                                  label:
+                                      service,
+                                ),
+                            ],
+                          ),
+
+                        const SizedBox(
+                          height: 25,
+                        ),
+
+                        const _RaProviderProfileSectionHeading(
+                          title:
+                              'Account',
+                          subtitle:
+                              'Security, appearance and RoadAssist support.',
+                        ),
+
+                        const SizedBox(
+                          height: 10,
+                        ),
+
+                        _RaProviderProfileLink(
+                          icon: Icons
+                              .security_outlined,
+                          title:
+                              'Account & Security',
+                          subtitle:
+                              'Password, verification and account controls',
+                          onTap: () {
+                            push(
+                              context,
+                              const AccountSecurityScreen(),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(
+                          height: 8,
+                        ),
+
+                        _RaProviderProfileLink(
+                          icon: Icons
+                              .palette_outlined,
+                          title:
+                              'Appearance',
+                          subtitle:
+                              'Light, dark or system theme',
+                          onTap: () {
+                            push(
+                              context,
+                              const AppearanceScreen(),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(
+                          height: 8,
+                        ),
+
+                        _RaProviderProfileLink(
+                          icon: Icons
+                              .support_agent_outlined,
+                          title:
+                              'RoadAssist Support',
+                          subtitle:
+                              'Get help with your provider account or jobs',
+                          onTap: () {
+                            push(
+                              context,
+                              const SupportScreen(
+                                isProvider:
+                                    true,
+                              ),
+                            );
+                          },
+                        ),
+
+                        const SizedBox(
+                          height: 22,
+                        ),
+
+                        OutlinedButton.icon(
+                          onPressed:
+                              () async {
+                            await AuthService()
+                                .signOut();
+
+                            if (!context
+                                .mounted) {
+                              return;
+                            }
+
+                            replace(
+                              context,
+                              const WelcomeScreen(),
+                            );
+                          },
+                          style:
+                              OutlinedButton
+                                  .styleFrom(
+                            foregroundColor:
+                                colors.error,
+                            side: BorderSide(
+                              color:
+                                  colors.error,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.logout_rounded,
+                          ),
+                          label:
+                              const Text(
+                            'Sign Out',
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+class _RaProviderProfileHero
+    extends StatelessWidget {
+  const _RaProviderProfileHero({
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.accepting,
+    required this.avatar,
+    required this.uploadingPhoto,
+    required this.onPhotoTap,
+    required this.onEditTap,
+  });
+
+  final String name;
+  final String phone;
+  final String email;
+  final bool accepting;
+  final Widget avatar;
+  final bool uploadingPhoto;
+  final VoidCallback onPhotoTap;
+  final VoidCallback onEditTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF0A497F),
+                  Color(0xFF08635D),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078C7E),
+                ],
         ),
+        borderRadius:
+            BorderRadius.circular(24),
+      ),
+      child: Column(
         children: [
-          if (!profileLoaded) ...[
-            const LinearProgressIndicator(minHeight: 3),
-            const SizedBox(height: RaSpace.md),
-          ],
-
-          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: firebaseReady ? AuthService().watchCurrentProfile() : null,
-            builder: (context, snapshot) {
-              final data = snapshot.data?.data();
-
-              final name =
-                  data?['displayName'] as String? ??
-                  (firebaseReady
-                      ? FirebaseAuth.instance.currentUser?.displayName
-                      : null) ??
-                  'Service Provider';
-
-              final phone = data?['phone'] as String? ?? 'Phone not added';
-
-              final email =
-                  data?['email'] as String? ??
-                  (firebaseReady
-                      ? FirebaseAuth.instance.currentUser?.email
-                      : null) ??
-                  '';
-
-              return Container(
-                padding: const EdgeInsets.all(RaSpace.xl),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [colors.primary, const Color(0xFF007D70)],
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.all(3),
+                decoration:
+                    const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: avatar,
+              ),
+              Positioned(
+                right: -5,
+                bottom: -5,
+                child: IconButton.filled(
+                  tooltip:
+                      'Change provider photo',
+                  onPressed:
+                      uploadingPhoto
+                          ? null
+                          : onPhotoTap,
+                  style:
+                      IconButton.styleFrom(
+                    backgroundColor:
+                        Colors.white,
+                    foregroundColor:
+                        raBlue,
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        _profileImage(name),
-                        Positioned(
-                          right: -5,
-                          bottom: -5,
-                          child: IconButton.filled(
-                            tooltip: 'Change provider photo',
-                            onPressed: uploadingPhoto
-                                ? null
-                                : changeProviderPhoto,
-                            icon: uploadingPhoto
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Icon(Icons.camera_alt_outlined),
+                  icon: uploadingPhoto
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
                           ),
+                        )
+                      : const Icon(
+                          Icons
+                              .camera_alt_outlined,
+                          size: 18,
                         ),
-                      ],
-                    ),
-
-                    const SizedBox(height: RaSpace.md),
-
-                    Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      email,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: .80),
-                      ),
-                    ),
-
-                    const SizedBox(height: RaSpace.md),
-
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: RaSpace.sm,
-                      runSpacing: RaSpace.sm,
-                      children: [
-                        _ProviderProfileHeroChip(
-                          icon: Icons.verified_outlined,
-                          label: 'RoadAssist Provider',
-                        ),
-                        _ProviderProfileHeroChip(
-                          icon: Icons.phone_outlined,
-                          label: phone,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: RaSpace.lg),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: .45),
-                          ),
-                        ),
-                        onPressed: editProviderProfile,
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Edit Provider Profile'),
-                      ),
-                    ),
-                  ],
                 ),
-              );
-            },
+              ),
+            ],
           ),
 
-          const SizedBox(height: RaSpace.xxl),
+          const SizedBox(height: 13),
 
           Text(
-            'Driver ratings',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
+            name,
+            textAlign: TextAlign.center,
+            style:
+                GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.35,
             ),
           ),
 
-          const SizedBox(height: RaSpace.md),
-
-          const _ProviderRatingSummary(),
-
-          const SizedBox(height: RaSpace.xxl),
+          const SizedBox(height: 6),
 
           Container(
-            padding: const EdgeInsets.all(RaSpace.md),
+            padding:
+                const EdgeInsets.symmetric(
+              horizontal: 9,
+              vertical: 5,
+            ),
             decoration: BoxDecoration(
-              color: colors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: colors.outlineVariant.withValues(alpha: .6),
-              ),
+              color: Colors.white
+                  .withValues(alpha: .13),
+              borderRadius:
+                  BorderRadius.circular(999),
             ),
-            child: Material(
-              type: MaterialType.transparency,
-              child: SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                secondary: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: accepting
-                        ? raSuccess.withValues(alpha: .10)
-                        : colors.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    accepting
-                        ? Icons.toggle_on_outlined
-                        : Icons.toggle_off_outlined,
-                    color: accepting ? raSuccess : colors.onSurfaceVariant,
-                  ),
-                ),
-                title: Text(
-                  'Accepting Requests',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                subtitle: Text(
-                  accepting
-                      ? 'You are currently online'
-                      : 'You are currently offline',
-                ),
-                value: accepting,
-                onChanged: (value) async {
-                  final previous = accepting;
-
-                  setState(() {
-                    accepting = value;
-                  });
-
-                  try {
-                    if (firebaseReady) {
-                      await AuthService().setProviderOnline(value);
-                    }
-                  } catch (_) {
-                    if (mounted) {
-                      setState(() {
-                        accepting = previous;
-                      });
-                    }
-                  }
-                },
+            child: Text(
+              accepting
+                  ? 'ACCEPTING REQUESTS'
+                  : 'OFFLINE',
+              style:
+                  GoogleFonts.plusJakartaSans(
+                color: Colors.white,
+                fontSize: 7.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .6,
               ),
             ),
           ),
 
-          const SizedBox(height: RaSpace.xxl),
+          const SizedBox(height: 14),
 
-          _ProviderProfileSection(
-            title: 'Availability',
-            action: 'Edit',
-            onAction: editSettings,
-            children: [
-              _ProviderProfileRow(
-                icon: Icons.schedule_outlined,
-                title: 'Working Hours',
-                value: workingHours,
-              ),
-              _ProviderProfileRow(
-                icon: Icons.radar_outlined,
-                title: 'Service Radius',
-                value: serviceRadius,
-              ),
-            ],
+          _RaProviderProfileHeroInfo(
+            icon: Icons.phone_outlined,
+            value: phone.trim().isEmpty
+                ? 'Phone not added'
+                : phone,
           ),
 
-          const SizedBox(height: RaSpace.xxl),
+          if (email.trim().isNotEmpty)
+            _RaProviderProfileHeroInfo(
+              icon: Icons.email_outlined,
+              value: email,
+            ),
 
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Services offered',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
+          const SizedBox(height: 11),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style:
+                  OutlinedButton.styleFrom(
+                foregroundColor:
+                    Colors.white,
+                side: BorderSide(
+                  color: Colors.white
+                      .withValues(
+                    alpha: .45,
                   ),
                 ),
               ),
-              TextButton.icon(
-                onPressed: editServices,
-                icon: const Icon(Icons.edit_outlined, size: 17),
-                label: const Text('Edit'),
+              onPressed: onEditTap,
+              icon: const Icon(
+                Icons.edit_outlined,
               ),
-            ],
-          ),
-
-          const SizedBox(height: RaSpace.md),
-
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: RaSpace.sm,
-              mainAxisSpacing: RaSpace.sm,
-              mainAxisExtent: 112,
+              label:
+                  const Text('Edit Profile'),
             ),
-            itemCount: services.length,
-            itemBuilder: (context, index) {
-              final service = services[index];
-
-              return Container(
-                padding: const EdgeInsets.all(RaSpace.md),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: colors.outlineVariant.withValues(alpha: .6),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: colors.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        serviceIcon(service),
-                        color: colors.onPrimaryContainer,
-                        size: 20,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      service,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: RaSpace.xxl),
-
-          _ProviderProfileMenuGroup(
-            children: [
-              _ProviderProfileMenuTile(
-                icon: Icons.security_outlined,
-                title: 'Account & Security',
-                subtitle: 'Password, verification and account settings',
-                onTap: () => push(context, const AccountSecurityScreen()),
-              ),
-              _ProviderProfileMenuTile(
-                icon: Icons.notifications_outlined,
-                title: 'Notifications',
-                subtitle: 'Background alerts and device permissions',
-                onTap: () => push(context, const NotificationSettingsScreen()),
-              ),
-              _ProviderProfileMenuTile(
-                icon: Icons.palette_outlined,
-                title: 'Appearance',
-                subtitle: 'Light, dark or system theme',
-                onTap: () => push(context, const AppearanceScreen()),
-              ),
-              _ProviderProfileMenuTile(
-                icon: Icons.help_outline_rounded,
-                title: 'Help & Support',
-                subtitle: 'Support, safety and troubleshooting',
-                onTap: () =>
-                    push(context, const SupportScreen(isProvider: true)),
-              ),
-              _ProviderProfileMenuTile(
-                icon: Icons.privacy_tip_outlined,
-                title: 'Privacy & Safety',
-                subtitle: 'Review privacy and safety controls',
-                onTap: () =>
-                    push(context, const PrivacySafetyScreen(isProvider: true)),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: RaSpace.xl),
-
-          OutlinedButton.icon(
-            onPressed: () async {
-              await AuthService().signOut();
-
-              if (context.mounted) {
-                replace(context, const WelcomeScreen());
-              }
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colors.error,
-              side: BorderSide(color: colors.error.withValues(alpha: .55)),
-            ),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Sign Out'),
           ),
         ],
       ),
@@ -925,31 +1289,423 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   }
 }
 
-class _ProviderProfileHeroChip extends StatelessWidget {
-  const _ProviderProfileHeroChip({required this.icon, required this.label});
+class _RaProviderProfileHeroInfo
+    extends StatelessWidget {
+  const _RaProviderProfileHeroInfo({
+    required this.icon,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          const EdgeInsets.only(
+        bottom: 5,
+      ),
+      child: Row(
+        mainAxisAlignment:
+            MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: Colors.white70,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.center,
+              style:
+                  GoogleFonts.plusJakartaSans(
+                color: Colors.white70,
+                fontSize: 8.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderAvailabilityCard
+    extends StatelessWidget {
+  const _RaProviderAvailabilityCard({
+    required this.accepting,
+    required this.busy,
+    required this.onChanged,
+    required this.workingHours,
+    required this.serviceRadius,
+    required this.onEdit,
+  });
+
+  final bool accepting;
+  final bool busy;
+  final ValueChanged<bool> onChanged;
+  final String workingHours;
+  final String serviceRadius;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(
+          19,
+        ),
+        border: Border.all(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration:
+                    BoxDecoration(
+                  color: (accepting
+                          ? raSuccess
+                          : colors
+                              .onSurfaceVariant)
+                      .withValues(
+                    alpha: .09,
+                  ),
+                  borderRadius:
+                      BorderRadius
+                          .circular(
+                    13,
+                  ),
+                ),
+                child: Icon(
+                  accepting
+                      ? Icons
+                          .wifi_tethering_rounded
+                      : Icons
+                          .wifi_off_rounded,
+                  color: accepting
+                      ? raSuccess
+                      : colors
+                          .onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(
+                width: 10,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
+                  children: [
+                    Text(
+                      'Accepting Requests',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight:
+                            FontWeight
+                                .w800,
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 2,
+                    ),
+                    Text(
+                      accepting
+                          ? 'Your provider account is available for matching.'
+                          : 'You are not receiving new matching requests.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.3,
+                        height: 1.4,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: accepting,
+                onChanged:
+                    busy ? null : onChanged,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          Divider(
+            height: 1,
+            color: colors.outlineVariant
+                .withValues(alpha: .35),
+          ),
+
+          const SizedBox(height: 12),
+
+          _RaProviderAvailabilityRow(
+            icon:
+                Icons.schedule_outlined,
+            label:
+                'Working hours',
+            value: workingHours
+                    .trim()
+                    .isEmpty
+                ? 'Not configured'
+                : workingHours,
+          ),
+
+          _RaProviderAvailabilityRow(
+            icon: Icons.radar_outlined,
+            label:
+                'Service radius',
+            value: serviceRadius
+                    .trim()
+                    .isEmpty
+                ? 'Not configured'
+                : serviceRadius,
+          ),
+
+          const SizedBox(height: 9),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(
+                Icons.tune_rounded,
+              ),
+              label: const Text(
+                'Edit Availability',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderAvailabilityRow
+    extends StatelessWidget {
+  const _RaProviderAvailabilityRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 6,
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: colors.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 8.5,
+                color:
+                    colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style:
+                  GoogleFonts.plusJakartaSans(
+                fontSize: 8.8,
+                fontWeight:
+                    FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderProfileSectionHeading
+    extends StatelessWidget {
+  const _RaProviderProfileSectionHeading({
+    required this.title,
+    required this.subtitle,
+    this.action,
+    this.onAction,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? action;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Row(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style:
+                    GoogleFonts.plusJakartaSans(
+                  fontSize: 16.5,
+                  fontWeight:
+                      FontWeight.w800,
+                  letterSpacing: -.3,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style:
+                    GoogleFonts.plusJakartaSans(
+                  fontSize: 9,
+                  height: 1.4,
+                  color:
+                      colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (action != null &&
+            onAction != null)
+          TextButton(
+            onPressed: onAction,
+            child: Text(action!),
+          ),
+      ],
+    );
+  }
+}
+
+class _RaProviderProfileServiceChip
+    extends StatelessWidget {
+  const _RaProviderProfileServiceChip({
+    required this.icon,
+    required this.label,
+  });
 
   final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(999),
+      width:
+          (MediaQuery.sizeOf(context).width -
+                  44) /
+              2,
+      constraints:
+          const BoxConstraints(
+        minHeight: 85,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      padding:
+          const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(
+                0xFF0D1D2B,
+              )
+            : Colors.white,
+        borderRadius:
+            BorderRadius.circular(
+          17,
+        ),
+        border: Border.all(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 5),
+          Icon(
+            icon,
+            color: colors.primary,
+            size: 21,
+          ),
+          const SizedBox(height: 8),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+            maxLines: 2,
+            overflow:
+                TextOverflow.ellipsis,
+            style:
+                GoogleFonts.plusJakartaSans(
+              fontSize: 9.2,
+              height: 1.3,
+              fontWeight:
+                  FontWeight.w700,
             ),
           ),
         ],
@@ -958,134 +1714,9 @@ class _ProviderProfileHeroChip extends StatelessWidget {
   }
 }
 
-class _ProviderProfileSection extends StatelessWidget {
-  const _ProviderProfileSection({
-    required this.title,
-    required this.children,
-    this.action,
-    this.onAction,
-  });
-
-  final String title;
-  final List<Widget> children;
-  final String? action;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-            ),
-            if (action != null && onAction != null)
-              TextButton(onPressed: onAction, child: Text(action!)),
-          ],
-        ),
-        const SizedBox(height: RaSpace.md),
-        Container(
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: colors.outlineVariant.withValues(alpha: .6),
-            ),
-          ),
-          child: Column(children: children),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProviderProfileRow extends StatelessWidget {
-  const _ProviderProfileRow({
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Material(
-      type: MaterialType.transparency,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: RaSpace.md,
-          vertical: 4,
-        ),
-        leading: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: colors.onPrimaryContainer),
-        ),
-        title: Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(value),
-      ),
-    );
-  }
-}
-
-class _ProviderProfileMenuGroup extends StatelessWidget {
-  const _ProviderProfileMenuGroup({required this.children});
-
-  final List<_ProviderProfileMenuTile> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: .6)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          for (var index = 0; index < children.length; index++) ...[
-            children[index],
-            if (index != children.length - 1)
-              Divider(
-                height: 1,
-                indent: 64,
-                color: colors.outlineVariant.withValues(alpha: .5),
-              ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ProviderProfileMenuTile extends StatelessWidget {
-  const _ProviderProfileMenuTile({
+class _RaProviderProfileLink
+    extends StatelessWidget {
+  const _RaProviderProfileLink({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -1099,33 +1730,106 @@ class _ProviderProfileMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Material(
-      type: MaterialType.transparency,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: RaSpace.md,
-          vertical: 5,
+      color: theme.brightness ==
+              Brightness.dark
+          ? const Color(
+              0xFF0D1D2B,
+            )
+          : Colors.white,
+      shape:
+          RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.circular(
+          17,
         ),
-        leading: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: colors
+              .outlineVariant
+              .withValues(
+            alpha: .45,
           ),
-          child: Icon(icon, color: colors.onPrimaryContainer),
         ),
-        title: Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right_rounded),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: onTap,
+        child: Padding(
+          padding:
+              const EdgeInsets.all(
+            13,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 41,
+                height: 41,
+                decoration:
+                    BoxDecoration(
+                  color: colors.primary
+                      .withValues(
+                    alpha: .07,
+                  ),
+                  borderRadius:
+                      BorderRadius
+                          .circular(
+                    13,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  color:
+                      colors.primary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(
+                width: 10,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment
+                          .start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 10,
+                        fontWeight:
+                            FontWeight
+                                .w700,
+                      ),
+                    ),
+                    const SizedBox(
+                      height: 2,
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 8.2,
+                        color: colors
+                            .onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons
+                    .chevron_right_rounded,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

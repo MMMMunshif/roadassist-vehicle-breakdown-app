@@ -1,15 +1,13 @@
 part of '../../screens.dart';
 
-class AccountSecurityScreen
-    extends StatefulWidget {
+class AccountSecurityScreen extends StatefulWidget {
   const AccountSecurityScreen({
     super.key,
   });
 
   @override
-  State<AccountSecurityScreen>
-      createState() =>
-          _AccountSecurityScreenState();
+  State<AccountSecurityScreen> createState() =>
+      _AccountSecurityScreenState();
 }
 
 class _AccountSecurityScreenState
@@ -20,22 +18,24 @@ class _AccountSecurityScreenState
   Future<void> sendReset(
     String email,
   ) async {
-    if (sendingReset) return;
+    if (sendingReset) {
+      return;
+    }
 
     setState(() {
       sendingReset = true;
     });
 
     try {
-      await AuthService()
-          .sendPasswordResetEmail(
+      await AuthService().sendPasswordResetEmail(
         email,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'If this account is available, a password-reset link will arrive shortly. Check Spam too.',
@@ -43,15 +43,15 @@ class _AccountSecurityScreenState
         ),
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Unable to send password reset: $error',
+            'Unable to send reset email: $error',
           ),
-          backgroundColor: raDanger,
         ),
       );
     } finally {
@@ -72,8 +72,7 @@ class _AccountSecurityScreenState
 
     var obscurePassword = true;
 
-    final confirmed =
-        await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
@@ -82,39 +81,27 @@ class _AccountSecurityScreenState
             context,
             setDialogState,
           ) {
-            final theme =
-                Theme.of(context);
-
             final colors =
-                theme.colorScheme;
+                Theme.of(context).colorScheme;
 
             final valid =
-                passwordController
-                    .text
-                    .isNotEmpty &&
-                confirmationController
-                        .text
-                        .trim() ==
+                passwordController.text.isNotEmpty &&
+                confirmationController.text.trim() ==
                     'DELETE';
 
             return AlertDialog(
               icon: Container(
                 width: 56,
                 height: 56,
-                decoration:
-                    BoxDecoration(
-                  color: colors.error
-                      .withValues(
-                    alpha: .10,
+                decoration: BoxDecoration(
+                  color: colors.error.withValues(
+                    alpha: .08,
                   ),
                   borderRadius:
-                      BorderRadius.circular(
-                    18,
-                  ),
+                      BorderRadius.circular(18),
                 ),
                 child: Icon(
-                  Icons
-                      .delete_forever_outlined,
+                  Icons.delete_forever_outlined,
                   color: colors.error,
                   size: 29,
                 ),
@@ -122,27 +109,28 @@ class _AccountSecurityScreenState
               title: const Text(
                 'Delete account permanently?',
               ),
-              content: SizedBox(
-                width: 390,
+              content: ConstrainedBox(
+                constraints:
+                    const BoxConstraints(
+                  maxWidth: 400,
+                ),
                 child: Column(
                   mainAxisSize:
                       MainAxisSize.min,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Your profile and saved device tokens will be removed. Completed service records may still be retained where required for security and transaction history.',
+                      'Your profile and saved device information will be removed. Completed service, payment, complaint or security records may remain where required.',
                       style: GoogleFonts
                           .plusJakartaSans(
-                        fontSize: 10.5,
+                        fontSize: 8.8,
                         height: 1.5,
-                        color: colors
-                            .onSurfaceVariant,
                       ),
                     ),
-
                     const SizedBox(
-                      height: 17,
+                      height: 16,
                     ),
-
                     TextField(
                       controller:
                           passwordController,
@@ -164,6 +152,10 @@ class _AccountSecurityScreenState
                         ),
                         suffixIcon:
                             IconButton(
+                          tooltip:
+                              obscurePassword
+                                  ? 'Show password'
+                                  : 'Hide password',
                           onPressed: () {
                             setDialogState(
                               () {
@@ -182,11 +174,9 @@ class _AccountSecurityScreenState
                         ),
                       ),
                     ),
-
                     const SizedBox(
                       height: 12,
                     ),
-
                     TextField(
                       controller:
                           confirmationController,
@@ -208,6 +198,19 @@ class _AccountSecurityScreenState
                         ),
                       ),
                     ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    Text(
+                      'This action cannot be automatically undone.',
+                      style: GoogleFonts
+                          .plusJakartaSans(
+                        fontSize: 7.7,
+                        color: colors.error,
+                        fontWeight:
+                            FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -223,7 +226,6 @@ class _AccountSecurityScreenState
                     'Keep Account',
                   ),
                 ),
-
                 FilledButton(
                   style:
                       FilledButton.styleFrom(
@@ -272,15 +274,18 @@ class _AccountSecurityScreenState
         password: password,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       replace(
         context,
         const WelcomeScreen(),
       );
-    } on FirebaseAuthException catch (
-        error) {
-      if (!mounted) return;
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) {
+        return;
+      }
 
       final message =
           switch (error.code) {
@@ -296,18 +301,18 @@ class _AccountSecurityScreenState
               'Unable to delete the account.',
       };
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: raDanger,
         ),
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Unable to delete account: $error',
@@ -326,12 +331,11 @@ class _AccountSecurityScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
 
     final user = firebaseReady
-        ? FirebaseAuth
-            .instance.currentUser
+        ? FirebaseAuth.instance.currentUser
         : null;
 
     if (!signedIn || user == null) {
@@ -342,7 +346,7 @@ class _AccountSecurityScreenState
           ),
         ),
         body: const Padding(
-          padding: EdgeInsets.all(20),
+          padding: EdgeInsets.all(18),
           child: EmptyState(
             icon: Icons.login_outlined,
             title: 'Sign in required',
@@ -363,7 +367,6 @@ class _AccountSecurityScreenState
               GoogleFonts.plusJakartaSans(
             fontSize: 19,
             fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
           ),
         ),
       ),
@@ -379,224 +382,105 @@ class _AccountSecurityScreenState
         ),
         children: [
           const _RaSecurityHero(),
-
-          const SizedBox(height: 26),
-
+          const SizedBox(height: 23),
           const _RaSecurityHeading(
             title: 'Account',
             subtitle:
-                'Your sign-in identity and verification status.',
+                'Your current sign-in identity and email verification status.',
           ),
-
-          const SizedBox(height: 11),
-
+          const SizedBox(height: 10),
           _RaSecurityAccountCard(
-            email: user.email ??
-                'Email unavailable',
+            email:
+                user.email ??
+                    'Email unavailable',
             verified:
                 user.emailVerified,
           ),
-
           const SizedBox(height: 12),
-
-          _RaSecurityMenuCard(
-            children: [
-              _RaSecurityMenuTile(
-                icon:
-                    Icons.password_outlined,
-                title:
-                    'Reset Password',
-                subtitle:
-                    'Receive a secure reset link by email',
-                trailing: sendingReset
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child:
-                            CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : null,
-                onTap: user.email ==
-                            null ||
-                        sendingReset
-                    ? null
-                    : () {
-                        sendReset(
-                          user.email!,
-                        );
-                      },
-              ),
-
-              _RaSecurityMenuTile(
-                icon: Icons
-                    .notifications_outlined,
-                title:
-                    'Push Notifications',
-                subtitle:
-                    'Manage alerts for this device',
-                onTap: () {
-                  push(
-                    context,
-                    const NotificationSettingsScreen(),
-                  );
-                },
-              ),
-
-              _RaSecurityMenuTile(
-                icon:
-                    Icons.privacy_tip_outlined,
-                title:
-                    'Privacy & Safety',
-                subtitle:
-                    'Review data visibility and permissions',
-                onTap: () {
-                  push(
-                    context,
-                    const PrivacySafetyScreen(
-                      isProvider: false,
-                    ),
-                  );
-                },
-              ),
-            ],
+          _RaSecuritySurface(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                _RaSecurityMenuTile(
+                  icon:
+                      Icons.password_outlined,
+                  title:
+                      'Reset Password',
+                  subtitle:
+                      'Receive a secure password-reset email',
+                  trailing: sendingReset
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child:
+                              CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : null,
+                  onTap: user.email == null ||
+                          sendingReset
+                      ? null
+                      : () {
+                          sendReset(
+                            user.email!,
+                          );
+                        },
+                ),
+                const Divider(
+                  height: 1,
+                  indent: 56,
+                ),
+                _RaSecurityMenuTile(
+                  icon: Icons
+                      .notifications_outlined,
+                  title:
+                      'Notification Settings',
+                  subtitle:
+                      'Background alerts and device permissions',
+                  onTap: () {
+                    push(
+                      context,
+                      const NotificationSettingsScreen(),
+                    );
+                  },
+                ),
+                const Divider(
+                  height: 1,
+                  indent: 56,
+                ),
+                _RaSecurityMenuTile(
+                  icon:
+                      Icons.privacy_tip_outlined,
+                  title:
+                      'Privacy & Safety',
+                  subtitle:
+                      'Review privacy and account-safety information',
+                  onTap: () {
+                    push(
+                      context,
+                      const PrivacySafetyScreen(
+                        isProvider: false,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-
-          const SizedBox(height: 28),
-
+          const SizedBox(height: 25),
           _RaSecurityHeading(
             title: 'Danger zone',
             subtitle:
                 'Permanent account actions cannot be automatically undone.',
-            danger: true,
+            tone:
+                Theme.of(context)
+                    .colorScheme
+                    .error,
           ),
-
-          const SizedBox(height: 11),
-
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colors.error
-                  .withValues(alpha: .055),
-              borderRadius:
-                  BorderRadius.circular(20),
-              border: Border.all(
-                color: colors.error
-                    .withValues(
-                  alpha: .20,
-                ),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration:
-                          BoxDecoration(
-                        color: colors.error
-                            .withValues(
-                          alpha: .10,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          13,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons
-                            .delete_forever_outlined,
-                        color:
-                            colors.error,
-                        size: 21,
-                      ),
-                    ),
-
-                    const SizedBox(
-                      width: 11,
-                    ),
-
-                    Expanded(
-                      child: Text(
-                        'Delete RoadAssist account',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 12.5,
-                          fontWeight:
-                              FontWeight
-                                  .w700,
-                          color:
-                              colors.error,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(
-                  height: 11,
-                ),
-
-                Text(
-                  'Your profile will be removed. Some completed service records may remain where required for transaction and security history.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10,
-                    height: 1.45,
-                    color: colors
-                        .onSurfaceVariant,
-                  ),
-                ),
-
-                const SizedBox(
-                  height: 14,
-                ),
-
-                SizedBox(
-                  width:
-                      double.infinity,
-                  child:
-                      OutlinedButton.icon(
-                    onPressed: deleting
-                        ? null
-                        : deleteAccount,
-                    style: OutlinedButton
-                        .styleFrom(
-                      foregroundColor:
-                          colors.error,
-                      side: BorderSide(
-                        color: colors.error
-                            .withValues(
-                          alpha: .45,
-                        ),
-                      ),
-                    ),
-                    icon: deleting
-                        ? const SizedBox
-                            .square(
-                            dimension: 17,
-                            child:
-                                CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(
-                            Icons
-                                .delete_forever_outlined,
-                          ),
-                    label: const Text(
-                      'Delete Account Permanently',
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 10),
+          _RaSecurityDangerCard(
+            deleting: deleting,
+            onDelete: deleteAccount,
           ),
         ],
       ),
@@ -615,7 +499,8 @@ class _RaSecurityHero
             Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(19),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -623,8 +508,8 @@ class _RaSecurityHero
               Alignment.bottomRight,
           colors: dark
               ? const [
-                  Color(0xFF0B477D),
-                  Color(0xFF08645D),
+                  Color(0xFF0A497F),
+                  Color(0xFF075A68),
                 ]
               : const [
                   Color(0xFF075BA8),
@@ -632,13 +517,13 @@ class _RaSecurityHero
                 ],
         ),
         borderRadius:
-            BorderRadius.circular(25),
+            BorderRadius.circular(23),
       ),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               color: Colors.white
                   .withValues(alpha: .13),
@@ -651,9 +536,7 @@ class _RaSecurityHero
               size: 26,
             ),
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -667,21 +550,15 @@ class _RaSecurityHero
                     fontSize: 18,
                     fontWeight:
                         FontWeight.w800,
-                    letterSpacing: -.4,
                   ),
                 ),
-
-                const SizedBox(height: 5),
-
+                const SizedBox(height: 4),
                 Text(
-                  'Manage sign-in security, password recovery and device notifications.',
+                  'Manage password recovery, verification and account access.',
                   style: GoogleFonts
                       .plusJakartaSans(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .80,
-                    ),
-                    fontSize: 10,
+                    color: Colors.white70,
+                    fontSize: 8.5,
                     height: 1.4,
                   ),
                 ),
@@ -699,12 +576,12 @@ class _RaSecurityHeading
   const _RaSecurityHeading({
     required this.title,
     required this.subtitle,
-    this.danger = false,
+    this.tone,
   });
 
   final String title;
   final String subtitle;
-  final bool danger;
+  final Color? tone;
 
   @override
   Widget build(BuildContext context) {
@@ -719,12 +596,9 @@ class _RaSecurityHeading
           title,
           style:
               GoogleFonts.plusJakartaSans(
-            color: danger
-                ? colors.error
-                : colors.onSurface,
-            fontSize: 17,
+            fontSize: 14.5,
             fontWeight: FontWeight.w800,
-            letterSpacing: -.35,
+            color: tone,
           ),
         ),
         const SizedBox(height: 3),
@@ -732,13 +606,51 @@ class _RaSecurityHeading
           subtitle,
           style:
               GoogleFonts.plusJakartaSans(
-            fontSize: 10,
+            fontSize: 8.3,
             height: 1.4,
             color:
                 colors.onSurfaceVariant,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RaSecuritySurface
+    extends StatelessWidget {
+  const _RaSecuritySurface({
+    required this.child,
+    this.padding =
+        const EdgeInsets.all(14),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme =
+        Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: theme.brightness ==
+                Brightness.dark
+            ? const Color(0xFF0D1D2B)
+            : theme.colorScheme.surface,
+        borderRadius:
+            BorderRadius.circular(18),
+        border: Border.all(
+          color: theme
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: .45),
+        ),
+      ),
+      child: child,
     );
   }
 }
@@ -755,49 +667,32 @@ class _RaSecurityAccountCard
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark =
-        theme.brightness == Brightness.dark;
-
     final tone =
         verified ? raSuccess : raGold;
 
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .48),
-        ),
-      ),
+    return _RaSecuritySurface(
       child: Row(
         children: [
           Container(
-            width: 47,
-            height: 47,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color:
-                  tone.withValues(alpha: .10),
+                  tone.withValues(
+                alpha: .08,
+              ),
               borderRadius:
-                  BorderRadius.circular(15),
+                  BorderRadius.circular(14),
             ),
             child: Icon(
               verified
-                  ? Icons.verified_rounded
+                  ? Icons.verified_outlined
                   : Icons
                       .mark_email_unread_outlined,
               color: tone,
             ),
           ),
-
-          const SizedBox(width: 12),
-
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -810,13 +705,12 @@ class _RaSecurityAccountCard
                       TextOverflow.ellipsis,
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 11.5,
+                    fontSize: 10,
                     fontWeight:
-                        FontWeight.w700,
-                    color: colors.onSurface,
+                        FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   verified
                       ? 'Email verified'
@@ -825,68 +719,15 @@ class _RaSecurityAccountCard
                           : 'Verification unavailable',
                   style: GoogleFonts
                       .plusJakartaSans(
-                    color: tone,
-                    fontSize: 9,
+                    fontSize: 7.8,
                     fontWeight:
-                        FontWeight.w600,
+                        FontWeight.w700,
+                    color: tone,
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RaSecurityMenuCard
-    extends StatelessWidget {
-  const _RaSecurityMenuCard({
-    required this.children,
-  });
-
-  final List<_RaSecurityMenuTile>
-      children;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .48),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          for (var index = 0;
-              index < children.length;
-              index++) ...[
-            children[index],
-            if (index !=
-                children.length - 1)
-              Divider(
-                height: 1,
-                indent: 59,
-                color: colors
-                    .outlineVariant
-                    .withValues(
-                  alpha: .35,
-                ),
-              ),
-          ],
         ],
       ),
     );
@@ -915,51 +756,169 @@ class _RaSecurityMenuTile
         Theme.of(context).colorScheme;
 
     return ListTile(
+      enabled: onTap != null,
       contentPadding:
           const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 4,
+        horizontal: 13,
+        vertical: 2,
       ),
-      onTap: onTap,
       leading: Container(
         width: 39,
         height: 39,
         decoration: BoxDecoration(
           color: colors.primary
-              .withValues(alpha: .08),
+              .withValues(alpha: .07),
           borderRadius:
               BorderRadius.circular(12),
         ),
         child: Icon(
           icon,
+          size: 18,
           color: colors.primary,
-          size: 19,
         ),
       ),
       title: Text(
         title,
         style:
             GoogleFonts.plusJakartaSans(
-          fontSize: 10.8,
+          fontSize: 9.6,
           fontWeight: FontWeight.w700,
-          color: colors.onSurface,
         ),
       ),
       subtitle: Text(
         subtitle,
+        maxLines: 1,
+        overflow:
+            TextOverflow.ellipsis,
         style:
             GoogleFonts.plusJakartaSans(
-          fontSize: 8.8,
+          fontSize: 7.5,
           color:
               colors.onSurfaceVariant,
         ),
       ),
       trailing: trailing ??
-          Icon(
+          const Icon(
             Icons.chevron_right_rounded,
-            color:
-                colors.onSurfaceVariant,
           ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _RaSecurityDangerCard
+    extends StatelessWidget {
+  const _RaSecurityDangerCard({
+    required this.deleting,
+    required this.onDelete,
+  });
+
+  final bool deleting;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return Container(
+      padding:
+          const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: colors.error
+            .withValues(alpha: .055),
+        borderRadius:
+            BorderRadius.circular(18),
+        border: Border.all(
+          color: colors.error
+              .withValues(alpha: .20),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration:
+                    BoxDecoration(
+                  color: colors.error
+                      .withValues(
+                    alpha: .08,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(
+                    13,
+                  ),
+                ),
+                child: Icon(
+                  Icons
+                      .delete_forever_outlined,
+                  color: colors.error,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Delete RoadAssist account',
+                  style: GoogleFonts
+                      .plusJakartaSans(
+                    fontSize: 10.5,
+                    fontWeight:
+                        FontWeight.w800,
+                    color: colors.error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Your active profile will be removed. Some completed service, payment, complaint or security records may still be retained where required.',
+            style:
+                GoogleFonts.plusJakartaSans(
+              fontSize: 8.2,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 13),
+          OutlinedButton.icon(
+            style:
+                OutlinedButton.styleFrom(
+              foregroundColor:
+                  colors.error,
+              side: BorderSide(
+                color: colors.error
+                    .withValues(
+                  alpha: .45,
+                ),
+              ),
+            ),
+            onPressed:
+                deleting ? null : onDelete,
+            icon: deleting
+                ? const SizedBox.square(
+                    dimension: 17,
+                    child:
+                        CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(
+                    Icons
+                        .delete_forever_outlined,
+                  ),
+            label: Text(
+              deleting
+                  ? 'Deleting Account…'
+                  : 'Delete Account Permanently',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

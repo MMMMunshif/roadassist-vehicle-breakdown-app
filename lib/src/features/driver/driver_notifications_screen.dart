@@ -19,12 +19,14 @@ class _DriverNotificationsScreenState
     super.initState();
 
     if (signedIn) {
-      AuthService()
-          .markNotificationsSeen();
+      unawaited(
+        AuthService()
+            .markNotificationsSeen(),
+      );
     }
   }
 
-  String _message(
+  String message(
     Map<String, dynamic> data,
   ) {
     final status =
@@ -41,23 +43,26 @@ class _DriverNotificationsScreenState
       'arrived' =>
         data['completionState'] ==
                 'pending'
-            ? 'Completed work needs your review'
+            ? 'Completed work is waiting for your review'
             : 'Your provider has arrived',
       'completed' =>
         'Your assistance request is complete',
       'cancelled' =>
-        data['cancellationReason'] == null
+        data['cancellationReason'] ==
+                null
             ? 'This request was cancelled'
             : 'Your assigned provider became unavailable',
-      _ => 'Request status updated',
+      _ =>
+        'Request status updated',
     };
   }
 
-  String _subtitle(
+  String subtitle(
     Map<String, dynamic> data,
   ) {
     final status =
-        data['status'] as String? ?? '';
+        data['status'] as String? ??
+            '';
 
     if (status == 'cancelled' &&
         data['cancellationReason'] !=
@@ -65,10 +70,14 @@ class _DriverNotificationsScreenState
       return '${data['cancellationReason']} • Open request for recovery options';
     }
 
-    return requestIssueLabel(data);
+    return requestIssueLabel(
+      data,
+    );
   }
 
-  IconData _icon(String status) {
+  IconData statusIcon(
+    String status,
+  ) {
     return switch (status) {
       'searching' =>
         Icons.person_search_outlined,
@@ -79,15 +88,17 @@ class _DriverNotificationsScreenState
       'arrived' =>
         Icons.location_on_outlined,
       'completed' =>
-        Icons.check_circle_outline_rounded,
+        Icons
+            .check_circle_outline_rounded,
       'cancelled' =>
         Icons.cancel_outlined,
       _ =>
-        Icons.notifications_active_outlined,
+        Icons
+            .notifications_active_outlined,
     };
   }
 
-  Color _tone(
+  Color statusTone(
     BuildContext context,
     String status,
   ) {
@@ -95,22 +106,22 @@ class _DriverNotificationsScreenState
         Theme.of(context).colorScheme;
 
     return switch (status) {
-      'completed' => raSuccess,
-      'arrived' => raSuccess,
-      'cancelled' => colors.error,
-      'en_route' =>
-        const Color(0xFF167DE4),
-      _ => colors.primary,
+      'completed' =>
+        raSuccess,
+      'cancelled' =>
+        colors.error,
+      'searching' =>
+        raGold,
+      _ =>
+        colors.primary,
     };
   }
 
-  void _openRequest(
-    BuildContext context,
-    QueryDocumentSnapshot<
-            Map<String, dynamic>>
-        request,
+  void openRequest(
+    QueryDocumentSnapshot<Map<String, dynamic>> request,
   ) {
-    final data = request.data();
+    final data =
+        request.data();
 
     final status =
         data['status'] as String? ??
@@ -127,6 +138,7 @@ class _DriverNotificationsScreenState
           requestId: request.id,
         ),
       );
+
       return;
     }
 
@@ -142,6 +154,7 @@ class _DriverNotificationsScreenState
           requestId: request.id,
         ),
       );
+
       return;
     }
 
@@ -156,8 +169,11 @@ class _DriverNotificationsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
+
+    final colors =
+        theme.colorScheme;
 
     return Scaffold(
       backgroundColor:
@@ -165,37 +181,47 @@ class _DriverNotificationsScreenState
       appBar: AppBar(
         title: Text(
           'Notifications',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.5,
+          style:
+              GoogleFonts.plusJakartaSans(
+            fontSize: 19,
+            fontWeight:
+                FontWeight.w800,
           ),
         ),
       ),
       body: !signedIn
           ? const Padding(
-              padding: EdgeInsets.all(20),
+              padding:
+                  EdgeInsets.all(18),
               child: EmptyState(
-                icon: Icons.login_outlined,
-                title: 'Sign in required',
+                icon:
+                    Icons.login_outlined,
+                title:
+                    'Sign in required',
                 message:
                     'Sign in as a driver to view request notifications.',
               ),
             )
           : StreamBuilder<
-              QuerySnapshot<
-                  Map<String, dynamic>>>(
+              QuerySnapshot<Map<String, dynamic>>>(
               stream: RequestService()
                   .watchDriverRequests(),
-              builder: (context, snapshot) {
+              builder: (
+                context,
+                snapshot,
+              ) {
                 if (snapshot.hasError) {
-                  return const EmptyState(
-                    icon:
-                        Icons.cloud_off_outlined,
-                    title:
-                        'Unable to load updates',
-                    message:
-                        'Check your connection and try again.',
+                  return const Padding(
+                    padding:
+                        EdgeInsets.all(18),
+                    child: EmptyState(
+                      icon: Icons
+                          .cloud_off_outlined,
+                      title:
+                          'Unable to load updates',
+                      message:
+                          'Check your connection and try again.',
+                    ),
                   );
                 }
 
@@ -207,229 +233,179 @@ class _DriverNotificationsScreenState
                 }
 
                 final requests =
-                    [...snapshot.data!.docs];
+                    snapshot.data!.docs
+                        .toList();
 
-                requests.sort((a, b) {
-                  final aData = a.data();
-                  final bData = b.data();
+                requests.sort(
+                  (
+                    first,
+                    second,
+                  ) {
+                    final firstTime =
+                        first.data()['updatedAt']
+                                as Timestamp? ??
+                            first.data()['createdAt']
+                                as Timestamp?;
 
-                  final aTime =
-                      (aData['updatedAt']
-                                  as Timestamp?) ??
-                          (aData['createdAt']
-                              as Timestamp?);
+                    final secondTime =
+                        second.data()['updatedAt']
+                                as Timestamp? ??
+                            second.data()['createdAt']
+                                as Timestamp?;
 
-                  final bTime =
-                      (bData['updatedAt']
-                                  as Timestamp?) ??
-                          (bData['createdAt']
-                              as Timestamp?);
+                    if (firstTime == null &&
+                        secondTime == null) {
+                      return 0;
+                    }
 
-                  if (aTime == null &&
-                      bTime == null) {
-                    return 0;
-                  }
+                    if (firstTime == null) {
+                      return 1;
+                    }
 
-                  if (aTime == null) return 1;
-                  if (bTime == null) return -1;
+                    if (secondTime == null) {
+                      return -1;
+                    }
 
-                  return bTime.compareTo(aTime);
-                });
+                    return secondTime.compareTo(
+                      firstTime,
+                    );
+                  },
+                );
 
-                return CustomScrollView(
+                return ListView(
                   physics:
                       const BouncingScrollPhysics(),
-                  slivers: [
-                    SliverPadding(
-                      padding:
-                          const EdgeInsets.fromLTRB(
-                        18,
-                        10,
-                        18,
-                        0,
-                      ),
-                      sliver:
-                          SliverToBoxAdapter(
-                        child:
-                            _DriverNotificationIntro(
-                          count:
-                              requests.length,
+                  padding:
+                      const EdgeInsets.fromLTRB(
+                    18,
+                    8,
+                    18,
+                    32,
+                  ),
+                  children: [
+                    _RaNotificationUpdatesHero(
+                      count:
+                          requests.length,
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        color: theme.brightness ==
+                                Brightness.dark
+                            ? const Color(
+                                0xFF0D1D2B,
+                              )
+                            : colors.surface,
+                        borderRadius:
+                            BorderRadius.circular(
+                          18,
                         ),
-                      ),
-                    ),
-
-                    const SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 14,
-                      ),
-                    ),
-
-                    SliverPadding(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 18,
-                      ),
-                      sliver:
-                          SliverToBoxAdapter(
-                        child: Container(
-                          decoration:
-                              BoxDecoration(
-                            color:
-                                colors.surface,
-                            borderRadius:
-                                BorderRadius
-                                    .circular(21),
-                            border: Border.all(
-                              color: colors
-                                  .outlineVariant
-                                  .withValues(
-                                alpha: .50,
-                              ),
-                            ),
-                          ),
-                          clipBehavior:
-                              Clip.antiAlias,
-                          child:
-                              const _ChatInbox(
-                            isProvider: false,
-                            preview: true,
+                        border: Border.all(
+                          color: colors
+                              .outlineVariant
+                              .withValues(
+                            alpha: .45,
                           ),
                         ),
                       ),
-                    ),
-
-                    const SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 26,
+                      clipBehavior:
+                          Clip.antiAlias,
+                      child: const _ChatInbox(
+                        isProvider: false,
+                        preview: true,
                       ),
                     ),
 
-                    SliverPadding(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 18,
-                      ),
-                      sliver:
-                          SliverToBoxAdapter(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Request updates',
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  fontSize: 17,
-                                  fontWeight:
-                                      FontWeight
-                                          .w800,
-                                  letterSpacing:
-                                      -.35,
-                                  color: colors
-                                      .onSurface,
-                                ),
-                              ),
+                    const SizedBox(height: 23),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Request updates',
+                            style: GoogleFonts
+                                .plusJakartaSans(
+                              fontSize: 14.5,
+                              fontWeight:
+                                  FontWeight
+                                      .w800,
                             ),
-                            Text(
-                              '${requests.length}',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                color: colors
-                                    .onSurfaceVariant,
-                                fontSize: 10.5,
-                                fontWeight:
-                                    FontWeight
-                                        .w700,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
+                        Text(
+                          '${requests.length}',
+                          style: GoogleFonts
+                              .plusJakartaSans(
+                            fontSize: 8,
+                            fontWeight:
+                                FontWeight
+                                    .w700,
+                            color: colors
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
 
-                    const SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: 11,
-                      ),
-                    ),
+                    const SizedBox(height: 10),
 
                     if (requests.isEmpty)
-                      const SliverPadding(
-                        padding:
-                            EdgeInsets.fromLTRB(
-                          18,
-                          0,
-                          18,
-                          30,
-                        ),
-                        sliver:
-                            SliverToBoxAdapter(
-                          child: EmptyState(
-                            icon: Icons
-                                .notifications_none_rounded,
-                            title:
-                                'No notifications yet',
-                            message:
-                                'Request status updates will appear here in real time.',
-                          ),
-                        ),
+                      const EmptyState(
+                        icon: Icons
+                            .notifications_none_rounded,
+                        title:
+                            'No notifications yet',
+                        message:
+                            'Request status updates will appear here in real time.',
                       )
                     else
-                      SliverPadding(
-                        padding:
-                            const EdgeInsets.fromLTRB(
-                          18,
-                          0,
-                          18,
-                          32,
-                        ),
-                        sliver:
-                            SliverList.separated(
-                          itemCount:
-                              requests.length,
-                          separatorBuilder:
-                              (_, __) =>
-                                  const SizedBox(
-                            height: 9,
+                      for (var index = 0;
+                          index < requests.length;
+                          index++) ...[
+                        _RaDriverNotificationCard(
+                          request:
+                              requests[index],
+                          message:
+                              message(
+                            requests[index]
+                                .data(),
                           ),
-                          itemBuilder:
-                              (context, index) {
-                            final request =
-                                requests[index];
-
-                            final status =
-                                request.data()[
-                                            'status']
-                                        as String? ??
-                                    '';
-
-                            return _PremiumDriverNotificationCard(
-                              request:
-                                  request,
-                              message:
-                                  _message(
-                                request.data(),
-                              ),
-                              subtitle:
-                                  _subtitle(
-                                request.data(),
-                              ),
-                              icon: _icon(
-                                status,
-                              ),
-                              tone: _tone(
-                                context,
-                                status,
-                              ),
-                              onTap: () {
-                                _openRequest(
-                                  context,
-                                  request,
-                                );
-                              },
+                          subtitle:
+                              subtitle(
+                            requests[index]
+                                .data(),
+                          ),
+                          icon:
+                              statusIcon(
+                            requests[index]
+                                        .data()[
+                                    'status']
+                                as String? ??
+                                '',
+                          ),
+                          tone:
+                              statusTone(
+                            context,
+                            requests[index]
+                                        .data()[
+                                    'status']
+                                as String? ??
+                                '',
+                          ),
+                          onTap: () {
+                            openRequest(
+                              requests[index],
                             );
                           },
                         ),
-                      ),
+                        if (index !=
+                            requests.length - 1)
+                          const SizedBox(
+                            height: 8,
+                          ),
+                      ],
                   ],
                 );
               },
@@ -438,9 +414,9 @@ class _DriverNotificationsScreenState
   }
 }
 
-class _DriverNotificationIntro
+class _RaNotificationUpdatesHero
     extends StatelessWidget {
-  const _DriverNotificationIntro({
+  const _RaNotificationUpdatesHero({
     required this.count,
   });
 
@@ -448,68 +424,77 @@ class _DriverNotificationIntro
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final dark =
+        Theme.of(context).brightness ==
+            Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(17),
+      padding:
+          const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colors.primary
-            .withValues(alpha: .08),
-        borderRadius:
-            BorderRadius.circular(21),
-        border: Border.all(
-          color: colors.primary
-              .withValues(alpha: .14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end:
+              Alignment.bottomRight,
+          colors: dark
+              ? const [
+                  Color(0xFF0A497F),
+                  Color(0xFF075A68),
+                ]
+              : const [
+                  Color(0xFF075BA8),
+                  Color(0xFF078C7E),
+                ],
         ),
+        borderRadius:
+            BorderRadius.circular(23),
       ),
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: colors.primary
-                  .withValues(alpha: .12),
+            width: 49,
+            height: 49,
+            decoration:
+                BoxDecoration(
+              color: Colors.white
+                  .withValues(alpha: .13),
               borderRadius:
-                  BorderRadius.circular(15),
+                  BorderRadius.circular(
+                15,
+              ),
             ),
-            child: Icon(
+            child: const Icon(
               Icons
                   .notifications_active_outlined,
-              color: colors.primary,
-              size: 22,
+              color: Colors.white,
             ),
           ),
-
-          const SizedBox(width: 13),
-
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment:
                   CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Stay up to date',
+                  'RoadAssist updates',
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 14,
+                    color: Colors.white,
+                    fontSize: 17,
                     fontWeight:
-                        FontWeight.w700,
-                    color: colors.onSurface,
+                        FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   count == 0
-                      ? 'RoadAssist will show important request and message updates here.'
-                      : '$count request ${count == 1 ? 'update is' : 'updates are'} available in your activity history.',
+                      ? 'Important request activity will appear here.'
+                      : '$count ${count == 1 ? 'request' : 'requests'} currently available in your update history.',
                   style: GoogleFonts
                       .plusJakartaSans(
-                    fontSize: 10.5,
-                    height: 1.45,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: Colors.white70,
+                    fontSize: 8.2,
+                    height: 1.4,
                   ),
                 ),
               ],
@@ -521,9 +506,9 @@ class _DriverNotificationIntro
   }
 }
 
-class _PremiumDriverNotificationCard
+class _RaDriverNotificationCard
     extends StatelessWidget {
-  const _PremiumDriverNotificationCard({
+  const _RaDriverNotificationCard({
     required this.request,
     required this.message,
     required this.subtitle,
@@ -533,33 +518,33 @@ class _PremiumDriverNotificationCard
   });
 
   final QueryDocumentSnapshot<
-          Map<String, dynamic>>
-      request;
+      Map<String, dynamic>> request;
 
   final String message;
   final String subtitle;
-
   final IconData icon;
   final Color tone;
-
   final VoidCallback onTap;
 
-  String? _timeLabel() {
-    final data = request.data();
+  String? timeLabel() {
+    final data =
+        request.data();
 
     final timestamp =
-        (data['updatedAt']
-                    as Timestamp?) ??
-            (data['createdAt']
-                as Timestamp?);
+        data['updatedAt'] as Timestamp? ??
+            data['createdAt'] as Timestamp?;
 
-    if (timestamp == null) return null;
+    if (timestamp == null) {
+      return null;
+    }
 
     final value =
         timestamp.toDate().toLocal();
 
     final difference =
-        DateTime.now().difference(value);
+        DateTime.now().difference(
+      value,
+    );
 
     if (difference.inMinutes < 1) {
       return 'Now';
@@ -573,66 +558,66 @@ class _PremiumDriverNotificationCard
       return '${difference.inHours}h';
     }
 
-    if (difference.inDays < 7) {
-      return '${difference.inDays}d';
-    }
-
     return '${value.day}/${value.month}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme =
+        Theme.of(context);
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final colors =
+        theme.colorScheme;
 
-    final time = _timeLabel();
+    final time =
+        timeLabel();
 
     return Material(
-      color: dark
+      color: theme.brightness ==
+              Brightness.dark
           ? const Color(0xFF0D1D2B)
-          : Colors.white,
-      borderRadius:
-          BorderRadius.circular(19),
-      clipBehavior: Clip.antiAlias,
+          : colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.circular(18),
+        side: BorderSide(
+          color: colors.outlineVariant
+              .withValues(alpha: .45),
+        ),
+      ),
+      clipBehavior:
+          Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(19),
-            border: Border.all(
-              color: colors.outlineVariant
-                  .withValues(alpha: .48),
-            ),
-          ),
+        child: Padding(
+          padding:
+              const EdgeInsets.all(13),
           child: Row(
             crossAxisAlignment:
                 CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: tone.withValues(
-                    alpha: .10,
+                width: 43,
+                height: 43,
+                decoration:
+                    BoxDecoration(
+                  color:
+                      tone.withValues(
+                    alpha: .08,
                   ),
                   borderRadius:
                       BorderRadius.circular(
-                    14,
+                    13,
                   ),
                 ),
                 child: Icon(
                   icon,
                   color: tone,
-                  size: 21,
+                  size: 20,
                 ),
               ),
 
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
 
               Expanded(
                 child: Column(
@@ -641,34 +626,28 @@ class _PremiumDriverNotificationCard
                   children: [
                     Row(
                       crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                          CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             message,
                             style: GoogleFonts
                                 .plusJakartaSans(
-                              fontSize: 12,
-                              height: 1.35,
+                              fontSize: 9.8,
                               fontWeight:
                                   FontWeight
-                                      .w700,
-                              color: colors
-                                  .onSurface,
+                                      .w800,
+                              height: 1.35,
                             ),
                           ),
                         ),
-
                         if (time != null) ...[
-                          const SizedBox(
-                            width: 8,
-                          ),
+                          const SizedBox(width: 7),
                           Text(
                             time,
                             style: GoogleFonts
                                 .plusJakartaSans(
-                              fontSize: 9,
+                              fontSize: 6.8,
                               color: colors
                                   .onSurfaceVariant,
                             ),
@@ -677,7 +656,7 @@ class _PremiumDriverNotificationCard
                       ],
                     ),
 
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
 
                     Text(
                       subtitle,
@@ -686,36 +665,36 @@ class _PremiumDriverNotificationCard
                           TextOverflow.ellipsis,
                       style: GoogleFonts
                           .plusJakartaSans(
-                        fontSize: 10,
+                        fontSize: 7.7,
                         height: 1.4,
                         color: colors
                             .onSurfaceVariant,
                       ),
                     ),
 
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 8),
 
                     Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.end,
                       children: [
                         Text(
                           'Open request',
                           style: GoogleFonts
                               .plusJakartaSans(
-                            color:
-                                colors.primary,
-                            fontSize: 9.5,
+                            fontSize: 7.2,
                             fontWeight:
                                 FontWeight
                                     .w700,
+                            color:
+                                colors.primary,
                           ),
                         ),
-                        const SizedBox(
-                          width: 4,
-                        ),
+                        const SizedBox(width: 2),
                         Icon(
                           Icons
                               .arrow_forward_rounded,
-                          size: 14,
+                          size: 15,
                           color:
                               colors.primary,
                         ),

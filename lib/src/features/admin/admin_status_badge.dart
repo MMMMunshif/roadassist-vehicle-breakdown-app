@@ -7,69 +7,19 @@ class _AdminStatusBadge extends StatelessWidget {
 
   final String status;
 
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+  String get normalized =>
+      status.trim().toLowerCase();
 
-    final normalized =
-        status.trim().toLowerCase();
-
-    final color = switch (normalized) {
-      'completed' ||
-      'resolved' ||
-      'verified' ||
-      'active' ||
-      'confirmed' =>
-        raSuccess,
-
-      'cancelled' ||
-      'rejected' ||
-      'suspended' ||
-      'failed' ||
-      'deleted' =>
-        colors.error,
-
-      'pending' ||
-      'pending renewal' ||
-      'under_review' ||
-      'under review' ||
-      'awaiting confirmation' =>
-        raGold,
-
-      'flagged' ||
-      'urgent' =>
-        raDanger,
-
-      _ => colors.primary,
-    };
-
-    final icon = switch (normalized) {
-      'completed' ||
-      'resolved' ||
-      'verified' ||
-      'active' =>
-        Icons.check_circle_outline_rounded,
-
-      'cancelled' ||
-      'rejected' ||
-      'suspended' =>
-        Icons.block_outlined,
-
-      'flagged' ||
-      'urgent' =>
-        Icons.flag_outlined,
-
-      'pending' ||
-      'pending renewal' ||
-      'under_review' ||
-      'under review' =>
-        Icons.schedule_outlined,
-
-      _ => Icons.circle_outlined,
-    };
-
-    final label = normalized
+  String get label {
+    final clean = normalized
         .replaceAll('_', ' ')
+        .trim();
+
+    if (clean.isEmpty) {
+      return 'Unknown';
+    }
+
+    return clean
         .split(' ')
         .where(
           (word) => word.isNotEmpty,
@@ -79,37 +29,185 @@ class _AdminStatusBadge extends StatelessWidget {
               '${word[0].toUpperCase()}${word.substring(1)}',
         )
         .join(' ');
+  }
+
+  Color _tone(
+    BuildContext context,
+  ) {
+    final colors =
+        Theme.of(context).colorScheme;
+
+    return switch (normalized) {
+      'verified' ||
+      'approved' ||
+      'active' ||
+      'enabled' ||
+      'online' ||
+      'completed' ||
+      'resolved' ||
+      'paid' =>
+        raSuccess,
+
+      'pending' ||
+      'pending renewal' ||
+      'pending_renewal' ||
+      'searching' ||
+      'waiting' ||
+      'under review' ||
+      'under_review' ||
+      'review' ||
+      'arrived' =>
+        raGold,
+
+      'rejected' ||
+      'suspended' ||
+      'cancelled' ||
+      'flagged' ||
+      'disabled' ||
+      'revoked' ||
+      'dismissed' ||
+      'blocked' =>
+        colors.error,
+
+      'accepted' ||
+      'en route' ||
+      'en_route' ||
+      'provider' ||
+      'driver' ||
+      'user' ||
+      'account' ||
+      'support' ||
+      'reviewer' ||
+      'super admin' ||
+      'super_admin' =>
+        colors.primary,
+
+      _ =>
+        colors.onSurfaceVariant,
+    };
+  }
+
+  IconData _icon() {
+    return switch (normalized) {
+      'verified' ||
+      'approved' =>
+        Icons.verified_outlined,
+
+      'active' ||
+      'enabled' ||
+      'online' =>
+        Icons.check_circle_outline_rounded,
+
+      'completed' ||
+      'resolved' ||
+      'paid' =>
+        Icons.task_alt_rounded,
+
+      'pending' ||
+      'pending renewal' ||
+      'pending_renewal' ||
+      'waiting' ||
+      'review' ||
+      'under review' ||
+      'under_review' =>
+        Icons.hourglass_top_rounded,
+
+      'searching' =>
+        Icons.search_rounded,
+
+      'accepted' =>
+        Icons.handshake_outlined,
+
+      'en route' ||
+      'en_route' =>
+        Icons.navigation_outlined,
+
+      'arrived' =>
+        Icons.location_on_outlined,
+
+      'rejected' ||
+      'cancelled' ||
+      'dismissed' =>
+        Icons.cancel_outlined,
+
+      'suspended' ||
+      'disabled' ||
+      'blocked' =>
+        Icons.block_outlined,
+
+      'flagged' =>
+        Icons.flag_outlined,
+
+      'revoked' =>
+        Icons.remove_circle_outline_rounded,
+
+      'provider' =>
+        Icons.handyman_outlined,
+
+      'driver' =>
+        Icons.directions_car_outlined,
+
+      'support' =>
+        Icons.support_agent_outlined,
+
+      'reviewer' =>
+        Icons.verified_user_outlined,
+
+      'super admin' ||
+      'super_admin' =>
+        Icons.security_outlined,
+
+      _ =>
+        Icons.circle_outlined,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tone =
+        _tone(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
+        horizontal: 8,
+        vertical: 5,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .10),
+        color: tone.withValues(
+          alpha: .075,
+        ),
         borderRadius:
             BorderRadius.circular(999),
         border: Border.all(
-          color: color.withValues(alpha: .20),
+          color: tone.withValues(
+            alpha: .16,
+          ),
         ),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize:
+            MainAxisSize.min,
         children: [
           Icon(
-            icon,
-            size: 13,
-            color: color,
+            _icon(),
+            size: 12,
+            color: tone,
           ),
-          const SizedBox(width: 5),
+
+          const SizedBox(width: 4),
+
           Text(
-            label.isEmpty
-                ? 'Unknown'
-                : label,
-            style: TextStyle(
-              color: color,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
+            label,
+            maxLines: 1,
+            overflow:
+                TextOverflow.ellipsis,
+            style:
+                GoogleFonts.plusJakartaSans(
+              fontSize: 6.9,
+              height: 1.1,
+              fontWeight:
+                  FontWeight.w800,
+              color: tone,
             ),
           ),
         ],
