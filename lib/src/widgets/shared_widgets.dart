@@ -4,7 +4,8 @@ class _NearbyProvidersPreview extends StatefulWidget {
   const _NearbyProvidersPreview();
 
   @override
-  State<_NearbyProvidersPreview> createState() => _NearbyProvidersPreviewState();
+  State<_NearbyProvidersPreview> createState() =>
+      _NearbyProvidersPreviewState();
 }
 
 class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
@@ -49,7 +50,8 @@ class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
           final lat = (data['latitude'] as num?)?.toDouble();
           final lon = (data['longitude'] as num?)?.toDouble();
           if (!hasLocation || lat == null || lon == null) return null;
-          return Geolocator.distanceBetween(latitude, longitude, lat, lon) / 1000;
+          return Geolocator.distanceBetween(latitude, longitude, lat, lon) /
+              1000;
         }
 
         return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -62,32 +64,43 @@ class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
               );
             }
             if (!snapshot.hasData) return const LinearProgressIndicator();
-            final nearby = snapshot.data!.docs.where((doc) {
-              final data = doc.data();
-              if (!_providerHasCurrentVerification(data) ||
-                  _providerAvailabilityStatus(data) != 'Online') return false;
-              final km = distance(data);
-              if (!hasLocation) return false;
-              if (km == null) return false;
-              final radius = double.tryParse(
-                RegExp(r'\d+(?:\.\d+)?')
-                    .firstMatch(data['serviceRadius'] as String? ?? '')
-                    ?.group(0) ?? '',
-              ) ?? 15;
-              return km <= radius;
-            }).toList()
-              ..sort((a, b) => (distance(a.data()) ?? double.infinity)
-                  .compareTo(distance(b.data()) ?? double.infinity));
+            final nearby =
+                snapshot.data!.docs.where((doc) {
+                  final data = doc.data();
+                  if (!_providerHasCurrentVerification(data) ||
+                      _providerAvailabilityStatus(data) != 'Online')
+                    return false;
+                  final km = distance(data);
+                  if (!hasLocation) return false;
+                  if (km == null) return false;
+                  final radius =
+                      double.tryParse(
+                        RegExp(r'\d+(?:\.\d+)?')
+                                .firstMatch(
+                                  data['serviceRadius'] as String? ?? '',
+                                )
+                                ?.group(0) ??
+                            '',
+                      ) ??
+                      15;
+                  return km <= radius;
+                }).toList()..sort(
+                  (a, b) => (distance(a.data()) ?? double.infinity).compareTo(
+                    distance(b.data()) ?? double.infinity,
+                  ),
+                );
             if (!hasLocation) {
               return const InlineMessage(
                 icon: Icons.location_on_outlined,
-                text: 'Update your current location to find providers near you.',
+                text:
+                    'Update your current location to find providers near you.',
               );
             }
             if (nearby.isEmpty) {
               return const InlineMessage(
                 icon: Icons.person_search_outlined,
-                text: 'No available providers nearby. Providers appear automatically when they come online.',
+                text:
+                    'No available providers nearby. Providers appear automatically when they come online.',
               );
             }
             return Column(
@@ -96,12 +109,16 @@ class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
                 if (!hasLocation) ...[
                   const InlineMessage(
                     icon: Icons.location_on_outlined,
-                    text: 'Update your current location to find providers near you. Showing available online providers.',
+                    text:
+                        'Update your current location to find providers near you. Showing available online providers.',
                   ),
                   const SizedBox(height: RaSpace.sm),
                 ],
                 for (final doc in nearby.take(3)) ...[
-                  _OnlineProviderPreviewCard(data: doc.data(), distanceKm: distance(doc.data())),
+                  _OnlineProviderPreviewCard(
+                    data: doc.data(),
+                    distanceKm: distance(doc.data()),
+                  ),
                   const SizedBox(height: RaSpace.sm),
                 ],
               ],
@@ -886,8 +903,7 @@ class _ProviderRequestBadge extends StatelessWidget {
             label: Text(count > 9 ? '9+' : '$count'),
             child: IconButton(
               tooltip: 'New requests',
-              onPressed: () =>
-                  push(context, const ProviderNotificationsScreen()),
+              onPressed: () => _openProviderRequests(context),
               icon: const Icon(Icons.notifications_none_rounded),
             ),
           );

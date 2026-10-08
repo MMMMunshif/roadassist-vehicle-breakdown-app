@@ -10,7 +10,7 @@ class ProviderCaseDetailsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       appBar: AppBar(
         title: const Text('Case Details'),
       ),

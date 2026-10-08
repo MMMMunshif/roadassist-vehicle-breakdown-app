@@ -1,231 +1,239 @@
 part of '../../screens.dart';
 
-class ProviderNotificationsScreen extends StatelessWidget {
+class ProviderNotificationsScreen extends StatefulWidget {
   const ProviderNotificationsScreen({super.key});
+  @override
+  State<ProviderNotificationsScreen> createState() =>
+      _ProviderNotificationsScreenState();
+}
+
+class _ProviderNotificationsScreenState
+    extends State<ProviderNotificationsScreen> {
+  bool offersOnly = false;
+  final scroll = ScrollController();
+  @override
+  void dispose() {
+    scroll.dispose();
+    super.dispose();
+  }
+
+  Widget _page(Map<String, dynamic> profile, Widget content) {
+    final services = (profile['services'] as List? ?? const [])
+        .whereType<String>()
+        .toList();
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        controller: scroll,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        children: [
+          RaProviderHeader(
+            notifications: IconButton(
+              tooltip: 'New requests',
+              onPressed: () {
+                setState(() => offersOnly = false);
+                if (scroll.hasClients) {
+                  scroll.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+              icon: const Icon(Icons.notifications_none_rounded),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Nearby requests',
+            style: _providerText(context, size: 24, weight: FontWeight.w800),
+          ),
+          const SizedBox(height: 16),
+          LayoutBuilder(
+            builder: (context, constraints) => SegmentedButton<bool>(
+              showSelectedIcon: false,
+              expandedInsets: EdgeInsets.zero,
+              segments: const [
+                ButtonSegment(value: false, label: Text('Available')),
+                ButtonSegment(value: true, label: Text('Offers sent')),
+              ],
+              selected: {offersOnly},
+              onSelectionChanged: (value) =>
+                  setState(() => offersOnly = value.first),
+              style: ButtonStyle(
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                ),
+                backgroundColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? Theme.of(context).colorScheme.primary
+                      : _providerSurface(context),
+                ),
+                foregroundColor: WidgetStateProperty.resolveWith(
+                  (states) => states.contains(WidgetState.selected)
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onSurface,
+                ),
+                textStyle: WidgetStatePropertyAll(
+                  _providerText(context, size: 13, weight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Matches your services and service radius.',
+            style: _providerText(context, size: 12, muted: true),
+          ),
+          const SizedBox(height: 18),
+          if (services.isEmpty) ...[
+            const RaProviderEmptyCard(
+              icon: Icons.home_repair_service_outlined,
+              title: 'Configure your services',
+              message:
+                  'Add the roadside services you provide to see matching requests.',
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => _openProviderProfile(context),
+              child: const Text('Manage services'),
+            ),
+          ] else
+            content,
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Assistance Requests',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
-          ),
-        ),
-      ),
-      body: !signedIn
-          ? const Padding(
-              padding: EdgeInsets.all(20),
-              child: EmptyState(
-                icon: Icons.login_outlined,
-                title: 'Sign in required',
-                message:
-                    'Sign in as a provider to view roadside assistance requests.',
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return RaScaffold(
+      body: uid == null
+          ? const SafeArea(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: EmptyState(
+                  icon: Icons.login_outlined,
+                  title: 'Sign in required',
+                  message:
+                      'Sign in as a provider to view roadside assistance requests.',
+                ),
               ),
             )
           : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: AuthService().watchCurrentProfile(),
               builder: (context, profileSnapshot) {
                 if (profileSnapshot.hasError) {
-                  return const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: EmptyState(
-                      icon: Icons.cloud_off_outlined,
-                      title: 'Unable to load provider profile',
-                      message:
-                          'Check your connection and try again.',
-                    ),
-                  );
-                }
-
-                if (!profileSnapshot.hasData) {
                   return const Center(
-                    child: CircularProgressIndicator(),
+                    child: InlineMessage(
+                      icon: Icons.cloud_off_outlined,
+                      text: 'Unable to load provider profile.',
+                    ),
                   );
                 }
-
+                if (!profileSnapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
                 final profile =
-                    profileSnapshot.data?.data() ??
-                    <String, dynamic>{};
-
-                final services =
-                    (profile['services'] as List<dynamic>? ??
-                            const [])
-                        .whereType<String>()
-                        .where(
-                          (service) =>
-                              service.trim().isNotEmpty,
-                        )
-                        .toList();
-
-                return Column(
-                  children: [
-                    const _ChatInbox(
-                      isProvider: true,
-                      preview: true,
-                    ),
-
-                    Expanded(
-                      child: services.isEmpty
-                          ? _RaProviderNotificationsNoServices()
-                          : StreamBuilder<
-                              QuerySnapshot<Map<String, dynamic>>>(
-                              stream: RequestService()
-                                  .watchOpenRequests(),
-                              builder: (
-                                context,
-                                snapshot,
-                              ) {
-                                if (snapshot.hasError) {
-                                  return const Padding(
-                                    padding: EdgeInsets.all(20),
-                                    child: EmptyState(
-                                      icon: Icons
-                                          .cloud_off_outlined,
-                                      title:
-                                          'Unable to load requests',
-                                      message:
-                                          'Check your connection and try again.',
-                                    ),
-                                  );
-                                }
-
-                                if (!snapshot.hasData) {
-                                  return const Center(
-                                    child:
-                                        CircularProgressIndicator(),
-                                  );
-                                }
-
-                                final userId = FirebaseAuth
-                                    .instance
-                                    .currentUser
-                                    ?.uid;
-
-                                if (userId == null) {
-                                  return const Padding(
-                                    padding:
-                                        EdgeInsets.all(20),
-                                    child: EmptyState(
-                                      icon: Icons.login_outlined,
-                                      title:
-                                          'Session unavailable',
-                                      message:
-                                          'Sign in again to continue.',
-                                    ),
-                                  );
-                                }
-
-                                final requests =
-                                    snapshot.data!.docs.where(
-                                  (request) {
-                                    return _requestMatchesProvider(
-                                      request.data(),
-                                      userId,
-                                      services: services,
-                                    );
-                                  },
-                                ).toList();
-
-                                requests.sort(
-                                  (a, b) {
-                                    final aPriority =
-                                        isHighPriority(
-                                      a.data()['priority']
-                                              as String? ??
-                                          'normal',
-                                    );
-
-                                    final bPriority =
-                                        isHighPriority(
-                                      b.data()['priority']
-                                              as String? ??
-                                          'normal',
-                                    );
-
-                                    if (aPriority != bPriority) {
-                                      return aPriority ? -1 : 1;
-                                    }
-
-                                    final aTime =
-                                        (a.data()['createdAt']
-                                                as Timestamp?)
-                                            ?.toDate();
-
-                                    final bTime =
-                                        (b.data()['createdAt']
-                                                as Timestamp?)
-                                            ?.toDate();
-
-                                    if (aTime == null &&
-                                        bTime == null) {
-                                      return 0;
-                                    }
-
-                                    if (aTime == null) return 1;
-                                    if (bTime == null) return -1;
-
-                                    return bTime.compareTo(aTime);
-                                  },
-                                );
-
-                                if (requests.isEmpty) {
-                                  return const Padding(
-                                    padding:
-                                        EdgeInsets.all(20),
-                                    child: EmptyState(
-                                      icon: Icons
-                                          .notifications_none_rounded,
-                                      title:
-                                          'No matching requests',
-                                      message:
-                                          'New roadside requests that match your configured services will appear here in real time.',
-                                    ),
-                                  );
-                                }
-
-                                return ListView(
-                                  physics:
-                                      const BouncingScrollPhysics(),
-                                  padding:
-                                      const EdgeInsets.fromLTRB(
-                                    18,
-                                    14,
-                                    18,
-                                    32,
-                                  ),
-                                  children: [
-                                    _RaProviderNotificationsHeader(
-                                      count: requests.length,
-                                      services: services,
-                                    ),
-
-                                    const SizedBox(height: 18),
-
-                                    for (var index = 0;
-                                        index < requests.length;
-                                        index++) ...[
-                                      if (index > 0)
-                                        const SizedBox(
-                                          height: 10,
-                                        ),
-
-                                      _RaProviderNotificationRequestCard(
-                                        request: requests[index],
-                                      ),
-                                    ],
-                                  ],
-                                );
-                              },
+                    profileSnapshot.data?.data() ?? <String, dynamic>{};
+                final services = (profile['services'] as List? ?? const [])
+                    .whereType<String>()
+                    .toList();
+                return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('providerDirectory')
+                      .doc(uid)
+                      .snapshots(),
+                  builder: (context, directorySnapshot) {
+                    if (directorySnapshot.hasError) {
+                      return _page(
+                        profile,
+                        const InlineMessage(
+                          icon: Icons.cloud_off_outlined,
+                          text:
+                              'Unable to load your availability. Please try again.',
+                        ),
+                      );
+                    }
+                    if (!directorySnapshot.hasData) {
+                      return _page(profile, const LinearProgressIndicator());
+                    }
+                    final directory =
+                        directorySnapshot.data?.data() ?? <String, dynamic>{};
+                    if (!offersOnly &&
+                        _providerAvailabilityStatus(directory) != 'Online') {
+                      return _page(
+                        profile,
+                        const RaProviderEmptyCard(
+                          icon: Icons.notifications_none_rounded,
+                          title: 'Go online to see matching requests',
+                          message:
+                              'Turn on availability from your dashboard when you are ready to help.',
+                        ),
+                      );
+                    }
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: RequestService().watchOpenRequests(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return _page(
+                            profile,
+                            const InlineMessage(
+                              icon: Icons.cloud_off_outlined,
+                              text: 'Unable to load matching requests.',
                             ),
-                    ),
-                  ],
+                          );
+                        }
+                        if (!snapshot.hasData) {
+                          return _page(
+                            profile,
+                            const LinearProgressIndicator(),
+                          );
+                        }
+                        final requests = snapshot.data!.docs
+                            .where(
+                              (request) => _requestMatchesProvider(
+                                request.data(),
+                                uid,
+                                services: services,
+                              ),
+                            )
+                            .toList();
+                        requests.sort((a, b) {
+                          final urgentA = isHighPriority(
+                            a.data()['priority'] as String? ?? 'normal',
+                          );
+                          final urgentB = isHighPriority(
+                            b.data()['priority'] as String? ?? 'normal',
+                          );
+                          if (urgentA != urgentB) return urgentA ? -1 : 1;
+                          final timeA =
+                              (a.data()['createdAt'] as Timestamp?)
+                                  ?.millisecondsSinceEpoch ??
+                              0;
+                          final timeB =
+                              (b.data()['createdAt'] as Timestamp?)
+                                  ?.millisecondsSinceEpoch ??
+                              0;
+                          return timeB.compareTo(timeA);
+                        });
+                        return _page(
+                          profile,
+                          _RaProviderOffersList(
+                            key: ValueKey(uid),
+                            userId: uid,
+                            requests: requests,
+                            offersOnly: offersOnly,
+                            directory: directory,
+                          ),
+                        );
+                      },
+                    );
+                  },
                 );
               },
             ),
@@ -233,141 +241,131 @@ class ProviderNotificationsScreen extends StatelessWidget {
   }
 }
 
-class _RaProviderNotificationsNoServices extends StatelessWidget {
+/// Listen only to this provider's quote documents; other providers' offers stay private.
+class _RaProviderOffersList extends StatefulWidget {
+  const _RaProviderOffersList({
+    super.key,
+    required this.userId,
+    required this.requests,
+    required this.offersOnly,
+    required this.directory,
+  });
+  final String userId;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> requests;
+  final bool offersOnly;
+  final Map<String, dynamic> directory;
+  @override
+  State<_RaProviderOffersList> createState() => _RaProviderOffersListState();
+}
+
+class _RaProviderOffersListState extends State<_RaProviderOffersList> {
+  final subscriptions =
+      <String, StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>{};
+  final offers = <String, bool>{};
+  final errors = <String>{};
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _RaProviderOffersList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _sync();
+  }
+
+  void _sync() {
+    final ids = widget.requests.map((r) => r.id).toSet();
+    for (final id
+        in subscriptions.keys.where((id) => !ids.contains(id)).toList()) {
+      subscriptions.remove(id)?.cancel();
+      offers.remove(id);
+      errors.remove(id);
+    }
+    for (final request in widget.requests) {
+      if (subscriptions.containsKey(request.id)) continue;
+      subscriptions[request.id] = request.reference
+          .collection('quotes')
+          .doc(widget.userId)
+          .snapshots()
+          .listen(
+            (snapshot) {
+              if (!mounted || !subscriptions.containsKey(request.id)) return;
+              setState(() {
+                offers[request.id] = snapshot.exists;
+                errors.remove(request.id);
+              });
+            },
+            onError: (_) {
+              if (mounted && subscriptions.containsKey(request.id)) {
+                setState(() => errors.add(request.id));
+              }
+            },
+          );
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final subscription in subscriptions.values) {
+      subscription.cancel();
+    }
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
+    if (errors.isNotEmpty) {
+      return const InlineMessage(
+        icon: Icons.cloud_off_outlined,
+        text:
+            'Unable to load offer status. Check your connection and try again.',
+      );
+    }
+    if (offers.length < widget.requests.length) {
+      return const LinearProgressIndicator();
+    }
+    final requests = widget.requests
+        .where((request) => offers[request.id] == widget.offersOnly)
+        .toList();
+    if (requests.isEmpty) {
+      return RaProviderEmptyCard(
+        icon: widget.offersOnly
+            ? Icons.request_quote_outlined
+            : Icons.notifications_none_rounded,
+        title: widget.offersOnly ? 'No pending offers' : 'No matching requests',
+        message: widget.offersOnly
+            ? 'Offers you send for open requests will appear here.'
+            : 'New matching requests will appear here in real time.',
+      );
+    }
+    return Column(
       children: [
-        const EmptyState(
-          icon: Icons.home_repair_service_outlined,
-          title: 'Configure your services',
-          message:
-              'Add the roadside services you provide before matching assistance requests can be shown.',
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () {
-            push(
-              context,
-              const ProviderProfileScreen(),
-            );
-          },
-          icon: const Icon(Icons.tune_rounded),
-          label: const Text('Manage Services'),
-        ),
+        for (var i = 0; i < requests.length; i++) ...[
+          if (i > 0) const SizedBox(height: 14),
+          _RaProviderNotificationRequestCard(
+            key: ValueKey(requests[i].id),
+            request: requests[i],
+            directory: widget.directory,
+            offerSent: widget.offersOnly,
+          ),
+        ],
       ],
     );
   }
 }
 
-class _RaProviderNotificationsHeader extends StatelessWidget {
-  const _RaProviderNotificationsHeader({
-    required this.count,
-    required this.services,
-  });
-
-  final int count;
-  final List<String> services;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colors.primary.withValues(alpha: .065),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.primary.withValues(alpha: .14),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: .11),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Icon(
-              Icons.notifications_active_outlined,
-              color: colors.primary,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$count matching ${count == 1 ? 'request' : 'requests'}',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Filtered using your current provider services. Open a request before submitting an offer.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9,
-                    height: 1.45,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 9),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final service in services)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius:
-                              BorderRadius.circular(999),
-                          border: Border.all(
-                            color: colors.outlineVariant
-                                .withValues(alpha: .5),
-                          ),
-                        ),
-                        child: Text(
-                          service,
-                          style:
-                              GoogleFonts.plusJakartaSans(
-                            fontSize: 7.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RaProviderNotificationRequestCard
-    extends StatefulWidget {
+class _RaProviderNotificationRequestCard extends StatefulWidget {
   const _RaProviderNotificationRequestCard({
+    super.key,
     required this.request,
+    required this.directory,
+    required this.offerSent,
   });
-
-  final QueryDocumentSnapshot<Map<String, dynamic>>
-      request;
-
+  final QueryDocumentSnapshot<Map<String, dynamic>> request;
+  final Map<String, dynamic> directory;
+  final bool offerSent;
   @override
   State<_RaProviderNotificationRequestCard> createState() =>
       _RaProviderNotificationRequestCardState();
@@ -376,315 +374,71 @@ class _RaProviderNotificationRequestCard
 class _RaProviderNotificationRequestCardState
     extends State<_RaProviderNotificationRequestCard> {
   bool busy = false;
-
-  Map<String, dynamic> get data =>
-      widget.request.data();
-
-  String _dateLabel() {
-    final timestamp =
-        data['createdAt'] as Timestamp?;
-
-    if (timestamp == null) {
-      return 'Time unavailable';
-    }
-
-    final value =
-        timestamp.toDate().toLocal();
-
-    final now = DateTime.now();
-
-    final difference =
-        now.difference(value);
-
-    if (!difference.isNegative &&
-        difference.inMinutes < 1) {
-      return 'Just now';
-    }
-
-    if (!difference.isNegative &&
-        difference.inHours < 1) {
-      return '${difference.inMinutes} min ago';
-    }
-
-    if (!difference.isNegative &&
-        difference.inHours < 24) {
-      return '${difference.inHours} hr ago';
-    }
-
-    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
-  }
-
-  String _locationLabel() {
-    return data['locationLabel'] as String? ??
-        data['location'] as String? ??
-        'Location unavailable';
-  }
-
-  String _vehicleLabel() {
-    return [
-      data['vehicleType'] as String? ?? '',
-      data['modelYear'] as String? ?? '',
-      data['registration'] as String? ?? '',
-    ]
-        .where(
-          (value) => value.trim().isNotEmpty,
-        )
-        .join(' • ');
-  }
-
   Future<void> _dismiss() async {
     if (busy) return;
-
-    setState(() {
-      busy = true;
-    });
-
+    setState(() => busy = true);
     try {
-      await RequestService().rejectRequest(
-        widget.request.id,
-      );
+      await RequestService().rejectRequest(widget.request.id);
     } catch (_) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to dismiss this request.',
-          ),
-        ),
-      );
-    } finally {
       if (mounted) {
-        setState(() {
-          busy = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to dismiss this request.')),
+        );
       }
+    } finally {
+      if (mounted) setState(() => busy = false);
     }
   }
 
-  Future<void> _reviewAndQuote() async {
-    if (busy) return;
-
-    push(
-      context,
-      ProviderRequestDetailsScreen(
-        requestId: widget.request.id,
-        data: data,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    final driver =
-        data['driverName'] as String? ?? 'Driver';
-
-    final priority =
-        data['priority'] as String? ?? 'normal';
-
-    final highPriority =
-        isHighPriority(priority);
-
-    final vehicle =
-        _vehicleLabel();
-
-    final workflowVersion =
-        data['workflowVersion'];
-
-    final legacyPrice =
-        (data['estimatedCost'] as num?)?.toInt();
-
-    return Material(
-      color: theme.brightness == Brightness.dark
-          ? const Color(0xFF0D1D2B)
-          : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: highPriority
-              ? raGold.withValues(alpha: .45)
-              : colors.outlineVariant
-                  .withValues(alpha: .45),
-          width: highPriority ? 1.25 : 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: _reviewAndQuote,
-        child: Padding(
-          padding: const EdgeInsets.all(15),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  ProfileInitials(
-                    name: driver,
-                    radius: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          driver,
-                          maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis,
-                          style:
-                              GoogleFonts.plusJakartaSans(
-                            fontSize: 11.5,
-                            fontWeight:
-                                FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          _dateLabel(),
-                          style:
-                              GoogleFonts.plusJakartaSans(
-                            fontSize: 8,
-                            color:
-                                colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  StatusPill(
-                    label: highPriority
-                        ? requestPriorityLabel(
-                            priority,
-                          )
-                        : 'New',
-                    tone: highPriority
-                        ? RaTone.warning
-                        : RaTone.info,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              Text(
-                requestIssueLabel(data),
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.25,
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              _RaProviderNotificationMeta(
-                icon: Icons.location_on_outlined,
-                text: _locationLabel(),
-              ),
-
-              if (vehicle.isNotEmpty)
-                _RaProviderNotificationMeta(
-                  icon:
-                      Icons.directions_car_outlined,
-                  text: vehicle,
-                ),
-
-              _RaProviderNotificationMeta(
-                icon:
-                    Icons.request_quote_outlined,
-                text: workflowVersion == 2
-                    ? 'Provider offer required'
-                    : legacyPrice == null
-                        ? 'Price unavailable'
-                        : 'Estimated Rs. $legacyPrice',
-              ),
-
-              const SizedBox(height: 12),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed:
-                          busy ? null : _dismiss,
-                      child: const Text('Dismiss'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      onPressed: busy
-                          ? null
-                          : _reviewAndQuote,
-                      icon: const Icon(
-                        Icons
-                            .arrow_forward_rounded,
-                      ),
-                      label: const Text(
-                        'Review Request',
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RaProviderNotificationMeta
-    extends StatelessWidget {
-  const _RaProviderNotificationMeta({
-    required this.icon,
-    required this.text,
-  });
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 7,
-      ),
-      child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            size: 15,
-            color: colors.primary,
-          ),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 2,
-              overflow:
-                  TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 8.7,
-                height: 1.4,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
+    final data = widget.request.data();
+    final created = (data['createdAt'] as Timestamp?)?.toDate();
+    final age = created == null ? null : DateTime.now().difference(created);
+    final time = age == null
+        ? 'Time unavailable'
+        : age.isNegative || age.inMinutes < 1
+        ? 'Just now'
+        : age.inHours < 1
+        ? '${age.inMinutes} min ago'
+        : age.inHours < 24
+        ? '${age.inHours} hr ago'
+        : '${created!.day}/${created.month}/${created.year}';
+    final lat = (data['latitude'] as num?)?.toDouble();
+    final lng = (data['longitude'] as num?)?.toDouble();
+    final providerLat = (widget.directory['latitude'] as num?)?.toDouble();
+    final providerLng = (widget.directory['longitude'] as num?)?.toDouble();
+    final updated = (widget.directory['locationUpdatedAt'] as Timestamp?)
+        ?.toDate();
+    String? distance;
+    if (lat != null &&
+        lng != null &&
+        providerLat != null &&
+        providerLng != null &&
+        ProviderAvailability.hasFreshLocation(updated, DateTime.now())) {
+      final km =
+          Geolocator.distanceBetween(lat, lng, providerLat, providerLng) / 1000;
+      if (km.isFinite) distance = '${km.toStringAsFixed(1)} km away';
+    }
+    final priority = data['priority'] as String? ?? 'normal';
+    return RaProviderRequestTile(
+      driver: data['driverName'] as String? ?? 'Driver',
+      issue: requestIssueLabel(data),
+      location:
+          data['locationLabel'] as String? ??
+          data['location'] as String? ??
+          'Location unavailable',
+      time: time,
+      distance: distance,
+      priority: isHighPriority(priority)
+          ? requestPriorityLabel(priority)
+          : null,
+      busy: busy,
+      offerSent: widget.offerSent,
+      onDismiss: _dismiss,
+      onView: () => push(
+        context,
+        ProviderRequestDetailsScreen(requestId: widget.request.id, data: data),
       ),
     );
   }

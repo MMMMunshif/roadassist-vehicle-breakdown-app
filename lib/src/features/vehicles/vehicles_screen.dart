@@ -475,7 +475,7 @@ class _VehiclesScreenState
         Theme.of(context);
 
     if (!signedIn) {
-      return Scaffold(
+      return RaScaffold(
         appBar: AppBar(
           title: Text(
             widget.selecting
@@ -497,7 +497,7 @@ class _VehiclesScreenState
       );
     }
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

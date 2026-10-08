@@ -1119,7 +1119,7 @@ class _BreakdownDetailsScreenState
                     as String? ??
                 '');
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

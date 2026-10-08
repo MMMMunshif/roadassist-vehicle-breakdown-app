@@ -95,7 +95,7 @@ class _AdminJobMonitorScreenState
     final theme =
         Theme.of(context);
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

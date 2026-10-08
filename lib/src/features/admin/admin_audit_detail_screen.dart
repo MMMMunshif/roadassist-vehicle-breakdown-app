@@ -155,7 +155,7 @@ class _AdminAuditScreen extends StatelessWidget {
         data['after'] !=
             null;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

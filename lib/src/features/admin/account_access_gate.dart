@@ -67,7 +67,7 @@ class _AccountAccessCheckingScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -131,7 +131,7 @@ class _AccountAccessBlockedScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

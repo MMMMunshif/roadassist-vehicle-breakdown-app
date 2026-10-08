@@ -1,20 +1,15 @@
 part of '../../screens.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({
-    super.key,
-    required this.onSignOut,
-  });
+  const AdminDashboardScreen({super.key, required this.onSignOut});
 
   final Future<void> Function() onSignOut;
 
   @override
-  State<AdminDashboardScreen> createState() =>
-      _AdminDashboardScreenState();
+  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState
-    extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int tab = 0;
 
   String accessRole = 'support';
@@ -85,10 +80,7 @@ class _AdminDashboardScreenState
       return [0, 2, 3, 4, 5, 6, 7, 8];
     }
 
-    return List.generate(
-      tabs.length,
-      (index) => index,
-    );
+    return List.generate(tabs.length, (index) => index);
   }
 
   String get roleLabel {
@@ -112,42 +104,33 @@ class _AdminDashboardScreenState
   void initState() {
     super.initState();
 
-    unawaited(
-      loadAccessRole(),
-    );
+    unawaited(loadAccessRole());
   }
 
   Future<void> loadAccessRole() async {
     try {
-      final currentUser =
-          FirebaseAuth.instance.currentUser;
+      final currentUser = FirebaseAuth.instance.currentUser;
 
       if (currentUser == null) {
         return;
       }
 
-      final access =
-          await FirebaseFirestore.instance
-              .collection('adminAccess')
-              .doc(currentUser.uid)
-              .get();
+      final access = await FirebaseFirestore.instance
+          .collection('adminAccess')
+          .doc(currentUser.uid)
+          .get();
 
       if (!mounted) {
         return;
       }
 
-      final role =
-          access.data()?['role'] as String? ??
-              'super_admin';
+      final role = access.data()?['role'] as String? ?? 'super_admin';
 
       final allowed = role == 'reviewer'
           ? [0, 1, 4, 5, 6]
           : role == 'support'
-              ? [0, 2, 3, 4, 5, 6, 7, 8]
-              : List.generate(
-                  tabs.length,
-                  (index) => index,
-                );
+          ? [0, 2, 3, 4, 5, 6, 7, 8]
+          : List.generate(tabs.length, (index) => index);
 
       setState(() {
         accessRole = role;
@@ -198,16 +181,12 @@ class _AdminDashboardScreenState
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: LayoutBuilder(
-          builder: (
-            context,
-            constraints,
-          ) {
-            final desktop =
-                constraints.maxWidth >= 900;
+          builder: (context, constraints) {
+            final desktop = constraints.maxWidth >= 900;
 
             if (desktop) {
               return Row(
@@ -229,9 +208,7 @@ class _AdminDashboardScreenState
                   ),
                   VerticalDivider(
                     width: 1,
-                    color: colors.outlineVariant.withValues(
-                      alpha: .50,
-                    ),
+                    color: colors.outlineVariant.withValues(alpha: .50),
                   ),
                   Expanded(
                     child: _AdminDashboardWorkspace(
@@ -251,9 +228,7 @@ class _AdminDashboardScreenState
                 _AdminDashboardMobileHeader(
                   title: tabs[tab],
                   description: descriptions[tab],
-                  roleLabel: loadingRole
-                      ? 'Checking access…'
-                      : roleLabel,
+                  roleLabel: loadingRole ? 'Checking access…' : roleLabel,
                   onSignOut: widget.onSignOut,
                 ),
                 _AdminDashboardMobileTabs(
@@ -265,20 +240,14 @@ class _AdminDashboardScreenState
                 ),
                 Divider(
                   height: 1,
-                  color: colors.outlineVariant.withValues(
-                    alpha: .50,
-                  ),
+                  color: colors.outlineVariant.withValues(alpha: .50),
                 ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(10),
                     child: ClipRRect(
-                      borderRadius:
-                          BorderRadius.circular(18),
-                      child: Material(
-                        color: colors.surface,
-                        child: content(),
-                      ),
+                      borderRadius: BorderRadius.circular(18),
+                      child: Material(color: colors.surface, child: content()),
                     ),
                   ),
                 ),
@@ -328,16 +297,10 @@ class _AdminDashboardSidebar extends StatelessWidget {
           ? const Color(0xFF0D1D2B)
           : colors.surface,
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              22,
-              20,
-              18,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
             child: Row(
               children: [
                 Container(
@@ -347,29 +310,20 @@ class _AdminDashboardSidebar extends StatelessWidget {
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF075BA8),
-                        Color(0xFF087D78),
-                      ],
+                      colors: [Color(0xFF075BA8), Color(0xFF087D78)],
                     ),
-                    borderRadius:
-                        BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
-                    Icons.shield_outlined,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.shield_outlined, color: Colors.white),
                 ),
                 const SizedBox(width: 11),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'RoadAssist',
-                        style:
-                            GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.35,
@@ -377,9 +331,8 @@ class _AdminDashboardSidebar extends StatelessWidget {
                       ),
                       Text(
                         'ADMIN WORKSPACE',
-                        style:
-                            GoogleFonts.plusJakartaSans(
-                          fontSize: 7.2,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                           letterSpacing: .85,
                           color: colors.onSurfaceVariant,
@@ -392,35 +345,22 @@ class _AdminDashboardSidebar extends StatelessWidget {
             ),
           ),
           Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 13,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 13),
             child: Container(
               padding: const EdgeInsets.all(11),
               decoration: BoxDecoration(
-                color: colors.primary.withValues(
-                  alpha: .07,
-                ),
-                borderRadius:
-                    BorderRadius.circular(15),
+                color: colors.primary.withValues(alpha: .07),
+                borderRadius: BorderRadius.circular(15),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    roleIcon,
-                    size: 18,
-                    color: colors.primary,
-                  ),
+                  Icon(roleIcon, size: 18, color: colors.primary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      loadingRole
-                          ? 'Checking access…'
-                          : roleLabel,
-                      style:
-                          GoogleFonts.plusJakartaSans(
-                        fontSize: 9,
+                      loadingRole ? 'Checking access…' : roleLabel,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -432,21 +372,13 @@ class _AdminDashboardSidebar extends StatelessWidget {
           const SizedBox(height: 13),
           Expanded(
             child: ListView(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 9,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 9),
               children: [
                 for (final index in visibleTabs)
                   Padding(
-                    padding:
-                        const EdgeInsets.only(
-                      bottom: 4,
-                    ),
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: _AdminDashboardNavItem(
-                      icon: tab == index
-                          ? selectedIcons[index]
-                          : icons[index],
+                      icon: tab == index ? selectedIcons[index] : icons[index],
                       label: tabs[index],
                       selected: tab == index,
                       onTap: () {
@@ -460,21 +392,18 @@ class _AdminDashboardSidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(13),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
                   padding: const EdgeInsets.all(11),
                   decoration: BoxDecoration(
-                    color: colors
-                        .surfaceContainerHighest
-                        .withValues(alpha: .35),
-                    borderRadius:
-                        BorderRadius.circular(14),
+                    color: colors.surfaceContainerHighest.withValues(
+                      alpha: .35,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         Icons.lock_outline_rounded,
@@ -485,12 +414,10 @@ class _AdminDashboardSidebar extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Private access. Administrative actions are audited.',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 7.5,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
                             height: 1.4,
-                            color:
-                                colors.onSurfaceVariant,
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -500,12 +427,9 @@ class _AdminDashboardSidebar extends StatelessWidget {
                 const SizedBox(height: 9),
                 OutlinedButton.icon(
                   onPressed: () {
-                    unawaited(
-                      onSignOut(),
-                    );
+                    unawaited(onSignOut());
                   },
-                  icon:
-                      const Icon(Icons.logout_rounded),
+                  icon: const Icon(Icons.logout_rounded),
                   label: const Text('Sign Out'),
                 ),
               ],
@@ -543,30 +467,22 @@ class _AdminDashboardNavItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 11,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(
             children: [
               Icon(
                 icon,
                 size: 20,
-                color: selected
-                    ? colors.primary
-                    : colors.onSurfaceVariant,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   label,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.2,
-                    fontWeight: selected
-                        ? FontWeight.w800
-                        : FontWeight.w600,
-                    color:
-                        selected ? colors.primary : null,
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: selected ? colors.primary : null,
                   ),
                 ),
               ),
@@ -609,24 +525,17 @@ class _AdminDashboardWorkspace extends StatelessWidget {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(
-            25,
-            18,
-            20,
-            17,
-          ),
+          padding: const EdgeInsets.fromLTRB(25, 18, 20, 17),
           color: colors.surface,
           child: Row(
             children: [
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style:
-                          GoogleFonts.plusJakartaSans(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 21,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -.5,
@@ -635,43 +544,33 @@ class _AdminDashboardWorkspace extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       description,
-                      style:
-                          GoogleFonts.plusJakartaSans(
-                        fontSize: 8.7,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
+              const _WelcomeThemeToggle(),
+              const SizedBox(width: 12),
               OutlinedButton.icon(
                 onPressed: () {
-                  unawaited(
-                    onSignOut(),
-                  );
+                  unawaited(onSignOut());
                 },
-                icon:
-                    const Icon(Icons.logout_rounded),
+                icon: const Icon(Icons.logout_rounded),
                 label: const Text('Sign Out'),
               ),
             ],
           ),
         ),
-        Divider(
-          height: 1,
-          color: colors.outlineVariant.withValues(
-            alpha: .50,
-          ),
-        ),
+        Divider(height: 1, color: colors.outlineVariant.withValues(alpha: .50)),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Material(
-                color: colors.surface,
-                child: child,
-              ),
+              child: Material(color: colors.surface, child: child),
             ),
           ),
         ),
@@ -698,38 +597,26 @@ class _AdminDashboardMobileHeader extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        15,
-        15,
-        10,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(15, 15, 10, 12),
       child: Row(
         children: [
           Container(
             width: 41,
             height: 41,
             decoration: BoxDecoration(
-              color:
-                  colors.primary.withValues(alpha: .08),
+              color: colors.primary.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(
-              Icons.shield_outlined,
-              color: colors.primary,
-              size: 20,
-            ),
+            child: Icon(Icons.shield_outlined, color: colors.primary, size: 20),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style:
-                      GoogleFonts.plusJakartaSans(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
@@ -739,18 +626,16 @@ class _AdminDashboardMobileHeader extends StatelessWidget {
                   description,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 7.8,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   roleLabel,
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 7.1,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: colors.primary,
                   ),
@@ -758,16 +643,14 @@ class _AdminDashboardMobileHeader extends StatelessWidget {
               ],
             ),
           ),
+          const _WelcomeThemeToggle(),
+          const SizedBox(width: 4),
           IconButton(
             tooltip: 'Sign out',
             onPressed: () {
-              unawaited(
-                onSignOut(),
-              );
+              unawaited(onSignOut());
             },
-            icon: const Icon(
-              Icons.logout_rounded,
-            ),
+            icon: const Icon(Icons.logout_rounded),
           ),
         ],
       ),
@@ -793,34 +676,18 @@ class _AdminDashboardMobileTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 48,
+      height: 44 + MediaQuery.textScalerOf(context).scale(16),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 3,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
         itemCount: visibleTabs.length,
-        separatorBuilder: (
-          context,
-          index,
-        ) =>
-            const SizedBox(width: 6),
-        itemBuilder: (
-          context,
-          position,
-        ) {
-          final index =
-              visibleTabs[position];
+        separatorBuilder: (context, index) => const SizedBox(width: 6),
+        itemBuilder: (context, position) {
+          final index = visibleTabs[position];
 
           return ChoiceChip(
-            avatar: Icon(
-              icons[index],
-              size: 16,
-            ),
-            label: Text(
-              tabs[index],
-            ),
+            avatar: Icon(icons[index], size: 16),
+            label: Text(tabs[index]),
             selected: tab == index,
             onSelected: (_) {
               onSelected(index);

@@ -1580,7 +1580,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final colors =
         theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

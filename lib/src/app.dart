@@ -244,6 +244,10 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
     foregroundMessageSubscription = FirebaseMessaging.onMessage.listen((
       message,
     ) {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final recipient = message.data['recipientUid'];
+      if (uid == null || (recipient != null && recipient != uid)) return;
+      unawaited(_playForegroundAlert());
       final title = message.notification?.title ?? 'RoadAssist update';
       final body =
           message.notification?.body ??
@@ -265,6 +269,16 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
     });
   }
 
+  Future<void> _playForegroundAlert() async {
+    try {
+      await const MethodChannel('roadassist/alerts').invokeMethod<void>('play');
+    } on MissingPluginException {
+      // Web and other platforms retain their existing notification behavior.
+    } on PlatformException {
+      // Notification presentation must continue if sound is unavailable.
+    }
+  }
+
   @override
   void dispose() {
     foregroundMessageSubscription?.cancel();
@@ -277,7 +291,8 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
     valueListenable: AppThemeController.mode,
     builder: (context, themeMode, _) => MaterialApp(
       title: const bool.fromEnvironment('ADMIN_PORTAL')
-          ? 'RoadAssist Admin' : 'RoadAssist',
+          ? 'RoadAssist Admin'
+          : 'RoadAssist',
       navigatorKey: navigationKey,
       navigatorObservers: [
         _NotificationNavigationObserver(() {

@@ -137,10 +137,14 @@ class _AuthFormState extends State<_AuthForm> {
 
       final user = FirebaseAuth.instance.currentUser;
 
-      if (registerMode &&
-          enforceEmailVerification &&
-          user != null &&
-          !user.emailVerified) {
+      if (user == null) {
+        throw FirebaseAuthException(
+          code: 'session-unavailable',
+          message: 'Your sign-in session is unavailable. Please sign in again.',
+        );
+      }
+
+      if (enforceEmailVerification && !user.emailVerified) {
         replace(
           context,
           EmailVerificationScreen(
@@ -718,7 +722,7 @@ class _AuthFormState extends State<_AuthForm> {
     final colors = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor: dark
           ? const Color(0xFF06121D)
           : const Color(0xFFF5F9FC),
@@ -924,6 +928,9 @@ class _AuthFormState extends State<_AuthForm> {
 
                                   if (name.length < 2) {
                                     return 'Name is too short';
+                                  }
+                                  if (name.length > 100) {
+                                    return 'Use at most 100 characters';
                                   }
 
                                   return null;
@@ -1186,8 +1193,8 @@ class _AuthFormState extends State<_AuthForm> {
                                 : Icons.login_rounded,
                             label: loading
                                 ? registerMode
-                                    ? 'Creating account…'
-                                    : 'Signing in…'
+                                    ? 'Creating accountâ€¦'
+                                    : 'Signing inâ€¦'
                                 : registerMode
                                     ? 'Create $roleName Account'
                                     : widget.isProvider
@@ -1227,7 +1234,7 @@ class _AuthFormState extends State<_AuthForm> {
 
                 Center(
                   child: Text(
-                    'RoadAssist • Sri Lanka',
+                    'RoadAssist â€¢ Sri Lanka',
                     style: GoogleFonts.plusJakartaSans(
                       color: colors.onSurfaceVariant.withValues(
                         alpha: .65,

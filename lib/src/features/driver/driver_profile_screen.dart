@@ -704,7 +704,7 @@ class _DriverProfileScreenState
         theme.colorScheme;
 
     if (!signedIn) {
-      return Scaffold(
+      return RaScaffold(
         appBar: AppBar(
           automaticallyImplyLeading:
               false,
@@ -724,7 +724,7 @@ class _DriverProfileScreenState
       );
     }
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

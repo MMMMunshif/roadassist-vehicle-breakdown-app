@@ -18,7 +18,7 @@ class DriverRequestDetailsScreen
         theme.brightness ==
             Brightness.dark;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

@@ -204,7 +204,7 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
     final searching =
         rawStatus == 'searching';
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(

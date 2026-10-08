@@ -339,7 +339,7 @@ class _AccountSecurityScreenState
         : null;
 
     if (!signedIn || user == null) {
-      return Scaffold(
+      return RaScaffold(
         appBar: AppBar(
           title: const Text(
             'Account & Security',
@@ -357,7 +357,7 @@ class _AccountSecurityScreenState
       );
     }
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

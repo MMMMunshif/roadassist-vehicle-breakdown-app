@@ -50,7 +50,7 @@ class CustomerContactScreen extends StatelessWidget {
       'arrived',
     ].contains(rawStatus);
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Customer Contact'),

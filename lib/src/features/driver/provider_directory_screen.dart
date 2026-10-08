@@ -44,7 +44,7 @@ class _ProviderDirectoryScreenState
         theme.colorScheme;
 
     if (!signedIn) {
-      return Scaffold(
+      return RaScaffold(
         appBar: AppBar(
           title: const Text(
             'Available Providers',
@@ -65,7 +65,7 @@ class _ProviderDirectoryScreenState
       );
     }
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

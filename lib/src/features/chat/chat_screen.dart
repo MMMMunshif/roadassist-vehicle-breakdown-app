@@ -25,6 +25,8 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   BuildContext context,
   Map<String, dynamic> requestData,
 ) async {
+  final quoteNavigator = Navigator.of(context, rootNavigator: true);
+  final quoteThemes = InheritedTheme.capture(from: context, to: quoteNavigator.context);
   var distanceKm =
       (requestData['providerDistanceKm'] as num?)
               ?.toDouble() ??
@@ -215,9 +217,10 @@ Future<Map<String, dynamic>?> requestProviderQuote(
     }
   }
 
-  final result =
-      await showDialog<Map<String, dynamic>>(
+  if (!context.mounted) return null;
+  final quoteRoute = DialogRoute<Map<String, dynamic>>(
     context: context,
+    themes: quoteThemes,
     barrierDismissible: false,
     builder: (dialogContext) {
       return StatefulBuilder(
@@ -1030,6 +1033,9 @@ Future<Map<String, dynamic>?> requestProviderQuote(
       );
     },
   );
+
+  final result = await Navigator.of(context, rootNavigator: true).push(quoteRoute);
+  await quoteRoute.completed;
 
   serviceController.dispose();
   travelController.dispose();
@@ -2289,7 +2295,7 @@ class _ChatScreenState
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

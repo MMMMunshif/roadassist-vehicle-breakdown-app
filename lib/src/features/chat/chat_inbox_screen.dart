@@ -290,7 +290,7 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
 
     final controller = inbox;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

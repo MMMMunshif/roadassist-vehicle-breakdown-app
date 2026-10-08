@@ -1114,7 +1114,7 @@ class _ProviderActiveJobScreenState
                     data['approvedRepairId'] !=
                         null));
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

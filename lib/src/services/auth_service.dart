@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import 'device_service.dart';
+import '../models/account_roles.dart';
 
 class AuthService {
   AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
@@ -86,7 +87,15 @@ class AuthService {
     final user = currentUser;
     if (user == null) return false;
     await user.reload();
-    return _auth.currentUser?.emailVerified ?? false;
+    final refreshed = _auth.currentUser;
+    if (refreshed == null ||
+        refreshed.uid != user.uid ||
+        !refreshed.emailVerified) {
+      return false;
+    }
+    // Document submission rules read email_verified from the ID token.
+    await refreshed.getIdToken(true);
+    return true;
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchCurrentProfile() {
@@ -105,7 +114,7 @@ class AuthService {
     final user = currentUser;
     if (user == null) return;
     final profile = await getCurrentProfile();
-    final role = profile.data()?['role'] as String?;
+    final role = accountLastRole(profile.data());
     if (role == null) return;
     _startBackgroundSetup(role);
   }
@@ -121,7 +130,7 @@ class AuthService {
     if (user == null) return;
     final profile = await _firestore.collection('users').doc(user.uid).get();
     final data = profile.data();
-    if (data?['role'] != 'provider') return;
+    if (!accountHasRole(data, 'provider')) return;
     final approval =
         (await _firestore.collection('accountModeration').doc(user.uid).get())
             .data();
@@ -140,12 +149,14 @@ class AuthService {
                 .get())
             .data();
     if (application == null ||
+        application['applicationStatus'] == 'withdrawn' ||
         application['revision'] != approval?['verificationRevision'])
       return;
     final professional = application['professionalDetails'] as Map?;
     if (professional == null) return;
     await updateCurrentProfile({
       'services': application['services'],
+      'additionalServiceNames': (application['customServices'] as List? ?? []).whereType<Map>().map((item) => item['name']).whereType<String>().toList(),
       'serviceRadius':
           professional['radiusKm'].toString() + ' km from current location',
     });
@@ -291,15 +302,25 @@ class AuthService {
         .collection('users')
         .doc(credential.user!.uid)
         .get();
-    if (!profile.exists || profile.data()?['role'] != role) {
+    if (!profile.exists || accountRoles(profile.data()).isEmpty) {
       await _auth.signOut();
       throw FirebaseAuthException(
         code: 'wrong-role',
         message: 'This account is not registered as a $role.',
       );
     }
-    if (role == 'provider') {
-      await updateCurrentProfile({'online': false});
+    if (role != 'driver' && role != 'provider') {
+      throw ArgumentError('Unsupported account role.');
+    }
+    final roles = {...accountRoles(profile.data()), role}.toList();
+    // Signing in with the existing password proves ownership before enrollment.
+    await updateCurrentProfile({
+      'roles': roles,
+      'lastRole': role,
+      'online': false,
+    });
+    if (accountHasRole(profile.data(), 'provider')) {
+      unawaited(syncProviderDirectory().catchError((_) {}));
     }
     _startBackgroundSetup(role);
     return credential;
@@ -312,16 +333,55 @@ class AuthService {
     required String displayName,
     required String phone,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    if (role != 'driver' && role != 'provider') {
+      throw ArgumentError('Unsupported account role.');
+    }
+    UserCredential credential;
+    try {
+      credential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'email-already-in-use') rethrow;
+      // Reuse the existing account only after authenticating its password.
+      credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final profile = await _firestore
+          .collection('users')
+          .doc(credential.user!.uid)
+          .get();
+      if (!profile.exists || accountRoles(profile.data()).isEmpty) {
+        await _auth.signOut();
+        throw FirebaseAuthException(
+          code: 'wrong-role',
+          message: 'This account has no RoadAssist profile.',
+        );
+      }
+      if (accountHasRole(profile.data(), role)) {
+        await _auth.signOut();
+        rethrow;
+      }
+      await updateCurrentProfile({
+        'roles': {...accountRoles(profile.data()), role}.toList(),
+        'lastRole': role,
+        'online': false,
+      });
+      if (accountHasRole(profile.data(), 'provider')) {
+        unawaited(syncProviderDirectory().catchError((_) {}));
+      }
+      return credential;
+    }
     await credential.user!.updateDisplayName(displayName.trim());
     await _firestore.collection('users').doc(credential.user!.uid).set({
       'email': email.trim().toLowerCase(),
       'displayName': displayName.trim(),
       'phone': phone.trim(),
       'role': role,
+      'roles': [role],
+      'lastRole': role,
       'online': false,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -348,7 +408,9 @@ class AuthService {
 
     final profileRef = _firestore.collection('users').doc(user.uid);
     final profile = await profileRef.get();
-    final role = profile.data()?['role'] as String?;
+    final role = accountHasRole(profile.data(), 'provider')
+        ? 'provider'
+        : 'driver';
     final devices = await profileRef.collection('devices').get();
     final batch = _firestore.batch();
     for (final device in devices.docs) {
@@ -386,7 +448,7 @@ class AuthService {
             .collection('users')
             .doc(user.uid)
             .get();
-        if (profile.data()?['role'] == 'provider') {
+        if (accountHasRole(profile.data(), 'provider')) {
           await setProviderOnline(false);
         }
       } catch (_) {

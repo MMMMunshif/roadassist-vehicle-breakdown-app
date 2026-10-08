@@ -201,7 +201,7 @@ class _ProviderCompletedContent
             .whereType<String>()
             .toList();
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

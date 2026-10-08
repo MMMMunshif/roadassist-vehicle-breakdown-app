@@ -16,7 +16,7 @@ class _DriverShellState extends State<DriverShell> {
   void initState() {
     super.initState();
 
-    if (signedIn) {
+    if (signedIn && FirebaseAuth.instance.currentUser!.emailVerified) {
       chatInbox = ChatInboxController(
         isProvider: false,
       );
@@ -41,6 +41,25 @@ class _DriverShellState extends State<DriverShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (!firebaseReady) return _buildDashboard(context);
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.userChanges(),
+      initialData: FirebaseAuth.instance.currentUser,
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        if (enforceEmailVerification && user != null && !user.emailVerified) {
+          return const EmailVerificationScreen(role: 'driver');
+        }
+        return _buildDashboard(context);
+      },
+    );
+  }
+
+  Widget _buildDashboard(BuildContext context) {
+    // Verification can finish while this shell is already mounted.
+    if (signedIn && FirebaseAuth.instance.currentUser!.emailVerified) {
+      chatInbox ??= ChatInboxController(isProvider: false);
+    }
     final theme = Theme.of(context);
 
     final dark =
@@ -67,7 +86,7 @@ class _DriverShellState extends State<DriverShell> {
           });
         }
       },
-      child: Scaffold(
+      child: RaScaffold(
         backgroundColor: dark
             ? const Color(0xFF07131E)
             : const Color(0xFFF4F8FC),

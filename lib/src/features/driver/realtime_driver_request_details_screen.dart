@@ -299,7 +299,7 @@ class RealtimeDriverRequestDetailsScreen
     final theme =
         Theme.of(context);
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

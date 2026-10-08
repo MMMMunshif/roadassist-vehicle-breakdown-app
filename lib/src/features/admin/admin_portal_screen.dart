@@ -1,13 +1,10 @@
 part of '../../screens.dart';
 
 class AdminPortalScreen extends StatefulWidget {
-  const AdminPortalScreen({
-    super.key,
-  });
+  const AdminPortalScreen({super.key});
 
   @override
-  State<AdminPortalScreen> createState() =>
-      _AdminPortalScreenState();
+  State<AdminPortalScreen> createState() => _AdminPortalScreenState();
 }
 
 class _AdminPortalScreenState extends State<AdminPortalScreen> {
@@ -27,9 +24,7 @@ class _AdminPortalScreenState extends State<AdminPortalScreen> {
   void initState() {
     super.initState();
 
-    unawaited(
-      _checkAccess(),
-    );
+    unawaited(_checkAccess());
   }
 
   @override
@@ -71,8 +66,7 @@ class _AdminPortalScreenState extends State<AdminPortalScreen> {
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
 
-    if (busy ||
-        !(formKey.currentState?.validate() ?? false)) {
+    if (busy || !(formKey.currentState?.validate() ?? false)) {
       return;
     }
 
@@ -106,18 +100,13 @@ class _AdminPortalScreenState extends State<AdminPortalScreen> {
       }
 
       final message = switch (exception.code) {
-        'invalid-credential' =>
-          'Incorrect email or password.',
-        'invalid-email' =>
-          'Enter a valid email address.',
-        'user-disabled' =>
-          'This account has been disabled.',
-        'too-many-requests' =>
-          'Too many sign-in attempts. Try again later.',
+        'invalid-credential' => 'Incorrect email or password.',
+        'invalid-email' => 'Enter a valid email address.',
+        'user-disabled' => 'This account has been disabled.',
+        'too-many-requests' => 'Too many sign-in attempts. Try again later.',
         'network-request-failed' =>
           'Network unavailable. Check your connection.',
-        _ =>
-          'Sign-in failed or this account has no verified admin permission.',
+        _ => 'Sign-in failed or this account has no verified admin permission.',
       };
 
       setState(() {
@@ -144,6 +133,26 @@ class _AdminPortalScreenState extends State<AdminPortalScreen> {
   }
 
   Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign out of admin?'),
+        content: const Text(
+          'You will need to sign in again to manage RoadAssist.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     await AuthService().signOut();
 
     if (!mounted) {
@@ -164,9 +173,7 @@ class _AdminPortalScreenState extends State<AdminPortalScreen> {
     }
 
     if (allowed) {
-      return AdminDashboardScreen(
-        onSignOut: _signOut,
-      );
+      return AdminDashboardScreen(onSignOut: _signOut);
     }
 
     return _RaAdminLoginScreen(
@@ -194,14 +201,12 @@ class _RaAdminAccessLoading extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 430,
-            ),
+            constraints: const BoxConstraints(maxWidth: 430),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Container(
@@ -213,9 +218,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
                       : colors.surface,
                   borderRadius: BorderRadius.circular(26),
                   border: Border.all(
-                    color: colors.outlineVariant.withValues(
-                      alpha: .45,
-                    ),
+                    color: colors.outlineVariant.withValues(alpha: .45),
                   ),
                 ),
                 child: Column(
@@ -225,9 +228,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
                       width: 74,
                       height: 74,
                       decoration: BoxDecoration(
-                        color: colors.primary.withValues(
-                          alpha: .08,
-                        ),
+                        color: colors.primary.withValues(alpha: .08),
                         borderRadius: BorderRadius.circular(23),
                       ),
                       child: Icon(
@@ -259,9 +260,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
                     const SizedBox(height: 22),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(999),
-                      child: const LinearProgressIndicator(
-                        minHeight: 4,
-                      ),
+                      child: const LinearProgressIndicator(minHeight: 4),
                     ),
                   ],
                 ),
@@ -303,53 +302,52 @@ class _RaAdminLoginScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 470,
-              ),
+              constraints: const BoxConstraints(maxWidth: 470),
               child: AutofillGroup(
                 child: Form(
                   key: formKey,
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: _WelcomeThemeToggle(),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
-                          BrandMark(
-                            size: 46,
-                          ),
+                          BrandMark(size: 46),
                           const SizedBox(width: 11),
                           Expanded(
                             child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'RoadAssist',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -.4,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'RoadAssist',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -.4,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'PRIVATE ADMINISTRATION',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 7.5,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: .75,
-                                  color: colors.onSurfaceVariant,
+                                Text(
+                                  'PRIVATE ADMINISTRATION',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: .75,
+                                    color: colors.onSurfaceVariant,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -360,32 +358,21 @@ class _RaAdminLoginScreen extends StatelessWidget {
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors:
-                                theme.brightness == Brightness.dark
-                                    ? const [
-                                        Color(0xFF0A497F),
-                                        Color(0xFF075A68),
-                                      ]
-                                    : const [
-                                        Color(0xFF075BA8),
-                                        Color(0xFF087D78),
-                                      ],
+                            colors: theme.brightness == Brightness.dark
+                                ? const [Color(0xFF0A497F), Color(0xFF075A68)]
+                                : const [Color(0xFF075BA8), Color(0xFF087D78)],
                           ),
                           borderRadius: BorderRadius.circular(26),
                         ),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
                               width: 51,
                               height: 51,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(
-                                  alpha: .13,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(16),
+                                color: Colors.white.withValues(alpha: .13),
+                                borderRadius: BorderRadius.circular(16),
                               ),
                               child: const Icon(
                                 Icons.shield_outlined,
@@ -407,9 +394,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                             Text(
                               'Restricted access for verified RoadAssist administrators. Permissions are granted separately by the project owner.',
                               style: GoogleFonts.plusJakartaSans(
-                                color: Colors.white.withValues(
-                                  alpha: .75,
-                                ),
+                                color: Colors.white.withValues(alpha: .75),
                                 fontSize: 9.5,
                                 height: 1.5,
                               ),
@@ -421,21 +406,16 @@ class _RaAdminLoginScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color:
-                              theme.brightness == Brightness.dark
-                                  ? const Color(0xFF0D1D2B)
-                                  : colors.surface,
+                          color: theme.brightness == Brightness.dark
+                              ? const Color(0xFF0D1D2B)
+                              : colors.surface,
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
-                            color:
-                                colors.outlineVariant.withValues(
-                              alpha: .45,
-                            ),
+                            color: colors.outlineVariant.withValues(alpha: .45),
                           ),
                         ),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.stretch,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
                               'Sign in',
@@ -457,34 +437,22 @@ class _RaAdminLoginScreen extends StatelessWidget {
                             TextFormField(
                               controller: email,
                               enabled: !busy,
-                              keyboardType:
-                                  TextInputType.emailAddress,
-                              autofillHints: const [
-                                AutofillHints.username,
-                              ],
-                              textInputAction:
-                                  TextInputAction.next,
-                              decoration:
-                                  const InputDecoration(
+                              keyboardType: TextInputType.emailAddress,
+                              autofillHints: const [AutofillHints.username],
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
                                 labelText: 'Admin email',
-                                prefixIcon: Icon(
-                                  Icons.email_outlined,
-                                ),
+                                prefixIcon: Icon(Icons.email_outlined),
                               ),
-                              validator:
-                                  validateEmailAddress,
+                              validator: validateEmailAddress,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: password,
                               enabled: !busy,
-                              obscureText:
-                                  obscurePassword,
-                              autofillHints: const [
-                                AutofillHints.password,
-                              ],
-                              textInputAction:
-                                  TextInputAction.done,
+                              obscureText: obscurePassword,
+                              autofillHints: const [AutofillHints.password],
+                              textInputAction: TextInputAction.done,
                               decoration: InputDecoration(
                                 labelText: 'Password',
                                 prefixIcon: const Icon(
@@ -494,19 +462,16 @@ class _RaAdminLoginScreen extends StatelessWidget {
                                   tooltip: obscurePassword
                                       ? 'Show password'
                                       : 'Hide password',
-                                  onPressed:
-                                      onTogglePassword,
+                                  onPressed: onTogglePassword,
                                   icon: Icon(
                                     obscurePassword
                                         ? Icons.visibility_outlined
-                                        : Icons
-                                            .visibility_off_outlined,
+                                        : Icons.visibility_off_outlined,
                                   ),
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null ||
-                                    value.isEmpty) {
+                                if (value == null || value.isEmpty) {
                                   return 'Enter your password';
                                 }
 
@@ -520,26 +485,20 @@ class _RaAdminLoginScreen extends StatelessWidget {
                             ),
                             if (error != null) ...[
                               const SizedBox(height: 12),
-                              _RaAdminLoginNotice(
-                                text: error!,
-                              ),
+                              _RaAdminLoginNotice(text: error!),
                             ],
                             const SizedBox(height: 16),
                             FilledButton.icon(
-                              onPressed:
-                                  busy ? null : onLogin,
+                              onPressed: busy ? null : onLogin,
                               icon: busy
                                   ? const SizedBox.square(
                                       dimension: 17,
-                                      child:
-                                          CircularProgressIndicator(
+                                      child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                         color: Colors.white,
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.login_rounded,
-                                    ),
+                                  : const Icon(Icons.login_rounded),
                               label: Text(
                                 busy
                                     ? 'Checking access...'
@@ -555,8 +514,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
                       Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.lock_outline_rounded,
@@ -568,11 +526,9 @@ class _RaAdminLoginScreen extends StatelessWidget {
                             child: Text(
                               'There is no public admin registration.',
                               textAlign: TextAlign.center,
-                              style:
-                                  GoogleFonts.plusJakartaSans(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 8,
-                                color:
-                                    colors.onSurfaceVariant,
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -591,47 +547,30 @@ class _RaAdminLoginScreen extends StatelessWidget {
 }
 
 class _RaAdminLoginNotice extends StatelessWidget {
-  const _RaAdminLoginNotice({
-    required this.text,
-  });
+  const _RaAdminLoginNotice({required this.text});
 
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.error.withValues(
-          alpha: .07,
-        ),
+        color: colors.error.withValues(alpha: .07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: colors.error.withValues(
-            alpha: .17,
-          ),
-        ),
+        border: Border.all(color: colors.error.withValues(alpha: .17)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.error_outline_rounded,
-            color: colors.error,
-            size: 19,
-          ),
+          Icon(Icons.error_outline_rounded, color: colors.error, size: 19),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 8.8,
-                height: 1.45,
-              ),
+              style: GoogleFonts.plusJakartaSans(fontSize: 8.8, height: 1.45),
             ),
           ),
         ],

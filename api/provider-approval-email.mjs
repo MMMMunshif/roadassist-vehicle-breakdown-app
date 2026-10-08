@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       db.doc(`users/${uid}`).get(), auth.getUser(uid),
     ]);
     const approval = approvalDoc.data(), application = applicationDoc.data();
-    if (!applicationDoc.exists || !application?.professionalDetails || !approval?.validUntil || profileDoc.data()?.role !== 'provider' || !user.emailVerified || user.disabled ||
+    if (!applicationDoc.exists || !application?.professionalDetails || !approval?.validUntil || !(profileDoc.data()?.role === 'provider' || profileDoc.data()?.roles?.includes('provider')) || !user.emailVerified || user.disabled ||
         approval?.verification !== 'verified' || approval.status !== 'active' ||
         approval.verificationRevision !== application?.revision || approval.validUntil?.toMillis() <= Date.now()) {
       return res.status(409).json({message: 'A current verified approval is required.'});

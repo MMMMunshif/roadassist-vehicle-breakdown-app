@@ -4,8 +4,15 @@ service cloud.firestore {
     function signedIn() {
       return authenticated() && !accountBlocked(request.auth.uid)
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && request.auth.token.get('email_verified', false) == true
         && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'provider'
-          || (request.auth.token.get('email_verified', false) == true && providerApproved(request.auth.uid)));
+          || providerApproved(request.auth.uid)
+          || 'driver' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roles', []));
+    }
+
+    function hasRole(uid, role) {
+      let profile = get(/databases/$(database)/documents/users/$(uid)).data;
+      return profile.role == role || role in profile.get('roles', []);
     }
 
     function authenticated() { return request.auth != null; }
@@ -26,6 +33,7 @@ service cloud.firestore {
         && get(m).data.status == 'active'
         && get(m).data.get('verificationRevision', 0) == get(a).data.revision
         && get(m).data.get('validUntil', request.time) > request.time
+        && get(a).data.get('applicationStatus', 'submitted') != 'withdrawn'
         && get(a).data.get('professionalDetails', {}).keys().hasAll(['workHistory','qualification','tools','businessPhone']);
     }
     function adminRole() {
@@ -74,12 +82,13 @@ service cloud.firestore {
 
     match /providerApplications/{uid} {
       function owner() { return authenticated() && request.auth.uid == uid && !accountBlocked(uid)
-        && get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider'; }
+        && hasRole(uid, 'provider'); }
       function valid() {
         let d = request.resource.data;
         return request.auth.token.get('email_verified', false) == true
           && d.keys().hasAll(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails'])
-          && d.keys().hasOnly(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails'])
+          && d.keys().hasOnly(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails','customServices'])
+          && validCustomServices(d.get('customServices', []), d.services)
           && validProfessional(d.professionalDetails, d.services)
           && d.legalName is string && d.legalName.size() >= 2 && d.legalName.size() <= 100
           && d.nicNumber is string && d.nicNumber.matches('([0-9]{9}[VX]|[0-9]{12})')
@@ -102,11 +111,33 @@ service cloud.firestore {
       allow read: if (authenticated() && request.auth.uid == uid) || canReviewProviders();
       allow create: if owner() && valid() && request.resource.data.revision == 1;
       allow update: if owner() && valid() && request.resource.data.revision == resource.data.revision + 1
-        && (!('professionalDetails' in resource.data) || (
+        && (resource.data.get('applicationStatus', 'submitted') == 'withdrawn' || !('professionalDetails' in resource.data) || (
           exists(/databases/$(database)/documents/accountModeration/$(uid))
           && get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending'
           && get(/databases/$(database)/documents/accountModeration/$(uid)).data.updatedAt > resource.data.submittedAt));
+      allow update: if owner() && request.auth.token.get('email_verified', false) == true
+        && resource.data.get('applicationStatus', 'submitted') != 'withdrawn'
+        && (!exists(/databases/$(database)/documents/accountModeration/$(uid))
+          || get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicationStatus','withdrawnAt'])
+        && request.resource.data.applicationStatus == 'withdrawn'
+        && request.resource.data.withdrawnAt == request.time;
       allow delete: if false;
+    }
+    function validCustomService(d, services) {
+      return d is map && d.keys().hasAll(['name','description','category'])
+        && d.keys().hasOnly(['name','description','category'])
+        && d.name is string && d.name.size() >= 3 && d.name.size() <= 60
+        && d.description is string && d.description.size() >= 10 && d.description.size() <= 160
+        && d.category is string && d.category in services;
+    }
+    function validCustomServices(items, services) {
+      return items is list && items.size() <= 5
+        && (items.size() < 1 || validCustomService(items[0], services))
+        && (items.size() < 2 || validCustomService(items[1], services))
+        && (items.size() < 3 || validCustomService(items[2], services))
+        && (items.size() < 4 || validCustomService(items[3], services))
+        && (items.size() < 5 || validCustomService(items[4], services));
     }
     function validDocument(value) { return value is string && value.size() > 20 && value.size() <= 160000; }
     match /providerApprovalEmails/{id} { allow read: if canReviewProviders(); allow write: if false; }
@@ -136,7 +167,7 @@ service cloud.firestore {
     match /accountModeration/{uid} {
       allow read: if (authenticated() && request.auth.uid == uid) || isAdmin();
       allow create, update: if isAdmin()
-        && (superAdmin() || (canReviewProviders() && get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider'))
+        && (superAdmin() || (canReviewProviders() && hasRole(uid, 'provider')))
         && exists(/databases/$(database)/documents/users/$(uid))
         && request.resource.data.keys().hasAll(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
         && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId','verificationRevision','validUntil','verificationChecks'])
@@ -148,9 +179,10 @@ service cloud.firestore {
         && request.resource.data.lastAuditId is string
         && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
         && (uid != request.auth.uid || (request.resource.data.status == 'active' && request.resource.data.verification != 'rejected'))
-        && (get(/databases/$(database)/documents/users/$(uid)).data.role == 'provider' || request.resource.data.verification == 'pending')
+        && (hasRole(uid, 'provider') || request.resource.data.verification == 'pending')
         && (request.resource.data.verification != 'verified' || (
           exists(/databases/$(database)/documents/providerApplications/$(uid))
+          && get(/databases/$(database)/documents/providerApplications/$(uid)).data.get('applicationStatus', 'submitted') != 'withdrawn'
           && validProfessional(get(/databases/$(database)/documents/providerApplications/$(uid)).data.professionalDetails, get(/databases/$(database)/documents/providerApplications/$(uid)).data.services)
           && request.resource.data.verificationRevision == get(/databases/$(database)/documents/providerApplications/$(uid)).data.revision
           && request.resource.data.validUntil is timestamp && request.resource.data.validUntil > request.time && request.resource.data.validUntil <= request.time + duration.value(366, 'd')
@@ -219,20 +251,43 @@ service cloud.firestore {
     }
 
     function isProvider() {
-      return signedIn() && userRole() == 'provider';
+      return authenticated() && request.auth.token.get('email_verified', false) == true
+        && !accountBlocked(request.auth.uid) && hasRole(request.auth.uid, 'provider')
+        && providerApproved(request.auth.uid);
     }
 
     function isDriver() {
-      return signedIn() && userRole() == 'driver';
+      return signedIn() && hasRole(request.auth.uid, 'driver');
     }
 
     match /users/{userId} {
-      allow create: if authenticated() && !accountBlocked(userId) && request.auth.uid == userId && request.resource.data.role in ['driver','provider'];
+      function validName(d) { return d.displayName is string && d.displayName.size() >= 2 && d.displayName.size() <= 100; }
+      function validEmail(d) { return d.email is string && d.email.size() <= 254
+        && d.email.matches('[^ @]+@[^ @]+[.][^ @]+') && d.email.lower() == request.auth.token.get('email', '').lower(); }
+      function validPhone(d) { return d.phone is string && d.phone.matches('[+]947[0-9]{8}'); }
+      function validRoles(d) { return d.get('roles', [d.role]) is list
+        && d.get('roles', [d.role]).size() >= 1 && d.get('roles', [d.role]).size() <= 2
+        && d.get('roles', [d.role]).hasOnly(['driver', 'provider'])
+        && d.role in d.get('roles', [d.role])
+        && d.get('lastRole', d.role) in d.get('roles', [d.role]); }
+      allow create: if authenticated() && !accountBlocked(userId) && request.auth.uid == userId
+        && request.resource.data.role in ['driver','provider']
+        && validName(request.resource.data) && validEmail(request.resource.data)
+        && validPhone(request.resource.data) && validRoles(request.resource.data)
+        && request.resource.data.get('online', false) == false
+        && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
       allow read: if isAdmin() || (authenticated() && request.auth.uid == userId);
       allow update: if authenticated() && !accountBlocked(userId)
         && request.auth.uid == userId
         && request.resource.data.role == resource.data.role
-        && (request.resource.data.get('online', false) == false || resource.data.role != 'provider' || providerApproved(userId));
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName']) || validName(request.resource.data))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) || validEmail(request.resource.data))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['phone']) || validPhone(request.resource.data))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['roles','lastRole'])
+          || (validRoles(request.resource.data)
+            && request.resource.data.get('roles', [resource.data.role]).hasAll(resource.data.get('roles', [resource.data.role]))))
+        && (request.resource.data.get('online', false) == false
+          || (request.auth.token.get('email_verified', false) == true && hasRole(userId, 'provider') && providerApproved(userId)));
       allow delete: if signedIn() && request.auth.uid == userId;
 
       match /devices/{deviceId} {
@@ -433,6 +488,7 @@ service cloud.firestore {
           && resource.data.status == 'searching'
           && resource.data.workflowVersion == 2
           && request.resource.data.status == 'accepted'
+          && request.resource.data.providerId != resource.data.driverId
           && request.resource.data.providerId == request.resource.data.selectedQuoteId
           && (resource.data.preferredProviderId == '' || resource.data.preferredProviderId == request.resource.data.providerId)
           && get(/databases/$(database)/documents/requests/$(requestId)/quotes/$(request.resource.data.selectedQuoteId)).data.providerId == request.resource.data.providerId
@@ -548,6 +604,7 @@ service cloud.firestore {
           ]))
         // Only one transaction can move a still-searching request to accepted.
         || (isProvider()
+          && resource.data.driverId != request.auth.uid
           && (!('workflowVersion' in resource.data) || resource.data.workflowVersion != 2)
           && resource.data.status == 'searching'
           && resource.data.providerId == null
@@ -679,6 +736,7 @@ service cloud.firestore {
         allow read: if signedIn() && (parent().driverId == request.auth.uid || request.auth.uid == providerId);
         allow create, update: if isProvider() && providerId == request.auth.uid
           && availableForRequests(get(/databases/$(database)/documents/providerDirectory/$(providerId)).data)
+          && parent().driverId != request.auth.uid
           && parent().status == 'searching' && parent().workflowVersion == 2
           && (parent().preferredProviderId == '' || parent().preferredProviderId == providerId)
           && !parent().rejectedBy.hasAny([providerId])

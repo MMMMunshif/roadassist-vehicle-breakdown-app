@@ -179,6 +179,9 @@ class RequestService {
     }
     final quotedTotal = serviceFee + travelFee + extraFee;
     final current = await _requests.doc(id).get();
+    if (current.data()?['driverId'] == _userId) {
+      throw StateError('You cannot offer assistance on your own request.');
+    }
     if (current.data()?['workflowVersion'] == 2) {
       final profile = await _firestore.collection('users').doc(_userId).get();
       await _requests.doc(id).collection('quotes').doc(_userId).set({
@@ -788,9 +791,8 @@ class RequestService {
   }
 
   Future<void> markChatSeen(String requestId) async {
-    final profile = await _firestore.collection('users').doc(_userId).get();
-    final role = profile.data()?['role'] as String?;
-    final field = role == 'provider'
+    final request = await _requests.doc(requestId).get();
+    final field = request.data()?['providerId'] == _userId
         ? 'providerMessagesSeenAt'
         : 'driverMessagesSeenAt';
     await _requests.doc(requestId).update({

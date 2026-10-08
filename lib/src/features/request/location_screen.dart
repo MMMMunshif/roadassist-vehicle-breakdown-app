@@ -621,7 +621,7 @@ class _LocationScreenState
     final colors =
         theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(

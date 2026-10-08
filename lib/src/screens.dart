@@ -20,6 +20,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'app.dart';
 import 'models/request_draft.dart';
+import 'models/account_roles.dart';
 import 'models/vehicle.dart';
 import 'models/provider_availability.dart';
 import 'models/provider_analytics.dart';
@@ -44,6 +45,8 @@ part 'features/vehicles/vehicles_screen.dart';
 part 'features/billing/invoice_screen.dart';
 part 'features/complaints/dispute_screen.dart';
 part 'widgets/shared_widgets.dart';
+part 'widgets/themed_scaffold.dart';
+part 'widgets/provider_design.dart';
 part 'widgets/quote_offers.dart';
 part 'widgets/chat_inbox.dart';
 part 'widgets/repair_quote_panel.dart';

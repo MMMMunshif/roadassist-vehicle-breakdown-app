@@ -99,7 +99,7 @@ class _InvoiceScreenState
     final theme =
         Theme.of(context);
 
-    return Scaffold(
+    return RaScaffold(
       backgroundColor:
           theme.scaffoldBackgroundColor,
       appBar: AppBar(
