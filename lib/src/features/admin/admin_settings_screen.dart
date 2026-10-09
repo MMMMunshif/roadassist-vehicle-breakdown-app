@@ -6,9 +6,7 @@ part of '../../screens.dart';
 /// coverage description and audited settings updates are handled
 /// by [_AdminSettingsPanel].
 class AdminSettingsScreen extends StatelessWidget {
-  const AdminSettingsScreen({
-    super.key,
-  });
+  const AdminSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

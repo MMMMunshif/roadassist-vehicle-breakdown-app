@@ -10,6 +10,8 @@ class _AdminRecords extends StatefulWidget {
 }
 
 class _AdminRecordsState extends State<_AdminRecords> {
+  final identityService = AdminIdentityService();
+  final auditLookups = <String, Future<Map<String, String>>>{};
   int limit = 50;
 
   String search = '';
@@ -74,8 +76,8 @@ class _AdminRecordsState extends State<_AdminRecords> {
 
   String get sectionTitle {
     return switch (widget.kind) {
-      'providers' => 'Provider accounts',
-      'users' => 'RoadAssist users',
+      'providers' => 'Provider approvals',
+      'users' => 'Users',
       'complaints' => 'Service complaints',
       'jobs' => 'Assistance jobs',
       _ => 'Administrative audit',
@@ -156,6 +158,9 @@ class _AdminRecordsState extends State<_AdminRecords> {
       ...(data['issues'] as List<dynamic>? ?? const []),
       data['target'],
       data['actor'],
+      identityService.resolved[data['actor']]?.label,
+      identityService.resolved[data['target']]?.label,
+      if (widget.kind == 'audit') AdminAuditPresentation.action(data),
       data['status'],
     ].join(' ').toLowerCase();
   }
@@ -216,7 +221,7 @@ class _AdminRecordsState extends State<_AdminRecords> {
       return;
     }
 
-    push(context, _AdminAuditScreen(data: document.data()));
+    push(context, AdminAuditDetailScreen(data: document.data()));
   }
 
   String recordTitle(QueryDocumentSnapshot<Map<String, dynamic>> document) {
@@ -233,7 +238,7 @@ class _AdminRecordsState extends State<_AdminRecords> {
     }
 
     if (widget.kind == 'audit') {
-      return data['kind']?.toString() ?? 'Administrative action';
+      return AdminAuditPresentation.action(data);
     }
 
     return data['displayName'] as String? ?? document.id;
@@ -331,7 +336,7 @@ class _AdminRecordsState extends State<_AdminRecords> {
 
     final colors = theme.colorScheme;
 
-    return Column(
+    return ListView(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 13),
@@ -402,39 +407,45 @@ class _AdminRecordsState extends State<_AdminRecords> {
                           : colors.outlineVariant.withValues(alpha: .40),
                     ),
                   ),
-                  child: SwitchListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 1,
-                    ),
-                    secondary: Icon(
-                      onlyAttention
-                          ? Icons.filter_alt_rounded
-                          : Icons.filter_alt_outlined,
-                      color: onlyAttention
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      attentionTitle,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 1,
+                        ),
+                        secondary: Icon(
+                          onlyAttention
+                              ? Icons.filter_alt_rounded
+                              : Icons.filter_alt_outlined,
+                          color: onlyAttention
+                              ? colors.primary
+                              : colors.onSurfaceVariant,
+                        ),
+                        title: Text(
+                          attentionTitle,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          attentionDescription,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                        value: onlyAttention,
+                        onChanged: (value) {
+                          setState(() {
+                            onlyAttention = value;
+                          });
+                        },
                       ),
                     ),
-                    subtitle: Text(
-                      attentionDescription,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                    value: onlyAttention,
-                    onChanged: (value) {
-                      setState(() {
-                        onlyAttention = value;
-                      });
-                    },
                   ),
                 ),
               ],
@@ -444,71 +455,79 @@ class _AdminRecordsState extends State<_AdminRecords> {
 
         Divider(height: 1, color: colors.outlineVariant.withValues(alpha: .45)),
 
-        Expanded(
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            key: ValueKey((widget.kind, userRole)),
-            stream: records,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: EmptyState(
-                    icon: Icons.cloud_off_outlined,
-                    title: 'Unable to load records',
-                    message:
-                        'Verify admin access, check your connection and try again.',
-                  ),
-                );
-              }
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          key: ValueKey((widget.kind, userRole)),
+          stream: records,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Padding(
+                padding: EdgeInsets.all(20),
+                child: EmptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Unable to load records',
+                  message:
+                      'Verify admin access, check your connection and try again.',
+                ),
+              );
+            }
 
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-              final loaded = snapshot.data!.docs;
+            final loaded = snapshot.data!.docs;
 
-              final docs = filteredDocuments(loaded);
+            final docs = filteredDocuments(loaded);
 
-              return ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(18, 15, 18, 28),
-                children: [
-                  _AdminRecordsSummary(
-                    loaded: loaded.length,
-                    matches: docs.length,
-                    filtered: onlyAttention || search.isNotEmpty,
-                  ),
+            return ListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(18, 15, 18, 28),
+              children: [
+                _AdminRecordsSummary(
+                  loaded: loaded.length,
+                  matches: docs.length,
+                  filtered: onlyAttention || search.isNotEmpty,
+                ),
 
-                  const SizedBox(height: 14),
+                const SizedBox(height: 14),
 
-                  if (docs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32),
-                      child: EmptyState(
-                        icon: Icons.search_off_rounded,
-                        title: 'No matching records',
-                        message:
-                            'Try another search term or change the current filter.',
-                      ),
-                    )
-                  else if (widget.kind == 'providers' || widget.kind == 'users')
-                    for (var index = 0; index < docs.length; index++) ...[
-                      _AdminUserRow(
-                        key: ValueKey(docs[index].id),
-                        uid: docs[index].id,
-                        data: docs[index].data(),
-                        pendingOnly:
-                            widget.kind == 'providers' && onlyAttention,
-                      ),
-                      if (index != docs.length - 1) const SizedBox(height: 8),
-                    ]
-                  else
-                    for (var index = 0; index < docs.length; index++) ...[
-                      _AdminRecordCard(
+                if (docs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: EmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'No matching records',
+                      message:
+                          'Try another search term or change the current filter.',
+                    ),
+                  )
+                else if (widget.kind == 'providers' || widget.kind == 'users')
+                  for (var index = 0; index < docs.length; index++) ...[
+                    _AdminUserRow(
+                      key: ValueKey(docs[index].id),
+                      uid: docs[index].id,
+                      data: docs[index].data(),
+                      pendingOnly: widget.kind == 'providers' && onlyAttention,
+                    ),
+                    if (index != docs.length - 1) const SizedBox(height: 8),
+                  ]
+                else
+                  for (var index = 0; index < docs.length; index++) ...[
+                    FutureBuilder<Map<String, String>>(
+                      future: widget.kind == 'audit'
+                          ? auditLookups.putIfAbsent(
+                              docs[index].id,
+                              () => identityService.audit(docs[index].data()),
+                            )
+                          : null,
+                      builder: (context, identity) => _AdminRecordCard(
                         document: docs[index],
                         kind: widget.kind,
                         title: recordTitle(docs[index]),
-                        subtitle: recordSubtitle(docs[index]),
+                        subtitle: widget.kind == 'audit'
+                            ? 'Target: ${identity.data?['target'] ?? 'Loading details...'}\nBy: ${identity.data?['actor'] ?? 'Loading details...'}\n${docs[index].data()['reason'] ?? 'Reason not recorded'}'
+                            : recordSubtitle(docs[index]),
                         icon: recordIcon(),
                         tone: recordTone(context, docs[index].data()),
                         time: formattedTime(docs[index].data()),
@@ -516,27 +535,27 @@ class _AdminRecordsState extends State<_AdminRecords> {
                           openRecord(context, docs[index]);
                         },
                       ),
-                      if (index != docs.length - 1) const SizedBox(height: 8),
-                    ],
-
-                  if (loaded.length == limit) ...[
-                    const SizedBox(height: 17),
-
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          limit += 50;
-                          connect();
-                        });
-                      },
-                      icon: const Icon(Icons.expand_more_rounded),
-                      label: Text('Load 50 More · currently $limit'),
                     ),
+                    if (index != docs.length - 1) const SizedBox(height: 8),
                   ],
+
+                if (loaded.length == limit) ...[
+                  const SizedBox(height: 17),
+
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        limit += 50;
+                        connect();
+                      });
+                    },
+                    icon: const Icon(Icons.expand_more_rounded),
+                    label: Text('Load 50 More · currently $limit'),
+                  ),
                 ],
-              );
-            },
-          ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -578,7 +597,7 @@ class _AdminRecordsHeader extends StatelessWidget {
               Text(
                 title,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15.5,
+                  fontSize: 22,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -586,7 +605,7 @@ class _AdminRecordsHeader extends StatelessWidget {
               Text(
                 description,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
+                  fontSize: 14,
                   height: 1.4,
                   color: colors.onSurfaceVariant,
                 ),
@@ -630,7 +649,7 @@ class _AdminRecordsSummary extends StatelessWidget {
                   ? '$loaded loaded • $matches match current search/filter'
                   : '$loaded records loaded',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -686,7 +705,7 @@ class _AdminRecordCard extends StatelessWidget {
 
     return Material(
       color: theme.brightness == Brightness.dark
-          ? const Color(0xFF0D1D2B)
+          ? const Color(0xFF0D2237)
           : colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
@@ -723,7 +742,7 @@ class _AdminRecordCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -733,7 +752,7 @@ class _AdminRecordCard extends StatelessWidget {
                           Text(
                             time!,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
+                              fontSize: 14,
                               color: colors.onSurfaceVariant,
                             ),
                           ),
@@ -744,17 +763,24 @@ class _AdminRecordCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        maxLines: kind == 'complaints' ? 3 : 2,
+                        maxLines: kind == 'audit'
+                            ? null
+                            : kind == 'complaints'
+                            ? 3
+                            : 2,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
+                          fontSize: 14,
                           height: 1.4,
                           color: colors.onSurfaceVariant,
                         ),
                       ),
                     ],
                     const SizedBox(height: 9),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (kind != 'audit' && status.isNotEmpty)
                           _AdminStatusBadge(status: status),
@@ -771,13 +797,13 @@ class _AdminRecordCard extends StatelessWidget {
                             child: Text(
                               status.replaceAll('_', ' ').toUpperCase(),
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w800,
                                 color: tone,
                               ),
                             ),
                           ),
-                        const Spacer(),
+
                         Text(
                           kind == 'jobs'
                               ? 'Monitor'
@@ -785,7 +811,7 @@ class _AdminRecordCard extends StatelessWidget {
                               ? 'Review'
                               : 'Details',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: colors.primary,
                           ),

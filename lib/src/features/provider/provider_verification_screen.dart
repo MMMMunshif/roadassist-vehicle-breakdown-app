@@ -185,6 +185,7 @@ class _ProviderVerificationScreenState
   }
 
   Future<void> pick(String kind) async {
+    if (correction != null && !correction!.documents.contains(kind)) return;
     if (busy) return;
 
     final navigator = Navigator.of(context);
@@ -272,6 +273,60 @@ class _ProviderVerificationScreenState
       if (services.contains('Vehicle Towing')) 'recoveryProof',
       if (professional['providerType'] == 'business') 'businessProof',
     ];
+  }
+
+  ProviderDocumentCorrection? get correction =>
+      ProviderDocumentCorrection.active(widget.application, widget.moderation);
+
+  Future<void> submitDocumentCorrections() async {
+    final request = correction;
+    if (request == null || busy || submittedThisSession) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await ProviderVerificationService().submitCorrections(
+        revision: request.revision,
+        replacements: {
+          for (final key in request.documents) key: photos[key] ?? '',
+        },
+      );
+      if (mounted)
+        setState(() {
+          submittedThisSession = true;
+          dirty = false;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => error =
+              'Upload a new photo for every requested document. If the request has changed, refresh and try again.',
+        );
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProviderVerificationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldRequest = oldWidget.moderation?['correctionRequest'];
+    final newRequest = widget.moderation?['correctionRequest'];
+    if (oldWidget.application?['revision'] != widget.application?['revision'] ||
+        (oldRequest is Map ? oldRequest['requestedAt'] : null) !=
+            (newRequest is Map ? newRequest['requestedAt'] : null)) {
+      submittedThisSession = false;
+      photos
+        ..clear()
+        ..addAll(
+          Map<String, String>.from(
+            widget.application?['documents'] as Map? ?? {},
+          ),
+        );
+      error = null;
+      dirty = false;
+    }
   }
 
   Future<void> submit() async {
@@ -367,6 +422,8 @@ class _ProviderVerificationScreenState
   }
 
   bool get changesRequested {
+    if (correction != null) return true;
+    if (widget.moderation?['correctionRequest'] is Map) return false;
     final application = widget.application;
 
     final moderation = widget.moderation;
@@ -479,22 +536,34 @@ class _ProviderVerificationScreenState
         verificationStatus == 'verified' &&
         (validUntil == null || !validUntil.isAfter(DateTime.now()));
 
-    return RaScaffold(
+    return RaProviderScaffold(
       preventLeave: busy || (dirty && canEdit),
       leaveMessage: busy
           ? 'Please wait until your document upload or application update finishes.'
           : 'You have unsaved application changes. Leave without saving?',
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Provider Verification',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.45,
-          ),
+        title: Row(
+          children: [
+            const BrandMark(size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Provider Verification',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.45,
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
+          const Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: _WelcomeThemeToggle(),
+          ),
           IconButton(
             tooltip: 'Sign out',
             onPressed: busy
@@ -580,7 +649,59 @@ class _ProviderVerificationScreenState
             ),
           ],
 
-          if (canEdit) ...[
+          if (canEdit && correction != null) ...[
+            const SizedBox(height: 20),
+            RaProviderCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Update requested documents',
+                    style: _providerText(
+                      context,
+                      size: 20,
+                      weight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.moderation?['reason']?.toString() ?? '',
+                    style: _providerText(context),
+                  ),
+                  const SizedBox(height: 12),
+                  const InlineMessage(
+                    icon: Icons.lock_outline_rounded,
+                    text:
+                        'Your other documents and application details stay saved. Replace every document listed below.',
+                  ),
+                  const SizedBox(height: 12),
+                  for (final key in correction!.documents) ...[
+                    _RaProviderVerificationDocumentCard(
+                      title: documents[key] ?? key,
+                      required: true,
+                      data: photos[key],
+                      busy: busy,
+                      onTap: () => pick(key),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (error != null)
+                    InlineMessage(icon: Icons.error_outline, text: error!),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: busy || !emailVerified
+                        ? null
+                        : submitDocumentCorrections,
+                    icon: const Icon(Icons.send_outlined),
+                    label: Text(
+                      busy ? 'Submitting...' : 'Resubmit requested documents',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (canEdit && correction == null) ...[
             const SizedBox(height: 25),
 
             const _RaProviderVerificationSection(
@@ -915,29 +1036,32 @@ class _ProviderVerificationScreenState
                       ),
                       borderRadius: BorderRadius.circular(17),
                     ),
-                    child: CheckboxListTile(
-                      value: consent,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: const EdgeInsets.all(11),
-                      onChanged: busy
-                          ? null
-                          : (value) {
-                              setState(() {
-                                consent = value ?? false;
-                              });
-                            },
-                      title: Text(
-                        'Provider declaration',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        value: consent,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: const EdgeInsets.all(11),
+                        onChanged: busy
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  consent = value ?? false;
+                                });
+                              },
+                        title: Text(
+                          'Provider declaration',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      subtitle: Text(
-                        'I confirm that these documents are mine, the information is accurate and I will request driver approval before additional work or charges.',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 8.4,
-                          height: 1.45,
+                        subtitle: Text(
+                          'I confirm that these documents are mine, the information is accurate and I will request driver approval before additional work or charges.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            height: 1.45,
+                          ),
                         ),
                       ),
                     ),
@@ -981,7 +1105,9 @@ class _ProviderVerificationScreenState
                 ],
               ),
             ),
-          ] else if (!submittedThisSession && widget.application != null) ...[
+          ] else if (!canEdit &&
+              !submittedThisSession &&
+              widget.application != null) ...[
             const SizedBox(height: 16),
 
             _RaProviderVerificationNotice(
@@ -1117,73 +1243,17 @@ class _RaProviderVerificationHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF0A497F), Color(0xFF08635D)]
-              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
-        ),
-        borderRadius: BorderRadius.circular(24),
+    return RaProviderSummaryCard(
+      title: title,
+      message: message,
+      icon: Icons.verified_user_outlined,
+      status: StatusPill(
+        label: status.replaceAll('_', ' ').toUpperCase(),
+        tone: tone,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Icon(
-                  Icons.verified_user_outlined,
-                  color: Colors.white,
-                ),
-              ),
-              const Spacer(),
-              StatusPill(
-                label: status.replaceAll('_', ' ').toUpperCase(),
-                tone: tone,
-              ),
-            ],
-          ),
-          const SizedBox(height: 17),
-          Text(
-            title,
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -.4,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white.withValues(alpha: .76),
-              fontSize: 9.3,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Verification is a manual review of identity and service capability. Approval is not a guarantee of service quality.',
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white.withValues(alpha: .58),
-              fontSize: 7.8,
-              height: 1.4,
-            ),
-          ),
-        ],
+      footer: Text(
+        'Verification is a manual review of identity and service capability. Approval is not a guarantee of service quality.',
+        style: _providerText(context, size: 12, muted: true),
       ),
     );
   }
@@ -1224,7 +1294,7 @@ class _RaProviderVerificationSection extends StatelessWidget {
               Text(
                 title,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1232,7 +1302,7 @@ class _RaProviderVerificationSection extends StatelessWidget {
               Text(
                 subtitle,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 8.8,
+                  fontSize: 12,
                   height: 1.4,
                   color: colors.onSurfaceVariant,
                 ),
@@ -1261,7 +1331,7 @@ class _RaProviderVerificationSurface extends StatelessWidget {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
+            ? const Color(0xFF0D2237)
             : Colors.white,
         borderRadius: BorderRadius.circular(19),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
@@ -1312,7 +1382,7 @@ class _RaProviderVerificationNotice extends StatelessWidget {
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1320,7 +1390,7 @@ class _RaProviderVerificationNotice extends StatelessWidget {
                 Text(
                   message,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 8.6,
+                    fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1373,14 +1443,14 @@ class _RaProviderVerificationStatusCard extends StatelessWidget {
           const SizedBox(height: 11),
           Text(
             reason,
-            style: GoogleFonts.plusJakartaSans(fontSize: 9.2, height: 1.5),
+            style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.5),
           ),
           if (!editable) ...[
             const SizedBox(height: 6),
             Text(
               'Documents are locked while the current review is active.',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 8,
+                fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -1448,7 +1518,7 @@ class _RaProviderVerificationDocumentCard extends StatelessWidget {
 
     return Material(
       color: theme.brightness == Brightness.dark
-          ? const Color(0xFF0D1D2B)
+          ? const Color(0xFF0D2237)
           : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(17),
@@ -1488,7 +1558,7 @@ class _RaProviderVerificationDocumentCard extends StatelessWidget {
                         Text(
                           title,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 9.6,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1496,7 +1566,7 @@ class _RaProviderVerificationDocumentCard extends StatelessWidget {
                         Text(
                           required ? 'Required' : 'Optional',
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 7.5,
+                            fontSize: 12,
                             color: required
                                 ? colors.primary
                                 : colors.onSurfaceVariant,
@@ -1627,7 +1697,7 @@ class _ProviderAdditionalServices extends StatelessWidget {
     children: [
       const Text(
         'Additional services / Other',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 6),
       const Text(
@@ -1635,20 +1705,23 @@ class _ProviderAdditionalServices extends StatelessWidget {
       ),
       for (final item in values)
         Card(
-          child: ListTile(
-            title: Text(item['name']!),
-            subtitle: Text(
-              '${item['category']} Ãƒâ€šÃ‚Â· ${item['description']}',
-            ),
-            trailing: IconButton(
-              tooltip: 'Remove service',
-              onPressed: onChanged == null
-                  ? null
-                  : () {
-                      values.remove(item);
-                      onChanged!();
-                    },
-              icon: const Icon(Icons.close),
+          child: Material(
+            color: Colors.transparent,
+            child: ListTile(
+              title: Text(item['name']!),
+              subtitle: Text(
+                '${item['category']} Ãƒâ€šÃ‚Â· ${item['description']}',
+              ),
+              trailing: IconButton(
+                tooltip: 'Remove service',
+                onPressed: onChanged == null
+                    ? null
+                    : () {
+                        values.remove(item);
+                        onChanged!();
+                      },
+                icon: const Icon(Icons.close),
+              ),
             ),
           ),
         ),

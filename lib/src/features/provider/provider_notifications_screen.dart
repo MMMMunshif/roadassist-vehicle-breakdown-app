@@ -111,7 +111,7 @@ class _ProviderNotificationsScreenState
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    return RaScaffold(
+    return RaProviderScaffold(
       body: uid == null
           ? const SafeArea(
               child: Padding(

@@ -11,12 +11,10 @@ class BreakdownDetailsScreen extends StatefulWidget {
   final RequestDraft? initialDraft;
 
   @override
-  State<BreakdownDetailsScreen> createState() =>
-      _BreakdownDetailsScreenState();
+  State<BreakdownDetailsScreen> createState() => _BreakdownDetailsScreenState();
 }
 
-class _BreakdownDetailsScreenState
-    extends State<BreakdownDetailsScreen> {
+class _BreakdownDetailsScreenState extends State<BreakdownDetailsScreen> {
   final formKey = GlobalKey<FormState>();
 
   final modelController = TextEditingController();
@@ -42,8 +40,7 @@ class _BreakdownDetailsScreenState
 
   final List<String> vehiclePhotoUrls = [];
 
-  final List<BreakdownPhotoAnnotation>
-      photoAnnotations = [];
+  final List<BreakdownPhotoAnnotation> photoAnnotations = [];
 
   static const Set<String> standardVehicleTypes = {
     'Sedan / Hatchback',
@@ -69,47 +66,35 @@ class _BreakdownDetailsScreenState
     vehicleId = draft.vehicleId;
     vehicleSnapshot = draft.vehicleSnapshot;
 
-    if (standardVehicleTypes.contains(
-      draft.vehicleType,
-    )) {
+    if (standardVehicleTypes.contains(draft.vehicleType)) {
       vehicle = draft.vehicleType;
     } else {
       vehicle = 'Other';
-      customVehicleController.text =
-          draft.vehicleType;
+      customVehicleController.text = draft.vehicleType;
     }
 
     modelController.text = draft.modelYear;
 
-    registrationController.text =
-        draft.registration;
+    registrationController.text = draft.registration;
 
-    descriptionController.text =
-        draft.description;
+    descriptionController.text = draft.description;
 
     notesController.text = draft.notes;
 
     priority = draft.priority;
 
-    partsPreference =
-        draft.partsPreference;
+    partsPreference = draft.partsPreference;
 
-    vehiclePhotoUrls.addAll(
-      draft.vehiclePhotoUrls,
-    );
+    vehiclePhotoUrls.addAll(draft.vehiclePhotoUrls);
 
-    photoAnnotations.addAll(
-      draft.photoAnnotations,
-    );
+    photoAnnotations.addAll(draft.photoAnnotations);
   }
 
   @override
   void dispose() {
     draftSaveDebounce?.cancel();
 
-    unawaited(
-      speechToText.stop(),
-    );
+    unawaited(speechToText.stop());
 
     modelController.dispose();
     registrationController.dispose();
@@ -126,15 +111,12 @@ class _BreakdownDetailsScreenState
 
   Future<void> loadDefaultVehicle() async {
     try {
-      final selected =
-          await VehicleService().loadDefault();
+      final selected = await VehicleService().loadDefault();
 
       if (!mounted ||
           selected == null ||
           modelController.text.trim().isNotEmpty ||
-          registrationController.text
-              .trim()
-              .isNotEmpty) {
+          registrationController.text.trim().isNotEmpty) {
         return;
       }
 
@@ -145,14 +127,8 @@ class _BreakdownDetailsScreenState
   }
 
   Future<void> selectSavedVehicle() async {
-    final selected =
-        await Navigator.of(context).push<Vehicle>(
-      MaterialPageRoute(
-        builder: (_) =>
-            const VehiclesScreen(
-          selecting: true,
-        ),
-      ),
+    final selected = await Navigator.of(context).push<Vehicle>(
+      MaterialPageRoute(builder: (_) => const VehiclesScreen(selecting: true)),
     );
 
     if (selected == null || !mounted) {
@@ -164,33 +140,25 @@ class _BreakdownDetailsScreenState
     scheduleDraftSave();
   }
 
-  void applyVehicle(
-    Vehicle selected,
-  ) {
+  void applyVehicle(Vehicle selected) {
     setState(() {
       vehicleId = selected.id;
 
-      vehicleSnapshot =
-          selected.toJson();
+      vehicleSnapshot = selected.toJson();
 
-      if (standardVehicleTypes.contains(
-        selected.vehicleType,
-      )) {
+      if (standardVehicleTypes.contains(selected.vehicleType)) {
         vehicle = selected.vehicleType;
 
         customVehicleController.clear();
       } else {
         vehicle = 'Other';
 
-        customVehicleController.text =
-            selected.vehicleType;
+        customVehicleController.text = selected.vehicleType;
       }
 
-      modelController.text =
-          selected.label;
+      modelController.text = selected.label;
 
-      registrationController.text =
-          selected.registration;
+      registrationController.text = selected.registration;
     });
   }
 
@@ -199,138 +167,81 @@ class _BreakdownDetailsScreenState
   // ===========================================================================
 
   RequestDraft buildDraft() {
-    final actualVehicleType =
-        vehicle == 'Other'
-            ? customVehicleController.text
-                .trim()
-            : vehicle;
+    final actualVehicleType = vehicle == 'Other'
+        ? customVehicleController.text.trim()
+        : vehicle;
 
     return RequestDraft(
       vehicleId: vehicleId,
-      vehicleSnapshot:
-          vehicleSnapshot == null
-              ? null
-              : {
-                  ...vehicleSnapshot!,
-                  'vehicleType':
-                      actualVehicleType,
-                  'modelYear':
-                      modelController.text
-                          .trim(),
-                  'registration':
-                      normalizeVehicleRegistration(
-                    registrationController.text,
-                  ),
-                },
+      vehicleSnapshot: vehicleSnapshot == null
+          ? null
+          : {
+              ...vehicleSnapshot!,
+              'vehicleType': actualVehicleType,
+              'modelYear': modelController.text.trim(),
+              'registration': normalizeVehicleRegistration(
+                registrationController.text,
+              ),
+            },
       issues: widget.issues,
-      vehicleType:
-          actualVehicleType,
-      modelYear:
-          modelController.text.trim(),
-      registration:
-          normalizeVehicleRegistration(
-        registrationController.text,
-      ),
-      description:
-          descriptionController.text.trim(),
+      vehicleType: actualVehicleType,
+      modelYear: modelController.text.trim(),
+      registration: normalizeVehicleRegistration(registrationController.text),
+      description: descriptionController.text.trim(),
       notes: notesController.text.trim(),
       priority: priority,
-      partsPreference:
-          partsPreference,
+      partsPreference: partsPreference,
       location:
           widget.initialDraft?.location ??
-              'Select current GPS or enter location manually',
-      landmark:
-          widget.initialDraft?.landmark ??
-              '',
-      locationAccuracyMeters:
-          widget.initialDraft
-              ?.locationAccuracyMeters,
-      latitude:
-          widget.initialDraft?.latitude ??
-              6.9271,
-      longitude:
-          widget.initialDraft?.longitude ??
-              79.8612,
-      provider:
-          widget.initialDraft?.provider ??
-              '',
-      preferredProviderId:
-          widget.initialDraft
-                  ?.preferredProviderId ??
-              '',
-      vehiclePhotoUrls:
-          List<String>.unmodifiable(
-        vehiclePhotoUrls,
-      ),
-      photoAnnotations:
-          List<BreakdownPhotoAnnotation>.unmodifiable(
+          'Select current GPS or enter location manually',
+      landmark: widget.initialDraft?.landmark ?? '',
+      locationAccuracyMeters: widget.initialDraft?.locationAccuracyMeters,
+      latitude: widget.initialDraft?.latitude ?? 6.9271,
+      longitude: widget.initialDraft?.longitude ?? 79.8612,
+      provider: widget.initialDraft?.provider ?? '',
+      preferredProviderId: widget.initialDraft?.preferredProviderId ?? '',
+      vehiclePhotoUrls: List<String>.unmodifiable(vehiclePhotoUrls),
+      photoAnnotations: List<BreakdownPhotoAnnotation>.unmodifiable(
         photoAnnotations,
       ),
     );
   }
 
-  Future<void> saveDraft({
-    bool showConfirmation = true,
-  }) async {
+  Future<void> saveDraft({bool showConfirmation = true}) async {
     try {
-      await RequestDraftStore().save(
-        buildDraft(),
-      );
+      await RequestDraftStore().save(buildDraft());
 
-      if (!mounted ||
-          !showConfirmation) {
+      if (!mounted || !showConfirmation) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Request saved as a draft.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request saved as a draft.')),
       );
     } catch (error) {
-      if (!mounted ||
-          !showConfirmation) {
+      if (!mounted || !showConfirmation) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Could not save draft: $error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save draft: $error')));
     }
   }
 
   void scheduleDraftSave() {
     draftSaveDebounce?.cancel();
 
-    draftSaveDebounce = Timer(
-      const Duration(
-        milliseconds: 600,
-      ),
-      () {
-        unawaited(
-          saveDraft(
-            showConfirmation: false,
-          ),
-        );
-      },
-    );
+    draftSaveDebounce = Timer(const Duration(milliseconds: 600), () {
+      unawaited(saveDraft(showConfirmation: false));
+    });
   }
 
   // ===========================================================================
   // SPEECH
   // ===========================================================================
 
-  Future<void>
-      toggleDescriptionDictation() async {
+  Future<void> toggleDescriptionDictation() async {
     if (listeningForDescription) {
       await speechToText.stop();
 
@@ -347,18 +258,15 @@ class _BreakdownDetailsScreenState
       return;
     }
 
-    final available =
-        await speechToText.initialize(
+    final available = await speechToText.initialize(
       onStatus: (status) {
         if (!mounted) {
           return;
         }
 
-        if (status == 'done' ||
-            status == 'notListening') {
+        if (status == 'done' || status == 'notListening') {
           setState(() {
-            listeningForDescription =
-                false;
+            listeningForDescription = false;
           });
 
           scheduleDraftSave();
@@ -370,16 +278,14 @@ class _BreakdownDetailsScreenState
         }
 
         setState(() {
-          listeningForDescription =
-              false;
+          listeningForDescription = false;
         });
       },
     );
 
     if (!available || !mounted) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               'Voice input is unavailable. Check microphone permission.',
@@ -397,24 +303,18 @@ class _BreakdownDetailsScreenState
 
     await speechToText.listen(
       onResult: (result) {
-        if (!mounted ||
-            result.recognizedWords
-                .trim()
-                .isEmpty) {
+        if (!mounted || result.recognizedWords.trim().isEmpty) {
           return;
         }
 
         setState(() {
-          descriptionController.text =
-              result.recognizedWords;
+          descriptionController.text = result.recognizedWords;
         });
       },
-      listenOptions:
-          SpeechListenOptions(
+      listenOptions: SpeechListenOptions(
         partialResults: true,
         cancelOnError: true,
-        listenMode:
-            ListenMode.dictation,
+        listenMode: ListenMode.dictation,
       ),
     );
   }
@@ -423,135 +323,81 @@ class _BreakdownDetailsScreenState
   // PHOTOS
   // ===========================================================================
 
-  Future<ImageSource?>
-      choosePhotoSource() {
-    return showModalBottomSheet<
-        ImageSource>(
+  Future<ImageSource?> choosePhotoSource() {
+    return showModalBottomSheet<ImageSource>(
       context: context,
       useSafeArea: true,
-      backgroundColor:
-          Colors.transparent,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        final theme =
-            Theme.of(sheetContext);
+        final theme = Theme.of(sheetContext);
 
-        final colors =
-            theme.colorScheme;
+        final colors = theme.colorScheme;
 
-        final dark =
-            theme.brightness ==
-                Brightness.dark;
+        final dark = theme.brightness == Brightness.dark;
 
-        final remaining =
-            3 - vehiclePhotoUrls.length;
+        final remaining = 3 - vehiclePhotoUrls.length;
 
         return Container(
-          padding:
-              const EdgeInsets.fromLTRB(
-            18,
-            12,
-            18,
-            24,
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
           decoration: BoxDecoration(
-            color: dark
-                ? const Color(
-                    0xFF0D1D2B,
-                  )
-                : colors.surface,
-            borderRadius:
-                const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            color: dark ? const Color(0xFF0D2237) : colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: colors
-                        .onSurfaceVariant
-                        .withValues(
-                      alpha: .24,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
-                    ),
+                    color: colors.onSurfaceVariant.withValues(alpha: .24),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
 
-              const SizedBox(
-                height: 20,
-              ),
+              const SizedBox(height: 20),
 
               Text(
                 'Add breakdown photos',
-                style:
-                    GoogleFonts.plusJakartaSans(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 18,
-                  fontWeight:
-                      FontWeight.w800,
-                  color:
-                      colors.onSurface,
+                  fontWeight: FontWeight.w800,
+                  color: colors.onSurface,
                 ),
               ),
 
-              const SizedBox(
-                height: 4,
-              ),
+              const SizedBox(height: 4),
 
               Text(
                 '$remaining of 3 photo slots remaining',
-                style:
-                    GoogleFonts.plusJakartaSans(
-                  fontSize: 9.5,
-                  color: colors
-                      .onSurfaceVariant,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
 
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: 16),
 
               _RaBreakdownPhotoSource(
-                icon: Icons
-                    .photo_library_outlined,
-                title:
-                    'Choose from gallery',
-                subtitle:
-                    'Select one or more existing photos',
+                icon: Icons.photo_library_outlined,
+                title: 'Choose from gallery',
+                subtitle: 'Select one or more existing photos',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    ImageSource.gallery,
-                  );
+                  Navigator.pop(sheetContext, ImageSource.gallery);
                 },
               ),
 
-              const SizedBox(
-                height: 8,
-              ),
+              const SizedBox(height: 8),
 
               _RaBreakdownPhotoSource(
-                icon: Icons
-                    .camera_alt_outlined,
+                icon: Icons.camera_alt_outlined,
                 title: 'Take a photo',
-                subtitle:
-                    'Capture the problem using your camera',
+                subtitle: 'Capture the problem using your camera',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    ImageSource.camera,
-                  );
+                  Navigator.pop(sheetContext, ImageSource.camera);
                 },
               ),
             ],
@@ -562,20 +408,17 @@ class _BreakdownDetailsScreenState
   }
 
   Future<void> addVehiclePhotos() async {
-    if (uploadingVehiclePhoto ||
-        vehiclePhotoUrls.length >= 3) {
+    if (uploadingVehiclePhoto || vehiclePhotoUrls.length >= 3) {
       return;
     }
 
-    final source =
-        await choosePhotoSource();
+    final source = await choosePhotoSource();
 
     if (source == null || !mounted) {
       return;
     }
 
-    final remainingSlots =
-        3 - vehiclePhotoUrls.length;
+    final remainingSlots = 3 - vehiclePhotoUrls.length;
 
     setState(() {
       uploadingVehiclePhoto = true;
@@ -586,29 +429,18 @@ class _BreakdownDetailsScreenState
 
       final List<XFile> selectedPhotos;
 
-      if (source ==
-          ImageSource.gallery) {
-        selectedPhotos =
-            await picker.pickMultiImage(
+      if (source == ImageSource.gallery) {
+        selectedPhotos = await picker.pickMultiImage(
           imageQuality: 75,
           maxWidth: 1600,
           limit: remainingSlots,
         );
       } else {
-        final captured =
-            await Navigator.of(context)
-                .push<XFile>(
-          MaterialPageRoute(
-            builder: (_) =>
-                const CameraCaptureScreen(),
-          ),
+        final captured = await Navigator.of(context).push<XFile>(
+          MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
         );
 
-        selectedPhotos = captured == null
-            ? <XFile>[]
-            : <XFile>[
-                captured,
-              ];
+        selectedPhotos = captured == null ? <XFile>[] : <XFile>[captured];
       }
 
       if (selectedPhotos.isEmpty) {
@@ -617,52 +449,35 @@ class _BreakdownDetailsScreenState
 
       final prepared = <String>[];
 
-      for (final photo
-          in selectedPhotos) {
-        if (prepared.length >=
-            remainingSlots) {
+      for (final photo in selectedPhotos) {
+        if (prepared.length >= remainingSlots) {
           break;
         }
 
-        final encoded =
-            await PhotoUploadService()
-                .prepareVehiclePhoto(
-          photo,
-        );
+        final encoded = await PhotoUploadService().prepareVehiclePhoto(photo);
 
-        if (vehiclePhotoUrls.contains(
-              encoded,
-            ) ||
-            prepared.contains(
-              encoded,
-            )) {
+        if (vehiclePhotoUrls.contains(encoded) || prepared.contains(encoded)) {
           continue;
         }
 
         prepared.add(encoded);
       }
 
-      if (!mounted ||
-          prepared.isEmpty) {
+      if (!mounted || prepared.isEmpty) {
         return;
       }
 
       setState(() {
-        vehiclePhotoUrls.addAll(
-          prepared,
-        );
+        vehiclePhotoUrls.addAll(prepared);
       });
 
-      await saveDraft(
-        showConfirmation: false,
-      );
+      await saveDraft(showConfirmation: false);
 
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             prepared.length == 1
@@ -676,32 +491,21 @@ class _BreakdownDetailsScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Photo upload failed: $error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Photo upload failed: $error')));
     } finally {
       if (mounted) {
         setState(() {
-          uploadingVehiclePhoto =
-              false;
+          uploadingVehiclePhoto = false;
         });
       }
     }
   }
 
-  BreakdownPhotoAnnotation?
-      annotationForPhoto(
-    int index,
-  ) {
-    for (final annotation
-        in photoAnnotations) {
-      if (annotation.photoIndex ==
-          index) {
+  BreakdownPhotoAnnotation? annotationForPhoto(int index) {
+    for (final annotation in photoAnnotations) {
+      if (annotation.photoIndex == index) {
         return annotation;
       }
     }
@@ -709,186 +513,108 @@ class _BreakdownDetailsScreenState
     return null;
   }
 
-  Future<void> annotatePhoto(
-    int index,
-  ) async {
-    if (index < 0 ||
-        index >= vehiclePhotoUrls.length) {
+  Future<void> annotatePhoto(int index) async {
+    if (index < 0 || index >= vehiclePhotoUrls.length) {
       return;
     }
 
-    final existing =
-        annotationForPhoto(index);
+    final existing = annotationForPhoto(index);
 
-    double markerX =
-        existing?.markerX ?? .5;
+    double markerX = existing?.markerX ?? .5;
 
-    double markerY =
-        existing?.markerY ?? .5;
+    double markerY = existing?.markerY ?? .5;
 
-    final noteController =
-        TextEditingController(
-      text: existing?.note ?? '',
-    );
+    final noteController = TextEditingController(text: existing?.note ?? '');
 
-    final annotation =
-        await showDialog<
-            BreakdownPhotoAnnotation>(
+    final annotation = await showDialog<BreakdownPhotoAnnotation>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (
-            context,
-            setDialogState,
-          ) {
-            final colors =
-                Theme.of(context)
-                    .colorScheme;
+          builder: (context, setDialogState) {
+            final colors = Theme.of(context).colorScheme;
 
             Widget image;
 
             try {
               image = Image.memory(
-                base64Decode(
-                  vehiclePhotoUrls[index],
-                ),
+                base64Decode(vehiclePhotoUrls[index]),
                 fit: BoxFit.cover,
               );
             } on FormatException {
               image = Container(
-                color: colors
-                    .surfaceContainerHighest,
-                alignment:
-                    Alignment.center,
-                child: const Icon(
-                  Icons
-                      .broken_image_outlined,
-                ),
+                color: colors.surfaceContainerHighest,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_outlined),
               );
             }
 
             return Dialog(
-              insetPadding:
-                  const EdgeInsets.all(
-                16,
-              ),
+              insetPadding: const EdgeInsets.all(16),
               child: ConstrainedBox(
-                constraints:
-                    const BoxConstraints(
-                  maxWidth: 520,
-                ),
-                child:
-                    SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.all(
-                    18,
-                  ),
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(18),
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .stretch,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
                         'Mark the damaged area',
-                        style: GoogleFonts
-                            .plusJakartaSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: 18,
-                          fontWeight:
-                              FontWeight
-                                  .w800,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
 
-                      const SizedBox(
-                        height: 5,
-                      ),
+                      const SizedBox(height: 5),
 
                       Text(
                         'Tap directly on the area you want the provider to notice.',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 9.5,
-                          color: colors
-                              .onSurfaceVariant,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
 
-                      const SizedBox(
-                        height: 15,
-                      ),
+                      const SizedBox(height: 15),
 
                       AspectRatio(
                         aspectRatio: 4 / 3,
-                        child:
-                            LayoutBuilder(
-                          builder: (
-                            context,
-                            constraints,
-                          ) {
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
                             return GestureDetector(
-                              onTapDown:
-                                  (details) {
-                                setDialogState(
-                                  () {
-                                    markerX = (details
-                                                .localPosition
-                                                .dx /
-                                            constraints
-                                                .maxWidth)
-                                        .clamp(
-                                          0.0,
-                                          1.0,
-                                        )
-                                        .toDouble();
+                              onTapDown: (details) {
+                                setDialogState(() {
+                                  markerX =
+                                      (details.localPosition.dx /
+                                              constraints.maxWidth)
+                                          .clamp(0.0, 1.0)
+                                          .toDouble();
 
-                                    markerY = (details
-                                                .localPosition
-                                                .dy /
-                                            constraints
-                                                .maxHeight)
-                                        .clamp(
-                                          0.0,
-                                          1.0,
-                                        )
-                                        .toDouble();
-                                  },
-                                );
+                                  markerY =
+                                      (details.localPosition.dy /
+                                              constraints.maxHeight)
+                                          .clamp(0.0, 1.0)
+                                          .toDouble();
+                                });
                               },
                               child: ClipRRect(
-                                borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                  17,
-                                ),
+                                borderRadius: BorderRadius.circular(17),
                                 child: Stack(
-                                  fit:
-                                      StackFit
-                                          .expand,
+                                  fit: StackFit.expand,
                                   children: [
                                     image,
 
                                     Positioned(
-                                      left: markerX *
-                                              constraints
-                                                  .maxWidth -
-                                          15,
-                                      top: markerY *
-                                              constraints
-                                                  .maxHeight -
-                                          28,
+                                      left: markerX * constraints.maxWidth - 15,
+                                      top: markerY * constraints.maxHeight - 28,
                                       child: Icon(
-                                        Icons
-                                            .location_on_rounded,
-                                        color: colors
-                                            .error,
+                                        Icons.location_on_rounded,
+                                        color: colors.error,
                                         size: 31,
-                                        shadows:
-                                            const [
+                                        shadows: const [
                                           Shadow(
-                                            color:
-                                                Colors.white,
-                                            blurRadius:
-                                                5,
+                                            color: Colors.white,
+                                            blurRadius: 5,
                                           ),
                                         ],
                                       ),
@@ -901,84 +627,52 @@ class _BreakdownDetailsScreenState
                         ),
                       ),
 
-                      const SizedBox(
-                        height: 13,
-                      ),
+                      const SizedBox(height: 13),
 
                       TextField(
-                        controller:
-                            noteController,
+                        controller: noteController,
                         maxLength: 120,
                         minLines: 2,
                         maxLines: 3,
-                        textCapitalization:
-                            TextCapitalization
-                                .sentences,
-                        decoration:
-                            const InputDecoration(
-                          labelText:
-                              'Damage note',
-                          hintText:
-                              'e.g. Deep cut on rear-left tyre',
-                          alignLabelWithHint:
-                              true,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Damage note',
+                          hintText: 'e.g. Deep cut on rear-left tyre',
+                          alignLabelWithHint: true,
                         ),
                       ),
 
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const SizedBox(height: 12),
 
                       Row(
                         children: [
                           Expanded(
-                            child:
-                                OutlinedButton(
+                            child: OutlinedButton(
                               onPressed: () {
-                                Navigator.pop(
-                                  dialogContext,
-                                );
+                                Navigator.pop(dialogContext);
                               },
-                              child:
-                                  const Text(
-                                'Cancel',
-                              ),
+                              child: const Text('Cancel'),
                             ),
                           ),
 
-                          const SizedBox(
-                            width: 8,
-                          ),
+                          const SizedBox(width: 8),
 
                           Expanded(
                             flex: 2,
-                            child:
-                                FilledButton.icon(
+                            child: FilledButton.icon(
                               onPressed: () {
                                 Navigator.pop(
                                   dialogContext,
                                   BreakdownPhotoAnnotation(
-                                    photoIndex:
-                                        index,
-                                    markerX:
-                                        markerX,
-                                    markerY:
-                                        markerY,
-                                    note:
-                                        noteController
-                                            .text
-                                            .trim(),
+                                    photoIndex: index,
+                                    markerX: markerX,
+                                    markerY: markerY,
+                                    note: noteController.text.trim(),
                                   ),
                                 );
                               },
-                              icon: const Icon(
-                                Icons
-                                    .check_rounded,
-                              ),
-                              label:
-                                  const Text(
-                                'Save Marker',
-                              ),
+                              icon: const Icon(Icons.check_rounded),
+                              label: const Text('Save Marker'),
                             ),
                           ),
                         ],
@@ -995,71 +689,44 @@ class _BreakdownDetailsScreenState
 
     noteController.dispose();
 
-    if (annotation == null ||
-        !mounted) {
+    if (annotation == null || !mounted) {
       return;
     }
 
     setState(() {
-      photoAnnotations.removeWhere(
-        (item) =>
-            item.photoIndex == index,
-      );
+      photoAnnotations.removeWhere((item) => item.photoIndex == index);
 
-      photoAnnotations.add(
-        annotation,
-      );
+      photoAnnotations.add(annotation);
     });
 
-    await saveDraft(
-      showConfirmation: false,
-    );
+    await saveDraft(showConfirmation: false);
   }
 
-  void removeVehiclePhoto(
-    int index,
-  ) {
-    if (index < 0 ||
-        index >= vehiclePhotoUrls.length) {
+  void removeVehiclePhoto(int index) {
+    if (index < 0 || index >= vehiclePhotoUrls.length) {
       return;
     }
 
     setState(() {
-      vehiclePhotoUrls.removeAt(
-        index,
-      );
+      vehiclePhotoUrls.removeAt(index);
 
-      final remainingAnnotations =
-          photoAnnotations
-              .where(
-                (item) =>
-                    item.photoIndex !=
-                    index,
-              )
-              .map(
-                (item) =>
-                    item.photoIndex >
-                            index
-                        ? BreakdownPhotoAnnotation(
-                            photoIndex:
-                                item.photoIndex -
-                                    1,
-                            markerX:
-                                item.markerX,
-                            markerY:
-                                item.markerY,
-                            note:
-                                item.note,
-                          )
-                        : item,
-              )
-              .toList();
+      final remainingAnnotations = photoAnnotations
+          .where((item) => item.photoIndex != index)
+          .map(
+            (item) => item.photoIndex > index
+                ? BreakdownPhotoAnnotation(
+                    photoIndex: item.photoIndex - 1,
+                    markerX: item.markerX,
+                    markerY: item.markerY,
+                    note: item.note,
+                  )
+                : item,
+          )
+          .toList();
 
       photoAnnotations
         ..clear()
-        ..addAll(
-          remainingAnnotations,
-        );
+        ..addAll(remainingAnnotations);
     });
 
     scheduleDraftSave();
@@ -1069,14 +736,10 @@ class _BreakdownDetailsScreenState
   // NAVIGATION
   // ===========================================================================
 
-  Future<void>
-      continueToLocation() async {
+  Future<void> continueToLocation() async {
     FocusScope.of(context).unfocus();
 
-    final valid =
-        formKey.currentState
-                ?.validate() ??
-            false;
+    final valid = formKey.currentState?.validate() ?? false;
 
     if (!valid) {
       return;
@@ -1084,20 +747,13 @@ class _BreakdownDetailsScreenState
 
     final draft = buildDraft();
 
-    await RequestDraftStore().save(
-      draft,
-    );
+    await RequestDraftStore().save(draft);
 
     if (!mounted) {
       return;
     }
 
-    push(
-      context,
-      LocationScreen(
-        draft: draft,
-      ),
-    );
+    push(context, LocationScreen(draft: draft));
   }
 
   // ===========================================================================
@@ -1108,28 +764,20 @@ class _BreakdownDetailsScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final previewPhoto =
-        vehiclePhotoUrls.isNotEmpty
-            ? vehiclePhotoUrls.first
-            : (vehicleSnapshot?[
-                        'photoData']
-                    as String? ??
-                '');
+    final previewPhoto = vehiclePhotoUrls.isNotEmpty
+        ? vehiclePhotoUrls.first
+        : (vehicleSnapshot?['photoData'] as String? ?? '');
 
-    return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    return RaDriverScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
+        title: RaDriverAppBarTitle(
           'Request Details',
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight:
-                FontWeight.w800,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
             letterSpacing: -.45,
           ),
         ),
@@ -1137,18 +785,11 @@ class _BreakdownDetailsScreenState
           IconButton(
             tooltip: 'Save draft',
             onPressed: () {
-              unawaited(
-                saveDraft(),
-              );
+              unawaited(saveDraft());
             },
-            icon: const Icon(
-              Icons
-                  .bookmark_border_rounded,
-            ),
+            icon: const Icon(Icons.bookmark_border_rounded),
           ),
-          const SizedBox(
-            width: 4,
-          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
@@ -1158,86 +799,50 @@ class _BreakdownDetailsScreenState
             Expanded(
               child: Form(
                 key: formKey,
-                autovalidateMode:
-                    AutovalidateMode
-                        .onUserInteraction,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: ListView(
                   keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior
-                          .onDrag,
-                  physics:
-                      const BouncingScrollPhysics(),
-                  padding:
-                      const EdgeInsets.fromLTRB(
-                    18,
-                    8,
-                    18,
-                    28,
-                  ),
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                   children: [
                     const _RaBreakdownProgress(),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
-                    _RaBreakdownHero(
-                      issues:
-                          widget.issues,
-                    ),
+                    _RaBreakdownHero(issues: widget.issues),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                    const SizedBox(height: 26),
 
                     _RaBreakdownSectionHeading(
-                      icon: Icons
-                          .directions_car_outlined,
-                      title:
-                          'Vehicle information',
+                      icon: Icons.directions_car_outlined,
+                      title: 'Vehicle information',
                       subtitle:
                           'Choose a saved vehicle or enter the details manually.',
-                      action: signedIn
-                          ? 'Choose saved'
-                          : null,
-                      onAction: signedIn
-                          ? selectSavedVehicle
-                          : null,
+                      action: signedIn ? 'Choose saved' : null,
+                      onAction: signedIn ? selectSavedVehicle : null,
                     ),
 
-                    const SizedBox(
-                      height: 11,
-                    ),
+                    const SizedBox(height: 11),
 
                     _RaBreakdownSurface(
-                      child:
-                          _buildVehicleSection(
-                        context,
-                        previewPhoto,
-                      ),
+                      child: _buildVehicleSection(context, previewPhoto),
                     ),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                    const SizedBox(height: 26),
 
                     const _RaBreakdownSectionHeading(
-                      icon: Icons
-                          .priority_high_rounded,
-                      title:
-                          'How urgent is it?',
+                      icon: Icons.priority_high_rounded,
+                      title: 'How urgent is it?',
                       subtitle:
                           'Choose the option that best describes your current situation.',
                     ),
 
-                    const SizedBox(
-                      height: 11,
-                    ),
+                    const SizedBox(height: 11),
 
                     _RaBreakdownPriorityGrid(
                       selected: priority,
-                      onSelected:
-                          (value) {
+                      onSelected: (value) {
                         setState(() {
                           priority = value;
                         });
@@ -1246,244 +851,155 @@ class _BreakdownDetailsScreenState
                       },
                     ),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                    const SizedBox(height: 26),
 
                     const _RaBreakdownSectionHeading(
-                      icon:
-                          Icons.notes_rounded,
-                      title:
-                          'Describe the symptoms',
+                      icon: Icons.notes_rounded,
+                      title: 'Describe the symptoms',
                       subtitle:
                           'Tell the provider what happened and what you noticed.',
                     ),
 
-                    const SizedBox(
-                      height: 11,
-                    ),
+                    const SizedBox(height: 11),
 
-                    _buildDescriptionField(
-                      context,
-                    ),
+                    _buildDescriptionField(context),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                    const SizedBox(height: 26),
 
                     const _RaBreakdownSectionHeading(
-                      icon:
-                          Icons.settings_outlined,
-                      title:
-                          'Parts preference',
+                      icon: Icons.settings_outlined,
+                      title: 'Parts preference',
                       subtitle:
                           'The provider confirms compatibility, price, availability and warranty.',
                     ),
 
-                    const SizedBox(
-                      height: 11,
-                    ),
+                    const SizedBox(height: 11),
 
-                    _RaBreakdownSurface(
-                      child:
-                          _buildPartsPreference(),
-                    ),
+                    _RaBreakdownSurface(child: _buildPartsPreference()),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                    const SizedBox(height: 26),
 
                     _RaBreakdownSectionHeading(
-                      icon: Icons
-                          .add_a_photo_outlined,
-                      title:
-                          'Photo evidence',
+                      icon: Icons.add_a_photo_outlined,
+                      title: 'Photo evidence',
                       subtitle:
                           'Optional. Add visible damage and mark the exact area.',
-                      trailing:
-                          '${vehiclePhotoUrls.length}/3',
+                      trailing: '${vehiclePhotoUrls.length}/3',
                     ),
 
-                    const SizedBox(
-                      height: 11,
-                    ),
+                    const SizedBox(height: 11),
 
-                    _RaBreakdownSurface(
-                      child:
-                          _buildPhotoSection(
-                        context,
-                      ),
-                    ),
+                    _RaBreakdownSurface(child: _buildPhotoSection(context)),
 
-                    const SizedBox(
-                      height: 26,
-                    ),
+                    const SizedBox(height: 26),
 
                     const _RaBreakdownSectionHeading(
-                      icon: Icons
-                          .sticky_note_2_outlined,
-                      title:
-                          'Additional notes',
+                      icon: Icons.sticky_note_2_outlined,
+                      title: 'Additional notes',
                       subtitle:
                           'Optional information that may help the provider prepare.',
                     ),
 
-                    const SizedBox(
-                      height: 11,
-                    ),
+                    const SizedBox(height: 11),
 
                     TextFormField(
-                      controller:
-                          notesController,
+                      controller: notesController,
                       maxLines: 3,
                       maxLength: 300,
-                      textCapitalization:
-                          TextCapitalization
-                              .sentences,
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            'Anything else?',
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Anything else?',
                         hintText:
                             'Parking access, special vehicle details, tools required...',
-                        alignLabelWithHint:
-                            true,
+                        alignLabelWithHint: true,
                       ),
                       onChanged: (_) {
                         scheduleDraftSave();
                       },
                     ),
 
-                    const SizedBox(
-                      height: 18,
-                    ),
+                    const SizedBox(height: 18),
 
-                    _buildSafetyNotice(
-                      context,
-                    ),
+                    _buildSafetyNotice(context),
                   ],
                 ),
               ),
             ),
 
-            _buildBottomActionBar(
-              context,
-            ),
+            _buildBottomActionBar(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVehicleSection(
-    BuildContext context,
-    String previewPhoto,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildVehicleSection(BuildContext context, String previewPhoto) {
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
       children: [
-        if (modelController.text
-                .trim()
-                .isNotEmpty ||
+        if (modelController.text.trim().isNotEmpty ||
             previewPhoto.isNotEmpty) ...[
           Row(
             children: [
               Container(
                 width: 82,
                 height: 62,
-                clipBehavior:
-                    Clip.antiAlias,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: colors
-                      .surfaceContainerHighest,
-                  borderRadius:
-                      BorderRadius.circular(
-                    14,
-                  ),
+                  color: colors.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child:
-                    VehiclePhotoPreview(
-                  model:
-                      modelController.text,
-                  photoData:
-                      previewPhoto,
+                child: VehiclePhotoPreview(
+                  model: modelController.text,
+                  photoData: previewPhoto,
                   height: 62,
                   compact: true,
                 ),
               ),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (vehicleId != null)
                       Text(
                         'SAVED VEHICLE',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 7.5,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
                           letterSpacing: .8,
-                          color: colors
-                              .primary,
-                          fontWeight:
-                              FontWeight
-                                  .w700,
+                          color: colors.primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
 
-                    if (vehicleId != null)
-                      const SizedBox(
-                        height: 3,
-                      ),
+                    if (vehicleId != null) const SizedBox(height: 3),
 
                     Text(
-                      modelController.text
-                              .trim()
-                              .isEmpty
+                      modelController.text.trim().isEmpty
                           ? 'Vehicle details'
-                          : modelController
-                              .text
-                              .trim(),
+                          : modelController.text.trim(),
                       maxLines: 1,
-                      overflow:
-                          TextOverflow
-                              .ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight:
-                            FontWeight
-                                .w700,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 3,
-                    ),
+                    const SizedBox(height: 3),
 
                     Text(
-                      registrationController
-                              .text
-                              .trim()
-                              .isEmpty
+                      registrationController.text.trim().isEmpty
                           ? vehicle
                           : '${registrationController.text.trim().toUpperCase()} • $vehicle',
                       maxLines: 1,
-                      overflow:
-                          TextOverflow
-                              .ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.5,
-                        color: colors
-                            .onSurfaceVariant,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1492,39 +1008,26 @@ class _BreakdownDetailsScreenState
             ],
           ),
 
-          const SizedBox(
-            height: 16,
-          ),
+          const SizedBox(height: 16),
         ],
 
         DropdownButtonFormField<String>(
           initialValue: vehicle,
           key: ValueKey(vehicle),
           isExpanded: true,
-          decoration:
-              const InputDecoration(
-            labelText:
-                'Vehicle type',
-            prefixIcon: Icon(
-              Icons
-                  .directions_car_outlined,
-            ),
+          decoration: const InputDecoration(
+            labelText: 'Vehicle type',
+            prefixIcon: Icon(Icons.directions_car_outlined),
           ),
-          items: const [
-            'Sedan / Hatchback',
-            'SUV',
-            'Van',
-            'Motorcycle',
-            'Other',
-          ]
-              .map(
-                (value) =>
-                    DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                ),
-              )
-              .toList(),
+          items:
+              const ['Sedan / Hatchback', 'SUV', 'Van', 'Motorcycle', 'Other']
+                  .map(
+                    (value) => DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    ),
+                  )
+                  .toList(),
           onChanged: (value) {
             if (value == null) {
               return;
@@ -1534,8 +1037,7 @@ class _BreakdownDetailsScreenState
               vehicle = value;
 
               if (vehicle != 'Other') {
-                customVehicleController
-                    .clear();
+                customVehicleController.clear();
               }
 
               vehicleId = null;
@@ -1547,60 +1049,38 @@ class _BreakdownDetailsScreenState
         ),
 
         if (vehicle == 'Other') ...[
-          const SizedBox(
-            height: 11,
-          ),
+          const SizedBox(height: 11),
 
           TextFormField(
-            controller:
-                customVehicleController,
+            controller: customVehicleController,
             maxLength: 40,
-            textCapitalization:
-                TextCapitalization.words,
-            textInputAction:
-                TextInputAction.next,
-            decoration:
-                const InputDecoration(
-              labelText:
-                  'Other vehicle type',
-              hintText:
-                  'Three Wheeler, Pickup Truck...',
-              prefixIcon: Icon(
-                Icons.commute_outlined,
-              ),
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: 'Other vehicle type',
+              hintText: 'Three Wheeler, Pickup Truck...',
+              prefixIcon: Icon(Icons.commute_outlined),
             ),
-            validator:
-                validateCustomVehicleType,
+            validator: validateCustomVehicleType,
             onChanged: (_) {
               scheduleDraftSave();
             },
           ),
         ],
 
-        const SizedBox(
-          height: 11,
-        ),
+        const SizedBox(height: 11),
 
         TextFormField(
-          controller:
-              modelController,
+          controller: modelController,
           maxLength: 50,
-          textCapitalization:
-              TextCapitalization.words,
-          textInputAction:
-              TextInputAction.next,
-          decoration:
-              const InputDecoration(
-            labelText:
-                'Make, model & year',
-            hintText:
-                'Toyota Aqua 2018',
-            prefixIcon: Icon(
-              Icons.badge_outlined,
-            ),
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            labelText: 'Make, model & year',
+            hintText: 'Toyota Aqua 2018',
+            prefixIcon: Icon(Icons.badge_outlined),
           ),
-          validator:
-              validateVehicleModelYear,
+          validator: validateVehicleModelYear,
           onChanged: (_) {
             setState(() {
               vehicleId = null;
@@ -1611,31 +1091,19 @@ class _BreakdownDetailsScreenState
           },
         ),
 
-        const SizedBox(
-          height: 11,
-        ),
+        const SizedBox(height: 11),
 
         TextFormField(
-          controller:
-              registrationController,
+          controller: registrationController,
           maxLength: 16,
-          textCapitalization:
-              TextCapitalization
-                  .characters,
-          textInputAction:
-              TextInputAction.next,
-          decoration:
-              const InputDecoration(
-            labelText:
-                'Registration number',
-            hintText:
-                'WP CAB-1234',
-            prefixIcon: Icon(
-              Icons.pin_outlined,
-            ),
+          textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            labelText: 'Registration number',
+            hintText: 'WP CAB-1234',
+            prefixIcon: Icon(Icons.pin_outlined),
           ),
-          validator:
-              validateVehicleRegistration,
+          validator: validateVehicleRegistration,
           onChanged: (_) {
             scheduleDraftSave();
           },
@@ -1644,62 +1112,39 @@ class _BreakdownDetailsScreenState
     );
   }
 
-  Widget _buildDescriptionField(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildDescriptionField(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TextFormField(
-          controller:
-              descriptionController,
+          controller: descriptionController,
           minLines: 4,
           maxLines: 6,
           maxLength: 500,
-          textCapitalization:
-              TextCapitalization
-                  .sentences,
-          validator:
-              validateBreakdownDescription,
+          textCapitalization: TextCapitalization.sentences,
+          validator: validateBreakdownDescription,
           onChanged: (_) {
             scheduleDraftSave();
           },
-          decoration:
-              InputDecoration(
-            labelText:
-                'What happened?',
+          decoration: InputDecoration(
+            labelText: 'What happened?',
             hintText:
                 'Example: Engine stopped while driving and now makes a clicking sound.',
-            alignLabelWithHint:
-                true,
+            alignLabelWithHint: true,
             suffixIcon: Padding(
-              padding:
-                  const EdgeInsets.only(
-                bottom: 72,
-                right: 4,
-              ),
-              child:
-                  IconButton.filledTonal(
-                tooltip:
-                    listeningForDescription
-                        ? 'Stop voice input'
-                        : 'Describe by voice',
-                onPressed:
-                    toggleDescriptionDictation,
+              padding: const EdgeInsets.only(bottom: 72, right: 4),
+              child: IconButton.filledTonal(
+                tooltip: listeningForDescription
+                    ? 'Stop voice input'
+                    : 'Describe by voice',
+                onPressed: toggleDescriptionDictation,
                 icon: Icon(
                   listeningForDescription
-                      ? Icons
-                          .stop_rounded
-                      : Icons
-                          .mic_none_rounded,
-                  color:
-                      listeningForDescription
-                          ? colors.error
-                          : null,
+                      ? Icons.stop_rounded
+                      : Icons.mic_none_rounded,
+                  color: listeningForDescription ? colors.error : null,
                 ),
               ),
             ),
@@ -1707,44 +1152,24 @@ class _BreakdownDetailsScreenState
         ),
 
         if (listeningForDescription) ...[
-          const SizedBox(
-            height: 8,
-          ),
+          const SizedBox(height: 8),
 
           Container(
-            padding:
-                const EdgeInsets.all(
-              12,
-            ),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: colors.error
-                  .withValues(
-                alpha: .07,
-              ),
-              borderRadius:
-                  BorderRadius.circular(
-                15,
-              ),
+              color: colors.error.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(15),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.mic_rounded,
-                  color: colors.error,
-                  size: 18,
-                ),
+                Icon(Icons.mic_rounded, color: colors.error, size: 18),
 
-                const SizedBox(
-                  width: 8,
-                ),
+                const SizedBox(width: 8),
 
                 Expanded(
                   child: Text(
                     'Listening… describe the symptoms naturally.',
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 9.5,
-                    ),
+                    style: GoogleFonts.plusJakartaSans(fontSize: 12),
                   ),
                 ),
               ],
@@ -1757,40 +1182,44 @@ class _BreakdownDetailsScreenState
 
   Widget _buildPartsPreference() {
     return DropdownButtonFormField<String>(
-      initialValue:
-          partsPreference,
-      decoration:
-          const InputDecoration(
-        labelText:
-            'Replacement parts',
-        prefixIcon: Icon(
-          Icons
-              .build_circle_outlined,
-        ),
+      initialValue: partsPreference,
+      isExpanded: true,
+      itemHeight: null,
+      decoration: const InputDecoration(
+        labelText: 'Replacement parts',
+        prefixIcon: Icon(Icons.build_circle_outlined),
       ),
       items: const [
         DropdownMenuItem<String>(
           value: 'discuss',
           child: Text(
             'Discuss options with provider',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         DropdownMenuItem<String>(
           value: 'budget',
           child: Text(
             'Budget compatible',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         DropdownMenuItem<String>(
           value: 'branded',
           child: Text(
             'Branded aftermarket',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         DropdownMenuItem<String>(
           value: 'genuine',
           child: Text(
             'Genuine manufacturer parts',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -1808,86 +1237,54 @@ class _BreakdownDetailsScreenState
     );
   }
 
-  Widget _buildPhotoSection(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildPhotoSection(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (vehiclePhotoUrls.isEmpty)
           Container(
-            padding:
-                const EdgeInsets.all(
-              18,
-            ),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest
-                  .withValues(
-                alpha: .32,
-              ),
-              borderRadius:
-                  BorderRadius.circular(
-                16,
-              ),
+              color: colors.surfaceContainerHighest.withValues(alpha: .32),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
               children: [
                 Container(
                   width: 57,
                   height: 57,
-                  decoration:
-                      BoxDecoration(
-                    color: colors.primary
-                        .withValues(
-                      alpha: .08,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      18,
-                    ),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Icon(
-                    Icons
-                        .photo_camera_back_outlined,
+                    Icons.photo_camera_back_outlined,
                     color: colors.primary,
                     size: 27,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 11,
-                ),
+                const SizedBox(height: 11),
 
                 Text(
                   'Add photos of the problem',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 11.5,
-                    fontWeight:
-                        FontWeight
-                            .w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 4,
-                ),
+                const SizedBox(height: 4),
 
                 Text(
                   'Up to 3 photos. Tap a photo after adding it to mark the damaged area.',
-                  textAlign:
-                      TextAlign.center,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     height: 1.4,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1897,128 +1294,74 @@ class _BreakdownDetailsScreenState
           SizedBox(
             height: 116,
             child: ListView.separated(
-              scrollDirection:
-                  Axis.horizontal,
-              itemCount:
-                  vehiclePhotoUrls.length,
-              separatorBuilder:
-                  (context, index) {
-                return const SizedBox(
-                  width: 8,
-                );
+              scrollDirection: Axis.horizontal,
+              itemCount: vehiclePhotoUrls.length,
+              separatorBuilder: (context, index) {
+                return const SizedBox(width: 8);
               },
-              itemBuilder:
-                  (context, index) {
+              itemBuilder: (context, index) {
                 return _RaBreakdownPhotoCard(
-                  data:
-                      vehiclePhotoUrls[index],
-                  annotation:
-                      annotationForPhoto(
-                    index,
-                  ),
+                  data: vehiclePhotoUrls[index],
+                  annotation: annotationForPhoto(index),
                   onTap: () {
-                    unawaited(
-                      annotatePhoto(
-                        index,
-                      ),
-                    );
+                    unawaited(annotatePhoto(index));
                   },
                   onRemove: () {
-                    removeVehiclePhoto(
-                      index,
-                    );
+                    removeVehiclePhoto(index);
                   },
                 );
               },
             ),
           ),
 
-        const SizedBox(
-          height: 12,
-        ),
+        const SizedBox(height: 12),
 
         OutlinedButton.icon(
-          onPressed:
-              uploadingVehiclePhoto ||
-                      vehiclePhotoUrls
-                              .length >=
-                          3
-                  ? null
-                  : addVehiclePhotos,
+          onPressed: uploadingVehiclePhoto || vehiclePhotoUrls.length >= 3
+              ? null
+              : addVehiclePhotos,
           icon: uploadingVehiclePhoto
               ? const SizedBox.square(
                   dimension: 17,
-                  child:
-                      CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(
-                  Icons
-                      .add_a_photo_outlined,
-                ),
+              : const Icon(Icons.add_a_photo_outlined),
           label: Text(
             uploadingVehiclePhoto
                 ? 'Preparing Photos…'
-                : vehiclePhotoUrls.length >=
-                        3
-                    ? 'Maximum 3 Photos Added'
-                    : 'Add Photo',
+                : vehiclePhotoUrls.length >= 3
+                ? 'Maximum 3 Photos Added'
+                : 'Add Photo',
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSafetyNotice(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildSafetyNotice(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        13,
-      ),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: raGold.withValues(
-          alpha: .075,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          16,
-        ),
-        border: Border.all(
-          color: raGold.withValues(
-            alpha: .14,
-          ),
-        ),
+        color: raGold.withValues(alpha: .075),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: raGold.withValues(alpha: .14)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons
-                .health_and_safety_outlined,
-            size: 19,
-            color: raGold,
-          ),
+          const Icon(Icons.health_and_safety_outlined, size: 19, color: raGold),
 
-          const SizedBox(
-            width: 9,
-          ),
+          const SizedBox(width: 9),
 
           Expanded(
             child: Text(
               'Do not inspect or photograph the vehicle from an unsafe traffic position. Move to safety first whenever possible.',
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 9.5,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
                 height: 1.45,
-                color: colors
-                    .onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ),
@@ -2027,30 +1370,15 @@ class _BreakdownDetailsScreenState
     );
   }
 
-  Widget _buildBottomActionBar(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildBottomActionBar(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        18,
-        8,
-        18,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(
-              alpha: .45,
-            ),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
@@ -2060,32 +1388,18 @@ class _BreakdownDetailsScreenState
             IconButton.filledTonal(
               tooltip: 'Save draft',
               onPressed: () {
-                unawaited(
-                  saveDraft(),
-                );
+                unawaited(saveDraft());
               },
-              icon: const Icon(
-                Icons
-                    .bookmark_add_outlined,
-              ),
+              icon: const Icon(Icons.bookmark_add_outlined),
             ),
 
-            const SizedBox(
-              width: 8,
-            ),
+            const SizedBox(width: 8),
 
             Expanded(
-              child:
-                  FilledButton.icon(
-                onPressed:
-                    continueToLocation,
-                icon: const Icon(
-                  Icons
-                      .arrow_forward_rounded,
-                ),
-                label: const Text(
-                  'Continue to Location',
-                ),
+              child: FilledButton.icon(
+                onPressed: continueToLocation,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: const Text('Continue to Location'),
               ),
             ),
           ],
@@ -2099,78 +1413,56 @@ class _BreakdownDetailsScreenState
 // PROGRESS
 // =============================================================================
 
-class _RaBreakdownProgress
-    extends StatelessWidget {
+class _RaBreakdownProgress extends StatelessWidget {
   const _RaBreakdownProgress();
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
       children: [
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          alignment: WrapAlignment.spaceBetween,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 9,
-                vertical: 5,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
-                color: colors.primary
-                    .withValues(
-                  alpha: .08,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  999,
-                ),
+                color: colors.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 'STEP 2 OF 4',
-                style: GoogleFonts
-                    .plusJakartaSans(
+                style: GoogleFonts.plusJakartaSans(
                   color: colors.primary,
-                  fontSize: 8,
-                  fontWeight:
-                      FontWeight.w700,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: .8,
                 ),
               ),
             ),
 
-            const Spacer(),
-
             Text(
               'Details',
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 9,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
                 color: colors.primary,
-                fontWeight:
-                    FontWeight.w700,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
 
-        const SizedBox(
-          height: 7,
-        ),
+        const SizedBox(height: 7),
 
         ClipRRect(
-          borderRadius:
-              BorderRadius.circular(
-            999,
-          ),
-          child:
-              LinearProgressIndicator(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
             value: .50,
             minHeight: 5,
-            backgroundColor: colors
-                .surfaceContainerHighest,
+            backgroundColor: colors.surfaceContainerHighest,
           ),
         ),
       ],
@@ -2182,43 +1474,26 @@ class _RaBreakdownProgress
 // HERO
 // =============================================================================
 
-class _RaBreakdownHero
-    extends StatelessWidget {
-  const _RaBreakdownHero({
-    required this.issues,
-  });
+class _RaBreakdownHero extends StatelessWidget {
+  const _RaBreakdownHero({required this.issues});
 
   final List<String> issues;
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness ==
-            Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        18,
-      ),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: dark
-              ? const [
-                  Color(0xFF0B477D),
-                  Color(0xFF08645D),
-                ]
-              : const [
-                  Color(0xFF075BA8),
-                  Color(0xFF078C7E),
-                ],
+              ? const [Color(0xFF0B477D), Color(0xFF08645D)]
+              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
         ),
-        borderRadius:
-            BorderRadius.circular(
-          24,
-        ),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Stack(
         children: [
@@ -2226,104 +1501,71 @@ class _RaBreakdownHero
             right: -25,
             bottom: -31,
             child: Icon(
-              Icons
-                  .engineering_outlined,
+              Icons.engineering_outlined,
               size: 125,
-              color: Colors.white
-                  .withValues(
-                alpha: .055,
-              ),
+              color: Colors.white.withValues(alpha: .055),
             ),
           ),
 
           Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Tell us about the vehicle',
-                style: GoogleFonts
-                    .plusJakartaSans(
+                style: GoogleFonts.plusJakartaSans(
                   color: Colors.white,
-                  fontSize: 19,
-                  fontWeight:
-                      FontWeight.w800,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
                 ),
               ),
 
-              const SizedBox(
-                height: 5,
-              ),
+              const SizedBox(height: 5),
 
               Text(
                 'These details help providers understand the problem before they send an offer.',
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  color: Colors.white
-                      .withValues(
-                    alpha: .80,
-                  ),
-                  fontSize: 10,
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white.withValues(alpha: .80),
+                  fontSize: 13,
                   height: 1.4,
                 ),
               ),
 
-              const SizedBox(
-                height: 13,
-              ),
+              const SizedBox(height: 13),
 
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  for (final issue
-                      in issues)
+                  for (final issue in issues)
                     Container(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 5,
                       ),
-                      decoration:
-                          BoxDecoration(
-                        color: Colors.white
-                            .withValues(
-                          alpha: .13,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          999,
-                        ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .13),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                       child: Row(
-                        mainAxisSize:
-                            MainAxisSize.min,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
-                            Icons
-                                .check_circle_outline_rounded,
-                            color:
-                                Colors.white,
+                            Icons.check_circle_outline_rounded,
+                            color: Colors.white,
                             size: 13,
                           ),
 
-                          const SizedBox(
-                            width: 4,
-                          ),
+                          const SizedBox(width: 4),
 
-                          Text(
-                            issue,
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color:
-                                  Colors.white,
-                              fontSize: 8.5,
-                              fontWeight:
-                                  FontWeight
-                                      .w600,
+                          Flexible(
+                            child: Text(
+                              issue,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
@@ -2343,8 +1585,7 @@ class _RaBreakdownHero
 // SECTION HEADING
 // =============================================================================
 
-class _RaBreakdownSectionHeading
-    extends StatelessWidget {
+class _RaBreakdownSectionHeading extends StatelessWidget {
   const _RaBreakdownSectionHeading({
     required this.icon,
     required this.title,
@@ -2366,53 +1607,35 @@ class _RaBreakdownSectionHeading
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 39,
           height: 39,
           decoration: BoxDecoration(
-            color: colors.primary
-                .withValues(
-              alpha: .08,
-            ),
-            borderRadius:
-                BorderRadius.circular(
-              12,
-            ),
+            color: colors.primary.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: colors.primary,
-            size: 19,
-          ),
+          child: Icon(icon, color: colors.primary, size: 19),
         ),
 
-        const SizedBox(
-          width: 10,
-        ),
+        const SizedBox(width: 10),
 
         Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Expanded(
                     child: Text(
                       title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight:
-                            FontWeight
-                                .w800,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
@@ -2420,40 +1643,26 @@ class _RaBreakdownSectionHeading
                   if (trailing != null)
                     Text(
                       trailing!,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.5,
-                        fontWeight:
-                            FontWeight
-                                .w700,
-                        color:
-                            colors.primary,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: colors.primary,
                       ),
                     ),
 
-                  if (action != null &&
-                      onAction != null)
-                    TextButton(
-                      onPressed:
-                          onAction,
-                      child:
-                          Text(action!),
-                    ),
+                  if (action != null && onAction != null)
+                    TextButton(onPressed: onAction, child: Text(action!)),
                 ],
               ),
 
-              const SizedBox(
-                height: 2,
-              ),
+              const SizedBox(height: 2),
 
               Text(
                 subtitle,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 9.3,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
                   height: 1.4,
-                  color: colors
-                      .onSurfaceVariant,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -2468,45 +1677,25 @@ class _RaBreakdownSectionHeading
 // SURFACE
 // =============================================================================
 
-class _RaBreakdownSurface
-    extends StatelessWidget {
-  const _RaBreakdownSurface({
-    required this.child,
-  });
+class _RaBreakdownSurface extends StatelessWidget {
+  const _RaBreakdownSurface({required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        15,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(
-                0xFF0D1D2B,
-              )
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .45,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: child,
     );
@@ -2517,8 +1706,7 @@ class _RaBreakdownSurface
 // PRIORITY
 // =============================================================================
 
-class _RaBreakdownPriorityGrid
-    extends StatelessWidget {
+class _RaBreakdownPriorityGrid extends StatelessWidget {
   const _RaBreakdownPriorityGrid({
     required this.selected,
     required this.onSelected,
@@ -2526,22 +1714,11 @@ class _RaBreakdownPriorityGrid
 
   final String selected;
 
-  final ValueChanged<String>
-      onSelected;
+  final ValueChanged<String> onSelected;
 
   static const items = [
-    (
-      'normal',
-      'Normal',
-      'Safe location',
-      Icons.schedule_rounded,
-    ),
-    (
-      'urgent',
-      'Urgent',
-      'Need help soon',
-      Icons.speed_rounded,
-    ),
+    ('normal', 'Normal', 'Safe location', Icons.schedule_rounded),
+    ('urgent', 'Urgent', 'Need help soon', Icons.speed_rounded),
     (
       'road_blocking',
       'Blocking road',
@@ -2558,18 +1735,11 @@ class _RaBreakdownPriorityGrid
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return LayoutBuilder(
-      builder: (
-        context,
-        constraints,
-      ) {
-        final cardWidth =
-            (constraints.maxWidth -
-                    8) /
-                2;
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 8) / 2;
 
         return Wrap(
           spacing: 8,
@@ -2579,146 +1749,80 @@ class _RaBreakdownPriorityGrid
               SizedBox(
                 width: cardWidth,
                 child: Material(
-                  color: selected ==
-                          item.$1
-                      ? colors.primary
-                          .withValues(
-                          alpha: .07,
-                        )
+                  color: selected == item.$1
+                      ? colors.primary.withValues(alpha: .07)
                       : colors.surface,
-                  borderRadius:
-                      BorderRadius.circular(
-                    18,
-                  ),
-                  clipBehavior:
-                      Clip.antiAlias,
+                  borderRadius: BorderRadius.circular(18),
+                  clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () {
-                      onSelected(
-                        item.$1,
-                      );
+                      onSelected(item.$1);
                     },
                     child: Container(
-                      constraints:
-                          const BoxConstraints(
-                        minHeight: 122,
-                      ),
-                      padding:
-                          const EdgeInsets
-                              .all(
-                        12,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        border:
-                            Border.all(
-                          color: selected ==
-                                  item.$1
-                              ? colors
-                                  .primary
-                                  .withValues(
-                                  alpha:
-                                      .42,
-                                )
-                              : colors
-                                  .outlineVariant
-                                  .withValues(
-                                  alpha:
-                                      .43,
-                                ),
+                      constraints: const BoxConstraints(minHeight: 122),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: selected == item.$1
+                              ? colors.primary.withValues(alpha: .42)
+                              : colors.outlineVariant.withValues(alpha: .43),
                         ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          18,
-                        ),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Container(
                                 width: 36,
                                 height: 36,
-                                decoration:
-                                    BoxDecoration(
-                                  color: selected ==
-                                          item.$1
-                                      ? colors
-                                          .primary
-                                      : colors
-                                          .primary
-                                          .withValues(
-                                          alpha:
-                                              .08,
-                                        ),
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    11,
-                                  ),
+                                decoration: BoxDecoration(
+                                  color: selected == item.$1
+                                      ? colors.primary
+                                      : colors.primary.withValues(alpha: .08),
+                                  borderRadius: BorderRadius.circular(11),
                                 ),
                                 child: Icon(
                                   item.$4,
                                   size: 18,
-                                  color: selected ==
-                                          item.$1
-                                      ? colors
-                                          .onPrimary
-                                      : colors
-                                          .primary,
+                                  color: selected == item.$1
+                                      ? colors.onPrimary
+                                      : colors.primary,
                                 ),
                               ),
 
                               const Spacer(),
 
                               Icon(
-                                selected ==
-                                        item.$1
-                                    ? Icons
-                                        .check_circle_rounded
-                                    : Icons
-                                        .radio_button_unchecked_rounded,
+                                selected == item.$1
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
                                 size: 19,
-                                color: selected ==
-                                        item.$1
-                                    ? colors
-                                        .primary
-                                    : colors
-                                        .outline,
+                                color: selected == item.$1
+                                    ? colors.primary
+                                    : colors.outline,
                               ),
                             ],
                           ),
 
-                          const SizedBox(
-                            height: 10,
-                          ),
+                          const SizedBox(height: 10),
 
                           Text(
                             item.$2,
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize: 10.5,
-                              fontWeight:
-                                  FontWeight
-                                      .w700,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
 
-                          const SizedBox(
-                            height: 3,
-                          ),
+                          const SizedBox(height: 3),
 
                           Text(
                             item.$3,
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize: 8.5,
-                              color: colors
-                                  .onSurfaceVariant,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -2738,8 +1842,7 @@ class _RaBreakdownPriorityGrid
 // PHOTO SOURCE
 // =============================================================================
 
-class _RaBreakdownPhotoSource
-    extends StatelessWidget {
+class _RaBreakdownPhotoSource extends StatelessWidget {
   const _RaBreakdownPhotoSource({
     required this.icon,
     required this.title,
@@ -2756,98 +1859,56 @@ class _RaBreakdownPhotoSource
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: colors
-          .surfaceContainerHighest
-          .withValues(
-        alpha: .34,
-      ),
-      borderRadius:
-          BorderRadius.circular(
-        17,
-      ),
+      color: colors.surfaceContainerHighest.withValues(alpha: .34),
+      borderRadius: BorderRadius.circular(17),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(
-          17,
-        ),
+        borderRadius: BorderRadius.circular(17),
         child: Padding(
-          padding:
-              const EdgeInsets.all(
-            13,
-          ),
+          padding: const EdgeInsets.all(13),
           child: Row(
             children: [
               Container(
                 width: 39,
                 height: 39,
-                decoration:
-                    BoxDecoration(
-                  color: colors.primary
-                      .withValues(
-                    alpha: .08,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    12,
-                  ),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color:
-                      colors.primary,
-                  size: 19,
-                ),
+                child: Icon(icon, color: colors.primary, size: 19),
               ),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10.8,
-                        fontWeight:
-                            FontWeight
-                                .w700,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 3,
-                    ),
+                    const SizedBox(height: 3),
 
                     Text(
                       subtitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.7,
-                        color: colors
-                            .onSurfaceVariant,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              Icon(
-                Icons
-                    .chevron_right_rounded,
-                color: colors
-                    .onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
             ],
           ),
         ),
@@ -2860,8 +1921,7 @@ class _RaBreakdownPhotoSource
 // PHOTO CARD
 // =============================================================================
 
-class _RaBreakdownPhotoCard
-    extends StatelessWidget {
+class _RaBreakdownPhotoCard extends StatelessWidget {
   const _RaBreakdownPhotoCard({
     required this.data,
     required this.annotation,
@@ -2871,8 +1931,7 @@ class _RaBreakdownPhotoCard
 
   final String data;
 
-  final BreakdownPhotoAnnotation?
-      annotation;
+  final BreakdownPhotoAnnotation? annotation;
 
   final VoidCallback onTap;
 
@@ -2880,8 +1939,7 @@ class _RaBreakdownPhotoCard
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     Widget preview;
 
@@ -2891,33 +1949,19 @@ class _RaBreakdownPhotoCard
         width: 116,
         height: 116,
         fit: BoxFit.cover,
-        errorBuilder: (
-          context,
-          error,
-          stackTrace,
-        ) {
+        errorBuilder: (context, error, stackTrace) {
           return Container(
-            color: colors
-                .surfaceContainerHighest,
-            alignment:
-                Alignment.center,
-            child: const Icon(
-              Icons
-                  .broken_image_outlined,
-            ),
+            color: colors.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined),
           );
         },
       );
     } on FormatException {
       preview = Container(
-        color: colors
-            .surfaceContainerHighest,
-        alignment:
-            Alignment.center,
-        child: const Icon(
-          Icons
-              .broken_image_outlined,
-        ),
+        color: colors.surfaceContainerHighest,
+        alignment: Alignment.center,
+        child: const Icon(Icons.broken_image_outlined),
       );
     }
 
@@ -2931,44 +1975,20 @@ class _RaBreakdownPhotoCard
           children: [
             Positioned.fill(
               child: ClipRRect(
-                borderRadius:
-                    BorderRadius.circular(
-                  16,
-                ),
+                borderRadius: BorderRadius.circular(16),
                 child: preview,
               ),
             ),
 
             if (annotation != null)
               Positioned(
-                left: (annotation!
-                            .markerX *
-                        100)
-                    .clamp(
-                      0.0,
-                      91.0,
-                    )
-                    .toDouble(),
-                top: (annotation!
-                            .markerY *
-                        88)
-                    .clamp(
-                      0.0,
-                      80.0,
-                    )
-                    .toDouble(),
+                left: (annotation!.markerX * 100).clamp(0.0, 91.0).toDouble(),
+                top: (annotation!.markerY * 88).clamp(0.0, 80.0).toDouble(),
                 child: Icon(
-                  Icons
-                      .location_on_rounded,
+                  Icons.location_on_rounded,
                   color: colors.error,
                   size: 24,
-                  shadows: const [
-                    Shadow(
-                      color:
-                          Colors.white,
-                      blurRadius: 4,
-                    ),
-                  ],
+                  shadows: const [Shadow(color: Colors.white, blurRadius: 4)],
                 ),
               ),
 
@@ -2976,47 +1996,26 @@ class _RaBreakdownPhotoCard
               left: 6,
               bottom: 6,
               child: Container(
-                padding:
-                    const EdgeInsets
-                        .symmetric(
-                  horizontal: 7,
-                  vertical: 4,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: Colors.black
-                      .withValues(
-                    alpha: .60,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    999,
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: .60),
+                  borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Row(
-                  mainAxisSize:
-                      MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons
-                          .edit_location_alt_outlined,
+                      Icons.edit_location_alt_outlined,
                       size: 12,
-                      color:
-                          Colors.white,
+                      color: Colors.white,
                     ),
-                    SizedBox(
-                      width: 3,
-                    ),
+                    SizedBox(width: 3),
                     Text(
                       'Mark',
                       style: TextStyle(
-                        color:
-                            Colors.white,
-                        fontSize: 8.5,
-                        fontWeight:
-                            FontWeight
-                                .w700,
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -3027,31 +2026,17 @@ class _RaBreakdownPhotoCard
             Positioned(
               top: 4,
               right: 4,
-              child:
-                  IconButton.filled(
+              child: IconButton.filled(
                 tooltip: 'Remove',
-                visualDensity:
-                    VisualDensity.compact,
+                visualDensity: VisualDensity.compact,
                 iconSize: 14,
-                style:
-                    IconButton.styleFrom(
-                  minimumSize:
-                      const Size(
-                    30,
-                    30,
-                  ),
-                  backgroundColor:
-                      Colors.black
-                          .withValues(
-                    alpha: .62,
-                  ),
-                  foregroundColor:
-                      Colors.white,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(30, 30),
+                  backgroundColor: Colors.black.withValues(alpha: .62),
+                  foregroundColor: Colors.white,
                 ),
                 onPressed: onRemove,
-                icon: const Icon(
-                  Icons.close_rounded,
-                ),
+                icon: const Icon(Icons.close_rounded),
               ),
             ),
           ],

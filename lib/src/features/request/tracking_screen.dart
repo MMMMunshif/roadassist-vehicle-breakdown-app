@@ -1,18 +1,13 @@
 part of '../../screens.dart';
 
 class TrackingScreen extends StatefulWidget {
-  const TrackingScreen({
-    super.key,
-    required this.draft,
-    this.requestId,
-  });
+  const TrackingScreen({super.key, required this.draft, this.requestId});
 
   final RequestDraft draft;
   final String? requestId;
 
   @override
-  State<TrackingScreen> createState() =>
-      _TrackingScreenState();
+  State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
@@ -31,6 +26,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
   String arrivalLocationHint = '';
 
   bool completionPending = false;
+  bool discountPending = false;
+  int? proposedFinalCost;
   String completionNotes = '';
   List<String> completionPhotos = [];
 
@@ -47,15 +44,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   bool confirmingCompletion = false;
   bool replacingProvider = false;
 
-  final statuses = const [
-    'Accepted',
-    'En Route',
-    'Arrived',
-    'Completed',
-  ];
+  final statuses = const ['Accepted', 'En Route', 'Arrived', 'Completed'];
 
-  StreamSubscription<
-      DocumentSnapshot<Map<String, dynamic>>>? requestListener;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? requestListener;
 
   @override
   void initState() {
@@ -64,24 +55,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
     final requestId = widget.requestId;
 
     if (requestId == null) {
-      requestError =
-          'This request is not connected to live tracking.';
+      requestError = 'This request is not connected to live tracking.';
       return;
     }
 
     requestListener = RequestService()
         .watchRequest(requestId)
         .listen(
-      _handleRequestUpdate,
-      onError: (_) {
-        if (!mounted) return;
+          _handleRequestUpdate,
+          onError: (_) {
+            if (!mounted) return;
 
-        setState(() {
-          requestError =
-              'Live updates are temporarily unavailable.';
-        });
-      },
-    );
+            setState(() {
+              requestError = 'Live updates are temporarily unavailable.';
+            });
+          },
+        );
   }
 
   @override
@@ -90,31 +79,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
     super.dispose();
   }
 
-  void _handleRequestUpdate(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
+  void _handleRequestUpdate(DocumentSnapshot<Map<String, dynamic>> snapshot) {
     final data = snapshot.data();
 
     if (!mounted || data == null) {
       return;
     }
 
-    final value =
-        data['status'] as String? ?? 'accepted';
+    final value = data['status'] as String? ?? 'accepted';
 
-    final latitude =
-        (data['providerLatitude'] as num?)?.toDouble();
+    final latitude = (data['providerLatitude'] as num?)?.toDouble();
 
-    final longitude =
-        (data['providerLongitude'] as num?)?.toDouble();
+    final longitude = (data['providerLongitude'] as num?)?.toDouble();
 
-    final updatedPosition =
-        latitude != null && longitude != null
-            ? LatLng(
-                latitude,
-                longitude,
-              )
-            : null;
+    final updatedPosition = latitude != null && longitude != null
+        ? LatLng(latitude, longitude)
+        : null;
 
     var shouldRefreshRoute = false;
 
@@ -124,16 +104,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
       if (old == null) {
         shouldRefreshRoute = true;
       } else {
-        final movement =
-            Geolocator.distanceBetween(
+        final movement = Geolocator.distanceBetween(
           old.latitude,
           old.longitude,
           updatedPosition.latitude,
           updatedPosition.longitude,
         );
 
-        shouldRefreshRoute =
-            movement >= 20;
+        shouldRefreshRoute = movement >= 20;
       }
     }
 
@@ -148,85 +126,60 @@ class _TrackingScreenState extends State<TrackingScreen> {
     setState(() {
       status = nextStatus;
 
-      cancelled =
-          value == 'cancelled';
+      cancelled = value == 'cancelled';
 
       arrivalNeedsConfirmation =
           data['arrivalVerificationRequired'] == true &&
-              data['arrivalConfirmedBy'] == null;
+          data['arrivalConfirmedBy'] == null;
 
-      arrivalLocationHint =
-          updatedPosition == null
-              ? 'Provider GPS is unavailable. Confirm arrival only if you have physically met the provider.'
-              : 'Provider GPS is informational. Confirm arrival only when the provider is physically with you.';
+      arrivalLocationHint = updatedPosition == null
+          ? 'Provider GPS is unavailable. Confirm arrival only if you have physically met the provider.'
+          : 'Provider GPS is informational. Confirm arrival only when the provider is physically with you.';
 
-      completionPending =
-          data['completionState'] == 'pending';
+      discountPending = data['pendingDiscountId'] != null;
+      proposedFinalCost = (data['finalCost'] as num?)?.toInt();
+      completionPending = data['completionState'] == 'pending';
 
-      completionNotes =
-          data['serviceNotes'] as String? ?? '';
+      completionNotes = data['serviceNotes'] as String? ?? '';
 
-      completionPhotos =
-          (data['servicePhotoData'] as List? ?? const [])
-              .whereType<String>()
-              .toList();
+      completionPhotos = (data['servicePhotoData'] as List? ?? const [])
+          .whereType<String>()
+          .toList();
 
-      recoveryReason =
-          data['cancellationReason'] as String?;
+      recoveryReason = data['cancellationReason'] as String?;
 
-      providerName =
-          data['providerName'] as String? ??
-              providerName;
+      providerName = data['providerName'] as String? ?? providerName;
 
-      providerPhone =
-          data['providerPhone'] as String? ??
-              providerPhone;
+      providerPhone = data['providerPhone'] as String? ?? providerPhone;
 
-      estimatedCost =
-          (data['estimatedCost'] as num?)?.toInt() ??
-              estimatedCost;
+      estimatedCost = (data['estimatedCost'] as num?)?.toInt() ?? estimatedCost;
 
       if (updatedPosition != null) {
-        providerPosition =
-            updatedPosition;
+        providerPosition = updatedPosition;
       }
 
       requestError = null;
     });
 
-    if (shouldRefreshRoute &&
-        updatedPosition != null) {
-      unawaited(
-        refreshRoadRoute(
-          updatedPosition,
-        ),
-      );
+    if (shouldRefreshRoute && updatedPosition != null) {
+      unawaited(refreshRoadRoute(updatedPosition));
     }
   }
 
-  Future<void> refreshRoadRoute(
-    LatLng origin,
-  ) async {
-    final version =
-        ++routeRequestVersion;
+  Future<void> refreshRoadRoute(LatLng origin) async {
+    final version = ++routeRequestVersion;
 
     setState(() {
       routeLoading = true;
     });
 
     try {
-      final result =
-          await const RouteService()
-              .fetchDrivingRoute(
+      final result = await const RouteService().fetchDrivingRoute(
         origin: origin,
-        destination: LatLng(
-          widget.draft.latitude,
-          widget.draft.longitude,
-        ),
+        destination: LatLng(widget.draft.latitude, widget.draft.longitude),
       );
 
-      if (!mounted ||
-          version != routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
@@ -235,37 +188,31 @@ class _TrackingScreenState extends State<TrackingScreen> {
         routeLoading = false;
       });
     } catch (_) {
-      if (!mounted ||
-          version != routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
       setState(() {
         routeLoading = false;
 
-        requestError =
-            'Road route and ETA are temporarily unavailable.';
+        requestError = 'Road route and ETA are temporarily unavailable.';
       });
     }
   }
 
   Future<void> confirmArrival() async {
-    final requestId =
-        widget.requestId;
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        confirmingArrival) {
+    if (requestId == null || confirmingArrival) {
       return;
     }
 
-    final reason =
-        await _adminReason(
+    final reason = await _adminReason(
       context,
       'Confirm you met the provider. Explain any missing or inaccurate GPS.',
     );
 
-    if (reason == null ||
-        !mounted) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -274,22 +221,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
 
     try {
-      await RequestService()
-          .confirmProviderArrival(
-        requestId,
-        reason,
-      );
+      await RequestService().confirmProviderArrival(requestId, reason);
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            '$error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -299,24 +237,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
-  Future<void>
-      replaceDelayedProvider() async {
-    final requestId =
-        widget.requestId;
+  Future<void> replaceDelayedProvider() async {
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        replacingProvider) {
+    if (requestId == null || replacingProvider) {
       return;
     }
 
-    final reason =
-        await _adminReason(
+    final reason = await _adminReason(
       context,
       'Reason for replacing the provider',
     );
 
-    if (reason == null ||
-        !mounted) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -325,22 +258,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
 
     try {
-      await RequestService()
-          .withdrawProvider(
-        requestId,
-        reason,
-      );
+      await RequestService().withdrawProvider(requestId, reason);
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            '$error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -350,13 +274,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
   }
 
-  Future<void>
-      confirmCompletion() async {
-    final requestId =
-        widget.requestId;
+  Future<void> confirmCompletion() async {
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        confirmingCompletion) {
+    if (requestId == null || confirmingCompletion) {
       return;
     }
 
@@ -365,21 +286,16 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
 
     try {
-      await RequestService()
-          .confirmJobCompletion(
+      await RequestService().confirmJobCompletion(
         requestId,
+        expectedFinalCost: proposedFinalCost,
       );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            '$error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -395,14 +311,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
 
     return switch (status) {
-      0 =>
-        'Provider accepted your request',
-      1 =>
-        'Provider is on the way',
-      2 =>
-        'Provider has arrived',
-      _ =>
-        'Assistance completed',
+      0 => 'Provider accepted your request',
+      1 => 'Provider is on the way',
+      2 => 'Provider has arrived',
+      _ => 'Assistance completed',
     };
   }
 
@@ -414,14 +326,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
 
     return switch (status) {
-      0 =>
-        'Your provider accepted the job and is preparing to travel to you.',
+      0 => 'Your provider accepted the job and is preparing to travel to you.',
       1 =>
         'Follow the live provider location while they travel to your breakdown point.',
-      2 =>
-        'Confirm arrival only after you physically meet the provider.',
-      _ =>
-        'The roadside assistance workflow has been completed.',
+      2 => 'Confirm arrival only after you physically meet the provider.',
+      _ => 'The roadside assistance workflow has been completed.',
     };
   }
 
@@ -446,81 +355,48 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return 'Calculating route';
     }
 
-    return roadRoute!.trafficAware
-        ? 'Live traffic route'
-        : 'Driving route';
+    return roadRoute!.trafficAware ? 'Live traffic route' : 'Driving route';
   }
 
-  String money(
-    int value,
-  ) {
-    final digits =
-        value.abs().toString();
+  String money(int value) {
+    final digits = value.abs().toString();
 
-    final buffer =
-        StringBuffer();
+    final buffer = StringBuffer();
 
-    for (var index = 0;
-        index < digits.length;
-        index++) {
-      if (index > 0 &&
-          (digits.length - index) % 3 == 0) {
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
         buffer.write(',');
       }
 
-      buffer.write(
-        digits[index],
-      );
+      buffer.write(digits[index]);
     }
 
     return 'Rs. ${value < 0 ? '-' : ''}${buffer.toString()}';
   }
 
-  Widget buildMap(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildMap(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final provider =
-        providerPosition;
+    final provider = providerPosition;
 
     return Container(
       height: 285,
-      clipBehavior:
-          Clip.antiAlias,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(
-          23,
-        ),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(
-            alpha: .48,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .48)),
       ),
       child: Stack(
         children: [
           Positioned.fill(
             child: MapMock(
-              position: LatLng(
-                widget.draft.latitude,
-                widget.draft.longitude,
-              ),
-              providerPosition:
-                  provider,
-              routePoints:
-                  roadRoute?.points,
-              showProviders:
-                  provider != null,
-              showRoute:
-                  provider != null &&
-                      roadRoute != null,
+              position: LatLng(widget.draft.latitude, widget.draft.longitude),
+              providerPosition: provider,
+              routePoints: roadRoute?.points,
+              showProviders: provider != null,
+              showRoute: provider != null && roadRoute != null,
             ),
           ),
 
@@ -529,27 +405,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
             left: 11,
             right: 11,
             child: Container(
-              padding:
-                  const EdgeInsets.all(
-                12,
-              ),
-              decoration:
-                  BoxDecoration(
-                color: colors.surface
-                    .withValues(
-                  alpha: .96,
-                ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  16,
-                ),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: .96),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: colors
-                      .outlineVariant
-                      .withValues(
-                    alpha: .30,
-                  ),
+                  color: colors.outlineVariant.withValues(alpha: .30),
                 ),
               ),
               child: Row(
@@ -557,66 +418,40 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   Container(
                     width: 39,
                     height: 39,
-                    decoration:
-                        BoxDecoration(
-                      color: colors
-                          .primary
-                          .withValues(
-                        alpha: .08,
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        12,
-                      ),
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: .08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      Icons
-                          .route_outlined,
-                      color:
-                          colors.primary,
+                      Icons.route_outlined,
+                      color: colors.primary,
                       size: 19,
                     ),
                   ),
 
-                  const SizedBox(
-                    width: 9,
-                  ),
+                  const SizedBox(width: 9),
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           routeTitle,
                           maxLines: 1,
-                          overflow:
-                              TextOverflow
-                                  .ellipsis,
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 10.5,
-                            fontWeight:
-                                FontWeight
-                                    .w700,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
 
-                        if (roadRoute != null &&
-                            !cancelled &&
-                            status < 3) ...[
-                          const SizedBox(
-                            height: 2,
-                          ),
+                        if (roadRoute != null && !cancelled && status < 3) ...[
+                          const SizedBox(height: 2),
                           Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize: 8.5,
-                              color: colors
-                                  .onSurfaceVariant,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -627,60 +462,38 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   if (routeLoading)
                     const SizedBox.square(
                       dimension: 18,
-                      child:
-                          CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                 ],
               ),
             ),
           ),
 
-          if (provider == null &&
-              !cancelled &&
-              status < 3)
+          if (provider == null && !cancelled && status < 3)
             Positioned(
               left: 11,
               right: 11,
               bottom: 11,
               child: Container(
-                padding:
-                    const EdgeInsets.all(
-                  11,
-                ),
-                decoration:
-                    BoxDecoration(
-                  color: colors.surface
-                      .withValues(
-                    alpha: .95,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    15,
-                  ),
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: colors.surface.withValues(alpha: .95),
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      Icons
-                          .location_searching_rounded,
-                      color:
-                          colors.primary,
+                      Icons.location_searching_rounded,
+                      color: colors.primary,
                       size: 18,
                     ),
-                    const SizedBox(
-                      width: 8,
-                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'The provider has not shared a live GPS location yet.',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 9,
-                          color: colors
-                              .onSurfaceVariant,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -693,98 +506,61 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget buildProviderCard(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildProviderCard(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        15,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(
-                0xFF0D1D2B,
-              )
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(
-            alpha: .45,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              ProfileInitials(
-                name:
-                    providerName,
-                radius: 25,
-              ),
+              ProfileInitials(name: providerName, radius: 25),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       providerName,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow
-                              .ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 12.5,
-                        fontWeight:
-                            FontWeight
-                                .w800,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 4,
-                    ),
+                    const SizedBox(height: 4),
 
                     Row(
                       children: [
                         const Icon(
-                          Icons
-                              .verified_outlined,
+                          Icons.verified_outlined,
                           size: 14,
-                          color:
-                              raSuccess,
+                          color: raSuccess,
                         ),
 
-                        const SizedBox(
-                          width: 4,
-                        ),
+                        const SizedBox(width: 4),
 
-                        Text(
-                          'Assigned RoadAssist provider',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 8.5,
-                            color: colors
-                                .onSurfaceVariant,
+                        Flexible(
+                          child: Text(
+                            'Assigned RoadAssist provider',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ],
@@ -795,73 +571,47 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ],
           ),
 
-          const SizedBox(
-            height: 13,
-          ),
+          const SizedBox(height: 13),
 
           Row(
             children: [
               Expanded(
-                child:
-                    OutlinedButton.icon(
-                  onPressed:
-                      providerPhone
-                              .trim()
-                              .isEmpty
-                          ? null
-                          : () {
-                              showCallPrompt(
-                                context,
-                                name:
-                                    providerName,
-                                number:
-                                    providerPhone,
-                              );
-                            },
-                  icon: const Icon(
-                    Icons.call_outlined,
-                  ),
-                  label:
-                      const Text(
-                    'Call',
-                  ),
+                child: OutlinedButton.icon(
+                  onPressed: providerPhone.trim().isEmpty
+                      ? null
+                      : () {
+                          showCallPrompt(
+                            context,
+                            name: providerName,
+                            number: providerPhone,
+                          );
+                        },
+                  icon: const Icon(Icons.call_outlined),
+                  label: const Text('Call'),
                 ),
               ),
 
-              const SizedBox(
-                width: 8,
-              ),
+              const SizedBox(width: 8),
 
               Expanded(
-                child:
-                    FilledButton.icon(
-                  onPressed:
-                      widget.requestId ==
-                              null
-                          ? null
-                          : () {
-                              push(
-                                context,
-                                ChatScreen(
-                                  requestId:
-                                      widget.requestId,
-                                  peerName:
-                                      providerName,
-                                  peerPhone:
-                                      providerPhone,
-                                ),
-                              );
-                            },
+                child: FilledButton.icon(
+                  onPressed: widget.requestId == null
+                      ? null
+                      : () {
+                          push(
+                            context,
+                            ChatScreen(
+                              requestId: widget.requestId,
+                              peerName: providerName,
+                              peerPhone: providerPhone,
+                            ),
+                          );
+                        },
                   icon: _UnreadChatIcon(
-                    requestId:
-                        widget.requestId,
-                    seenField:
-                        'driverMessagesSeenAt',
+                    requestId: widget.requestId,
+                    seenField: 'driverMessagesSeenAt',
                   ),
-                  label:
-                      const Text(
-                    'Message',
-                  ),
+                  label: const Text('Message'),
                 ),
               ),
             ],
@@ -871,116 +621,70 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget buildStatusCard(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildStatusCard(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final tone =
-        cancelled
-            ? colors.error
-            : status == 3
-                ? raSuccess
-                : colors.primary;
+    final tone = cancelled
+        ? colors.error
+        : status == 3
+        ? raSuccess
+        : colors.primary;
 
-    final icon =
-        cancelled
-            ? Icons.close_rounded
-            : switch (status) {
-                0 =>
-                  Icons.handshake_outlined,
-                1 =>
-                  Icons.navigation_outlined,
-                2 =>
-                  Icons.location_on_outlined,
-                _ =>
-                  Icons.task_alt_rounded,
-              };
+    final icon = cancelled
+        ? Icons.close_rounded
+        : switch (status) {
+            0 => Icons.handshake_outlined,
+            1 => Icons.navigation_outlined,
+            2 => Icons.location_on_outlined,
+            _ => Icons.task_alt_rounded,
+          };
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        16,
-      ),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: tone.withValues(
-          alpha: .07,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          21,
-        ),
-        border: Border.all(
-          color: tone.withValues(
-            alpha: .17,
-          ),
-        ),
+        color: tone.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: tone.withValues(alpha: .17)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
                 width: 47,
                 height: 47,
-                decoration:
-                    BoxDecoration(
-                  color: tone
-                      .withValues(
-                    alpha: .11,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    15,
-                  ),
+                decoration: BoxDecoration(
+                  color: tone.withValues(alpha: .11),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                child: Icon(
-                  icon,
-                  color: tone,
-                ),
+                child: Icon(icon, color: tone),
               ),
 
-              const SizedBox(
-                width: 11,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       statusTitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight:
-                            FontWeight
-                                .w800,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 4,
-                    ),
+                    const SizedBox(height: 4),
 
                     Text(
                       statusDescription,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9.3,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
                         height: 1.4,
-                        color: colors
-                            .onSurfaceVariant,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -990,80 +694,47 @@ class _TrackingScreenState extends State<TrackingScreen> {
           ),
 
           if (!cancelled) ...[
-            const SizedBox(
-              height: 17,
-            ),
+            const SizedBox(height: 17),
 
-            StatusTimeline(
-              statuses:
-                  statuses,
-              current: status,
-            ),
+            StatusTimeline(statuses: statuses, current: status),
           ],
         ],
       ),
     );
   }
 
-  Widget buildRequestSummary(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildRequestSummary(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final vehicle =
-        [
-          widget.draft.modelYear,
-          widget.draft.registration,
-        ]
-            .where(
-              (value) =>
-                  value.trim().isNotEmpty,
-            )
-            .join(' • ');
+    final vehicle = [
+      widget.draft.modelYear,
+      widget.draft.registration,
+    ].where((value) => value.trim().isNotEmpty).join(' • ');
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        15,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(
-                0xFF0D1D2B,
-              )
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(
-            alpha: .45,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
           _RaTrackDetail(
-            icon: Icons
-                .car_repair_outlined,
+            icon: Icons.car_repair_outlined,
             label: 'Assistance',
-            value:
-                widget.draft.issue,
+            value: widget.draft.issue,
           ),
 
           const _RaTrackDivider(),
 
           if (vehicle.isNotEmpty) ...[
             _RaTrackDetail(
-              icon: Icons
-                  .directions_car_outlined,
+              icon: Icons.directions_car_outlined,
               label: 'Vehicle',
               value: vehicle,
             ),
@@ -1072,53 +743,36 @@ class _TrackingScreenState extends State<TrackingScreen> {
           ],
 
           _RaTrackDetail(
-            icon: Icons
-                .location_on_outlined,
+            icon: Icons.location_on_outlined,
             label: 'Location',
-            value:
-                widget.draft.location,
+            value: widget.draft.location,
           ),
 
-          if (widget.draft.landmark
-              .trim()
-              .isNotEmpty) ...[
+          if (widget.draft.landmark.trim().isNotEmpty) ...[
             const _RaTrackDivider(),
 
             _RaTrackDetail(
-              icon:
-                  Icons.signpost_outlined,
+              icon: Icons.signpost_outlined,
               label: 'Landmark',
-              value:
-                  widget.draft.landmark,
+              value: widget.draft.landmark,
             ),
           ],
 
           const _RaTrackDivider(),
 
           _RaTrackDetail(
-            icon: Icons
-                .request_quote_outlined,
-            label:
-                'Approved quote',
-            value:
-                estimatedCost > 0
-                    ? money(
-                        estimatedCost,
-                      )
-                    : 'Price pending',
+            icon: Icons.request_quote_outlined,
+            label: 'Approved quote',
+            value: estimatedCost > 0 ? money(estimatedCost) : 'Price pending',
           ),
 
-          if (widget.requestId !=
-              null) ...[
+          if (widget.requestId != null) ...[
             const _RaTrackDivider(),
 
             _RaTrackDetail(
-              icon:
-                  Icons.tag_rounded,
-              label:
-                  'Request ID',
-              value:
-                  widget.requestId!,
+              icon: Icons.tag_rounded,
+              label: 'Request ID',
+              value: widget.requestId!,
             ),
           ],
         ],
@@ -1126,221 +780,131 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget buildArrivalConfirmation(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildArrivalConfirmation(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        15,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: raGold.withValues(
-          alpha: .075,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          19,
-        ),
-        border: Border.all(
-          color: raGold.withValues(
-            alpha: .18,
-          ),
-        ),
+        color: raGold.withValues(alpha: .075),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: raGold.withValues(alpha: .18)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
                 width: 43,
                 height: 43,
-                decoration:
-                    BoxDecoration(
-                  color: raGold
-                      .withValues(
-                    alpha: .12,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    14,
-                  ),
+                decoration: BoxDecoration(
+                  color: raGold.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
-                  Icons
-                      .person_pin_circle_outlined,
+                  Icons.person_pin_circle_outlined,
                   color: raGold,
                 ),
               ),
 
-              const SizedBox(
-                width: 10,
-              ),
+              const SizedBox(width: 10),
 
               Expanded(
                 child: Text(
                   'Confirm provider arrival',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight:
-                        FontWeight
-                            .w800,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(
-            height: 10,
-          ),
+          const SizedBox(height: 10),
 
           Text(
             arrivalLocationHint,
-            style: GoogleFonts
-                .plusJakartaSans(
-              fontSize: 9.3,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
               height: 1.45,
-              color: colors
-                  .onSurfaceVariant,
+              color: colors.onSurfaceVariant,
             ),
           ),
 
-          const SizedBox(
-            height: 13,
-          ),
+          const SizedBox(height: 13),
 
           FilledButton.icon(
-            onPressed:
-                confirmingArrival
-                    ? null
-                    : confirmArrival,
+            onPressed: confirmingArrival ? null : confirmArrival,
             icon: confirmingArrival
                 ? const SizedBox.square(
                     dimension: 17,
-                    child:
-                        CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color:
-                          Colors.white,
+                      color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons
-                        .check_circle_outline_rounded,
-                  ),
-            label: const Text(
-              'Provider Is Here',
-            ),
+                : const Icon(Icons.check_circle_outline_rounded),
+            label: const Text('Provider Is Here'),
           ),
         ],
       ),
     );
   }
 
-  Widget buildCompletionReview(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildCompletionReview(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        15,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(
-                0xFF0D1D2B,
-              )
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: raSuccess.withValues(
-            alpha: .30,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: raSuccess.withValues(alpha: .30)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
                 width: 44,
                 height: 44,
-                decoration:
-                    BoxDecoration(
-                  color: raSuccess
-                      .withValues(
-                    alpha: .10,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    14,
-                  ),
+                decoration: BoxDecoration(
+                  color: raSuccess.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons.task_alt_rounded,
-                  color:
-                      raSuccess,
-                ),
+                child: const Icon(Icons.task_alt_rounded, color: raSuccess),
               ),
 
-              const SizedBox(
-                width: 10,
-              ),
+              const SizedBox(width: 10),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Review completed work',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight
-                                .w800,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 3,
-                    ),
+                    const SizedBox(height: 3),
 
                     Text(
                       'Confirm only after checking the agreed service.',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.8,
-                        color: colors
-                            .onSurfaceVariant,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1349,217 +913,124 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ],
           ),
 
-          if (completionNotes
-              .trim()
-              .isNotEmpty) ...[
-            const SizedBox(
-              height: 14,
-            ),
+          if (completionNotes.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
 
             Text(
               'Provider notes',
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 10,
-                fontWeight:
-                    FontWeight.w700,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
 
-            const SizedBox(
-              height: 5,
-            ),
+            const SizedBox(height: 5),
 
             Text(
               completionNotes,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 9.5,
-                height: 1.45,
-              ),
+              style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.45),
             ),
           ],
 
-          if (completionPhotos
-              .isNotEmpty) ...[
-            const SizedBox(
-              height: 14,
-            ),
+          if (completionPhotos.isNotEmpty) ...[
+            const SizedBox(height: 14),
 
-            RevisionEvidencePhotos(
-              photos:
-                  completionPhotos,
-            ),
+            RevisionEvidencePhotos(photos: completionPhotos),
           ],
 
-          const SizedBox(
-            height: 16,
-          ),
+          const SizedBox(height: 16),
 
+          CompletionReviewPanel(requestId: widget.requestId!),
+          const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed:
-                confirmingCompletion
-                    ? null
-                    : confirmCompletion,
-            icon:
-                confirmingCompletion
-                    ? const SizedBox.square(
-                        dimension: 17,
-                        child:
-                            CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color:
-                              Colors.white,
-                        ),
-                      )
-                    : const Icon(
-                        Icons
-                            .verified_outlined,
-                      ),
-            label: const Text(
-              'Confirm Work Completed',
-            ),
+            onPressed: confirmingCompletion || discountPending
+                ? null
+                : confirmCompletion,
+            icon: confirmingCompletion
+                ? const SizedBox.square(
+                    dimension: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.verified_outlined),
+            label: const Text('Agree Final Amount & Complete'),
           ),
 
-          const SizedBox(
-            height: 7,
-          ),
+          const SizedBox(height: 7),
 
           TextButton.icon(
-            style:
-                TextButton.styleFrom(
-              foregroundColor:
-                  colors.error,
-            ),
-            onPressed:
-                widget.requestId == null
-                    ? null
-                    : () {
-                        push(
-                          context,
-                          DisputeScreen(
-                            requestId:
-                                widget.requestId!,
-                          ),
-                        );
-                      },
-            icon: const Icon(
-              Icons
-                  .report_problem_outlined,
-            ),
-            label: const Text(
-              'There Is a Problem',
-            ),
+            style: TextButton.styleFrom(foregroundColor: colors.error),
+            onPressed: widget.requestId == null
+                ? null
+                : () {
+                    push(context, DisputeScreen(requestId: widget.requestId!));
+                  },
+            icon: const Icon(Icons.report_problem_outlined),
+            label: const Text('There Is a Problem'),
           ),
         ],
       ),
     );
   }
 
-  Widget buildRecoveryCard(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+  Widget buildRecoveryCard(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        15,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors.error
-            .withValues(
-          alpha: .07,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          19,
-        ),
-        border: Border.all(
-          color: colors.error
-              .withValues(
-            alpha: .18,
-          ),
-        ),
+        color: colors.error.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: colors.error.withValues(alpha: .18)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 43,
             height: 43,
-            decoration:
-                BoxDecoration(
-              color: colors.error
-                  .withValues(
-                alpha: .11,
-              ),
-              borderRadius:
-                  BorderRadius
-                      .circular(
-                14,
-              ),
+            decoration: BoxDecoration(
+              color: colors.error.withValues(alpha: .11),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              Icons
-                  .person_off_outlined,
-              color:
-                  colors.error,
-            ),
+            child: Icon(Icons.person_off_outlined, color: colors.error),
           ),
 
-          const SizedBox(
-            width: 10,
-          ),
+          const SizedBox(width: 10),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Provider unavailable',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 11.5,
-                    fontWeight:
-                        FontWeight
-                            .w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 4,
-                ),
+                const SizedBox(height: 4),
 
                 Text(
                   recoveryReason ??
                       'The assigned provider is no longer available.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9.2,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     height: 1.4,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 5,
-                ),
+                const SizedBox(height: 5),
 
                 Text(
                   'Choose another provider and approve a new offer before continuing.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 8.8,
-                    color: colors
-                        .onSurfaceVariant,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1571,71 +1042,42 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    return RaDriverScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Track Assistance',
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight:
-                FontWeight.w800,
+        title: RaDriverAppBarTitle(
+          'Active request',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
             letterSpacing: -.45,
           ),
         ),
         actions: [
-          if (widget.requestId != null &&
-              status == 3)
+          if (widget.requestId != null && status == 3)
             IconButton(
-              tooltip:
-                  'Invoice',
+              tooltip: 'Invoice',
               onPressed: () {
-                push(
-                  context,
-                  InvoiceScreen(
-                    requestId:
-                        widget.requestId!,
-                  ),
-                );
+                push(context, InvoiceScreen(requestId: widget.requestId!));
               },
-              icon: const Icon(
-                Icons
-                    .receipt_long_outlined,
-              ),
+              icon: const Icon(Icons.receipt_long_outlined),
             ),
 
           IconButton(
             tooltip: 'Emergency',
-            style:
-                IconButton.styleFrom(
-              foregroundColor:
-                  colors.error,
-            ),
+            style: IconButton.styleFrom(foregroundColor: colors.error),
             onPressed: () {
-              push(
-                context,
-                const EmergencyScreen(),
-              );
+              push(context, const EmergencyScreen());
             },
-            icon: const Icon(
-              Icons.sos_outlined,
-            ),
+            icon: const Icon(Icons.sos_outlined),
           ),
 
-          const SizedBox(
-            width: 4,
-          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
@@ -1644,78 +1086,42 @@ class _TrackingScreenState extends State<TrackingScreen> {
           children: [
             Expanded(
               child: ListView(
-                physics:
-                    const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  18,
-                  8,
-                  18,
-                  28,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
-                  if (widget.requestId !=
-                      null) ...[
-                    RepairQuotePanel(
-                      requestId:
-                          widget.requestId!,
-                    ),
+                  if (widget.requestId != null) ...[
+                    RepairQuotePanel(requestId: widget.requestId!),
 
-                    const SizedBox(
-                      height: 13,
-                    ),
+                    const SizedBox(height: 13),
                   ],
 
-                  buildMap(
-                    context,
-                  ),
+                  buildMap(context),
 
-                  if (requestError !=
-                      null) ...[
-                    const SizedBox(
-                      height: 11,
-                    ),
+                  if (requestError != null) ...[
+                    const SizedBox(height: 11),
 
                     Container(
-                      padding:
-                          const EdgeInsets.all(
-                        12,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: colors.error
-                            .withValues(
-                          alpha: .07,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          15,
-                        ),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.error.withValues(alpha: .07),
+                        borderRadius: BorderRadius.circular(15),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            Icons
-                                .cloud_off_outlined,
-                            color:
-                                colors.error,
+                            Icons.cloud_off_outlined,
+                            color: colors.error,
                             size: 18,
                           ),
 
-                          const SizedBox(
-                            width: 8,
-                          ),
+                          const SizedBox(width: 8),
 
                           Expanded(
                             child: Text(
                               requestError!,
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize:
-                                    9,
-                                color: colors
-                                    .onSurfaceVariant,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -1724,76 +1130,46 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   ],
 
-                  const SizedBox(
-                    height: 14,
-                  ),
+                  const SizedBox(height: 14),
 
-                  buildProviderCard(
-                    context,
-                  ),
+                  buildProviderCard(context),
 
-                  const SizedBox(
-                    height: 18,
-                  ),
+                  const SizedBox(height: 18),
 
-                  buildStatusCard(
-                    context,
-                  ),
+                  buildStatusCard(context),
 
-                  const SizedBox(
-                    height: 13,
-                  ),
+                  const SizedBox(height: 13),
 
-                  buildRequestSummary(
-                    context,
-                  ),
+                  buildRequestSummary(context),
 
                   if (!cancelled &&
                       status == 0 &&
-                      widget.requestId !=
-                          null) ...[
-                    const SizedBox(
-                      height: 13,
-                    ),
+                      widget.requestId != null) ...[
+                    const SizedBox(height: 13),
 
                     OutlinedButton.icon(
-                      onPressed:
-                          replacingProvider
-                              ? null
-                              : replaceDelayedProvider,
-                      icon:
-                          replacingProvider
-                              ? const SizedBox.square(
-                                  dimension:
-                                      16,
-                                  child:
-                                      CircularProgressIndicator(
-                                    strokeWidth:
-                                        2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons
-                                      .person_search_outlined,
-                                ),
+                      onPressed: replacingProvider
+                          ? null
+                          : replaceDelayedProvider,
+                      icon: replacingProvider
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.person_search_outlined),
                       label: const Text(
                         'Provider Has Not Departed? Replace Provider',
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 5,
-                    ),
+                    const SizedBox(height: 5),
 
                     Text(
                       'Use replacement only when the assigned provider has not departed after the expected waiting period.',
-                      textAlign:
-                          TextAlign.center,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.5,
-                        color: colors
-                            .onSurfaceVariant,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1801,67 +1177,37 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   if (!cancelled &&
                       status == 2 &&
                       arrivalNeedsConfirmation) ...[
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
-                    buildArrivalConfirmation(
-                      context,
-                    ),
+                    buildArrivalConfirmation(context),
                   ],
 
-                  if (completionPending &&
-                      widget.requestId !=
-                          null) ...[
-                    const SizedBox(
-                      height: 16,
-                    ),
+                  if (completionPending && widget.requestId != null) ...[
+                    const SizedBox(height: 16),
 
-                    buildCompletionReview(
-                      context,
-                    ),
+                    buildCompletionReview(context),
                   ],
 
-                  if (cancelled &&
-                      recoveryReason !=
-                          null) ...[
-                    const SizedBox(
-                      height: 16,
-                    ),
+                  if (cancelled && recoveryReason != null) ...[
+                    const SizedBox(height: 16),
 
-                    buildRecoveryCard(
-                      context,
-                    ),
+                    buildRecoveryCard(context),
                   ],
 
-                  if (status == 3 &&
-                      widget.requestId !=
-                          null) ...[
-                    const SizedBox(
-                      height: 17,
-                    ),
+                  if (status == 3 && widget.requestId != null) ...[
+                    const SizedBox(height: 17),
 
                     SizedBox(
-                      width:
-                          double.infinity,
-                      child:
-                          OutlinedButton.icon(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
                         onPressed: () {
                           push(
                             context,
-                            InvoiceScreen(
-                              requestId:
-                                  widget.requestId!,
-                            ),
+                            InvoiceScreen(requestId: widget.requestId!),
                           );
                         },
-                        icon: const Icon(
-                          Icons
-                              .receipt_long_outlined,
-                        ),
-                        label: const Text(
-                          'View Service Invoice',
-                        ),
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: const Text('View / Download Invoice'),
                       ),
                     ),
                   ],
@@ -1870,35 +1216,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ),
 
             _RaTrackingBottomBar(
-              cancelled:
-                  cancelled,
-              completed:
-                  status == 3,
-              canFindAnother:
-                  cancelled &&
-                      recoveryReason !=
-                          null,
+              cancelled: cancelled,
+              completed: status == 3,
+              canFindAnother: cancelled && recoveryReason != null,
               onPressed: () {
-                if (cancelled &&
-                    recoveryReason !=
-                        null) {
+                if (cancelled && recoveryReason != null) {
                   replace(
                     context,
                     ReviewScreen(
-                      draft:
-                          widget.draft
-                              .copyWith(
+                      draft: widget.draft.copyWith(
                         provider: '',
-                        preferredProviderId:
-                            '',
+                        preferredProviderId: '',
                       ),
                     ),
                   );
                 } else {
-                  replace(
-                    context,
-                    const DriverShell(),
-                  );
+                  replace(context, const DriverShell());
                 }
               },
             ),
@@ -1909,8 +1242,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 }
 
-class _RaTrackDetail
-    extends StatelessWidget {
+class _RaTrackDetail extends StatelessWidget {
   const _RaTrackDetail({
     required this.icon,
     required this.label,
@@ -1923,76 +1255,45 @@ class _RaTrackDetail
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 38,
             height: 38,
-            decoration:
-                BoxDecoration(
-              color: colors.primary
-                  .withValues(
-                alpha: .07,
-              ),
-              borderRadius:
-                  BorderRadius
-                      .circular(
-                12,
-              ),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              size: 18,
-              color:
-                  colors.primary,
-            ),
+            child: Icon(icon, size: 18, color: colors.primary),
           ),
 
-          const SizedBox(
-            width: 10,
-          ),
+          const SizedBox(width: 10),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 8.4,
-                    color: colors
-                        .onSurfaceVariant,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 3,
-                ),
+                const SizedBox(height: 3),
 
                 Text(
                   value,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.3,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     height: 1.4,
-                    fontWeight:
-                        FontWeight
-                            .w600,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -2004,8 +1305,7 @@ class _RaTrackDetail
   }
 }
 
-class _RaTrackDivider
-    extends StatelessWidget {
+class _RaTrackDivider extends StatelessWidget {
   const _RaTrackDivider();
 
   @override
@@ -2013,18 +1313,14 @@ class _RaTrackDivider
     return Divider(
       height: 1,
       indent: 48,
-      color: Theme.of(context)
-          .colorScheme
-          .outlineVariant
-          .withValues(
-            alpha: .34,
-          ),
+      color: Theme.of(
+        context,
+      ).colorScheme.outlineVariant.withValues(alpha: .34),
     );
   }
 }
 
-class _RaTrackingBottomBar
-    extends StatelessWidget {
+class _RaTrackingBottomBar extends StatelessWidget {
   const _RaTrackingBottomBar({
     required this.cancelled,
     required this.completed,
@@ -2040,60 +1336,37 @@ class _RaTrackingBottomBar
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final enabled =
-        cancelled || completed;
+    final enabled = cancelled || completed;
 
     return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        18,
-        8,
-        18,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(
-              alpha: .45,
-            ),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          width:
-              double.infinity,
-          child:
-              FilledButton.icon(
-            onPressed:
-                enabled
-                    ? onPressed
-                    : null,
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: enabled ? onPressed : null,
             icon: Icon(
               canFindAnother
-                  ? Icons
-                      .person_search_outlined
+                  ? Icons.person_search_outlined
                   : enabled
-                      ? Icons
-                          .home_outlined
-                      : Icons
-                          .hourglass_top_rounded,
+                  ? Icons.home_outlined
+                  : Icons.hourglass_top_rounded,
             ),
             label: Text(
               canFindAnother
                   ? 'Find Another Provider'
                   : enabled
-                      ? 'Back to Home'
-                      : 'Waiting for Provider Update',
+                  ? 'Back to Home'
+                  : 'Waiting for Provider Update',
             ),
           ),
         ),

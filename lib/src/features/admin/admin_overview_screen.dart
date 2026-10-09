@@ -7,10 +7,17 @@ part of '../../screens.dart';
 class AdminOverviewScreen extends StatelessWidget {
   const AdminOverviewScreen({
     super.key,
+    this.canReviewProviders = false,
+    this.onReviewProviders,
   });
+  final bool canReviewProviders;
+  final VoidCallback? onReviewProviders;
 
   @override
   Widget build(BuildContext context) {
-    return const _AdminOverview();
+    return _AdminOverview(
+      canReviewProviders: canReviewProviders,
+      onReviewProviders: onReviewProviders,
+    );
   }
 }

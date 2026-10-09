@@ -1,48 +1,30 @@
 part of '../../screens.dart';
 
-class _AdminComplaintScreen
-    extends StatefulWidget {
-  const _AdminComplaintScreen({
-    required this.requestId,
-  });
+class _AdminComplaintScreen extends StatefulWidget {
+  const _AdminComplaintScreen({required this.requestId});
 
   final String requestId;
 
   @override
-  State<_AdminComplaintScreen> createState() =>
-      _AdminComplaintScreenState();
+  State<_AdminComplaintScreen> createState() => _AdminComplaintScreenState();
 }
 
-class _AdminComplaintScreenState
-    extends State<_AdminComplaintScreen> {
+class _AdminComplaintScreenState extends State<_AdminComplaintScreen> {
   String priority = 'normal';
 
-  DateTime dueAt =
-      DateTime.now().add(
-    const Duration(days: 2),
-  );
+  DateTime dueAt = DateTime.now().add(const Duration(days: 2));
 
   bool busy = false;
 
-  late final review =
-      FirebaseFirestore.instance
-          .collection(
-            'complaintReviews',
-          )
-          .doc(widget.requestId)
-          .snapshots();
+  late final review = FirebaseFirestore.instance
+      .collection('complaintReviews')
+      .doc(widget.requestId)
+      .snapshots();
 
-  Future<void> decide(
-    String status,
-  ) async {
-    final reason =
-        await _adminReason(
-      context,
-      'Public decision / next step',
-    );
+  Future<void> decide(String status) async {
+    final reason = await _adminReason(context, 'Public decision / next step');
 
-    if (reason == null ||
-        !mounted) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -51,8 +33,7 @@ class _AdminComplaintScreenState
     });
 
     try {
-      await AdminService()
-          .reviewComplaint(
+      await AdminService().reviewComplaint(
         widget.requestId,
         status: status,
         priority: priority,
@@ -64,26 +45,16 @@ class _AdminComplaintScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Complaint review updated.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Complaint review updated.')),
       );
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not save the decision.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save the decision.')),
       );
     } finally {
       if (mounted) {
@@ -100,81 +71,54 @@ class _AdminComplaintScreenState
         '${dueAt.year}';
   }
 
-  Color priorityColor(
-    BuildContext context,
-    String value,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Color priorityColor(BuildContext context, String value) {
+    final colors = Theme.of(context).colorScheme;
 
     return switch (value) {
       'urgent' => colors.error,
       'high' => raGold,
-      'low' =>
-        colors.onSurfaceVariant,
+      'low' => colors.onSurfaceVariant,
       _ => colors.primary,
     };
   }
 
-  String friendlyStatus(
-    String value,
-  ) {
+  String friendlyStatus(String value) {
     return value
         .replaceAll('_', ' ')
         .split(' ')
-        .where(
-          (item) => item.isNotEmpty,
-        )
-        .map(
-          (item) =>
-              '${item[0].toUpperCase()}${item.substring(1)}',
-        )
+        .where((item) => item.isNotEmpty)
+        .map((item) => '${item[0].toUpperCase()}${item.substring(1)}')
         .join(' ');
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    return RaAdminScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'Complaint Review',
-          style:
-              GoogleFonts.plusJakartaSans(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 18,
             fontWeight: FontWeight.w800,
           ),
         ),
       ),
       body: ListView(
-        physics:
-            const BouncingScrollPhysics(),
-        padding:
-            const EdgeInsets.fromLTRB(
-          18,
-          8,
-          18,
-          32,
-        ),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
-          _AdminComplaintHero(
-            requestId:
-                widget.requestId,
-          ),
+          _AdminComplaintHero(requestId: widget.requestId),
 
           const SizedBox(height: 12),
 
           const _AdminComplaintNotice(
             icon: Icons.gavel_outlined,
-            title:
-                'Evidence-based review',
+            title: 'Evidence-based review',
             message:
                 'Review the driver report, provider response and invoice evidence before deciding. Admin decisions are visible to participants but do not automatically process refunds.',
             tone: raBlue,
@@ -183,59 +127,28 @@ class _AdminComplaintScreenState
           const SizedBox(height: 18),
 
           LayoutBuilder(
-            builder: (
-              context,
-              constraints,
-            ) {
-              final compact =
-                  constraints.maxWidth <
-                      480;
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 480;
 
-              final caseButton =
-                  OutlinedButton.icon(
+              final caseButton = OutlinedButton.icon(
                 onPressed: () {
-                  push(
-                    context,
-                    DisputeScreen(
-                      requestId:
-                          widget.requestId,
-                    ),
-                  );
+                  push(context, DisputeScreen(requestId: widget.requestId));
                 },
-                icon: const Icon(
-                  Icons
-                      .report_problem_outlined,
-                ),
-                label: const Text(
-                  'Case Evidence',
-                ),
+                icon: const Icon(Icons.report_problem_outlined),
+                label: const Text('Case Evidence'),
               );
 
-              final invoiceButton =
-                  OutlinedButton.icon(
+              final invoiceButton = OutlinedButton.icon(
                 onPressed: () {
-                  push(
-                    context,
-                    InvoiceScreen(
-                      requestId:
-                          widget.requestId,
-                    ),
-                  );
+                  push(context, InvoiceScreen(requestId: widget.requestId));
                 },
-                icon: const Icon(
-                  Icons
-                      .receipt_long_outlined,
-                ),
-                label: const Text(
-                  'Invoice',
-                ),
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: const Text('Invoice'),
               );
 
               if (compact) {
                 return Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     caseButton,
                     const SizedBox(height: 8),
@@ -246,13 +159,9 @@ class _AdminComplaintScreenState
 
               return Row(
                 children: [
-                  Expanded(
-                    child: caseButton,
-                  ),
+                  Expanded(child: caseButton),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: invoiceButton,
-                  ),
+                  Expanded(child: invoiceButton),
                 ],
               );
             },
@@ -261,32 +170,22 @@ class _AdminComplaintScreenState
           const SizedBox(height: 24),
 
           const _AdminComplaintHeading(
-            title:
-                'Current admin review',
+            title: 'Current admin review',
             subtitle:
                 'Current complaint ownership, priority, deadline and published decision.',
           ),
 
           const SizedBox(height: 10),
 
-          StreamBuilder<
-              DocumentSnapshot<
-                  Map<String, dynamic>>>(
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: review,
-            builder: (
-              context,
-              snapshot,
-            ) {
+            builder: (context, snapshot) {
               if (snapshot.hasError) {
                 return const _AdminComplaintNotice(
-                  icon: Icons
-                      .cloud_off_outlined,
-                  title:
-                      'Review unavailable',
-                  message:
-                      'Could not load the current admin complaint review.',
-                  tone:
-                      raDanger,
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Review unavailable',
+                  message: 'Could not load the current admin complaint review.',
+                  tone: raDanger,
                 );
               }
 
@@ -294,85 +193,47 @@ class _AdminComplaintScreenState
                 return const LinearProgressIndicator();
               }
 
-              final data =
-                  snapshot.data?.data();
+              final data = snapshot.data?.data();
 
-              final currentPriority =
-                  data?['priority']
-                          as String? ??
-                      'normal';
+              final currentPriority = data?['priority'] as String? ?? 'normal';
 
-              final due =
-                  data?['dueAt']
-                      as Timestamp?;
+              final due = data?['dueAt'] as Timestamp?;
 
-              final decision =
-                  data?['decision']
-                          as String? ??
-                      '';
+              final decision = data?['decision'] as String? ?? '';
 
               return _AdminComplaintSurface(
                 child: Column(
                   children: [
                     _AdminCaseRow(
                       label: 'Status',
-                      value:
-                          friendlyStatus(
-                        data?['status']
-                                as String? ??
-                            'Not assigned',
+                      value: friendlyStatus(
+                        data?['status'] as String? ?? 'Not assigned',
                       ),
                     ),
-                    const Divider(
-                      height: 1,
-                    ),
+                    const Divider(height: 1),
                     _AdminCaseRow(
-                      label:
-                          'Assigned admin',
-                      value:
-                          data?['assignedTo']
-                                  as String? ??
-                              'None',
+                      label: 'Assigned admin',
+                      value: data?['assignedTo'] as String? ?? 'None',
                     ),
-                    const Divider(
-                      height: 1,
-                    ),
+                    const Divider(height: 1),
                     _AdminCaseRow(
                       label: 'Priority',
-                      value:
-                          friendlyStatus(
-                        currentPriority,
-                      ),
-                      valueColor:
-                          priorityColor(
-                        context,
-                        currentPriority,
-                      ),
+                      value: friendlyStatus(currentPriority),
+                      valueColor: priorityColor(context, currentPriority),
                     ),
                     if (due != null) ...[
-                      const Divider(
-                        height: 1,
-                      ),
+                      const Divider(height: 1),
                       _AdminCaseRow(
-                        label:
-                            'Follow-up deadline',
+                        label: 'Follow-up deadline',
                         value:
                             '${due.toDate().toLocal().day.toString().padLeft(2, '0')}/'
                             '${due.toDate().toLocal().month.toString().padLeft(2, '0')}/'
                             '${due.toDate().toLocal().year}',
                       ),
                     ],
-                    if (decision
-                        .trim()
-                        .isNotEmpty) ...[
-                      const Divider(
-                        height: 1,
-                      ),
-                      _AdminCaseRow(
-                        label:
-                            'Public decision',
-                        value: decision,
-                      ),
+                    if (decision.trim().isNotEmpty) ...[
+                      const Divider(height: 1),
+                      _AdminCaseRow(label: 'Public decision', value: decision),
                     ],
                   ],
                 ),
@@ -392,32 +253,21 @@ class _AdminComplaintScreenState
 
           _AdminComplaintSurface(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: priority,
-                  decoration:
-                      const InputDecoration(
-                    labelText:
-                        'Priority for next action',
-                    prefixIcon: Icon(
-                      Icons
-                          .priority_high_rounded,
-                    ),
+                  isExpanded: true,
+                  itemHeight: null,
+                  decoration: const InputDecoration(
+                    labelText: 'Priority for next action',
+                    prefixIcon: Icon(Icons.priority_high_rounded),
                   ),
                   items: [
-                    for (final value in [
-                      'low',
-                      'normal',
-                      'high',
-                      'urgent',
-                    ])
+                    for (final value in ['low', 'normal', 'high', 'urgent'])
                       DropdownMenuItem(
                         value: value,
-                        child: Text(
-                          value.toUpperCase(),
-                        ),
+                        child: Text(value.toUpperCase()),
                       ),
                   ],
                   onChanged: busy
@@ -439,50 +289,32 @@ class _AdminComplaintScreenState
                   onPressed: busy
                       ? null
                       : () async {
-                          final picked =
-                              await showDatePicker(
+                          final picked = await showDatePicker(
                             context: context,
                             initialDate: dueAt,
-                            firstDate:
-                                DateTime.now(),
-                            lastDate:
-                                DateTime.now()
-                                    .add(
-                              const Duration(
-                                days: 30,
-                              ),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 30),
                             ),
                           );
 
-                          if (picked != null &&
-                              mounted) {
+                          if (picked != null && mounted) {
                             setState(() {
-                              dueAt =
-                                  picked.add(
-                                const Duration(
-                                  hours: 23,
-                                  minutes: 59,
-                                ),
+                              dueAt = picked.add(
+                                const Duration(hours: 23, minutes: 59),
                               );
                             });
                           }
                         },
-                  icon: const Icon(
-                    Icons
-                        .calendar_month_outlined,
-                  ),
-                  label: Text(
-                    'Follow-up deadline · ${dueLabel()}',
-                  ),
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  label: Text('Follow-up deadline · ${dueLabel()}'),
                 ),
 
                 const SizedBox(height: 12),
 
                 const _AdminComplaintNotice(
-                  icon: Icons
-                      .info_outline_rounded,
-                  title:
-                      'Decision reasons are required',
+                  icon: Icons.info_outline_rounded,
+                  title: 'Decision reasons are required',
                   message:
                       'Starting review can reopen an existing resolved admin review. A reason is required for every recorded decision.',
                   tone: raGold,
@@ -494,83 +326,46 @@ class _AdminComplaintScreenState
           const SizedBox(height: 14),
 
           LayoutBuilder(
-            builder: (
-              context,
-              constraints,
-            ) {
-              final narrow =
-                  constraints.maxWidth <
-                      560;
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 560;
 
-              final startReview =
-                  FilledButton.icon(
+              final startReview = FilledButton.icon(
                 onPressed: busy
                     ? null
                     : () {
-                        decide(
-                          'under_review',
-                        );
+                        decide('under_review');
                       },
-                icon: const Icon(
-                  Icons
-                      .assignment_ind_outlined,
-                ),
-                label: const Text(
-                  'Start Review',
-                ),
+                icon: const Icon(Icons.assignment_ind_outlined),
+                label: const Text('Start Review'),
               );
 
-              final resolve =
-                  OutlinedButton.icon(
+              final resolve = OutlinedButton.icon(
                 onPressed: busy
                     ? null
                     : () {
-                        decide(
-                          'resolved',
-                        );
+                        decide('resolved');
                       },
-                icon: const Icon(
-                  Icons
-                      .task_alt_rounded,
-                ),
-                label: const Text(
-                  'Record Resolution',
-                ),
+                icon: const Icon(Icons.task_alt_rounded),
+                label: const Text('Record Resolution'),
               );
 
-              final dismiss =
-                  OutlinedButton.icon(
-                style:
-                    OutlinedButton.styleFrom(
-                  foregroundColor:
-                      colors.error,
-                  side: BorderSide(
-                    color: colors.error
-                        .withValues(
-                      alpha: .45,
-                    ),
-                  ),
+              final dismiss = OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.error,
+                  side: BorderSide(color: colors.error.withValues(alpha: .45)),
                 ),
                 onPressed: busy
                     ? null
                     : () {
-                        decide(
-                          'dismissed',
-                        );
+                        decide('dismissed');
                       },
-                icon: const Icon(
-                  Icons.cancel_outlined,
-                ),
-                label: const Text(
-                  'Dismiss',
-                ),
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Dismiss'),
               );
 
               if (narrow) {
                 return Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     startReview,
                     const SizedBox(height: 8),
@@ -584,21 +379,14 @@ class _AdminComplaintScreenState
               return Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [
-                  startReview,
-                  resolve,
-                  dismiss,
-                ],
+                children: [startReview, resolve, dismiss],
               );
             },
           ),
 
           const SizedBox(height: 25),
 
-          _AdminPrivateNotes(
-            kind: 'complaint',
-            target: widget.requestId,
-          ),
+          _AdminPrivateNotes(kind: 'complaint', target: widget.requestId),
 
           if (busy) ...[
             const SizedBox(height: 14),
@@ -611,36 +399,17 @@ class _AdminComplaintScreenState
 }
 
 class _AdminComplaintHero extends StatelessWidget {
-  const _AdminComplaintHero({
-    required this.requestId,
-  });
+  const _AdminComplaintHero({required this.requestId});
 
   final String requestId;
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness ==
-            Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [
-                  Color(0xFF0A497F),
-                  Color(0xFF075A68),
-                ]
-              : const [
-                  Color(0xFF075BA8),
-                  Color(0xFF078C7E),
-                ],
-        ),
-        borderRadius:
-            BorderRadius.circular(23),
+        color: _providerSurface(context),
+        borderRadius: BorderRadius.circular(23),
       ),
       child: Row(
         children: [
@@ -648,44 +417,38 @@ class _AdminComplaintHero extends StatelessWidget {
             width: 49,
             height: 49,
             decoration: BoxDecoration(
-              color: Colors.white
-                  .withValues(alpha: .13),
-              borderRadius:
-                  BorderRadius.circular(15),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(15),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.fact_check_outlined,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Case review',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    color: Colors.white,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
-                    fontWeight:
-                        FontWeight.w800,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'JOB $requestId',
                   maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    color: Colors.white70,
-                    fontSize: 7.7,
-                    fontWeight:
-                        FontWeight.w700,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: .45,
                   ),
                 ),
@@ -699,37 +462,30 @@ class _AdminComplaintHero extends StatelessWidget {
 }
 
 class _AdminComplaintHeading extends StatelessWidget {
-  const _AdminComplaintHeading({
-    required this.title,
-    required this.subtitle,
-  });
+  const _AdminComplaintHeading({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 14.5,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 8.3,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
           ),
@@ -740,32 +496,24 @@ class _AdminComplaintHeading extends StatelessWidget {
 }
 
 class _AdminComplaintSurface extends StatelessWidget {
-  const _AdminComplaintSurface({
-    required this.child,
-  });
+  const _AdminComplaintSurface({required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(0xFF0D1D2B)
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: theme
-              .colorScheme
-              .outlineVariant
-              .withValues(alpha: .45),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
         ),
       ),
       child: child,
@@ -788,53 +536,39 @@ class _AdminComplaintNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: tone.withValues(alpha: .07),
-        borderRadius:
-            BorderRadius.circular(15),
-        border: Border.all(
-          color: tone.withValues(alpha: .17),
-        ),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: tone.withValues(alpha: .17)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: tone,
-            size: 19,
-          ),
+          Icon(icon, color: tone, size: 19),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9.3,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 8.1,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     height: 1.45,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -859,23 +593,18 @@ class _AdminCaseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Text(
               label,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 8.1,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
                 color: colors.onSurfaceVariant,
               ),
             ),
@@ -885,9 +614,8 @@ class _AdminCaseRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 9,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
                 height: 1.4,
                 fontWeight: FontWeight.w700,
                 color: valueColor,

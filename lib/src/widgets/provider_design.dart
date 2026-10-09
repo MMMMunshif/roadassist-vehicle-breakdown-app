@@ -478,3 +478,290 @@ void _openProviderProfile(BuildContext context) {
     push(context, const ProviderProfileScreen());
   }
 }
+
+/// Provider presentation is scoped; driver/admin routes retain their theme.
+class RaProviderTheme extends StatelessWidget {
+  const RaProviderTheme({super.key, required this.child});
+  final Widget child;
+  static bool isActive(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<_ProviderStyleScope>() != null ||
+      Theme.of(context).extension<_ProviderTypographyFlag>() != null;
+  @override
+  Widget build(BuildContext context) {
+    final base = Theme.of(context);
+    final text = GoogleFonts.plusJakartaSansTextTheme(base.textTheme).copyWith(
+      headlineSmall: _providerText(context, size: 22, weight: FontWeight.w700),
+      titleLarge: _providerText(context, size: 22, weight: FontWeight.w700),
+      titleMedium: _providerText(context, size: 16, weight: FontWeight.w600),
+      titleSmall: _providerText(context, size: 15, weight: FontWeight.w600),
+      bodyLarge: _providerText(context, size: 15),
+      bodyMedium: _providerText(context, size: 14),
+      bodySmall: _providerText(context, size: 12, muted: true),
+      labelLarge: _providerText(context, size: 15, weight: FontWeight.w600),
+      labelMedium: _providerText(context, size: 13),
+      labelSmall: _providerText(context, size: 12),
+    );
+    final buttonText = GoogleFonts.plusJakartaSans(
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+    );
+    return _ProviderStyleScope(
+      child: Theme(
+        data: base.copyWith(
+          extensions: [
+            ...base.extensions.values.where(
+              (extension) => extension is! _ProviderTypographyFlag,
+            ),
+            const _ProviderTypographyFlag(),
+          ],
+          textTheme: text,
+          appBarTheme: base.appBarTheme.copyWith(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            titleTextStyle: text.titleLarge,
+          ),
+          cardTheme: base.cardTheme.copyWith(
+            color: _providerSurface(context),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: base.colorScheme.outlineVariant.withValues(alpha: .45),
+              ),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style:
+                base.filledButtonTheme.style?.copyWith(
+                  textStyle: WidgetStatePropertyAll(buttonText),
+                  minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+                ) ??
+                FilledButton.styleFrom(
+                  textStyle: buttonText,
+                  minimumSize: const Size(48, 48),
+                ),
+          ),
+          outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(
+              textStyle: buttonText,
+              minimumSize: const Size(48, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(textStyle: buttonText),
+          ),
+          inputDecorationTheme: base.inputDecorationTheme.copyWith(
+            filled: true,
+            fillColor: _providerSurface(context),
+            labelStyle: text.bodyMedium,
+            hintStyle: text.bodyMedium?.copyWith(
+              color: base.colorScheme.onSurfaceVariant,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _ProviderStyleScope extends InheritedWidget {
+  const _ProviderStyleScope({required super.child});
+  @override
+  bool updateShouldNotify(_ProviderStyleScope oldWidget) => false;
+}
+
+class RaProviderScaffold extends RaScaffold {
+  const RaProviderScaffold({
+    super.key,
+    super.appBar,
+    super.body,
+    super.backgroundColor,
+    super.bottomNavigationBar,
+    super.floatingActionButton,
+    super.extendBodyBehindAppBar,
+    super.extendBody,
+    super.resizeToAvoidBottomInset,
+    super.preventLeave,
+    super.leaveMessage,
+  });
+  @override
+  Widget build(BuildContext context) => RaProviderTheme(
+    child: Builder(builder: (context) => super.build(context)),
+  );
+}
+
+class RaProviderSummaryCard extends StatelessWidget {
+  const RaProviderSummaryCard({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.icon,
+    this.status,
+    this.footer,
+  });
+  final String title;
+  final String message;
+  final IconData icon;
+  final Widget? status;
+  final Widget? footer;
+  @override
+  Widget build(BuildContext context) => RaProviderCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+            ),
+            ?status,
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          title,
+          style: _providerText(context, size: 18, weight: FontWeight.w700),
+        ),
+        if (message.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(message, style: _providerText(context, size: 14, muted: true)),
+        ],
+        if (footer != null) ...[const SizedBox(height: 14), footer!],
+      ],
+    ),
+  );
+}
+
+class RaProviderMetricGrid extends StatelessWidget {
+  const RaProviderMetricGrid({super.key, required this.metrics});
+  final Map<String, String> metrics;
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final columns =
+          box.maxWidth >= 480 &&
+              MediaQuery.textScalerOf(context).scale(14) <= 21
+          ? 3
+          : box.maxWidth >= 270 &&
+                MediaQuery.textScalerOf(context).scale(14) <= 21
+          ? 2
+          : 1;
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final item in metrics.entries)
+            SizedBox(
+              width: (box.maxWidth - (columns - 1) * 10) / columns,
+              child: RaProviderCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.key,
+                      style: _providerText(context, size: 12, muted: true),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.value,
+                      style: _providerText(
+                        context,
+                        size: 18,
+                        weight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
+
+class RaProviderJobProgress extends StatelessWidget {
+  const RaProviderJobProgress({super.key, required this.current});
+  final int current;
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Accepted', 'En route', 'Arrived', 'Completed'];
+    return Column(
+      children: [
+        for (var i = 0; i < labels.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Icon(
+                  i < current
+                      ? Icons.check_circle
+                      : i == current
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 20,
+                  color: i <= current
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.outline,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    labels[i],
+                    style: _providerText(
+                      context,
+                      size: 13,
+                      weight: i == current ? FontWeight.w700 : FontWeight.w500,
+                      muted: i > current,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+double providerFontSize(BuildContext context, double original) {
+  if (!RaProviderTheme.isActive(context)) return original;
+  if (original < 10) return 12;
+  if (original < 12) return 13;
+  if (original < 14) return 14;
+  if (original < 16) return 15;
+  if (original < 19) return 18;
+  if (original < 25) return 22;
+  return original;
+}
+
+class _ProviderTypographyFlag extends ThemeExtension<_ProviderTypographyFlag> {
+  const _ProviderTypographyFlag();
+  @override
+  _ProviderTypographyFlag copyWith() => this;
+  @override
+  _ProviderTypographyFlag lerp(
+    covariant _ProviderTypographyFlag? other,
+    double t,
+  ) => this;
+}
