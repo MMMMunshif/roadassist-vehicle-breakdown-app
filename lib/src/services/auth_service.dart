@@ -176,6 +176,39 @@ class AuthService {
       return;
     final professional = application['professionalDetails'] as Map?;
     if (professional == null) return;
+    final savedRadius = (data?['serviceRadius'] as String? ?? '').trim();
+    final radius = savedRadius.isNotEmpty
+        ? savedRadius
+        : '${professional['radiusKm'] ?? 15} km from current location';
+    final savedHours = data?['workingHours'] as String? ?? '';
+    final schedule = switch (savedHours) {
+      '24 hours, 7 days a week' => <String, dynamic>{
+        'available24Hours': true,
+        'scheduleConfigured': false,
+        'workStartMinute': 0,
+        'workEndMinute': 0,
+      },
+      'Daily, 08:00 AM - 08:00 PM' => <String, dynamic>{
+        'available24Hours': false,
+        'scheduleConfigured': true,
+        'workStartMinute': 480,
+        'workEndMinute': 1200,
+      },
+      'Mon - Fri, 08:00 AM - 06:00 PM' => <String, dynamic>{
+        'available24Hours': false,
+        'scheduleConfigured': true,
+        'workStartMinute': 480,
+        'workEndMinute': 1080,
+      },
+      _ => <String, dynamic>{
+        'available24Hours': professional['available24Hours'] == true,
+        'scheduleConfigured':
+            (professional['startTime'] as String? ?? '').isNotEmpty &&
+            (professional['endTime'] as String? ?? '').isNotEmpty,
+        'workStartMinute': _workMinute(professional['startTime']),
+        'workEndMinute': _workMinute(professional['endTime']),
+      },
+    };
     await updateCurrentProfile({
       'services': application['services'],
       'additionalServiceNames': (application['customServices'] as List? ?? [])
@@ -183,8 +216,7 @@ class AuthService {
           .map((item) => item['name'])
           .whereType<String>()
           .toList(),
-      'serviceRadius':
-          professional['radiusKm'].toString() + ' km from current location',
+      'serviceRadius': radius,
     });
     final jobs = await _firestore
         .collection('requests')
@@ -215,14 +247,8 @@ class AuthService {
       'vehicleTypes': application['vehicleTypes'],
       'verified': true,
       'verificationExpiresAt': approval!['validUntil'],
-      'available24Hours': professional['available24Hours'] == true,
-      'scheduleConfigured':
-          (professional['startTime'] as String? ?? '').isNotEmpty &&
-          (professional['endTime'] as String? ?? '').isNotEmpty,
-      'workStartMinute': _workMinute(professional['startTime']),
-      'workEndMinute': _workMinute(professional['endTime']),
-      'serviceRadius':
-          professional['radiusKm'].toString() + ' km from current location',
+      ...schedule,
+      'serviceRadius': radius,
       'completedJobs': completed.length,
       'averageRating': ratings.isEmpty
           ? 0.0

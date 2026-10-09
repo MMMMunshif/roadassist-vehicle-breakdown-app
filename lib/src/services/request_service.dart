@@ -1000,6 +1000,17 @@ class RequestService {
           'Documentation can only be updated during an active job.',
         );
       }
+      if (data?['arrivalVerificationRequired'] == true &&
+          data?['arrivalConfirmedBy'] != data?['driverId']) {
+        throw StateError(
+          'Ask the driver to confirm your arrival or verify the job-start code before saving service documentation.',
+        );
+      }
+      if (data?['completionState'] == 'pending') {
+        throw StateError(
+          'Documentation is locked while the driver reviews completion.',
+        );
+      }
       transaction.update(reference, {
         'serviceNotes': serviceNotes.trim(),
         'servicePhotoData': servicePhotoData,
