@@ -6,7 +6,7 @@ import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, writeBatch, s
 let env;
 before(async () => {
   env = await initializeTestEnvironment({projectId: 'demo-roadassist', firestore: {host: '127.0.0.1', port: Number(process.env.FIRESTORE_TEST_PORT ?? 8089),
-    rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8')}});
+    rules: readFileSync(process.env.ROADASSIST_RULES_FILE ?? new URL('../../firestore.rules', import.meta.url), 'utf8')}});
 });
 after(async () => { await env?.cleanup(); });
 beforeEach(async () => {
@@ -39,11 +39,11 @@ function approval(db,id,quoteType = 'direct') {
   return batch.commit();
 }
 test('driver vehicle records are owner-only', async () => {
-  const db = env.authenticatedContext('driver').firestore();
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
   await assertSucceeds(setDoc(doc(db,'users/driver/vehicles/v1'),{make:'Toyota',model:'Aqua',year:2017,
     vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',archived:false,
     createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  await assertFails(getDoc(doc(env.authenticatedContext('other').firestore(),'users/driver/vehicles/v1')));
+  await assertFails(getDoc(doc(env.authenticatedContext('other', {email_verified:true}).firestore(),'users/driver/vehicles/v1')));
 });
 test('provider can submit an itemized offer but cannot assign a new-flow job', async () => {
   const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
@@ -52,17 +52,17 @@ test('provider can submit an itemized offer but cannot assign a new-flow job', a
   await assertFails(setDoc(doc(db,'requests/r1/quotes/provider'),{...offer(),total:1}));
 });
 test('quote approval atomically reserves a provider and prevents a competing selection', async () => {
-  await assertSucceeds(approval(env.authenticatedContext('driver').firestore(),'r1'));
-  await assertFails(approval(env.authenticatedContext('other').firestore(),'r2'));
+  await assertSucceeds(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1'));
+  await assertFails(approval(env.authenticatedContext('other', {email_verified:true}).firestore(),'r2'));
   await assertFails(updateDoc(doc(env.authenticatedContext('provider', {email_verified:true}).firestore(),'requests/r1/quotes/provider'),{total:9999}));
 });
 test('driver cannot approve an offer without reserving its provider', async () => {
-  const db = env.authenticatedContext('driver').firestore();
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
   await assertFails(updateDoc(doc(db,'requests/r1'),{providerId:'provider',status:'accepted',selectedQuoteId:'provider',
     serviceFee:1000,dispatchFee:500,extraFee:0,estimatedCost:1500,quoteApprovedAt:serverTimestamp()}));
 });
 test('driver cancellation releases the selected provider', async () => {
-  const db = env.authenticatedContext('driver').firestore();
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
   await approval(db,'r1');
   const batch = writeBatch(db);
   batch.update(doc(db,'requests/r1'),{status:'cancelled',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()});
@@ -70,26 +70,30 @@ test('driver cancellation releases the selected provider', async () => {
   await assertSucceeds(batch.commit());
 });
 test('provider cannot silently increase an approved final charge', async () => {
-  await approval(env.authenticatedContext('driver').firestore(),'r1');
+  await approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1');
   await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived'}));
   await assertFails(updateDoc(doc(env.authenticatedContext('provider', {email_verified:true}).firestore(),'requests/r1'),{status:'completed',finalCost:2000,completedAt:serverTimestamp()}));
 });
 test('approved direct-service job progresses and releases its provider', async () => {
-  await approval(env.authenticatedContext('driver').firestore(),'r1');
+  await approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1');
   const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{providerMessagesSeenAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{providerLatitude:6.9,providerLongitude:79.9,providerLocationUpdatedAt:serverTimestamp()}));
-  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{serviceNotes:'Tyre repair',servicePhotoData:[],documentationUpdatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{serviceNotes:'Tyre repair complete',servicePhotoData:['photo'],documentationUpdatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{status:'en_route',en_routeAt:serverTimestamp(),updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(db,'requests/r1'),{status:'arrived',arrivedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
-  const batch = writeBatch(db);
-  batch.update(doc(db,'requests/r1'),{status:'completed',finalCost:1500,completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
-  batch.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});
+  await assertFails(updateDoc(doc(db,'requests/r1'),{status:'completed',finalCost:1500,completedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{completionState:'pending',finalCost:1500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),{serviceNotes:'Changed evidence after submission',documentationUpdatedAt:serverTimestamp()}));
+  const driver = env.authenticatedContext('driver', {email_verified:true}).firestore();
+  const batch = writeBatch(driver);
+  batch.update(doc(driver,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  batch.update(doc(driver,'providerDirectory/provider'),{activeRequestId:null});
   await assertSucceeds(batch.commit());
 });
 test('inspection-only job requires repair approval and revisions are immutable', async () => {
   await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1/quotes/provider'),{quoteType:'inspection'}));
-  const driver = env.authenticatedContext('driver').firestore();
+  const driver = env.authenticatedContext('driver', {email_verified:true}).firestore();
   const provider = env.authenticatedContext('provider', {email_verified:true}).firestore();
   await approval(driver,'r1','inspection');
   await updateDoc(doc(provider,'requests/r1'),{status:'en_route',en_routeAt:serverTimestamp()});
@@ -109,27 +113,28 @@ test('inspection-only job requires repair approval and revisions are immutable',
   await assertSucceeds(decision.commit());
   await assertFails(updateDoc(doc(driver,'requests/r1/repairDecisions/change-1'),{decision:'rejected'}));
   await assertFails(updateDoc(doc(provider,'requests/r1/repairQuotes/change-1'),{total:3500}));
-  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{status:'completed',finalCost:2500,completedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{serviceNotes:'Valve replaced and tested',servicePhotoData:['photo'],documentationUpdatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{completionState:'pending',finalCost:2500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
 });
 test('new requests support saved vehicle snapshots without a synthetic price', async () => {
-  const db = env.authenticatedContext('driver').firestore();
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
   await setDoc(doc(db,'users/driver/vehicles/v1'),{make:'Toyota',model:'Aqua',year:2017,
     vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',archived:false,
     createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   await assertSucceeds(setDoc(doc(db,'requests/new'),{driverId:'driver',driverName:'Driver',driverPhone:'',providerId:null,
-    preferredProviderId:'',preferredProviderName:'',rejectedBy:[],status:'searching',workflowVersion:2,
+    preferredProviderId:'',preferredProviderName:'',rejectedBy:[],status:'searching',workflowVersion:2,arrivalVerificationRequired:true,
     issue:'Flat Tyre',issues:['Flat Tyre'],vehicleType:'Sedan / Hatchback',modelYear:'Toyota Aqua 2017',registration:'CAB-1234',
-    vehicleId:'v1',vehicleSnapshot:{make:'Toyota',model:'Aqua',year:2017},partsPreference:'genuine',description:'',notes:'',priority:'normal',
+    vehicleId:'v1',vehicleSnapshot:{make:'Toyota',model:'Aqua',year:2017,photoData:'saved-photo'},partsPreference:'genuine',description:'',notes:'',priority:'normal',
     vehiclePhotoUrls:[],photoAnnotations:[],locationLabel:'Colombo',landmark:'',locationAccuracyMeters:null,
     latitude:6.9,longitude:79.9,serviceFee:0,dispatchFee:0,estimatedCost:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
 });
 test('an active provider cannot clear their reservation or delete the directory entry', async () => {
-  await approval(env.authenticatedContext('driver').firestore(),'r1');
+  await approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1');
   await assertFails(updateDoc(doc(env.authenticatedContext('provider', {email_verified:true}).firestore(),'providerDirectory/provider'),{activeRequestId:null}));
 });
 test('payment declarations are participant-only and do not alter invoice amounts', async () => {
   await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1'),{status:'completed',providerId:'provider',finalCost:1500}));
-  const driver = env.authenticatedContext('driver').firestore();
+  const driver = env.authenticatedContext('driver', {email_verified:true}).firestore();
   const provider = env.authenticatedContext('provider', {email_verified:true}).firestore();
   await assertFails(updateDoc(doc(provider,'requests/r1'),{providerConfirmedPayment:true,paymentConfirmedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(driver,'requests/r1'),{driverReportedPayment:true,paymentMethod:'cash',paymentReportedAt:serverTimestamp()}));
@@ -170,9 +175,9 @@ test('dispute evidence, participant access and resolution are protected', async 
   await env.withSecurityRulesDisabled(async c => {
     await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed',estimatedCost:1500,finalCost:1500});
   });
-  const driver = env.authenticatedContext('driver').firestore();
+  const driver = env.authenticatedContext('driver', {email_verified:true}).firestore();
   const provider = env.authenticatedContext('provider', {email_verified:true}).firestore();
-  const other = env.authenticatedContext('other').firestore();
+  const other = env.authenticatedContext('other', {email_verified:true}).firestore();
   const path='requests/r1/disputes/case';
   const report={driverId:'driver',providerId:'provider',reason:'extra_charge',description:'Requested an unapproved extra fee.',photos:['evidence'],status:'open',providerResponse:'',resolution:'',approvedTotal:1500,finalTotal:1500,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
   await assertFails(setDoc(doc(provider,path), report));
@@ -189,7 +194,7 @@ test('dispute evidence, participant access and resolution are protected', async 
 });
 
 test('disputes cannot be opened for unfinished jobs', async () => {
-  const db=env.authenticatedContext('driver').firestore();
+  const db=env.authenticatedContext('driver', {email_verified:true}).firestore();
   await assertFails(setDoc(doc(db,'requests/r1/disputes/case'), {driverId:'driver',providerId:'provider',status:'open'}));
 });
 function administrator(verified=true) { return env.authenticatedContext('admin',{admin:true,email_verified:verified}).firestore(); }
@@ -206,13 +211,13 @@ test('verified admin claims allow management reads, profile fields cannot grant 
   await assertSucceeds(getDoc(doc(administrator(),'requests/r2')));
   await assertFails(getDoc(doc(administrator(false),'users/driver')));
   await env.withSecurityRulesDisabled(async c=>setDoc(doc(c.firestore(),'users/driver'),{role:'driver',admin:true}));
-  await assertFails(getDoc(doc(env.authenticatedContext('driver').firestore(),'users/other')));
+  await assertFails(getDoc(doc(env.authenticatedContext('driver', {email_verified:true}).firestore(),'users/other')));
 });
 test('moderation needs an atomic immutable audit and blocks suspended accounts',async()=>{
   const admin=administrator();
   await assertFails(setDoc(doc(admin,'accountModeration/driver'),{status:'suspended'}));
   await assertSucceeds(accountAction(admin,'driver',{status:'suspended'}));
-  const driver=env.authenticatedContext('driver').firestore();
+  const driver=env.authenticatedContext('driver', {email_verified:true}).firestore();
   await assertSucceeds(getDoc(doc(driver,'accountModeration/driver')));
   await assertFails(getDoc(doc(driver,'requests/r1')));
   await assertFails(updateDoc(doc(driver,'accountModeration/driver'),{status:'active'}));
@@ -237,8 +242,8 @@ test('complaint decisions require audit and are visible only to participants and
   batch.set(doc(admin,'complaintReviews/r1'),after);
   batch.set(doc(admin,'adminAudit/case-audit'),{kind:'complaint',target:'r1',actor:'admin',reason:after.decision,before:{},after,createdAt:serverTimestamp()});
   await assertSucceeds(batch.commit());
-  await assertSucceeds(getDoc(doc(env.authenticatedContext('driver').firestore(),'complaintReviews/r1')));
-  await assertFails(getDoc(doc(env.authenticatedContext('other').firestore(),'complaintReviews/r1')));
+  await assertSucceeds(getDoc(doc(env.authenticatedContext('driver', {email_verified:true}).firestore(),'complaintReviews/r1')));
+  await assertFails(getDoc(doc(env.authenticatedContext('other', {email_verified:true}).firestore(),'complaintReviews/r1')));
   await assertFails(updateDoc(doc(env.authenticatedContext('provider', {email_verified:true}).firestore(),'complaintReviews/r1'),{status:'resolved'}));
 });
 test('admin can list complaints but cannot forge evidence or self-promote through signup',async()=>{
@@ -252,7 +257,7 @@ test('admin can list complaints but cannot forge evidence or self-promote throug
 });
 test('suspended providers cannot be selected or operate their directory',async()=>{
   await accountAction(administrator(),'provider',{status:'suspended'});
-  await assertFails(approval(env.authenticatedContext('driver').firestore(),'r1'));
+  await assertFails(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1'));
   await assertFails(updateDoc(doc(env.authenticatedContext('provider', {email_verified:true}).firestore(),'providerDirectory/provider'),{online:true}));
 });
 test('admin registry cannot be edited by clients and revocation immediately blocks admin reads',async()=>{
@@ -264,7 +269,7 @@ test('admin registry cannot be edited by clients and revocation immediately bloc
 test('private notes are append-only, authored and hidden from normal users',async()=>{
   const admin=administrator();
   await assertSucceeds(setDoc(doc(admin,'adminNotes/n1'),{kind:'account',target:'driver',text:'Private follow-up note for account review.',actor:'admin',createdAt:serverTimestamp()}));
-  await assertFails(getDoc(doc(env.authenticatedContext('driver').firestore(),'adminNotes/n1')));
+  await assertFails(getDoc(doc(env.authenticatedContext('driver', {email_verified:true}).firestore(),'adminNotes/n1')));
   await assertFails(updateDoc(doc(admin,'adminNotes/n1'),{text:'Rewritten note'}));
 });
 test('provider suspension and directory deactivation commit with the matching audit',async()=>{
@@ -291,7 +296,7 @@ test('pending providers can submit privately but cannot read jobs or publish ava
   const pending = env.authenticatedContext('pending', providerToken).firestore();
   await assertSucceeds(setDoc(doc(pending, 'providerApplications/pending'), application()));
   await assertSucceeds(getDoc(doc(pending, 'providerApplications/pending')));
-  await assertFails(getDoc(doc(env.authenticatedContext('driver').firestore(), 'providerApplications/pending')));
+  await assertFails(getDoc(doc(env.authenticatedContext('driver', {email_verified:true}).firestore(), 'providerApplications/pending')));
   await assertFails(getDoc(doc(pending, 'requests/r1')));
   await assertFails(setDoc(doc(pending, 'providerDirectory/pending'), {online: true}));
   await assertFails(setDoc(doc(pending, 'accountModeration/pending'), {verification: 'verified'}));
@@ -318,13 +323,13 @@ test('document corrections allow resubmission and revoke business access until f
   await assertSucceeds(setDoc(doc(provider, 'providerApplications/provider'), application(2)));
   await assertFails(getDoc(doc(provider, 'requests/r1')));
   await assertFails(setDoc(doc(provider, 'requests/r1/quotes/provider'), offer()));
-  await assertFails(approval(env.authenticatedContext('driver').firestore(), 'r1'));
+  await assertFails(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(), 'r1'));
 });
 test('expired or email-unverified providers cannot take assistance jobs', async () => {
   await assertFails(getDoc(doc(env.authenticatedContext('provider').firestore(), 'requests/r1')));
   await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(), 'accountModeration/provider'), {validUntil: Timestamp.fromMillis(Date.now() - 1000)}));
   await assertFails(setDoc(doc(env.authenticatedContext('provider', providerToken).firestore(), 'requests/r1/quotes/provider'), offer()));
-  await assertFails(approval(env.authenticatedContext('driver').firestore(), 'r1'));
+  await assertFails(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(), 'r1'));
 });
 test('support cannot access identity documents or approve providers; reviewer cannot suspend drivers', async () => {
   const admin = administrator();
@@ -357,9 +362,9 @@ test('approved directory publication binds expiry and services to reviewed docum
   await assertFails(setDoc(doc(db, 'providerDirectory/provider'), {...original, services: ['Vehicle Towing']}));
 });
 test('maintenance and disabled services reject new requests while existing jobs remain readable', async () => {
-  const db = env.authenticatedContext('driver').firestore();
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
   const request = {driverId: 'driver', driverName: 'Driver', driverPhone: '+94771234567', providerId: null, preferredProviderId: '', preferredProviderName: '', rejectedBy: [],
-    status: 'searching', workflowVersion: 2, issue: 'Flat Tyre', issues: ['Flat Tyre'], vehicleType: 'Sedan / Hatchback', modelYear: 'Toyota Aqua 2018', registration: 'WP-1234',
+    status: 'searching', workflowVersion: 2, arrivalVerificationRequired:true, issue: 'Flat Tyre', issues: ['Flat Tyre'], vehicleType: 'Sedan / Hatchback', modelYear: 'Toyota Aqua 2018', registration: 'WP-1234',
     description: '', notes: '', priority: 'normal', vehiclePhotoUrls: [], photoAnnotations: [], locationLabel: 'Test location', landmark: '', locationAccuracyMeters: null,
     latitude: 6.9, longitude: 79.9, serviceFee: 0, dispatchFee: 0, estimatedCost: 0, createdAt: serverTimestamp(), updatedAt: serverTimestamp()};
   await assertSucceeds(setDoc(doc(db, 'requests/new-a'), request));
@@ -417,4 +422,226 @@ test('simplified provider application accepts omitted optional answers without i
   const db=env.authenticatedContext('simple-provider',{email_verified:true}).firestore();
   const basic={...professionalDetails(),workHistory:'',qualification:'',trainingInstitute:'',qualificationYear:0,specializations:'',coverageAreas:'',startTime:'',endTime:'',languages:[],workDays:[],tools:[]};
   await assertSucceeds(setDoc(doc(db,'providerApplications/simple-provider'),{...application(),businessName:'',emergencyPhone:'',professionalDetails:basic}));
+});
+test('provider withdrawal requires reason and atomic release and preserves charges', async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'provider',acceptedAt:Timestamp.now(),estimatedCost:1800});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const change={status:'cancelled',cancelledBy:'provider',cancellationType:'provider_withdrawal',cancellationReason:'Vehicle equipment broke down.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(db,'requests/r1'),change));
+  const batch=writeBatch(db); batch.update(doc(db,'requests/r1'),change); batch.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});
+  await assertSucceeds(batch.commit());
+  const saved=(await getDoc(doc(db,'requests/r1'))).data();
+  if(saved.estimatedCost!==1800) throw new Error('Approved price was changed');
+});
+test('departure timeout rejects premature cancellation and allows driver recovery after ten minutes', async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'provider',acceptedAt:Timestamp.now()});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('driver', {email_verified:true}).firestore();
+  const change={status:'cancelled',cancelledBy:'driver',cancellationType:'departure_timeout',cancellationReason:'Provider has not departed or replied.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  function cancel(){ const b=writeBatch(db);b.update(doc(db,'requests/r1'),change);b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});return b.commit(); }
+  await assertFails(cancel());
+  await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'requests/r1'),{acceptedAt:Timestamp.fromMillis(Date.now()-11*60000)}));
+  await assertSucceeds(cancel());
+});
+test('providers cannot abandon arrived jobs or cancel another provider assignment',async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider'});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const change={status:'cancelled',cancelledBy:'provider',cancellationType:'provider_withdrawal',cancellationReason:'Cannot attend this job anymore.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const b=writeBatch(db);b.update(doc(db,'requests/r1'),change);b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});await assertFails(b.commit());
+  await env.withSecurityRulesDisabled(async c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'accepted',providerId:'someone-else'}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),change));
+});
+test('completion requires evidence and drivers cannot confirm without a submission', async()=> {
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'arrived',estimatedCost:1500,serviceNotes:'',servicePhotoData:[]});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore(),driver=env.authenticatedContext('driver', {email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(provider,'requests/r1'),{completionState:'pending',finalCost:1500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(driver,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+test('completion complaint evidence blocks closure until admin review is resolved',async()=> {
+  await env.withSecurityRulesDisabled(async c=> {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider',completionState:'pending',estimatedCost:1500,finalCost:1500});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('driver', {email_verified:true}).firestore();
+  await assertSucceeds(setDoc(doc(db,'requests/r1/disputes/case'),{driverId:'driver',providerId:'provider',reason:'incomplete_service',description:'The vehicle still cannot start after repair.',photos:['evidence'],status:'open',providerResponse:'',resolution:'',approvedTotal:1500,finalTotal:1500,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  function confirm(){ const b=writeBatch(db);b.update(doc(db,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});return b.commit(); }
+  await assertFails(confirm());
+  await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'complaintReviews/r1'),{status:'resolved'}));
+  await assertSucceeds(confirm());
+});
+test('new arrival verification is driver-only and blocks repair completion until confirmed',async()=> {
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider',arrivalVerificationRequired:true,estimatedCost:1500,serviceNotes:'Work complete and tested',servicePhotoData:['photo']});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const driver=env.authenticatedContext('driver', {email_verified:true}).firestore(),provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const completion={completionState:'pending',completionSubmittedAt:serverTimestamp(),finalCost:1500,updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(provider,'requests/r1'),completion));
+  const confirmation={arrivalConfirmedBy:'driver',arrivalConfirmedAt:serverTimestamp(),arrivalConfirmationMethod:'manual_driver',arrivalConfirmationReason:'GPS unavailable but provider met me.',arrivalDistanceMeters:null,updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(provider,'requests/r1'),confirmation));
+  await assertFails(updateDoc(doc(env.authenticatedContext('other', {email_verified:true}).firestore(),'requests/r1'),confirmation));
+  await assertFails(updateDoc(doc(driver,'requests/r1'),{...confirmation,arrivalConfirmationReason:''}));
+  await assertSucceeds(updateDoc(doc(driver,'requests/r1'),confirmation));
+  await assertFails(updateDoc(doc(driver,'requests/r1'),{...confirmation,arrivalConfirmationReason:'Rewrite existing confirmation'}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),completion));
+});
+test('driver cannot confirm arrival before provider reports arrival',async()=> {
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'en_route',providerId:'provider',arrivalVerificationRequired:true}));
+  const db=env.authenticatedContext('driver', {email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(db,'requests/r1'),{arrivalConfirmedBy:'driver',arrivalConfirmedAt:serverTimestamp(),arrivalConfirmationMethod:'gps_nearby_driver',arrivalConfirmationReason:'',arrivalDistanceMeters:10,updatedAt:serverTimestamp()}));
+});
+test('pause and closed working hours prevent quotes and driver reservation',async()=> {
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'providerDirectory/provider'),{requestsPaused:true}));
+  await assertFails(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+  await assertFails(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1'));
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'providerDirectory/provider'),{requestsPaused:false,scheduleConfigured:true,available24Hours:false,workStartMinute:0,workEndMinute:0}));
+  await assertFails(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+  await assertFails(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1'));
+  await assertSucceeds(updateDoc(doc(provider,'providerDirectory/provider'),{hoursOverrideUntil:Timestamp.fromMillis(Date.now()+2*3600000),updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+  await assertSucceeds(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1'));
+});
+test('availability override is bounded and 24-hour providers can quote with a closed schedule',async()=> {
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(provider,'providerDirectory/provider'),{hoursOverrideUntil:Timestamp.fromMillis(Date.now()+4*3600000)}));
+  await assertSucceeds(updateDoc(doc(provider,'providerDirectory/provider'),{scheduleConfigured:true,workStartMinute:0,workEndMinute:0,available24Hours:true}));
+  await assertSucceeds(setDoc(doc(provider,'requests/r1/quotes/provider'),offer()));
+});
+test('warranty offers are validated and immutable after acceptance', async () => {
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  const ref = doc(db,'requests/r1/quotes/provider');
+  const warranty = {...offer(),warrantyDays:30,warrantyTerms:'Repaired puncture only; new tyre damage excluded.'};
+  await assertFails(setDoc(ref,{...warranty,warrantyDays:366}));
+  await assertFails(setDoc(ref,{...warranty,warrantyTerms:''}));
+  await assertFails(setDoc(ref,{...warranty,quoteType:'inspection'}));
+  await assertSucceeds(setDoc(ref,warranty));
+  await assertSucceeds(approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1'));
+  await assertFails(updateDoc(ref,{warrantyDays:0,warrantyTerms:''}));
+});
+test('repeated problem reports require completed service and photo evidence',async()=> {
+  await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed',estimatedCost:1500,finalCost:1500}));
+  const db=env.authenticatedContext('driver', {email_verified:true}).firestore();
+  const ref=doc(db,'requests/r1/disputes/case');
+  const report={driverId:'driver',providerId:'provider',reason:'same_problem',description:'The same repaired puncture is leaking again.',photos:[],status:'open',providerResponse:'',resolution:'',approvedTotal:1500,finalTotal:1500,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(setDoc(ref,report));
+  await assertSucceeds(setDoc(ref,{...report,photos:['photo']}));
+  await assertFails(updateDoc(doc(env.authenticatedContext('provider',{email_verified:true}).firestore(),'requests/r1'),{finalCost:2000}));
+});
+
+test('saved vehicle photos are bounded and stay owner-only',async()=> {
+  const db=env.authenticatedContext('driver', {email_verified:true}).firestore();
+  const vehicle={make:'Toyota',model:'Aqua',year:2018,vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',photoData:'photo',archived:false,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  const ref=doc(db,'users/driver/vehicles/photo');
+  await assertSucceeds(setDoc(ref,vehicle));
+  await assertFails(getDoc(doc(env.authenticatedContext('provider',{email_verified:true}).firestore(),'users/driver/vehicles/photo')));
+  await assertFails(updateDoc(ref,{photoData:'x'.repeat(210001),updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{photoData:'',updatedAt:serverTimestamp()}));
+});
+
+test('unverified drivers cannot access vehicles or assistance requests', async () => {
+  const db = env.authenticatedContext('driver', {email_verified:false}).firestore();
+  await assertFails(getDoc(doc(db,'requests/r1')));
+  await assertFails(setDoc(doc(db,'users/driver/vehicles/v1'),{make:'Toyota',model:'Aqua',year:2017,
+    vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',archived:false,
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+
+test('owner may add provider role but cannot grant admin or remove driver role', async () => {
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
+  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],lastRole:'provider',online:false}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{roles:['driver','provider','admin']}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{roles:['provider']}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{role:'provider'}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{online:true}));
+  await assertFails(setDoc(doc(db,'requests/r1/quotes/driver'),{...offer(),providerId:'driver'}));
+});
+
+test('profile updates validate name, phone and authenticated email', async () => {
+  const db = env.authenticatedContext('driver', {email_verified:true,email:'driver@example.com'}).firestore();
+  await assertFails(updateDoc(doc(db,'users/driver'),{displayName:'A'}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{phone:'123'}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{email:'other@example.com'}));
+  await assertSucceeds(updateDoc(doc(db,'users/driver'),{displayName:'Driver Name',phone:'+94771234567',email:'driver@example.com'}));
+});
+
+test('dual-role provider retains driver access and cannot quote own job', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(doc(c.firestore(),'users/provider'),{roles:['provider','driver'],lastRole:'driver'});
+    await updateDoc(doc(c.firestore(),'requests/r1'),{driverId:'provider'});
+  });
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  await assertSucceeds(getDoc(doc(db,'requests/r1')));
+  await assertFails(setDoc(doc(db,'requests/r1/quotes/provider'),offer()));
+  await assertSucceeds(setDoc(doc(db,'users/provider/vehicles/v1'),{make:'Toyota',model:'Aqua',year:2017,
+    vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',archived:false,
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+
+
+test('new unverified account profile is allowed but malformed registration is rejected', async () => {
+  const db = env.authenticatedContext('new-account', {email:'new@example.com',email_verified:false}).firestore();
+  const profile = {email:'new@example.com',displayName:'New Driver',phone:'+94771234567',role:'driver',roles:['driver'],lastRole:'driver',online:false,createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(setDoc(doc(db,'users/new-account'),{...profile,phone:'123'}));
+  await assertFails(setDoc(doc(db,'users/new-account'),{...profile,roles:['driver','admin']}));
+  await assertSucceeds(setDoc(doc(db,'users/new-account'),profile));
+  await assertFails(getDoc(doc(db,'requests/r1')));
+});
+
+test('driver-first dual-role account may submit provider documents while approval remains required', async () => {
+  const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
+  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],lastRole:'provider',online:false}));
+  await assertSucceeds(setDoc(doc(db,'providerApplications/driver'),application()));
+  await assertFails(setDoc(doc(db,'requests/r2/quotes/driver'),{...offer(),providerId:'driver'}));
+  await assertSucceeds(getDoc(doc(db,'requests/r1')));
+});
+
+
+test('pending provider may withdraw only their application; documents are retained and approval blocked', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(doc(c.firestore(),'accountModeration/provider'), {verification:'pending'});
+  });
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(env.authenticatedContext('other', {email_verified:true}).firestore(),'providerApplications/provider'), {applicationStatus:'withdrawn',withdrawnAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'providerApplications/provider'), {applicationStatus:'withdrawn',withdrawnAt:serverTimestamp(),documents:{}}));
+  await assertSucceeds(updateDoc(doc(db,'providerApplications/provider'), {applicationStatus:'withdrawn',withdrawnAt:serverTimestamp()}));
+  const saved = (await getDoc(doc(db,'providerApplications/provider'))).data();
+  if (!saved.documents.selfie) throw new Error('Selfie must be retained');
+  await assertSucceeds(setDoc(doc(db,'providerApplications/provider'), {...application(),revision:2}));
+});
+
+test('approved provider cannot withdraw an already approved application', async () => {
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(db,'providerApplications/provider'), {applicationStatus:'withdrawn',withdrawnAt:serverTimestamp()}));
+});
+
+test('additional services require a selected matching category and bounded description', async () => {
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(doc(c.firestore(),'providerApplications/provider'), {applicationStatus:'withdrawn'});
+  });
+  const item = {name:'Fuel delivery',description:'Emergency fuel delivery for stranded cars.',category:'General Mechanic'};
+  await assertFails(setDoc(doc(db,'providerApplications/provider'), {...application(), revision:2,customServices:[{...item,category:'Unreviewed category'}]}));
+  await assertFails(setDoc(doc(db,'providerApplications/provider'), {...application(), revision:2,customServices:[{...item,description:'x'}]}));
+  await assertSucceeds(setDoc(doc(db,'providerApplications/provider'), {...application(), revision:2,customServices:[item]}));
+});
+
+
+test('withdrawn application never grants provider permissions even with stale verified moderation', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(doc(c.firestore(),'providerApplications/provider'), {applicationStatus:'withdrawn'});
+  });
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  await assertFails(setDoc(doc(db,'requests/r1/quotes/provider'),offer()));
 });

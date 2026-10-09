@@ -10,13 +10,13 @@ void main() {
     'driver photo upload is shown for signup and hidden for sign in',
     (tester) async {
       await tester.pumpWidget(testApp(const LoginScreen(isProvider: false)));
-      expect(find.text('Add profile photo (required)'), findsNothing);
+      expect(find.text('Driver photo'), findsNothing);
       await tester.tap(find.text('Create Account'));
       await tester.pumpAndSettle();
-      expect(find.text('Add profile photo (required)'), findsOneWidget);
+      expect(find.text('Driver photo'), findsOneWidget);
       await tester.tap(find.text('Sign In').first);
       await tester.pumpAndSettle();
-      expect(find.text('Add profile photo (required)'), findsNothing);
+      expect(find.text('Driver photo'), findsNothing);
       expect(find.byTooltip('Add profile photo'), findsNothing);
     },
   );
@@ -26,7 +26,7 @@ void main() {
       testApp(const BreakdownDetailsScreen(issues: ['Flat Tyre'])),
     );
 
-    await tester.tap(find.text('Confirm & Next'));
+    await tester.tap(find.text('Continue to Location'));
     await tester.pump();
 
     expect(find.text('Enter the vehicle model and year'), findsOneWidget);
@@ -34,7 +34,7 @@ void main() {
       find.text('Use a format such as WP CAB-1234 or CAA-1234'),
       findsOneWidget,
     );
-    expect(find.text('Location Confirmation'), findsNothing);
+    expect(find.text('Confirm Location'), findsNothing);
   });
 
   testWidgets('other vehicle type requires a custom value', (tester) async {
@@ -48,11 +48,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.widgetWithText(TextFormField, 'Other Vehicle Type'),
+      find.widgetWithText(TextFormField, 'Other vehicle type'),
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Confirm & Next'));
+    await tester.tap(find.text('Continue to Location'));
     await tester.pump();
     expect(find.text('Enter your vehicle type'), findsOneWidget);
   });
@@ -63,28 +63,30 @@ void main() {
     );
 
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Model / Year'),
+      find.widgetWithText(TextFormField, 'Make, model & year'),
       'Toyota Aqua 2018',
     );
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Registration Number'),
+      find.widgetWithText(TextFormField, 'Registration number'),
       'WP CAB 1234',
     );
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextFormField, 'What happened?'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.enterText(
-      find.widgetWithText(TextFormField, 'Detailed description (Optional)'),
+      find.widgetWithText(TextFormField, 'What happened?'),
       'Rear tyre is punctured near the kerb.',
     );
-    await tester.tap(find.text('Confirm & Next'));
+    await tester.tap(find.text('Continue to Location'));
     // The destination contains a live map/loading animation; do not wait for
     // every animation to stop to verify that navigation completed.
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('Location Confirmation'), findsOneWidget);
-    expect(
-      find.text('Select current GPS or enter location manually'),
-      findsOneWidget,
-    );
+    expect(find.text('Confirm Location'), findsOneWidget);
+    expect(find.byType(LocationScreen), findsOneWidget);
   });
 
   test('vehicle registration is normalised before validation', () {
@@ -114,47 +116,16 @@ void main() {
     expect(validateBreakdownDescription('Tyre flat'), isNull);
   });
 
-  testWidgets('driver can edit profile and sign out', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1000));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('signed-out drivers cannot edit a profile', (tester) async {
     await tester.pumpWidget(testApp(const DriverProfileScreen()));
-
-    await tester.tap(find.text('Edit Profile'));
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Full Name'),
-      'Kamal Perera',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Phone Number'),
-      '0771234567',
-    );
-    await tester.tap(find.text('Save Changes'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Kamal Perera'), findsNWidgets(2));
-    expect(find.text('Profile updated successfully.'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-      find.text('Sign Out'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Sign Out'));
-    await tester.pumpAndSettle();
-    expect(find.text('Sign out of RoadAssist?'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Sign Out'));
-    await tester.pumpAndSettle();
-    expect(find.text('Help is closer than you think.'), findsOneWidget);
+    expect(find.text('Sign in required'), findsOneWidget);
+    expect(find.byTooltip('Edit profile'), findsNothing);
   });
 
   testWidgets('provider can update availability settings', (tester) async {
     await tester.pumpWidget(testApp(const ProviderProfileScreen()));
 
-    await tester.tap(find.byTooltip('Settings'));
+    await tester.tap(find.byTooltip('Availability settings'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Weekdays · 8 AM–6 PM'));
     await tester.pumpAndSettle();

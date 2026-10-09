@@ -1,0 +1,9 @@
+# Free vehicle photos
+
+The vehicle header uses a driver-uploaded image first, then the saved vehicle photo, then an optional Wikimedia Commons model reference. Saved photoData is compressed JPEG base64, at most 210,000 characters. Existing vehicles without this optional field still work. The saved photo travels in the request vehicleSnapshot, so providers never need access to private saved vehicle records. Current incident photos remain a separate list.
+
+Enter make and model in Model / Year (e.g. Toyota Aqua 2018). Saved vehicles already supply make, model and year. Preview updates after a 700ms debounce. Commons requests use origin=* and a maximum of six image results, timeout after eight seconds, and are deduplicated/cached for the session. No paid API key, server deployment or billing upgrade is used. The existing Firestore plan quotas still apply to saving photos.
+
+Only Commons thumbnails with matching model words, known free licence metadata and approved Wikimedia image hosts are used. Author/licence credit and the original source page are displayed. This is a best-effort filename match, not manufacturer-certified identification. Filename year matches are labelled separately; generation, trim, engine and colour may differ. Some models have no suitable photo. API/rate limit/image failures show a placeholder and never block a request. Upload an actual photo to ensure the provider sees your vehicle. Confirm engine/variant and part numbers separately.
+
+Actual-photo previews are present in Breakdown Details, saved vehicle editor, provider Case Details, and provider quote dialog before acceptance. A single new saved vehicle photo can be removed in its editor. Changing manually entered model details clears the previous saved-vehicle association to avoid attaching an old vehicle photo.

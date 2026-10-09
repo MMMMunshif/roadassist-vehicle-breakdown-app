@@ -1,7 +1,35 @@
 part of '../screens.dart';
 
-class _NearbyProvidersPreview extends StatelessWidget {
+class _NearbyProvidersPreview extends StatefulWidget {
   const _NearbyProvidersPreview();
+
+  @override
+  State<_NearbyProvidersPreview> createState() =>
+      _NearbyProvidersPreviewState();
+}
+
+class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
+  Stream<DocumentSnapshot<Map<String, dynamic>>>? profile;
+  Stream<QuerySnapshot<Map<String, dynamic>>>? providers;
+  Timer? clock;
+
+  @override
+  void initState() {
+    super.initState();
+    if (signedIn) {
+      profile = AuthService().watchCurrentProfile();
+      providers = AuthService().watchOnlineProviders();
+      clock = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    clock?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,36 +39,91 @@ class _NearbyProvidersPreview extends StatelessWidget {
         text: 'Sign in to see available providers near you.',
       );
     }
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: AuthService().watchOnlineProviders(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const InlineMessage(
-            icon: Icons.cloud_off_outlined,
-            text: 'Unable to load online providers.',
-          );
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: profile,
+      builder: (context, driverSnapshot) {
+        final driver = driverSnapshot.data?.data();
+        final latitude = (driver?['currentLatitude'] as num?)?.toDouble();
+        final longitude = (driver?['currentLongitude'] as num?)?.toDouble();
+        final hasLocation = latitude != null && longitude != null;
+        double? distance(Map<String, dynamic> data) {
+          final lat = (data['latitude'] as num?)?.toDouble();
+          final lon = (data['longitude'] as num?)?.toDouble();
+          if (!hasLocation || lat == null || lon == null) return null;
+          return Geolocator.distanceBetween(latitude, longitude, lat, lon) /
+              1000;
         }
-        if (!snapshot.hasData) return const LinearProgressIndicator();
-        final providers = snapshot.data!.docs.take(2).toList();
-        if (providers.isEmpty) {
-          return const InlineMessage(
-            icon: Icons.person_search_outlined,
-            text: 'No service providers are online right now.',
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var index = 0; index < providers.length; index++) ...[
-              if (index > 0) const SizedBox(width: RaSpace.sm),
-              Expanded(
-                child: _OnlineProviderPreviewCard(
-                  data: providers[index].data(),
-                ),
-              ),
-            ],
-            if (providers.length == 1) const Spacer(),
-          ],
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: providers,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const InlineMessage(
+                icon: Icons.cloud_off_outlined,
+                text: 'Unable to load online providers. Check your connection.',
+              );
+            }
+            if (!snapshot.hasData) return const LinearProgressIndicator();
+            final nearby =
+                snapshot.data!.docs.where((doc) {
+                  final data = doc.data();
+                  if (!_providerHasCurrentVerification(data) ||
+                      _providerAvailabilityStatus(data) != 'Online')
+                    return false;
+                  final km = distance(data);
+                  if (!hasLocation) return false;
+                  if (km == null) return false;
+                  final radius =
+                      double.tryParse(
+                        RegExp(r'\d+(?:\.\d+)?')
+                                .firstMatch(
+                                  data['serviceRadius'] as String? ?? '',
+                                )
+                                ?.group(0) ??
+                            '',
+                      ) ??
+                      15;
+                  return km <= radius;
+                }).toList()..sort(
+                  (a, b) => (distance(a.data()) ?? double.infinity).compareTo(
+                    distance(b.data()) ?? double.infinity,
+                  ),
+                );
+            if (!hasLocation) {
+              return const InlineMessage(
+                icon: Icons.location_on_outlined,
+                text:
+                    'Update your current location to find providers near you.',
+              );
+            }
+            if (nearby.isEmpty) {
+              return const InlineMessage(
+                icon: Icons.person_search_outlined,
+                text:
+                    'No available providers nearby. Providers appear automatically when they come online.',
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!hasLocation) ...[
+                  const InlineMessage(
+                    icon: Icons.location_on_outlined,
+                    text:
+                        'Update your current location to find providers near you. Showing available online providers.',
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                ],
+                for (final doc in nearby.take(3)) ...[
+                  _OnlineProviderPreviewCard(
+                    data: doc.data(),
+                    distanceKm: distance(doc.data()),
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                ],
+              ],
+            );
+          },
         );
       },
     );
@@ -95,8 +178,9 @@ class _DriverQuickAction extends StatelessWidget {
 }
 
 class _OnlineProviderPreviewCard extends StatelessWidget {
-  const _OnlineProviderPreviewCard({required this.data});
+  const _OnlineProviderPreviewCard({required this.data, this.distanceKm});
   final Map<String, dynamic> data;
+  final double? distanceKm;
 
   @override
   Widget build(BuildContext context) {
@@ -111,10 +195,12 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: RaSpace.md,
+                runSpacing: RaSpace.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   ProfileInitials(name: name, radius: 24),
-                  const Spacer(),
                   const StatusPill(label: 'Online', tone: RaTone.success),
                 ],
               ),
@@ -127,7 +213,9 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Available for roadside requests',
+                distanceKm == null
+                    ? 'Available for roadside requests'
+                    : '${distanceKm!.toStringAsFixed(1)} km away • Available for requests',
                 style: RaText.caption,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -141,15 +229,23 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
 }
 
 class InlineMessage extends StatelessWidget {
-  const InlineMessage({super.key, required this.icon, required this.text});
+  const InlineMessage({
+    super.key,
+    this.icon = Icons.info_outline,
+    required this.text,
+    this.error = false,
+  });
   final IconData icon;
   final String text;
+  final bool error;
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(RaSpace.lg),
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
+      color: error
+          ? Theme.of(context).colorScheme.errorContainer
+          : Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(RaRadius.md),
       border: Border.all(color: Theme.of(context).dividerColor),
     ),
@@ -161,7 +257,9 @@ class InlineMessage extends StatelessWidget {
           child: Text(
             text,
             style: RaText.bodyMuted.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: error
+                  ? Theme.of(context).colorScheme.onErrorContainer
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -805,8 +903,7 @@ class _ProviderRequestBadge extends StatelessWidget {
             label: Text(count > 9 ? '9+' : '$count'),
             child: IconButton(
               tooltip: 'New requests',
-              onPressed: () =>
-                  push(context, const ProviderNotificationsScreen()),
+              onPressed: () => _openProviderRequests(context),
               icon: const Icon(Icons.notifications_none_rounded),
             ),
           );
@@ -1501,23 +1598,12 @@ class BrandMark extends StatelessWidget {
   final double size;
   final bool elevated;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Image.asset(
+    'assets/images/roadassist_mark.png',
     width: size,
     height: size,
-    decoration: BoxDecoration(
-      color: raBlue,
-      borderRadius: BorderRadius.circular(size * .26),
-      boxShadow: elevated
-          ? [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ]
-          : null,
-    ),
-    child: Icon(Icons.shield_outlined, color: Colors.white, size: size * .55),
+    fit: BoxFit.contain,
+    semanticLabel: 'RoadAssist logo',
   );
 }
 
@@ -2543,12 +2629,23 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final dark = colors.brightness == Brightness.dark;
     final (Color bg, Color fg) = switch (tone) {
-      RaTone.success => (raSuccessPale, raSuccess),
-      RaTone.danger => (raDangerPale, raDanger),
-      RaTone.warning => (raGoldPale, const Color(0xFFA5670C)),
-      RaTone.info => (raPale, raBlue),
-      RaTone.neutral => (const Color(0xFFF0F2F6), raMuted),
+      RaTone.success =>
+        dark
+            ? (const Color(0xFF123D30), const Color(0xFF87DDB3))
+            : (raSuccessPale, const Color(0xFF08643C)),
+      RaTone.danger => (colors.errorContainer, colors.onErrorContainer),
+      RaTone.warning =>
+        dark
+            ? (const Color(0xFF493819), const Color(0xFFF2CF83))
+            : (raGoldPale, const Color(0xFF805000)),
+      RaTone.info => (colors.primaryContainer, colors.onPrimaryContainer),
+      RaTone.neutral => (
+        colors.surfaceContainerHighest,
+        colors.onSurfaceVariant,
+      ),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -2567,13 +2664,15 @@ class StatusPill extends StatelessWidget {
             ),
             const SizedBox(width: 6),
           ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              color: fg,
-              letterSpacing: 0.2,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: fg,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],
