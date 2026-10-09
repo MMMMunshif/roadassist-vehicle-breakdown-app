@@ -1,3 +1,4 @@
+import '../models/completion_report.dart';
 import '../models/provider_availability.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -322,7 +323,8 @@ class RequestService {
                 provider.data() ?? {},
                 DateTime.now(),
                 locationUpdatedAt:
-                    (provider.data()?['locationUpdatedAt'] as Timestamp?)?.toDate(),
+                    (provider.data()?['locationUpdatedAt'] as Timestamp?)
+                        ?.toDate(),
                 overrideUntil:
                     (provider.data()?['hoursOverrideUntil'] as Timestamp?)
                         ?.toDate(),
@@ -562,7 +564,12 @@ class RequestService {
     });
   }
 
-  Future<void> completeProviderJob(String id, int finalCost) async {
+  Future<void> completeProviderJob(
+    String id,
+    int finalCost, {
+    required CompletionReport report,
+  }) async {
+    report.validate();
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final data = (await tx.get(ref)).data();
@@ -590,6 +597,7 @@ class RequestService {
         );
       tx.update(ref, {
         'completionState': 'pending',
+        'completionReport': report.toMap(),
         'completionSubmittedAt': FieldValue.serverTimestamp(),
         'finalCost': finalCost,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -597,7 +605,79 @@ class RequestService {
     });
   }
 
-  Future<void> confirmJobCompletion(String id) async {
+  Future<void> requestCompletionDiscount(
+    String id,
+    int amount,
+    String reason,
+  ) async {
+    if (amount < 0 || reason.trim().length < 10 || reason.trim().length > 500) {
+      throw ArgumentError(
+        'Enter a valid amount and a reason of 10?500 characters.',
+      );
+    }
+    final ref = _requests.doc(id);
+    final proposal = ref.collection('completionDiscounts').doc();
+    await _firestore.runTransaction((tx) async {
+      final data = (await tx.get(ref)).data();
+      final current = data?['finalCost'];
+      if (data?['driverId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['completionState'] != 'pending' ||
+          data?['pendingDiscountId'] != null ||
+          current is! int ||
+          amount >= current) {
+        throw StateError(
+          'A discount can be requested only while reviewing completion, below the proposed final total.',
+        );
+      }
+      tx.set(proposal, {
+        'driverId': data!['driverId'],
+        'providerId': data['providerId'],
+        'previousTotal': current,
+        'requestedTotal': amount,
+        'reason': reason.trim(),
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(ref, {
+        'pendingDiscountId': proposal.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> respondCompletionDiscount(
+    String id,
+    String proposalId, {
+    required bool accept,
+  }) async {
+    final ref = _requests.doc(id);
+    final proposal = ref.collection('completionDiscounts').doc(proposalId);
+    await _firestore.runTransaction((tx) async {
+      final data = (await tx.get(ref)).data();
+      final offer = (await tx.get(proposal)).data();
+      if (data?['providerId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['completionState'] != 'pending' ||
+          data?['pendingDiscountId'] != proposalId ||
+          offer?['status'] != 'pending' ||
+          offer?['previousTotal'] != data?['finalCost']) {
+        throw StateError('This discount request is no longer pending.');
+      }
+      tx.update(proposal, {
+        'status': accept ? 'accepted' : 'declined',
+        'decidedBy': _userId,
+        'decidedAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(ref, {
+        'pendingDiscountId': null,
+        if (accept) 'finalCost': offer!['requestedTotal'],
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> confirmJobCompletion(String id, {int? expectedFinalCost}) async {
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final data = (await tx.get(ref)).data();
@@ -606,6 +686,17 @@ class RequestService {
           data?['status'] != 'arrived' ||
           data?['completionState'] != 'pending')
         throw StateError('No completion is awaiting your confirmation.');
+      if (data?['pendingDiscountId'] != null) {
+        throw StateError(
+          'Wait for the provider to respond to your discount request.',
+        );
+      }
+      if (expectedFinalCost != null &&
+          data?['finalCost'] != expectedFinalCost) {
+        throw StateError(
+          'The final amount changed. Review it before confirming.',
+        );
+      }
       final review = await tx.get(
         _firestore.collection('complaintReviews').doc(id),
       );

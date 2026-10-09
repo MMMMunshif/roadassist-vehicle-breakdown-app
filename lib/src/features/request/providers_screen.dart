@@ -1,32 +1,20 @@
 part of '../../screens.dart';
 
 class ProvidersScreen extends StatefulWidget {
-  const ProvidersScreen({
-    super.key,
-    required this.draft,
-  });
+  const ProvidersScreen({super.key, required this.draft});
 
   final RequestDraft draft;
 
   @override
-  State<ProvidersScreen> createState() =>
-      _ProvidersScreenState();
+  State<ProvidersScreen> createState() => _ProvidersScreenState();
 }
 
-double? _providerDistanceKm(
-  Map<String, dynamic> data,
-  RequestDraft draft,
-) {
-  final latitude =
-      (data['latitude'] as num?)
-          ?.toDouble();
+double? _providerDistanceKm(Map<String, dynamic> data, RequestDraft draft) {
+  final latitude = (data['latitude'] as num?)?.toDouble();
 
-  final longitude =
-      (data['longitude'] as num?)
-          ?.toDouble();
+  final longitude = (data['longitude'] as num?)?.toDouble();
 
-  if (latitude == null ||
-      longitude == null) {
+  if (latitude == null || longitude == null) {
     return null;
   }
 
@@ -39,123 +27,68 @@ double? _providerDistanceKm(
       1000;
 }
 
-String _providerAvailabilityStatus(
-  Map<String, dynamic> data,
-) {
+String _providerAvailabilityStatus(Map<String, dynamic> data) {
   return ProviderAvailability.status(
     data,
     DateTime.now(),
     locationUpdatedAt: (data['locationUpdatedAt'] as Timestamp?)?.toDate(),
-    overrideUntil:
-        (data['hoursOverrideUntil']
-                as Timestamp?)
-            ?.toDate(),
+    overrideUntil: (data['hoursOverrideUntil'] as Timestamp?)?.toDate(),
   );
 }
 
-bool _providerLocationOutdated(
-  Map<String, dynamic> data,
-) {
-  final updated =
-      (data['locationUpdatedAt']
-              as Timestamp?)
-          ?.toDate();
+bool _providerLocationOutdated(Map<String, dynamic> data) {
+  final updated = (data['locationUpdatedAt'] as Timestamp?)?.toDate();
 
   if (updated == null) {
     return true;
   }
 
-  return DateTime.now()
-          .difference(updated) >
-      const Duration(
-        minutes: 10,
-      );
+  return DateTime.now().difference(updated) > const Duration(minutes: 10);
 }
 
-bool _providerMatchesDraft(
-  Map<String, dynamic> data,
-  RequestDraft draft,
-) {
-  if (!_providerHasCurrentVerification(
-        data,
-      ) ||
-      _providerAvailabilityStatus(
-            data,
-          ) !=
-          'Online') {
+bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
+  if (!_providerHasCurrentVerification(data) ||
+      _providerAvailabilityStatus(data) != 'Online') {
     return false;
   }
 
-  final vehicles =
-      data['vehicleTypes']
-              as List? ??
-          const [];
+  final vehicles = data['vehicleTypes'] as List? ?? const [];
 
-  if (!vehicles.contains(
-    draft.vehicleType,
-  )) {
+  if (!vehicles.contains(draft.vehicleType)) {
     return false;
   }
 
-  if ((data['activeRequestId']
-              as String? ??
-          '')
-      .isNotEmpty) {
+  if ((data['activeRequestId'] as String? ?? '').isNotEmpty) {
     return false;
   }
 
-  final services =
-      (data['services']
-                  as List<dynamic>? ??
-              const [])
-          .whereType<String>()
-          .toList();
+  final services = (data['services'] as List<dynamic>? ?? const [])
+      .whereType<String>()
+      .toList();
 
-  if (services.isNotEmpty &&
-      !draft.issues.every(
-        services.contains,
-      )) {
+  if (services.isNotEmpty && !draft.issues.every(services.contains)) {
     return false;
   }
 
-  final distance =
-      _providerDistanceKm(
-    data,
-    draft,
-  );
+  final distance = _providerDistanceKm(data, draft);
 
   if (distance == null) {
     return false;
   }
 
-  final radiusText =
-      data['serviceRadius']
-              as String? ??
-          '15 km';
+  final radiusText = data['serviceRadius'] as String? ?? '15 km';
 
-  final radiusMatch =
-      RegExp(r'\d+')
-          .firstMatch(
-            radiusText,
-          )
-          ?.group(0);
+  final radiusMatch = RegExp(r'\d+').firstMatch(radiusText)?.group(0);
 
-  final radius =
-      double.tryParse(
-            radiusMatch ?? '',
-          ) ??
-          15;
+  final radius = double.tryParse(radiusMatch ?? '') ?? 15;
 
   return distance <= radius;
 }
 
-class _ProvidersScreenState
-    extends State<ProvidersScreen> {
+class _ProvidersScreenState extends State<ProvidersScreen> {
   Timer? availabilityClock;
 
-  late final Stream<
-      QuerySnapshot<Map<String, dynamic>>>
-      onlineProviders;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> onlineProviders;
 
   String? selectedId;
   String? selectedName;
@@ -164,34 +97,19 @@ class _ProvidersScreenState
   void initState() {
     super.initState();
 
-    onlineProviders =
-        AuthService()
-            .watchOnlineProviders();
+    onlineProviders = AuthService().watchOnlineProviders();
 
-    selectedId = widget
-            .draft
-            .preferredProviderId
-            .isEmpty
+    selectedId = widget.draft.preferredProviderId.isEmpty
         ? null
-        : widget.draft
-            .preferredProviderId;
+        : widget.draft.preferredProviderId;
 
-    selectedName =
-        widget.draft.provider.isEmpty
-            ? null
-            : widget.draft.provider;
+    selectedName = widget.draft.provider.isEmpty ? null : widget.draft.provider;
 
-    availabilityClock =
-        Timer.periodic(
-      const Duration(
-        minutes: 1,
-      ),
-      (_) {
-        if (mounted) {
-          setState(() {});
-        }
-      },
-    );
+    availabilityClock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -202,28 +120,18 @@ class _ProvidersScreenState
   }
 
   Future<void> reviewRequest() async {
-    final selectedDraft =
-        widget.draft.copyWith(
-      provider: selectedName ??
-          'Available Provider',
-      preferredProviderId:
-          selectedId,
+    final selectedDraft = widget.draft.copyWith(
+      provider: selectedName ?? 'Available Provider',
+      preferredProviderId: selectedId,
     );
 
-    await RequestDraftStore().save(
-      selectedDraft,
-    );
+    await RequestDraftStore().save(selectedDraft);
 
     if (!mounted) {
       return;
     }
 
-    push(
-      context,
-      ReviewScreen(
-        draft: selectedDraft,
-      ),
-    );
+    push(context, ReviewScreen(draft: selectedDraft));
   }
 
   void selectAllOffers() {
@@ -234,58 +142,44 @@ class _ProvidersScreenState
   }
 
   void resetSelectionIfMissing(
-    List<
-            QueryDocumentSnapshot<
-                Map<String, dynamic>>>
-        providers,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> providers,
   ) {
     if (selectedId == null) {
       return;
     }
 
-    final stillAvailable =
-        providers.any(
-      (provider) =>
-          provider.id ==
-          selectedId,
+    final stillAvailable = providers.any(
+      (provider) => provider.id == selectedId,
     );
 
     if (stillAvailable) {
       return;
     }
 
-    WidgetsBinding.instance
-        .addPostFrameCallback(
-      (_) {
-        if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
 
-        setState(() {
-          selectedId = null;
-          selectedName = null;
-        });
-      },
-    );
+      setState(() {
+        selectedId = null;
+        selectedName = null;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    return RaDriverScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
+        title: RaDriverAppBarTitle(
           'Choose Provider',
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight:
-                FontWeight.w800,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
             letterSpacing: -.45,
           ),
         ),
@@ -296,114 +190,73 @@ class _ProvidersScreenState
           children: [
             Expanded(
               child: ListView(
-                physics:
-                    const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  18,
-                  8,
-                  18,
-                  28,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
                   const _RaProvidersProgress(),
 
-                  const SizedBox(
-                    height: 16,
-                  ),
+                  const SizedBox(height: 16),
 
                   const _RaProvidersHero(),
 
-                  const SizedBox(
-                    height: 16,
-                  ),
+                  const SizedBox(height: 16),
 
-                  _RaProviderLocationSummary(
-                    draft:
-                        widget.draft,
-                  ),
+                  _RaProviderLocationSummary(draft: widget.draft),
 
-                  const SizedBox(
-                    height: 25,
-                  ),
+                  const SizedBox(height: 25),
 
                   Text(
                     'How do you want to request help?',
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 17,
-                      fontWeight:
-                          FontWeight.w800,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: -.35,
-                      color:
-                          colors.onSurface,
+                      color: colors.onSurface,
                     ),
                   ),
 
-                  const SizedBox(
-                    height: 4,
-                  ),
+                  const SizedBox(height: 4),
 
                   Text(
                     'Compare offers from suitable providers, or direct the request to one specific provider.',
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 10,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
                       height: 1.4,
-                      color: colors
-                          .onSurfaceVariant,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
 
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   _RaAllProvidersCard(
-                    selected:
-                        selectedId == null,
-                    onTap:
-                        selectAllOffers,
+                    selected: selectedId == null,
+                    onTap: selectAllOffers,
                   ),
 
-                  const SizedBox(
-                    height: 26,
-                  ),
+                  const SizedBox(height: 26),
 
                   Row(
                     children: [
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Available providers',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize:
-                                    17,
-                                fontWeight:
-                                    FontWeight
-                                        .w800,
-                                letterSpacing:
-                                    -.35,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.35,
                               ),
                             ),
 
-                            const SizedBox(
-                              height: 3,
-                            ),
+                            const SizedBox(height: 3),
 
                             Text(
                               'Only verified, online and suitable providers are shown.',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize:
-                                    9.5,
-                                color: colors
-                                    .onSurfaceVariant,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -412,28 +265,16 @@ class _ProvidersScreenState
                     ],
                   ),
 
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
-                  StreamBuilder<
-                      QuerySnapshot<
-                          Map<String,
-                              dynamic>>>(
-                    stream:
-                        onlineProviders,
-                    builder: (
-                      context,
-                      snapshot,
-                    ) {
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: onlineProviders,
+                    builder: (context, snapshot) {
                       if (snapshot.hasError) {
                         return const EmptyState(
-                          icon: Icons
-                              .cloud_off_outlined,
-                          title:
-                              'Unable to load providers',
-                          message:
-                              'Check your connection and try again.',
+                          icon: Icons.cloud_off_outlined,
+                          title: 'Unable to load providers',
+                          message: 'Check your connection and try again.',
                         );
                       }
 
@@ -441,48 +282,26 @@ class _ProvidersScreenState
                         return const _RaProvidersLoading();
                       }
 
-                      final providers =
-                          snapshot.data!.docs
-                              .where(
-                        (provider) {
-                          return _providerMatchesDraft(
-                            provider.data(),
-                            widget.draft,
-                          );
-                        },
-                      ).toList();
+                      final providers = snapshot.data!.docs.where((provider) {
+                        return _providerMatchesDraft(
+                          provider.data(),
+                          widget.draft,
+                        );
+                      }).toList();
 
-                      providers.sort(
-                        (
-                          first,
-                          second,
-                        ) {
-                          final firstDistance =
-                              _providerDistanceKm(
-                                    first.data(),
-                                    widget.draft,
-                                  ) ??
-                                  double
-                                      .infinity;
+                      providers.sort((first, second) {
+                        final firstDistance =
+                            _providerDistanceKm(first.data(), widget.draft) ??
+                            double.infinity;
 
-                          final secondDistance =
-                              _providerDistanceKm(
-                                    second.data(),
-                                    widget.draft,
-                                  ) ??
-                                  double
-                                      .infinity;
+                        final secondDistance =
+                            _providerDistanceKm(second.data(), widget.draft) ??
+                            double.infinity;
 
-                          return firstDistance
-                              .compareTo(
-                            secondDistance,
-                          );
-                        },
-                      );
+                        return firstDistance.compareTo(secondDistance);
+                      });
 
-                      resetSelectionIfMissing(
-                        providers,
-                      );
+                      resetSelectionIfMissing(providers);
 
                       if (providers.isEmpty) {
                         return const _RaNoProviders();
@@ -490,50 +309,32 @@ class _ProvidersScreenState
 
                       return Column(
                         children: [
-                          for (var index = 0;
-                              index <
-                                  providers
-                                      .length;
-                              index++) ...[
+                          for (
+                            var index = 0;
+                            index < providers.length;
+                            index++
+                          ) ...[
                             _RaProviderChoiceCard(
-                              data:
-                                  providers[
-                                          index]
-                                      .data(),
-                              draft:
-                                  widget.draft,
-                              selected:
-                                  selectedId ==
-                                      providers[
-                                              index]
-                                          .id,
+                              data: providers[index].data(),
+                              draft: widget.draft,
+                              selected: selectedId == providers[index].id,
                               onTap: () {
-                                final provider =
-                                    providers[
-                                        index];
+                                final provider = providers[index];
 
-                                final data =
-                                    provider
-                                        .data();
+                                final data = provider.data();
 
                                 setState(() {
-                                  selectedId =
-                                      provider.id;
+                                  selectedId = provider.id;
 
                                   selectedName =
-                                      data['displayName']
-                                              as String? ??
-                                          'Service Provider';
+                                      data['displayName'] as String? ??
+                                      'Service Provider';
                                 });
                               },
                             ),
 
-                            if (index !=
-                                providers.length -
-                                    1)
-                              const SizedBox(
-                                height: 9,
-                              ),
+                            if (index != providers.length - 1)
+                              const SizedBox(height: 9),
                           ],
                         ],
                       );
@@ -544,10 +345,8 @@ class _ProvidersScreenState
             ),
 
             _RaProvidersBottomBar(
-              selectedProvider:
-                  selectedName,
-              onContinue:
-                  reviewRequest,
+              selectedProvider: selectedName,
+              onContinue: reviewRequest,
             ),
           ],
         ),
@@ -556,49 +355,30 @@ class _ProvidersScreenState
   }
 }
 
-class _RaProvidersProgress
-    extends StatelessWidget {
+class _RaProvidersProgress extends StatelessWidget {
   const _RaProvidersProgress();
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
       children: [
         Row(
           children: [
             Container(
-              padding:
-                  const EdgeInsets
-                      .symmetric(
-                horizontal: 9,
-                vertical: 5,
-              ),
-              decoration:
-                  BoxDecoration(
-                color: colors.primary
-                    .withValues(
-                  alpha: .08,
-                ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  999,
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 'PROVIDER',
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 8,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
                   letterSpacing: .8,
-                  fontWeight:
-                      FontWeight.w700,
-                  color:
-                      colors.primary,
+                  fontWeight: FontWeight.w700,
+                  color: colors.primary,
                 ),
               ),
             ),
@@ -607,33 +387,23 @@ class _RaProvidersProgress
 
             Text(
               'Next: Review',
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 9,
-                color:
-                    colors.primary,
-                fontWeight:
-                    FontWeight.w700,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: colors.primary,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
         ),
 
-        const SizedBox(
-          height: 7,
-        ),
+        const SizedBox(height: 7),
 
         ClipRRect(
-          borderRadius:
-              BorderRadius.circular(
-            999,
-          ),
-          child:
-              LinearProgressIndicator(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
             value: .88,
             minHeight: 5,
-            backgroundColor: colors
-                .surfaceContainerHighest,
+            backgroundColor: colors.surfaceContainerHighest,
           ),
         ),
       ],
@@ -641,50 +411,24 @@ class _RaProvidersProgress
   }
 }
 
-class _RaProvidersHero
-    extends StatelessWidget {
+class _RaProvidersHero extends StatelessWidget {
   const _RaProvidersHero();
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context)
-                .brightness ==
-            Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        19,
-      ),
+      padding: const EdgeInsets.all(19),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin:
-              Alignment.topLeft,
-          end:
-              Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: dark
-              ? const [
-                  Color(
-                    0xFF0B477D,
-                  ),
-                  Color(
-                    0xFF08645D,
-                  ),
-                ]
-              : const [
-                  Color(
-                    0xFF075BA8,
-                  ),
-                  Color(
-                    0xFF078C7E,
-                  ),
-                ],
+              ? const [Color(0xFF0B477D), Color(0xFF08645D)]
+              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
         ),
-        borderRadius:
-            BorderRadius.circular(
-          25,
-        ),
+        borderRadius: BorderRadius.circular(25),
       ),
       child: Stack(
         children: [
@@ -692,76 +436,50 @@ class _RaProvidersHero
             right: -22,
             bottom: -31,
             child: Icon(
-              Icons
-                  .handyman_outlined,
+              Icons.handyman_outlined,
               size: 130,
-              color: Colors.white
-                  .withValues(
-                alpha: .06,
-              ),
+              color: Colors.white.withValues(alpha: .06),
             ),
           ),
 
           Column(
-            crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 50,
                 height: 50,
-                decoration:
-                    BoxDecoration(
-                  color: Colors.white
-                      .withValues(
-                    alpha: .13,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    16,
-                  ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .13),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
-                  Icons
-                      .person_search_outlined,
+                  Icons.person_search_outlined,
                   color: Colors.white,
                   size: 25,
                 ),
               ),
 
-              const SizedBox(
-                height: 15,
-              ),
+              const SizedBox(height: 15),
 
               Text(
                 'Choose how you get help',
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  color:
-                      Colors.white,
-                  fontSize: 20,
-                  fontWeight:
-                      FontWeight.w800,
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
                   letterSpacing: -.5,
                 ),
               ),
 
-              const SizedBox(
-                height: 6,
-              ),
+              const SizedBox(height: 6),
 
               SizedBox(
                 width: 295,
                 child: Text(
                   'Let several suitable providers send offers, or request one provider directly.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .80,
-                    ),
-                    fontSize: 10,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white.withValues(alpha: .80),
+                    fontSize: 13,
                     height: 1.45,
                   ),
                 ),
@@ -774,121 +492,71 @@ class _RaProvidersHero
   }
 }
 
-class _RaProviderLocationSummary
-    extends StatelessWidget {
-  const _RaProviderLocationSummary({
-    required this.draft,
-  });
+class _RaProviderLocationSummary extends StatelessWidget {
+  const _RaProviderLocationSummary({required this.draft});
 
   final RequestDraft draft;
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        14,
-      ),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(
-                0xFF0D1D2B,
-              )
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          18,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .45,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment
-                .start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 41,
             height: 41,
-            decoration:
-                BoxDecoration(
-              color: colors.primary
-                  .withValues(
-                alpha: .08,
-              ),
-              borderRadius:
-                  BorderRadius
-                      .circular(
-                13,
-              ),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(
-              Icons
-                  .location_on_outlined,
-              color:
-                  colors.primary,
-            ),
+            child: Icon(Icons.location_on_outlined, color: colors.primary),
           ),
 
-          const SizedBox(
-            width: 11,
-          ),
+          const SizedBox(width: 11),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment
-                      .start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Provider search location',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.8,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
 
-                const SizedBox(
-                  height: 3,
-                ),
+                const SizedBox(height: 3),
 
                 Text(
                   draft.location,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     height: 1.4,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
 
-                if (draft.landmark
-                    .isNotEmpty) ...[
-                  const SizedBox(
-                    height: 4,
-                  ),
+                if (draft.landmark.isNotEmpty) ...[
+                  const SizedBox(height: 4),
                   Text(
                     'Landmark: ${draft.landmark}',
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 8.5,
-                      color: colors
-                          .onSurfaceVariant,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -901,12 +569,8 @@ class _RaProviderLocationSummary
   }
 }
 
-class _RaAllProvidersCard
-    extends StatelessWidget {
-  const _RaAllProvidersCard({
-    required this.selected,
-    required this.onTap,
-  });
+class _RaAllProvidersCard extends StatelessWidget {
+  const _RaAllProvidersCard({required this.selected, required this.onTap});
 
   final bool selected;
 
@@ -914,176 +578,102 @@ class _RaAllProvidersCard
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Material(
       color: selected
-          ? colors.primary
-              .withValues(
-              alpha: .07,
-            )
-          : theme.brightness ==
-                  Brightness.dark
-              ? const Color(
-                  0xFF0D1D2B,
-                )
-              : Colors.white,
-      borderRadius:
-          BorderRadius.circular(
-        20,
-      ),
+          ? colors.primary.withValues(alpha: .07)
+          : theme.brightness == Brightness.dark
+          ? const Color(0xFF0D2237)
+          : Colors.white,
+      borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding:
-              const EdgeInsets.all(
-            15,
-          ),
+          padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(
-              20,
-            ),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: selected
-                  ? colors.primary
-                      .withValues(
-                      alpha: .48,
-                    )
-                  : colors
-                      .outlineVariant
-                      .withValues(
-                      alpha: .45,
-                    ),
-              width:
-                  selected ? 1.4 : 1,
+                  ? colors.primary.withValues(alpha: .48)
+                  : colors.outlineVariant.withValues(alpha: .45),
+              width: selected ? 1.4 : 1,
             ),
           ),
           child: Row(
-            crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 47,
                 height: 47,
-                decoration:
-                    BoxDecoration(
-                  color: colors.primary
-                      .withValues(
-                    alpha: .09,
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    15,
-                  ),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: Icon(
-                  Icons
-                      .compare_arrows_rounded,
-                  color:
-                      colors.primary,
+                  Icons.compare_arrows_rounded,
+                  color: colors.primary,
                 ),
               ),
 
-              const SizedBox(
-                width: 12,
-              ),
+              const SizedBox(width: 12),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'Receive provider offers',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize:
-                                  12.5,
-                              fontWeight:
-                                  FontWeight
-                                      .w700,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
 
                         Icon(
                           selected
-                              ? Icons
-                                  .check_circle_rounded
-                              : Icons
-                                  .radio_button_unchecked_rounded,
-                          color: selected
-                              ? colors
-                                  .primary
-                              : colors
-                                  .outline,
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: selected ? colors.primary : colors.outline,
                         ),
                       ],
                     ),
 
-                    const SizedBox(
-                      height: 5,
-                    ),
+                    const SizedBox(height: 5),
 
                     Text(
                       'Suitable providers can review your request and submit offers for you to compare before selecting one.',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9.3,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
                         height: 1.4,
-                        color: colors
-                            .onSurfaceVariant,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 7,
-                    ),
+                    const SizedBox(height: 7),
 
                     Container(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 4,
                       ),
-                      decoration:
-                          BoxDecoration(
-                        color: colors.primary
-                            .withValues(
-                          alpha: .08,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          999,
-                        ),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
                         'Compare before approval',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 8,
-                          fontWeight:
-                              FontWeight
-                                  .w700,
-                          color: colors
-                              .primary,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: colors.primary,
                         ),
                       ),
                     ),
@@ -1098,8 +688,7 @@ class _RaAllProvidersCard
   }
 }
 
-class _RaProviderChoiceCard
-    extends StatelessWidget {
+class _RaProviderChoiceCard extends StatelessWidget {
   const _RaProviderChoiceCard({
     required this.data,
     required this.draft,
@@ -1107,8 +696,7 @@ class _RaProviderChoiceCard
     required this.onTap,
   });
 
-  final Map<String, dynamic>
-      data;
+  final Map<String, dynamic> data;
 
   final RequestDraft draft;
 
@@ -1118,175 +706,99 @@ class _RaProviderChoiceCard
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final name =
-        data['displayName']
-                as String? ??
-            'Service Provider';
+    final name = data['displayName'] as String? ?? 'Service Provider';
 
-    final distance =
-        _providerDistanceKm(
-      data,
-      draft,
-    );
+    final distance = _providerDistanceKm(data, draft);
 
-    final stale =
-        _providerLocationOutdated(
-      data,
-    );
+    final stale = _providerLocationOutdated(data);
 
-    final rating =
-        (data['averageRating']
-                as num?)
-            ?.toDouble();
+    final rating = (data['averageRating'] as num?)?.toDouble();
 
-    final completedJobs =
-        (data['completedJobs']
-                as num?)
-            ?.toInt();
+    final completedJobs = (data['completedJobs'] as num?)?.toInt();
 
-    final responseMinutes =
-        (data['averageResponseMinutes']
-                as num?)
-            ?.toDouble();
+    final responseMinutes = (data['averageResponseMinutes'] as num?)
+        ?.toDouble();
 
-    final services =
-        (data['services']
-                    as List<dynamic>? ??
-                const [])
-            .whereType<String>()
-            .toList();
+    final services = (data['services'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .toList();
 
     return Material(
       color: selected
-          ? colors.primary
-              .withValues(
-              alpha: .07,
-            )
-          : theme.brightness ==
-                  Brightness.dark
-              ? const Color(
-                  0xFF0D1D2B,
-                )
-              : Colors.white,
-      borderRadius:
-          BorderRadius.circular(
-        20,
-      ),
-      clipBehavior:
-          Clip.antiAlias,
+          ? colors.primary.withValues(alpha: .07)
+          : theme.brightness == Brightness.dark
+          ? const Color(0xFF0D2237)
+          : Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.all(
-            15,
-          ),
+          padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(
-              20,
-            ),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: selected
-                  ? colors.primary
-                      .withValues(
-                      alpha: .48,
-                    )
-                  : colors
-                      .outlineVariant
-                      .withValues(
-                      alpha: .45,
-                    ),
-              width:
-                  selected ? 1.4 : 1,
+                  ? colors.primary.withValues(alpha: .48)
+                  : colors.outlineVariant.withValues(alpha: .45),
+              width: selected ? 1.4 : 1,
             ),
           ),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  ProfileInitials(
-                    name: name,
-                    radius: 24,
-                  ),
+                  ProfileInitials(name: name, radius: 24),
 
-                  const SizedBox(
-                    width: 11,
-                  ),
+                  const SizedBox(width: 11),
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             Expanded(
                               child: Text(
                                 name,
-                                maxLines:
-                                    1,
-                                overflow:
-                                    TextOverflow
-                                        .ellipsis,
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  fontSize:
-                                      12.5,
-                                  fontWeight:
-                                      FontWeight
-                                          .w800,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
 
                             Icon(
                               selected
-                                  ? Icons
-                                      .check_circle_rounded
-                                  : Icons
-                                      .radio_button_unchecked_rounded,
-                              color: selected
-                                  ? colors
-                                      .primary
-                                  : colors
-                                      .outline,
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: selected ? colors.primary : colors.outline,
                               size: 21,
                             ),
                           ],
                         ),
 
-                        const SizedBox(
-                          height: 5,
-                        ),
+                        const SizedBox(height: 5),
 
                         const Wrap(
                           spacing: 6,
                           runSpacing: 6,
                           children: [
                             _RaProviderBadge(
-                              icon: Icons
-                                  .verified_outlined,
-                              label:
-                                  'Verified',
+                              icon: Icons.verified_outlined,
+                              label: 'Verified',
                             ),
                             _RaProviderBadge(
-                              icon: Icons
-                                  .circle,
-                              label:
-                                  'Online',
-                              success:
-                                  true,
+                              icon: Icons.circle,
+                              label: 'Online',
+                              success: true,
                             ),
                           ],
                         ),
@@ -1296,135 +808,86 @@ class _RaProviderChoiceCard
                 ],
               ),
 
-              const SizedBox(
-                height: 13,
-              ),
+              const SizedBox(height: 13),
 
               Wrap(
                 spacing: 12,
                 runSpacing: 7,
                 children: [
                   _RaProviderFact(
-                    icon: Icons
-                        .location_on_outlined,
+                    icon: Icons.location_on_outlined,
                     value: stale
                         ? 'Location needs confirmation'
-                        : distance ==
-                                null
-                            ? 'Distance unavailable'
-                            : '${distance.toStringAsFixed(1)} km away',
+                        : distance == null
+                        ? 'Distance unavailable'
+                        : '${distance.toStringAsFixed(1)} km away',
                   ),
 
-                  if (rating != null &&
-                      rating > 0)
+                  if (rating != null && rating > 0)
                     _RaProviderFact(
-                      icon: Icons
-                          .star_outline_rounded,
-                      value:
-                          '${rating.toStringAsFixed(1)} rating',
+                      icon: Icons.star_outline_rounded,
+                      value: '${rating.toStringAsFixed(1)} rating',
                     ),
 
-                  if (completedJobs !=
-                          null &&
-                      completedJobs >
-                          0)
+                  if (completedJobs != null && completedJobs > 0)
                     _RaProviderFact(
-                      icon: Icons
-                          .task_alt_rounded,
-                      value:
-                          '$completedJobs completed',
+                      icon: Icons.task_alt_rounded,
+                      value: '$completedJobs completed',
                     ),
 
-                  if (responseMinutes !=
-                          null &&
-                      responseMinutes >
-                          0)
+                  if (responseMinutes != null && responseMinutes > 0)
                     _RaProviderFact(
-                      icon: Icons
-                          .schedule_outlined,
-                      value:
-                          '${responseMinutes.ceil()} min response',
+                      icon: Icons.schedule_outlined,
+                      value: '${responseMinutes.ceil()} min response',
                     ),
                 ],
               ),
 
               if (services.isNotEmpty) ...[
-                const SizedBox(
-                  height: 12,
-                ),
+                const SizedBox(height: 12),
 
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: [
-                    for (final service
-                        in services.take(
-                      3,
-                    ))
+                    for (final service in services.take(3))
                       Container(
-                        padding:
-                            const EdgeInsets
-                                .symmetric(
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 5,
                         ),
-                        decoration:
-                            BoxDecoration(
-                          color: colors
-                              .surfaceContainerHighest
-                              .withValues(
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerHighest.withValues(
                             alpha: .45,
                           ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            999,
-                          ),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           service,
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize:
-                                8,
-                            fontWeight:
-                                FontWeight
-                                    .w600,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
 
-                    if (services.length >
-                        3)
+                    if (services.length > 3)
                       Container(
-                        padding:
-                            const EdgeInsets
-                                .symmetric(
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 5,
                         ),
-                        decoration:
-                            BoxDecoration(
-                          color: colors
-                              .surfaceContainerHighest
-                              .withValues(
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerHighest.withValues(
                             alpha: .45,
                           ),
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            999,
-                          ),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           '+${services.length - 3}',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize:
-                                8,
-                            fontWeight:
-                                FontWeight
-                                    .w600,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -1433,50 +896,31 @@ class _RaProviderChoiceCard
               ],
 
               if (stale) ...[
-                const SizedBox(
-                  height: 11,
-                ),
+                const SizedBox(height: 11),
 
                 Container(
-                  padding:
-                      const EdgeInsets.all(
-                    10,
-                  ),
-                  decoration:
-                      BoxDecoration(
-                    color: raGold
-                        .withValues(
-                      alpha: .075,
-                    ),
-                    borderRadius:
-                        BorderRadius
-                            .circular(
-                      14,
-                    ),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: raGold.withValues(alpha: .075),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
                     children: [
                       const Icon(
-                        Icons
-                            .location_searching_rounded,
+                        Icons.location_searching_rounded,
                         size: 17,
                         color: raGold,
                       ),
 
-                      const SizedBox(
-                        width: 7,
-                      ),
+                      const SizedBox(width: 7),
 
                       Expanded(
                         child: Text(
                           'Provider location may be outdated. Confirm their location after connecting.',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize:
-                                8.7,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
                             height: 1.4,
-                            color: colors
-                                .onSurfaceVariant,
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -1492,8 +936,7 @@ class _RaProviderChoiceCard
   }
 }
 
-class _RaProviderBadge
-    extends StatelessWidget {
+class _RaProviderBadge extends StatelessWidget {
   const _RaProviderBadge({
     required this.icon,
     required this.label,
@@ -1506,51 +949,28 @@ class _RaProviderBadge
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final tone =
-        success
-            ? raSuccess
-            : colors.primary;
+    final tone = success ? raSuccess : colors.primary;
 
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: tone.withValues(
-          alpha: .08,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          999,
-        ),
+        color: tone.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
-        mainAxisSize:
-            MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 11,
-            color: tone,
-          ),
+          Icon(icon, size: 11, color: tone),
 
-          const SizedBox(
-            width: 4,
-          ),
+          const SizedBox(width: 4),
 
           Text(
             label,
-            style: GoogleFonts
-                .plusJakartaSans(
-              fontSize: 7.5,
-              fontWeight:
-                  FontWeight.w700,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
               color: tone,
             ),
           ),
@@ -1560,44 +980,28 @@ class _RaProviderBadge
   }
 }
 
-class _RaProviderFact
-    extends StatelessWidget {
-  const _RaProviderFact({
-    required this.icon,
-    required this.value,
-  });
+class _RaProviderFact extends StatelessWidget {
+  const _RaProviderFact({required this.icon, required this.value});
 
   final IconData icon;
   final String value;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Row(
-      mainAxisSize:
-          MainAxisSize.min,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          icon,
-          size: 14,
-          color: colors
-              .onSurfaceVariant,
-        ),
+        Icon(icon, size: 14, color: colors.onSurfaceVariant),
 
-        const SizedBox(
-          width: 4,
-        ),
+        const SizedBox(width: 4),
 
         Text(
           value,
-          style: GoogleFonts
-              .plusJakartaSans(
-            fontSize: 8.3,
-            color: colors
-                .onSurfaceVariant,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            color: colors.onSurfaceVariant,
           ),
         ),
       ],
@@ -1605,98 +1009,60 @@ class _RaProviderFact
   }
 }
 
-class _RaNoProviders
-    extends StatelessWidget {
+class _RaNoProviders extends StatelessWidget {
   const _RaNoProviders();
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        20,
-      ),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(
-                0xFF0D1D2B,
-              )
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : Colors.white,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .45,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
           Container(
             width: 61,
             height: 61,
-            decoration:
-                BoxDecoration(
-              color: colors.primary
-                  .withValues(
-                alpha: .07,
-              ),
-              borderRadius:
-                  BorderRadius
-                      .circular(
-                19,
-              ),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(19),
             ),
             child: Icon(
-              Icons
-                  .person_search_outlined,
-              color:
-                  colors.primary,
+              Icons.person_search_outlined,
+              color: colors.primary,
               size: 29,
             ),
           ),
 
-          const SizedBox(
-            height: 12,
-          ),
+          const SizedBox(height: 12),
 
           Text(
             'No matching provider online right now',
-            textAlign:
-                TextAlign.center,
-            style: GoogleFonts
-                .plusJakartaSans(
-              fontSize: 12,
-              fontWeight:
-                  FontWeight.w700,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
 
-          const SizedBox(
-            height: 5,
-          ),
+          const SizedBox(height: 5),
 
           Text(
             'You can still continue with provider offers. Suitable providers can respond when your request becomes available.',
-            textAlign:
-                TextAlign.center,
-            style: GoogleFonts
-                .plusJakartaSans(
-              fontSize: 9,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
               height: 1.4,
-              color: colors
-                  .onSurfaceVariant,
+              color: colors.onSurfaceVariant,
             ),
           ),
         ],
@@ -1705,46 +1071,31 @@ class _RaNoProviders
   }
 }
 
-class _RaProvidersLoading
-    extends StatelessWidget {
+class _RaProvidersLoading extends StatelessWidget {
   const _RaProvidersLoading();
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        20,
-      ),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color:
-            colors.surface,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: const Column(
         children: [
           CircularProgressIndicator(),
-          SizedBox(
-            height: 12,
-          ),
-          Text(
-            'Finding suitable providers…',
-          ),
+          SizedBox(height: 12),
+          Text('Finding suitable providers…'),
         ],
       ),
     );
   }
 }
 
-class _RaProvidersBottomBar
-    extends StatelessWidget {
+class _RaProvidersBottomBar extends StatelessWidget {
   const _RaProvidersBottomBar({
     required this.selectedProvider,
     required this.onContinue,
@@ -1756,93 +1107,57 @@ class _RaProvidersBottomBar
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        18,
-        8,
-        18,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(
-              alpha: .45,
-            ),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
                 Icon(
-                  selectedProvider ==
-                          null
-                      ? Icons
-                          .compare_arrows_rounded
-                      : Icons
-                          .person_pin_circle_outlined,
+                  selectedProvider == null
+                      ? Icons.compare_arrows_rounded
+                      : Icons.person_pin_circle_outlined,
                   size: 16,
-                  color:
-                      colors.primary,
+                  color: colors.primary,
                 ),
 
-                const SizedBox(
-                  width: 6,
-                ),
+                const SizedBox(width: 6),
 
                 Expanded(
                   child: Text(
-                    selectedProvider ==
-                            null
+                    selectedProvider == null
                         ? 'Receive and compare provider offers'
                         : 'Requesting $selectedProvider',
                     maxLines: 1,
-                    overflow:
-                        TextOverflow
-                            .ellipsis,
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 9,
-                      color: colors
-                          .onSurfaceVariant,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(
-              height: 7,
-            ),
+            const SizedBox(height: 7),
 
             SizedBox(
-              width:
-                  double.infinity,
-              child:
-                  FilledButton.icon(
-                onPressed:
-                    onContinue,
-                icon: const Icon(
-                  Icons
-                      .arrow_forward_rounded,
-                ),
-                label: const Text(
-                  'Review Request',
-                ),
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onContinue,
+                icon: const Icon(Icons.arrow_forward_rounded),
+                label: const Text('Review Request'),
               ),
             ),
           ],

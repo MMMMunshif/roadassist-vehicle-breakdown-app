@@ -183,17 +183,17 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
       year.text.trim(),
     ].where((value) => value.isNotEmpty).join(' ');
 
-    return RaScaffold(
+    return RaDriverScaffold(
       preventLeave: !saved && (dirty || saving || uploadingPhoto),
       leaveMessage: saving || uploadingPhoto
           ? 'Please wait until saving or uploading finishes.'
           : 'You have unsaved vehicle changes. Leave without saving?',
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
+        title: RaDriverAppBarTitle(
           editing ? 'Edit Vehicle' : 'Add Vehicle',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 19,
+            fontSize: 22,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -527,7 +527,7 @@ class _RaVehicleEditorHero extends StatelessWidget {
                   'Accurate vehicle details help make roadside requests faster and clearer.',
                   style: GoogleFonts.plusJakartaSans(
                     color: Colors.white70,
-                    fontSize: 8.4,
+                    fontSize: 12,
                     height: 1.4,
                   ),
                 ),
@@ -556,7 +556,7 @@ class _RaVehicleEditorHeading extends StatelessWidget {
         Text(
           title,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 14.5,
+            fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -564,7 +564,7 @@ class _RaVehicleEditorHeading extends StatelessWidget {
         Text(
           subtitle,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 8.3,
+            fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
           ),
@@ -588,7 +588,7 @@ class _RaVehicleEditorSurface extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
+            ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(

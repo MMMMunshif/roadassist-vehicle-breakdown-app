@@ -51,7 +51,7 @@ class EmergencyScreen extends StatelessWidget {
                           Text(
                             'Emergency contact',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -59,7 +59,7 @@ class EmergencyScreen extends StatelessWidget {
                           Text(
                             'Save a trusted contact for roadside situations.',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 8,
+                              fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
                           ),
@@ -144,8 +144,8 @@ class EmergencyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RaScaffold(
-      appBar: AppBar(title: const Text('Emergency')),
+    return RaDriverScaffold(
+      appBar: AppBar(title: const RaDriverAppBarTitle('Emergency')),
       body: ListView(
         padding: const EdgeInsets.all(18),
         children: [
@@ -153,7 +153,7 @@ class EmergencyScreen extends StatelessWidget {
           const SizedBox(height: 20),
           const Text(
             'Sri Lanka emergency services',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           const Text(
@@ -206,7 +206,7 @@ class EmergencyScreen extends StatelessWidget {
                               Text(
                                 item.$1,
                                 style: const TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -499,7 +499,7 @@ class _RaEmergencyHero extends StatelessWidget {
                       'For immediate danger, contact emergency services before continuing with RoadAssist.',
                       style: GoogleFonts.plusJakartaSans(
                         color: Colors.white70,
-                        fontSize: 8.4,
+                        fontSize: 12,
                         height: 1.4,
                       ),
                     ),

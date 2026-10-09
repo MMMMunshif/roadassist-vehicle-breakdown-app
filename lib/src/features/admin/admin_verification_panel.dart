@@ -29,14 +29,29 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
   };
 
   Future<void> _act(Map<String, dynamic> application, String action) async {
-    final reason = await _adminReason(
-      context,
-      action == 'verified'
-          ? 'Approval reason (visible to provider)'
-          : action == 'pending'
-          ? 'Documents or corrections required'
-          : 'Rejection reason',
-    );
+    ProviderCorrectionDraft? correction;
+    String? reason;
+    if (action == 'pending') {
+      final keys = <String>{
+        'selfie',
+        'nicFront',
+        'nicBack',
+        'serviceProof',
+        ...(application['documents'] as Map? ?? {}).keys.whereType<String>(),
+      }.where(ProviderDocumentCorrection.labels.containsKey).toList();
+      correction = await showDialog<ProviderCorrectionDraft>(
+        context: context,
+        builder: (_) => ProviderCorrectionDialog(documentKeys: keys),
+      );
+      reason = correction?.reason;
+    } else {
+      reason = await _adminReason(
+        context,
+        action == 'verified'
+            ? 'Approval reason (visible to provider)'
+            : 'Rejection reason',
+      );
+    }
 
     if (reason == null || !mounted) {
       return;
@@ -58,6 +73,8 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
         widget.uid,
         verification: action,
         reason: reason,
+        correctionDocuments: correction?.documents,
+        expectedApplicationRevision: correction != null ? revision : null,
         verificationRevision: action == 'verified' ? revision : null,
         validUntil: action == 'verified' ? validUntil : null,
         verificationChecks: action == 'verified' ? checks.toList() : null,
@@ -91,14 +108,15 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
               'Decision saved. The provider can see the updated verification result in the app.';
         });
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
 
       setState(() {
-        message =
-            'Decision could not be saved. Check your admin permission and the current application revision.';
+        message = error is StateError
+            ? error.message
+            : 'Decision could not be saved. Check your admin permission and the current application revision.';
       });
     } finally {
       if (mounted) {
@@ -304,6 +322,27 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('accountModeration')
+                  .doc(widget.uid)
+                  .snapshots(),
+              builder: (context, review) {
+                final request = ProviderDocumentCorrection.active(
+                  application,
+                  review.data?.data(),
+                );
+                if (request == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: InlineMessage(
+                    icon: Icons.pending_actions,
+                    text:
+                        'Waiting for corrected documents: ${request.documents.map((key) => ProviderDocumentCorrection.labels[key]).join(', ')}. Approval is available after resubmission.',
+                  ),
+                );
+              },
+            ),
             _RaAdminVerificationHero(
               revision: revision,
               providerName: application['legalName']?.toString(),
@@ -449,27 +488,30 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
               child: Column(
                 children: [
                   for (final entry in checklist.entries)
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      value: checks.contains(entry.key),
-                      onChanged: busy
-                          ? null
-                          : (selected) {
-                              setState(() {
-                                if (selected == true) {
-                                  checks.add(entry.key);
-                                } else {
-                                  checks.remove(entry.key);
-                                }
-                              });
-                            },
-                      title: Text(
-                        entry.value,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 9.5,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
+                    Material(
+                      color: Colors.transparent,
+                      child: CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        value: checks.contains(entry.key),
+                        onChanged: busy
+                            ? null
+                            : (selected) {
+                                setState(() {
+                                  if (selected == true) {
+                                    checks.add(entry.key);
+                                  } else {
+                                    checks.remove(entry.key);
+                                  }
+                                });
+                              },
+                        title: Text(
+                          entry.value,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -600,18 +642,10 @@ class _RaAdminVerificationHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF0A497F), Color(0xFF075A68)]
-              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
-        ),
+        color: _providerSurface(context),
         borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
@@ -621,12 +655,14 @@ class _RaAdminVerificationHero extends StatelessWidget {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .13),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.verified_user_outlined,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               size: 26,
             ),
           ),
@@ -640,8 +676,8 @@ class _RaAdminVerificationHero extends StatelessWidget {
                 Text(
                   'Provider verification',
                   style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 17,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -.3,
                   ),
@@ -653,8 +689,8 @@ class _RaAdminVerificationHero extends StatelessWidget {
                   Text(
                     providerName!,
                     style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white70,
-                      fontSize: 9,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -664,8 +700,10 @@ class _RaAdminVerificationHero extends StatelessWidget {
                 Text(
                   'Review private identity and service-capability evidence before making a decision.',
                   style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white.withValues(alpha: .72),
-                    fontSize: 8.6,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: .72),
+                    fontSize: 12,
                     height: 1.45,
                   ),
                 ),
@@ -676,14 +714,16 @@ class _RaAdminVerificationHero extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .13),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
               'REV $revision',
               style: GoogleFonts.plusJakartaSans(
-                color: Colors.white,
-                fontSize: 7.5,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
                 fontWeight: FontWeight.w800,
                 letterSpacing: .5,
               ),
@@ -714,7 +754,7 @@ class _RaAdminVerificationHeading extends StatelessWidget {
         Text(
           title,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -722,7 +762,7 @@ class _RaAdminVerificationHeading extends StatelessWidget {
         Text(
           subtitle,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 8.6,
+            fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
           ),
@@ -746,7 +786,7 @@ class _RaAdminVerificationSurface extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
+            ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
@@ -795,7 +835,7 @@ class _RaAdminVerificationNotice extends StatelessWidget {
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -803,7 +843,7 @@ class _RaAdminVerificationNotice extends StatelessWidget {
                 Text(
                   message,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 8.5,
+                    fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
                   ),
@@ -841,7 +881,7 @@ class _RaAdminVerificationChecklistHeader extends StatelessWidget {
               child: Text(
                 'Reviewer checklist',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -849,7 +889,7 @@ class _RaAdminVerificationChecklistHeader extends StatelessWidget {
             Text(
               '$completed/$total',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 9,
+                fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: colors.primary,
               ),
@@ -886,54 +926,58 @@ class _RaAdminVerificationDocument extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
+            ? const Color(0xFF0D2237)
             : colors.surface,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        leading: Container(
-          width: 39,
-          height: 39,
-          decoration: BoxDecoration(
-            color: colors.primary.withValues(alpha: .075),
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.transparent,
+        child: ExpansionTile(
+          leading: Container(
+            width: 39,
+            height: 39,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .075),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.description_outlined,
+              color: colors.primary,
+              size: 19,
+            ),
           ),
-          child: Icon(
-            Icons.description_outlined,
-            color: colors.primary,
-            size: 19,
+          title: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
           ),
+          subtitle: Text(
+            'Private verification evidence',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child:
+                  document is String && (document as String).trim().isNotEmpty
+                  ? _privateDocumentPreview(document as String, 280)
+                  : const _RaAdminVerificationNotice(
+                      icon: Icons.broken_image_outlined,
+                      title: 'Document unavailable',
+                      message:
+                          'The stored verification document could not be displayed.',
+                      tone: raDanger,
+                    ),
+            ),
+          ],
         ),
-        title: Text(
-          label,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 9.7,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        subtitle: Text(
-          'Private verification evidence',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 7.8,
-            color: colors.onSurfaceVariant,
-          ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: document is String && (document as String).trim().isNotEmpty
-                ? _privateDocumentPreview(document as String, 280)
-                : const _RaAdminVerificationNotice(
-                    icon: Icons.broken_image_outlined,
-                    title: 'Document unavailable',
-                    message:
-                        'The stored verification document could not be displayed.',
-                    tone: raDanger,
-                  ),
-          ),
-        ],
       ),
     );
   }
@@ -960,7 +1004,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
                 Text(
                   label,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 7.8,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurfaceVariant,
                   ),
@@ -969,7 +1013,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
                 Text(
                   value,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.3,
+                    fontSize: 12,
                     height: 1.45,
                     fontWeight: FontWeight.w600,
                   ),
@@ -986,7 +1030,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
                 child: Text(
                   label,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 8,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurfaceVariant,
                   ),
@@ -997,7 +1041,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
                 child: Text(
                   value,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 9.4,
+                    fontSize: 12,
                     height: 1.45,
                     fontWeight: FontWeight.w600,
                   ),

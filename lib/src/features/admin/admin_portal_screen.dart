@@ -201,7 +201,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return RaScaffold(
+    return RaAdminScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
@@ -214,7 +214,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
                 padding: const EdgeInsets.all(25),
                 decoration: BoxDecoration(
                   color: theme.brightness == Brightness.dark
-                      ? const Color(0xFF0D1D2B)
+                      ? const Color(0xFF0D2237)
                       : colors.surface,
                   borderRadius: BorderRadius.circular(26),
                   border: Border.all(
@@ -242,7 +242,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
                       'Checking admin access',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -.4,
                       ),
@@ -252,7 +252,7 @@ class _RaAdminAccessLoading extends StatelessWidget {
                       'Confirming the signed-in account and its current RoadAssist administration permissions.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 9.5,
+                        fontSize: 12,
                         height: 1.5,
                         color: colors.onSurfaceVariant,
                       ),
@@ -302,7 +302,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return RaScaffold(
+    return RaAdminScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
@@ -340,7 +340,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                                 Text(
                                   'PRIVATE ADMINISTRATION',
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 7.5,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: .75,
                                     color: colors.onSurfaceVariant,
@@ -385,7 +385,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                               'Admin workspace',
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.white,
-                                fontSize: 23,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -.6,
                               ),
@@ -395,7 +395,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                               'Restricted access for verified RoadAssist administrators. Permissions are granted separately by the project owner.',
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.white.withValues(alpha: .75),
-                                fontSize: 9.5,
+                                fontSize: 12,
                                 height: 1.5,
                               ),
                             ),
@@ -407,7 +407,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
                           color: theme.brightness == Brightness.dark
-                              ? const Color(0xFF0D1D2B)
+                              ? const Color(0xFF0D2237)
                               : colors.surface,
                           borderRadius: BorderRadius.circular(22),
                           border: Border.all(
@@ -420,7 +420,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                             Text(
                               'Sign in',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 16,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -428,7 +428,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                             Text(
                               'Use an existing verified account with active admin permission.',
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 8.8,
+                                fontSize: 12,
                                 height: 1.4,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -527,7 +527,7 @@ class _RaAdminLoginScreen extends StatelessWidget {
                               'There is no public admin registration.',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 8,
+                                fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
@@ -570,7 +570,7 @@ class _RaAdminLoginNotice extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.plusJakartaSans(fontSize: 8.8, height: 1.45),
+              style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.45),
             ),
           ),
         ],

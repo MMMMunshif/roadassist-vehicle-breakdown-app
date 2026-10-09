@@ -136,7 +136,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return RaScaffold(
+    return RaAdminScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
@@ -363,7 +363,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
                           Text(
                             'SERVICES',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
                               letterSpacing: .65,
                               color: Theme.of(
@@ -377,7 +377,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
                                 ? 'No services recorded.'
                                 : services.join(', '),
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
+                              fontSize: 15,
                               height: 1.45,
                             ),
                           ),
@@ -398,7 +398,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
                           Text(
                             'Private provider approval should be completed using the verification application and reviewer checklist below.',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
+                              fontSize: 14,
                               height: 1.4,
                               color: Theme.of(
                                 context,
@@ -477,18 +477,13 @@ class _AdminAccountHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF0A497F), Color(0xFF075A68)]
-              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
-        ),
+        color: _providerSurface(context),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
         borderRadius: BorderRadius.circular(23),
       ),
       child: Row(
@@ -504,8 +499,8 @@ class _AdminAccountHero extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 17,
+                    color: colors.onSurface,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -515,8 +510,8 @@ class _AdminAccountHero extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white70,
-                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -554,7 +549,7 @@ class _AdminAccountHeading extends StatelessWidget {
         Text(
           title,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 14.5,
+            fontSize: 15,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -562,7 +557,7 @@ class _AdminAccountHeading extends StatelessWidget {
         Text(
           subtitle,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
+            fontSize: 14,
             height: 1.4,
             color: colors.onSurfaceVariant,
           ),
@@ -586,7 +581,7 @@ class _AdminAccountSurface extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
+            ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
@@ -617,7 +612,7 @@ class _AdminAccountRow extends StatelessWidget {
             child: Text(
               label,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
+                fontSize: 14,
                 color: colors.onSurfaceVariant,
               ),
             ),
@@ -628,7 +623,7 @@ class _AdminAccountRow extends StatelessWidget {
               value,
               textAlign: TextAlign.right,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -676,7 +671,7 @@ class _AdminAccountNotice extends StatelessWidget {
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -684,7 +679,7 @@ class _AdminAccountNotice extends StatelessWidget {
                 Text(
                   message,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
+                    fontSize: 14,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
                   ),
@@ -731,7 +726,7 @@ class _AdminAccountDangerZone extends StatelessWidget {
                 child: Text(
                   'Permanent account deletion',
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: colors.error,
                   ),
@@ -742,7 +737,7 @@ class _AdminAccountDangerZone extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Login, profile, vehicles, device tokens and verification documents are removed. Job, payment, complaint and audit records remain. Active jobs, unconfirmed payments and unresolved complaints block deletion.',
-            style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.45),
+            style: GoogleFonts.plusJakartaSans(fontSize: 14, height: 1.45),
           ),
           const SizedBox(height: 13),
           OutlinedButton.icon(

@@ -645,3 +645,88 @@ test('withdrawn application never grants provider permissions even with stale ve
   const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
   await assertFails(setDoc(doc(db,'requests/r1/quotes/provider'),offer()));
 });
+
+async function seedCompletion() {
+  await env.withSecurityRulesDisabled(async c => {
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',providerId:'provider',completionState:'pending',
+      estimatedCost:1500,finalCost:1500,serviceNotes:'Repair complete and checked',servicePhotoData:['photo']});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+}
+function discountRequest(db, total=1200) {
+  const batch=writeBatch(db);
+  batch.set(doc(db,'requests/r1/completionDiscounts/d1'),{driverId:'driver',providerId:'provider',previousTotal:1500,
+    requestedTotal:total,reason:'Please agree to this cash discount.',status:'pending',createdAt:serverTimestamp()});
+  batch.update(doc(db,'requests/r1'),{pendingDiscountId:'d1',updatedAt:serverTimestamp()});
+  return batch.commit();
+}
+function discountAnswer(db, accept=true) {
+  const batch=writeBatch(db);
+  batch.update(doc(db,'requests/r1/completionDiscounts/d1'),{status:accept?'accepted':'declined',decidedBy:'provider',decidedAt:serverTimestamp()});
+  batch.update(doc(db,'requests/r1'),{pendingDiscountId:null,finalCost:accept?1200:1500,updatedAt:serverTimestamp()});
+  return batch.commit();
+}
+test('discount is mutually agreed, cannot increase price and keeps an immutable record',async()=>{
+  await seedCompletion();
+  const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertFails(discountRequest(provider));
+  await assertFails(discountRequest(driver,1800));
+  await assertSucceeds(discountRequest(driver));
+  await assertFails(discountAnswer(driver));
+  await assertFails(updateDoc(doc(provider,'requests/r1'),{finalCost:1200,pendingDiscountId:null,updatedAt:serverTimestamp()}));
+  const close=writeBatch(driver);
+  close.update(doc(driver,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  close.update(doc(driver,'providerDirectory/provider'),{activeRequestId:null});
+  await assertFails(close.commit());
+  await assertSucceeds(discountAnswer(provider));
+  await assertFails(updateDoc(doc(provider,'requests/r1/completionDiscounts/d1'),{requestedTotal:1300}));
+  await assertFails(updateDoc(doc(provider,'requests/r1'),{finalCost:1700,updatedAt:serverTimestamp()}));
+  const complete=writeBatch(driver);
+  complete.update(doc(driver,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  complete.update(doc(driver,'providerDirectory/provider'),{activeRequestId:null});
+  await assertSucceeds(complete.commit());
+});
+test('declining a discount preserves the original final price',async()=>{
+  await seedCompletion();
+  const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await discountRequest(driver);
+  await assertSucceeds(discountAnswer(provider,false));
+  if((await getDoc(doc(driver,'requests/r1'))).data().finalCost!==1500) throw new Error('Price changed on decline');
+});
+test('completed report is validated and locked after submission',async()=>{
+  await seedCompletion();
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{completionState:''}));
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const report={problem:'The tyre valve was leaking',repairs:'Replaced valve and checked pressure',parts:'1 tyre valve',advice:'Recheck pressure tomorrow'};
+  const submit={completionState:'pending',finalCost:1500,completionSubmittedAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertFails(updateDoc(doc(provider,'requests/r1'),{...submit,completionReport:{...report,problem:''}}));
+  await assertSucceeds(updateDoc(doc(provider,'requests/r1'),{...submit,completionReport:report}));
+  await assertFails(updateDoc(doc(provider,'requests/r1'),{completionReport:{...report,parts:'Something else'},updatedAt:serverTimestamp()}));
+});
+
+
+test('selective corrections bind revision and lock unselected fields and documents', async () => {
+  const admin = administrator();
+  const request = {revision:1,documents:['selfie','nicBack'],requestedAt:serverTimestamp()};
+  await assertFails(accountAction(admin,'provider',{verification:'pending',correctionRequest:{...request,revision:99}},'stale-correction'));
+  await assertFails(accountAction(admin,'provider',{verification:'pending',correctionRequest:{...request,documents:['unknown']}},'unknown-correction'));
+  await assertSucceeds(accountAction(admin,'provider',{verification:'pending',correctionRequest:request},'selective-correction'));
+  await assertFails(accountAction(admin,'provider',{verification:'verified',correctionRequest:request},'early-approval'));
+  const provider = env.authenticatedContext('provider',providerToken).firestore();
+  const saved = (await getDoc(doc(provider,'providerApplications/provider'))).data();
+  const corrected = {...saved, revision:2,submittedAt:serverTimestamp(),documents:{...saved.documents,selfie:'new-valid-face-photo-contents-longer-than-twenty',nicBack:'new-valid-back-photo-contents-longer-than-twenty'}};
+  await assertFails(setDoc(doc(provider,'providerApplications/provider'),{...corrected,legalName:'Tampered Name'}));
+  await assertFails(setDoc(doc(provider,'providerApplications/provider'),{...corrected,documents:{...corrected.documents,nicFront:'tampered-front-photo-contents-longer-than-twenty'}}));
+  await assertFails(setDoc(doc(provider,'providerApplications/provider'),{...corrected,documents:{...corrected.documents,selfie:saved.documents.selfie}}));
+  await assertSucceeds(setDoc(doc(provider,'providerApplications/provider'),corrected));
+  await assertFails(setDoc(doc(provider,'providerApplications/provider'),{...corrected,revision:3}));
+  const before=(await getDoc(doc(admin,'accountModeration/provider'))).data();
+  const after={...before,verification:'verified',verificationRevision:2,reason:'Corrected identity documents have been reviewed.',updatedBy:'admin',updatedAt:serverTimestamp(),lastAuditId:'after-correction'};
+  delete after.correctionRequest;
+  const batch=writeBatch(admin);
+  batch.set(doc(admin,'accountModeration/provider'),after);
+  batch.set(doc(admin,'adminAudit/after-correction'),{kind:'account',target:'provider',actor:'admin',reason:after.reason,before,after,createdAt:serverTimestamp()});
+  await assertSucceeds(batch.commit());
+});

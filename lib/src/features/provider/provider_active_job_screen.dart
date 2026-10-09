@@ -15,8 +15,7 @@ class ProviderActiveJobScreen extends StatefulWidget {
       _ProviderActiveJobScreenState();
 }
 
-class _ProviderActiveJobScreenState
-    extends State<ProviderActiveJobScreen> {
+class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   static const backendStatuses = [
     'accepted',
     'en_route',
@@ -24,12 +23,7 @@ class _ProviderActiveJobScreenState
     'completed',
   ];
 
-  static const statuses = [
-    'Accepted',
-    'En Route',
-    'Arrived',
-    'Completed',
-  ];
+  static const statuses = ['Accepted', 'En Route', 'Arrived', 'Completed'];
 
   int status = 0;
 
@@ -38,10 +32,9 @@ class _ProviderActiveJobScreenState
   StreamSubscription<Position>? locationSubscription;
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      requestSubscription;
+  requestSubscription;
 
-  final serviceNotesController =
-      TextEditingController();
+  final serviceNotesController = TextEditingController();
 
   List<String> servicePhotos = [];
 
@@ -52,6 +45,7 @@ class _ProviderActiveJobScreenState
 
   int routeRequestVersion = 0;
 
+  Map<String, dynamic>? completionReportDraft;
   bool updatingStatus = false;
   bool savingDocumentation = false;
   bool requestCancelled = false;
@@ -60,144 +54,95 @@ class _ProviderActiveJobScreenState
   void initState() {
     super.initState();
 
-    requestData =
-        Map<String, dynamic>.from(
-      widget.requestData,
-    );
+    requestData = Map<String, dynamic>.from(widget.requestData);
 
     status = backendStatuses.indexOf(
-      requestData['status']
-              as String? ??
-          'accepted',
+      requestData['status'] as String? ?? 'accepted',
     );
 
     if (status < 0) {
       status = 0;
     }
 
-    requestCancelled =
-        requestData['status'] ==
-            'cancelled';
+    requestCancelled = requestData['status'] == 'cancelled';
 
-    serviceNotesController.text =
-        requestData['serviceNotes']
-                as String? ??
-            '';
+    serviceNotesController.text = requestData['serviceNotes'] as String? ?? '';
 
     servicePhotos =
-        (requestData['servicePhotoData']
-                    as List<dynamic>? ??
-                const [])
+        (requestData['servicePhotoData'] as List<dynamic>? ?? const [])
             .whereType<String>()
             .toList();
 
-    final requestId =
-        widget.requestId;
+    final requestId = widget.requestId;
 
     if (requestId != null) {
-      requestSubscription =
-          RequestService()
-              .watchRequest(
-        requestId,
-      )
-              .listen(
-        _handleRequestUpdate,
-        onError: (_) {
-          if (!mounted) return;
+      requestSubscription = RequestService()
+          .watchRequest(requestId)
+          .listen(
+            _handleRequestUpdate,
+            onError: (_) {
+              if (!mounted) return;
 
-          setState(() {
-            locationMessage =
-                'Unable to receive live request updates.';
-          });
-        },
-      );
+              setState(() {
+                locationMessage = 'Unable to receive live request updates.';
+              });
+            },
+          );
 
-      unawaited(
-        startLocationSharing(),
-      );
+      unawaited(startLocationSharing());
     }
   }
 
   @override
   void dispose() {
-    locationSubscription
-        ?.cancel();
+    locationSubscription?.cancel();
 
-    requestSubscription
-        ?.cancel();
+    requestSubscription?.cancel();
 
-    serviceNotesController
-        .dispose();
+    serviceNotesController.dispose();
 
     super.dispose();
   }
 
-  void _handleRequestUpdate(
-    DocumentSnapshot<Map<String, dynamic>>
-        snapshot,
-  ) {
-    final data =
-        snapshot.data();
+  void _handleRequestUpdate(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data();
 
-    if (!mounted ||
-        data == null) {
+    if (!mounted || data == null) {
       return;
     }
 
-    final nextStatus =
-        backendStatuses.indexOf(
-      data['status']
-              as String? ??
-          '',
-    );
+    final nextStatus = backendStatuses.indexOf(data['status'] as String? ?? '');
 
     setState(() {
       requestData = data;
 
-      requestCancelled =
-          data['status'] ==
-              'cancelled';
+      requestCancelled = data['status'] == 'cancelled';
 
       if (nextStatus >= 0) {
         status = nextStatus;
       }
 
-      servicePhotos =
-          (data['servicePhotoData']
-                      as List<dynamic>? ??
-                  const [])
-              .whereType<String>()
-              .toList();
+      servicePhotos = (data['servicePhotoData'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList();
 
-      final notes =
-          data['serviceNotes']
-                  as String? ??
-              '';
+      final notes = data['serviceNotes'] as String? ?? '';
 
-      if (!serviceNotesController
-          .text
-          .trim()
-          .isNotEmpty) {
-        serviceNotesController.text =
-            notes;
+      if (!serviceNotesController.text.trim().isNotEmpty) {
+        serviceNotesController.text = notes;
       }
     });
   }
 
   Future<void> startLocationSharing() async {
-    final requestId =
-        widget.requestId;
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        requestCancelled ||
-        status >= 3) {
+    if (requestId == null || requestCancelled || status >= 3) {
       return;
     }
 
     try {
-      final enabled =
-          await Geolocator
-              .isLocationServiceEnabled();
+      final enabled = await Geolocator.isLocationServiceEnabled();
 
       if (!enabled) {
         if (!mounted) return;
@@ -210,23 +155,14 @@ class _ProviderActiveJobScreenState
         return;
       }
 
-      var permission =
-          await Geolocator
-              .checkPermission();
+      var permission = await Geolocator.checkPermission();
 
-      if (permission ==
-          LocationPermission.denied) {
-        permission =
-            await Geolocator
-                .requestPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
 
-      if (permission ==
-              LocationPermission
-                  .denied ||
-          permission ==
-              LocationPermission
-                  .deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         if (!mounted) return;
 
         setState(() {
@@ -237,107 +173,71 @@ class _ProviderActiveJobScreenState
         return;
       }
 
-      await locationSubscription
-          ?.cancel();
+      await locationSubscription?.cancel();
 
       locationSubscription =
-          Geolocator
-              .getPositionStream(
-        locationSettings:
-            const LocationSettings(
-          accuracy:
-              LocationAccuracy.high,
-          distanceFilter: 25,
-        ),
-      ).listen(
-        (position) {
-          final point =
-              LatLng(
-            position.latitude,
-            position.longitude,
-          );
-
-          if (mounted) {
-            setState(() {
-              currentProviderPosition =
-                  point;
-
-              locationMessage =
-                  null;
-            });
-          }
-
-          unawaited(
-            RequestService()
-                .updateProviderLocation(
-              requestId,
-              latitude:
-                  position.latitude,
-              longitude:
-                  position.longitude,
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 25,
             ),
-          );
+          ).listen(
+            (position) {
+              final point = LatLng(position.latitude, position.longitude);
 
-          unawaited(
-            refreshProviderRoute(
-              point,
-            ),
-          );
-        },
-        onError: (_) {
-          if (!mounted) return;
+              if (mounted) {
+                setState(() {
+                  currentProviderPosition = point;
 
-          setState(() {
-            locationMessage =
-                'Live location sharing stopped.';
-          });
-        },
-      );
+                  locationMessage = null;
+                });
+              }
+
+              unawaited(
+                RequestService().updateProviderLocation(
+                  requestId,
+                  latitude: position.latitude,
+                  longitude: position.longitude,
+                ),
+              );
+
+              unawaited(refreshProviderRoute(point));
+            },
+            onError: (_) {
+              if (!mounted) return;
+
+              setState(() {
+                locationMessage = 'Live location sharing stopped.';
+              });
+            },
+          );
     } catch (_) {
       if (!mounted) return;
 
       setState(() {
-        locationMessage =
-            'Unable to start live location sharing.';
+        locationMessage = 'Unable to start live location sharing.';
       });
     }
   }
 
-  Future<void> refreshProviderRoute(
-    LatLng origin,
-  ) async {
-    final latitude =
-        (requestData['latitude']
-                as num?)
-            ?.toDouble();
+  Future<void> refreshProviderRoute(LatLng origin) async {
+    final latitude = (requestData['latitude'] as num?)?.toDouble();
 
-    final longitude =
-        (requestData['longitude']
-                as num?)
-            ?.toDouble();
+    final longitude = (requestData['longitude'] as num?)?.toDouble();
 
-    if (latitude == null ||
-        longitude == null) {
+    if (latitude == null || longitude == null) {
       return;
     }
 
-    final version =
-        ++routeRequestVersion;
+    final version = ++routeRequestVersion;
 
     try {
-      final result =
-          await const RouteService()
-              .fetchDrivingRoute(
+      final result = await const RouteService().fetchDrivingRoute(
         origin: origin,
-        destination: LatLng(
-          latitude,
-          longitude,
-        ),
+        destination: LatLng(latitude, longitude),
       );
 
-      if (!mounted ||
-          version !=
-              routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
@@ -345,36 +245,29 @@ class _ProviderActiveJobScreenState
         roadRoute = result;
       });
     } catch (_) {
-      if (!mounted ||
-          version !=
-              routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
       setState(() {
-        locationMessage =
-            'Road route and ETA are temporarily unavailable.';
+        locationMessage = 'Road route and ETA are temporarily unavailable.';
       });
     }
   }
 
   Future<void> withdraw() async {
-    final requestId =
-        widget.requestId;
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        updatingStatus) {
+    if (requestId == null || updatingStatus) {
       return;
     }
 
-    final reason =
-        await _adminReason(
+    final reason = await _adminReason(
       context,
       'Why can you no longer attend this job?',
     );
 
-    if (reason == null ||
-        !mounted) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -383,29 +276,17 @@ class _ProviderActiveJobScreenState
     });
 
     try {
-      await RequestService()
-          .withdrawProvider(
-        requestId,
-        reason,
-      );
+      await RequestService().withdrawProvider(requestId, reason);
 
       if (!mounted) return;
 
-      replace(
-        context,
-        const ProviderShell(),
-      );
+      replace(context, const ProviderShell());
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            '$error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -415,43 +296,29 @@ class _ProviderActiveJobScreenState
     }
   }
 
-  Future<void>
-      addDocumentationPhoto() async {
-    final requestId =
-        widget.requestId;
+  Future<void> addDocumentationPhoto() async {
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        savingDocumentation ||
-        servicePhotos.length >= 3) {
+    if (requestId == null || savingDocumentation || servicePhotos.length >= 3) {
       return;
     }
 
-    final source =
-        await showModalBottomSheet<
-            ImageSource>(
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
       useSafeArea: true,
-      builder: (
-        sheetContext,
-      ) {
+      builder: (sheetContext) {
         return const SafeArea(
           child: Wrap(
             children: [
               _PhotoSourceTile(
-                icon: Icons
-                    .camera_alt_outlined,
-                label:
-                    'Take a photo',
-                source:
-                    ImageSource.camera,
+                icon: Icons.camera_alt_outlined,
+                label: 'Take a photo',
+                source: ImageSource.camera,
               ),
               _PhotoSourceTile(
-                icon: Icons
-                    .photo_library_outlined,
-                label:
-                    'Choose from gallery',
-                source:
-                    ImageSource.gallery,
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                source: ImageSource.gallery,
               ),
             ],
           ),
@@ -459,249 +326,174 @@ class _ProviderActiveJobScreenState
       },
     );
 
-    if (source == null ||
-        !mounted) {
+    if (source == null || !mounted) {
       return;
     }
 
-    final navigator =
-        Navigator.of(context);
+    final navigator = Navigator.of(context);
 
-    final photo =
-        source == ImageSource.camera
-            ? await navigator
-                .push<XFile>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const CameraCaptureScreen(),
-                ),
-              )
-            : await ImagePicker()
-                .pickImage(
-                source:
-                    ImageSource.gallery,
-                imageQuality: 70,
-                maxWidth: 1200,
-              );
+    final photo = source == ImageSource.camera
+        ? await navigator.push<XFile>(
+            MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+          )
+        : await ImagePicker().pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 70,
+            maxWidth: 1200,
+          );
 
-    if (photo == null ||
-        !mounted) {
+    if (photo == null || !mounted) {
       return;
     }
 
     setState(() {
-      savingDocumentation =
-          true;
+      savingDocumentation = true;
     });
 
     try {
-      final encoded =
-          await PhotoUploadService()
-              .prepareVehiclePhoto(
-        photo,
-      );
+      final encoded = await PhotoUploadService().prepareVehiclePhoto(photo);
 
-      final updated = [
-        ...servicePhotos,
-        encoded,
-      ];
+      final updated = [...servicePhotos, encoded];
 
-      await RequestService()
-          .updateProviderDocumentation(
+      await RequestService().updateProviderDocumentation(
         requestId,
-        serviceNotes:
-            serviceNotesController
-                .text
-                .trim(),
-        servicePhotoData:
-            updated,
+        serviceNotes: serviceNotesController.text.trim(),
+        servicePhotoData: updated,
       );
 
       if (!mounted) return;
 
       setState(() {
-        servicePhotos =
-            updated;
+        servicePhotos = updated;
       });
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to add documentation: $error',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add documentation: $error')),
       );
     } finally {
       if (mounted) {
         setState(() {
-          savingDocumentation =
-              false;
+          savingDocumentation = false;
         });
       }
     }
   }
 
-  Future<void>
-      removeDocumentationPhoto(
-    int index,
-  ) async {
-    final requestId =
-        widget.requestId;
+  Future<void> removeDocumentationPhoto(int index) async {
+    final requestId = widget.requestId;
 
     if (requestId == null ||
         savingDocumentation ||
         index < 0 ||
-        index >=
-            servicePhotos.length) {
+        index >= servicePhotos.length) {
       return;
     }
 
-    final previous = [
-      ...servicePhotos,
-    ];
+    final previous = [...servicePhotos];
 
-    final updated = [
-      ...servicePhotos,
-    ]..removeAt(index);
+    final updated = [...servicePhotos]..removeAt(index);
 
     setState(() {
-      servicePhotos =
-          updated;
+      servicePhotos = updated;
 
-      savingDocumentation =
-          true;
+      savingDocumentation = true;
     });
 
     try {
-      await RequestService()
-          .updateProviderDocumentation(
+      await RequestService().updateProviderDocumentation(
         requestId,
-        serviceNotes:
-            serviceNotesController
-                .text
-                .trim(),
-        servicePhotoData:
-            updated,
+        serviceNotes: serviceNotesController.text.trim(),
+        servicePhotoData: updated,
       );
     } catch (_) {
       if (!mounted) return;
 
       setState(() {
-        servicePhotos =
-            previous;
+        servicePhotos = previous;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to remove the photo.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to remove the photo.')),
       );
     } finally {
       if (mounted) {
         setState(() {
-          savingDocumentation =
-              false;
+          savingDocumentation = false;
         });
       }
     }
   }
 
-  Future<void>
-      saveDocumentation() async {
-    final requestId =
-        widget.requestId;
+  Future<void> saveDocumentation() async {
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        savingDocumentation) {
+    if (requestId == null || savingDocumentation) {
       return;
     }
 
     setState(() {
-      savingDocumentation =
-          true;
+      savingDocumentation = true;
     });
 
     try {
-      await RequestService()
-          .updateProviderDocumentation(
+      await RequestService().updateProviderDocumentation(
         requestId,
-        serviceNotes:
-            serviceNotesController
-                .text
-                .trim(),
-        servicePhotoData:
-            servicePhotos,
+        serviceNotes: serviceNotesController.text.trim(),
+        servicePhotoData: servicePhotos,
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Service documentation saved.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Service documentation saved.')),
       );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to save documentation: $error',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save documentation: $error')),
       );
     } finally {
       if (mounted) {
         setState(() {
-          savingDocumentation =
-              false;
+          savingDocumentation = false;
         });
       }
     }
   }
 
-  Future<void>
-      advanceStatus() async {
-    final requestId =
-        widget.requestId;
+  Future<void> advanceStatus() async {
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        updatingStatus ||
-        requestCancelled) {
+    if (requestId == null || updatingStatus || requestCancelled) {
       return;
     }
 
     if (status == 3) {
       replace(
         context,
-        ProviderCompletedScreen(
-          requestId: requestId,
-          requestData:
-              requestData,
-        ),
+        ProviderCompletedScreen(requestId: requestId, requestData: requestData),
       );
 
       return;
     }
 
     int? finalCost;
+    CompletionReport? report;
 
     if (status == 2) {
-      finalCost =
-          await requestFinalCost();
+      report = await requestCompletionReport(context, {
+        ...requestData,
+        if (completionReportDraft != null)
+          'completionReport': completionReportDraft,
+      });
+      if (report == null || !mounted) return;
+      completionReportDraft = report.toMap();
+      finalCost = await requestFinalCost();
 
-      if (finalCost == null ||
-          !mounted) {
+      if (finalCost == null || !mounted) {
         return;
       }
     }
@@ -712,27 +504,21 @@ class _ProviderActiveJobScreenState
 
     try {
       if (status == 2) {
-        await RequestService()
-            .updateProviderDocumentation(
+        await RequestService().updateProviderDocumentation(
           requestId,
-          serviceNotes:
-              serviceNotesController
-                  .text
-                  .trim(),
-          servicePhotoData:
-              servicePhotos,
+          serviceNotes: serviceNotesController.text.trim(),
+          servicePhotoData: servicePhotos,
         );
 
-        await RequestService()
-            .completeProviderJob(
+        await RequestService().completeProviderJob(
           requestId,
           finalCost!,
+          report: report!,
         );
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               'Completion submitted. Waiting for driver confirmation.',
@@ -743,23 +529,16 @@ class _ProviderActiveJobScreenState
         return;
       }
 
-      await RequestService()
-          .advanceProviderStatus(
+      await RequestService().advanceProviderStatus(
         requestId,
-        backendStatuses[
-            status + 1],
+        backendStatuses[status + 1],
       );
 
       try {
-        await RequestService()
-            .updateProviderDocumentation(
+        await RequestService().updateProviderDocumentation(
           requestId,
-          serviceNotes:
-              serviceNotesController
-                  .text
-                  .trim(),
-          servicePhotoData:
-              servicePhotos,
+          serviceNotes: serviceNotesController.text.trim(),
+          servicePhotoData: servicePhotos,
         );
       } catch (_) {
         // Optional notes save must not block workflow progression.
@@ -767,8 +546,7 @@ class _ProviderActiveJobScreenState
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Unable to update job status: ${error.toString().replaceFirst('Exception: ', '')}',
@@ -784,101 +562,51 @@ class _ProviderActiveJobScreenState
     }
   }
 
-  Future<int?>
-      requestFinalCost() async {
-    final approved =
-        (requestData[
-                    'estimatedCost']
-                as num?)
-            ?.toInt() ??
-        0;
+  Future<int?> requestFinalCost() async {
+    final approved = (requestData['estimatedCost'] as num?)?.toInt() ?? 0;
 
-    final protected =
-        requestData[
-                'workflowVersion'] ==
-            2;
+    final protected = requestData['workflowVersion'] == 2;
 
-    final controller =
-        TextEditingController(
-      text: '$approved',
-    );
+    final controller = TextEditingController(text: '$approved');
 
-    final value =
-        await showDialog<int>(
+    final value = await showDialog<int>(
       context: context,
-      builder: (
-        dialogContext,
-      ) {
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (
-            context,
-            refresh,
-          ) {
-            final amount =
-                int.tryParse(
-              controller.text
-                  .trim(),
-            );
+          builder: (context, refresh) {
+            final amount = int.tryParse(controller.text.trim());
 
-            final changed =
-                protected &&
-                    amount !=
-                        approved;
+            final changed = protected && amount != approved;
 
             return AlertDialog(
-              icon: const Icon(
-                Icons
-                    .receipt_long_outlined,
-              ),
-              title: const Text(
-                'Confirm final charge',
-              ),
+              icon: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Confirm final charge'),
               content: Column(
-                mainAxisSize:
-                    MainAxisSize.min,
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .stretch,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Driver-approved total: Rs. $approved',
-                  ),
+                  Text('Driver-approved total: Rs. $approved'),
 
-                  const SizedBox(
-                    height: 12,
-                  ),
+                  const SizedBox(height: 12),
 
                   TextField(
-                    controller:
-                        controller,
+                    controller: controller,
                     autofocus: true,
-                    keyboardType:
-                        TextInputType
-                            .number,
+                    keyboardType: TextInputType.number,
                     inputFormatters: [
-                      FilteringTextInputFormatter
-                          .digitsOnly,
-                      LengthLimitingTextInputFormatter(
-                        8,
-                      ),
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(8),
                     ],
-                    onChanged:
-                        (_) {
-                      refresh(
-                        () {},
-                      );
+                    onChanged: (_) {
+                      refresh(() {});
                     },
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Final amount (Rs.)',
+                    decoration: const InputDecoration(
+                      labelText: 'Final amount (Rs.)',
                     ),
                   ),
 
                   if (changed) ...[
-                    const SizedBox(
-                      height: 10,
-                    ),
+                    const SizedBox(height: 10),
                     const Text(
                       'A changed total requires driver approval before completion.',
                     ),
@@ -888,36 +616,18 @@ class _ProviderActiveJobScreenState
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(
-                      dialogContext,
-                    );
+                    Navigator.pop(dialogContext);
                   },
-                  child:
-                      const Text(
-                    'Cancel',
-                  ),
+                  child: const Text('Cancel'),
                 ),
 
                 FilledButton(
-                  onPressed:
-                      amount ==
-                                  null ||
-                              amount <
-                                  0 ||
-                              amount >
-                                  10000000
-                          ? null
-                          : () {
-                              Navigator.pop(
-                                dialogContext,
-                                amount,
-                              );
-                            },
-                  child: Text(
-                    changed
-                        ? 'Request Approval'
-                        : 'Continue',
-                  ),
+                  onPressed: amount == null || amount < 0 || amount > 10000000
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext, amount);
+                        },
+                  child: Text(changed ? 'Request Approval' : 'Continue'),
                 ),
               ],
             );
@@ -928,41 +638,27 @@ class _ProviderActiveJobScreenState
 
     controller.dispose();
 
-    if (value == null ||
-        !mounted) {
+    if (value == null || !mounted) {
       return null;
     }
 
-    if (protected &&
-        value != approved) {
-      final quote =
-          await requestProviderQuote(
-        context,
-        {
-          ...requestData,
-          'repairRevision':
-              true,
-          'proposedTotal':
-              value,
-        },
-      );
+    if (protected && value != approved) {
+      final quote = await requestProviderQuote(context, {
+        ...requestData,
+        'repairRevision': true,
+        'proposedTotal': value,
+      });
 
-      if (quote == null ||
-          !mounted) {
+      if (quote == null || !mounted) {
         return null;
       }
 
       try {
-        await RequestService()
-            .proposeRepair(
-          widget.requestId!,
-          quote,
-        );
+        await RequestService().proposeRepair(widget.requestId!, quote);
 
         if (!mounted) return null;
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               'Price revision sent. Wait for driver approval before completing the job.',
@@ -972,13 +668,8 @@ class _ProviderActiveJobScreenState
       } catch (_) {
         if (!mounted) return null;
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Unable to send the revised price.',
-            ),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to send the revised price.')),
         );
       }
 
@@ -993,169 +684,103 @@ class _ProviderActiveJobScreenState
       return 'Job cancelled';
     }
 
-    if (requestData[
-            'completionState'] ==
-        'pending') {
+    if (requestData['completionState'] == 'pending') {
       return 'Waiting for driver confirmation';
     }
 
     return switch (status) {
-      0 =>
-        'Job accepted',
-      1 =>
-        'Travelling to driver',
-      2 =>
-        'Arrived at breakdown',
-      _ =>
-        'Job completed',
+      0 => 'Job accepted',
+      1 => 'Travelling to driver',
+      2 => 'Arrived at breakdown',
+      _ => 'Job completed',
     };
   }
 
   String _statusDescription() {
     if (requestCancelled) {
-      return requestData[
-                  'cancellationReason']
-              as String? ??
+      return requestData['cancellationReason'] as String? ??
           'This roadside assistance job is no longer active.';
     }
 
-    if (requestData[
-            'completionState'] ==
-        'pending') {
+    if (requestData['completionState'] == 'pending') {
       return 'The completion has been submitted. The driver must review and confirm the work.';
     }
 
     return switch (status) {
-      0 =>
-        'Review the request and start travelling when you are ready.',
+      0 => 'Review the request and start travelling when you are ready.',
       1 =>
         'Your live location is being shared with the driver while travelling.',
       2 =>
         'Confirm arrival, document the work and complete only after required approvals.',
-      _ =>
-        'The roadside assistance job has been completed.',
+      _ => 'The roadside assistance job has been completed.',
     };
   }
 
   @override
   Widget build(BuildContext context) {
-    final data =
-        requestData;
+    final data = requestData;
 
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    final latitude =
-        (data['latitude'] as num?)
-            ?.toDouble();
+    final latitude = (data['latitude'] as num?)?.toDouble();
 
-    final longitude =
-        (data['longitude'] as num?)
-            ?.toDouble();
+    final longitude = (data['longitude'] as num?)?.toDouble();
 
-    final hasDriverLocation =
-        latitude != null &&
-            longitude != null;
+    final hasDriverLocation = latitude != null && longitude != null;
 
-    final driverName =
-        data['driverName']
-                as String? ??
-            'Driver';
+    final driverName = data['driverName'] as String? ?? 'Driver';
 
-    final driverPhone =
-        data['driverPhone']
-                as String? ??
-            '';
+    final driverPhone = data['driverPhone'] as String? ?? '';
 
     final location =
-        data['locationLabel']
-                as String? ??
-            data['location']
-                as String? ??
-            'Location unavailable';
+        data['locationLabel'] as String? ??
+        data['location'] as String? ??
+        'Location unavailable';
 
     final vehicle = [
-      data['vehicleType']
-              as String? ??
-          '',
-      data['modelYear']
-              as String? ??
-          '',
-      data['registration']
-              as String? ??
-          '',
-    ]
-        .where(
-          (value) =>
-              value.trim().isNotEmpty,
-        )
-        .join(' • ');
+      data['vehicleType'] as String? ?? '',
+      data['modelYear'] as String? ?? '',
+      data['registration'] as String? ?? '',
+    ].where((value) => value.trim().isNotEmpty).join(' • ');
 
-    final completionPending =
-        data['completionState'] ==
-            'pending';
+    final completionPending = data['completionState'] == 'pending';
 
     final waitingForArrivalConfirmation =
         status == 2 &&
-            data['arrivalVerificationRequired'] ==
-                true &&
-            data['arrivalConfirmedBy'] ==
-                null;
+        data['arrivalVerificationRequired'] == true &&
+        data['arrivalConfirmedBy'] == null;
 
     final repairReady =
         data['workflowVersion'] != 2 ||
-            (data['pendingRepairId'] ==
-                    null &&
-                (data['approvedQuoteType'] !=
-                        'inspection' ||
-                    data['approvedRepairId'] !=
-                        null));
+        (data['pendingRepairId'] == null &&
+            (data['approvedQuoteType'] != 'inspection' ||
+                data['approvedRepairId'] != null));
 
-    return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    return RaProviderScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'Active Assistance',
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight:
-                FontWeight.w800,
-            letterSpacing: -.45,
-          ),
-        ),
-        actions: [
-          if (widget.requestId !=
-              null)
-            IconButton(
-              tooltip:
-                  'Message driver',
-              onPressed: () {
-                push(
-                  context,
-                  ChatScreen(
-                    requestId:
-                        widget.requestId,
-                    peerName:
-                        driverName,
-                    peerPhone:
-                        driverPhone,
-                  ),
-                );
-              },
-              icon: _UnreadChatIcon(
-                requestId:
-                    widget.requestId,
-                seenField:
-                    'providerMessagesSeenAt',
+        title: Row(
+          children: [
+            const BrandMark(size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Active Assistance',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.45,
+                ),
               ),
             ),
-          const SizedBox(
-            width: 4,
+          ],
+        ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: _WelcomeThemeToggle(),
           ),
         ],
       ),
@@ -1165,200 +790,122 @@ class _ProviderActiveJobScreenState
           children: [
             Expanded(
               child: ListView(
-                physics:
-                    const BouncingScrollPhysics(),
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  18,
-                  8,
-                  18,
-                  28,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
                   _RaProviderActiveStatusCard(
-                    title:
-                        _statusTitle(),
-                    description:
-                        _statusDescription(),
-                    status:
-                        status,
-                    cancelled:
-                        requestCancelled,
+                    title: _statusTitle(),
+                    description: _statusDescription(),
+                    status: status,
+                    cancelled: requestCancelled,
                   ),
 
-                  if (widget.requestId !=
-                          null &&
-                      (data['arrivalVerificationRequired'] !=
-                              true ||
-                          data['arrivalConfirmedBy'] ==
-                              data['driverId'])) ...[
-                    const SizedBox(
-                      height: 13,
-                    ),
+                  if (widget.requestId != null &&
+                      (data['arrivalVerificationRequired'] != true ||
+                          data['arrivalConfirmedBy'] == data['driverId'])) ...[
+                    const SizedBox(height: 13),
 
                     RepairQuotePanel(
-                      requestId:
-                          widget.requestId!,
-                      isProvider:
-                          true,
+                      requestId: widget.requestId!,
+                      isProvider: true,
                     ),
                   ],
 
-                  const SizedBox(
-                    height: 14,
-                  ),
+                  const SizedBox(height: 14),
 
                   if (hasDriverLocation)
                     _RaProviderActiveMap(
-                      latitude:
-                          latitude,
-                      longitude:
-                          longitude,
-                      providerPosition:
-                          currentProviderPosition,
-                      roadRoute:
-                          roadRoute,
-                      locationMessage:
-                          locationMessage,
-                      location:
-                          location,
+                      latitude: latitude,
+                      longitude: longitude,
+                      providerPosition: currentProviderPosition,
+                      roadRoute: roadRoute,
+                      locationMessage: locationMessage,
+                      location: location,
                     )
                   else
                     _RaProviderActiveNotice(
-                      icon: Icons
-                          .location_off_outlined,
-                      title:
-                          'Driver coordinates unavailable',
-                      message:
-                          location,
-                      tone:
-                          colors.error,
+                      icon: Icons.location_off_outlined,
+                      title: 'Driver coordinates unavailable',
+                      message: location,
+                      tone: colors.error,
                     ),
 
-                  const SizedBox(
-                    height: 14,
-                  ),
+                  const SizedBox(height: 14),
 
                   _RaProviderActiveDriverCard(
-                    name:
-                        driverName,
-                    phone:
-                        driverPhone,
-                    requestId:
-                        widget.requestId,
+                    name: driverName,
+                    phone: driverPhone,
+                    requestId: widget.requestId,
                   ),
 
-                  const SizedBox(
-                    height: 14,
-                  ),
+                  const SizedBox(height: 14),
 
                   _RaProviderActiveSummary(
-                    issue:
-                        requestIssueLabel(
-                      data,
-                    ),
-                    vehicle:
-                        vehicle,
-                    location:
-                        location,
-                    approvedTotal:
-                        (data['estimatedCost']
-                                as num?)
-                            ?.toInt(),
+                    issue: requestIssueLabel(data),
+                    vehicle: vehicle,
+                    location: location,
+                    approvedTotal: (data['estimatedCost'] as num?)?.toInt(),
                   ),
 
                   if (waitingForArrivalConfirmation) ...[
-                    const SizedBox(
-                      height: 14,
-                    ),
+                    const SizedBox(height: 14),
 
                     const _RaProviderActiveNotice(
-                      icon: Icons
-                          .person_pin_circle_outlined,
-                      title:
-                          'Waiting for driver',
+                      icon: Icons.person_pin_circle_outlined,
+                      title: 'Waiting for driver',
                       message:
                           'The driver must confirm that you have physically arrived before repair work begins.',
-                      tone:
-                          raGold,
+                      tone: raGold,
                     ),
                   ],
 
-                  if (status == 2 &&
-                      !requestCancelled) ...[
-                    const SizedBox(
-                      height: 24,
-                    ),
+                  if (status == 2 && !requestCancelled) ...[
+                    const SizedBox(height: 24),
 
                     const _RaProviderActiveHeading(
-                      title:
-                          'Service documentation',
+                      title: 'Service documentation',
                       subtitle:
                           'Record notes and evidence of the work performed.',
                     ),
 
-                    const SizedBox(
-                      height: 10,
-                    ),
+                    const SizedBox(height: 10),
 
                     _RaProviderDocumentationCard(
-                      controller:
-                          serviceNotesController,
-                      photos:
-                          servicePhotos,
-                      saving:
-                          savingDocumentation,
-                      onAddPhoto:
-                          addDocumentationPhoto,
-                      onRemovePhoto:
-                          removeDocumentationPhoto,
-                      onSave:
-                          saveDocumentation,
+                      controller: serviceNotesController,
+                      photos: servicePhotos,
+                      saving: savingDocumentation,
+                      onAddPhoto: addDocumentationPhoto,
+                      onRemovePhoto: removeDocumentationPhoto,
+                      onSave: saveDocumentation,
                     ),
                   ],
 
-                  if (!requestCancelled &&
-                      status < 2) ...[
-                    const SizedBox(
-                      height: 15,
-                    ),
+                  if (!requestCancelled && status < 2) ...[
+                    const SizedBox(height: 15),
 
                     TextButton.icon(
-                      style:
-                          TextButton.styleFrom(
-                        foregroundColor:
-                            colors.error,
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.error,
                       ),
-                      onPressed:
-                          updatingStatus
-                              ? null
-                              : withdraw,
-                      icon:
-                          const Icon(
-                        Icons
-                            .cancel_outlined,
-                      ),
-                      label:
-                          const Text(
-                        'Cannot Attend This Job',
-                      ),
+                      onPressed: updatingStatus ? null : withdraw,
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: const Text('Cannot Attend This Job'),
                     ),
                   ],
 
-                  if (completionPending) ...[
-                    const SizedBox(
-                      height: 14,
+                  if (completionPending && widget.requestId != null) ...[
+                    CompletionReviewPanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
                     ),
+                    const SizedBox(height: 14),
 
                     const _RaProviderActiveNotice(
-                      icon: Icons
-                          .hourglass_top_rounded,
-                      title:
-                          'Driver confirmation pending',
+                      icon: Icons.hourglass_top_rounded,
+                      title: 'Driver confirmation pending',
                       message:
                           'No further status action is required until the driver reviews the submitted completion.',
-                      tone:
-                          raSuccess,
+                      tone: raSuccess,
                     ),
                   ],
                 ],
@@ -1369,26 +916,20 @@ class _ProviderActiveJobScreenState
               label: requestCancelled
                   ? 'Back to Dashboard'
                   : completionPending
-                      ? 'Waiting for Driver Confirmation'
-                      : status == 3
-                          ? 'Finish Job'
-                          : 'Mark as ${statuses[status + 1]}',
+                  ? 'Waiting for Driver Confirmation'
+                  : status == 3
+                  ? 'Finish Job'
+                  : 'Mark as ${statuses[status + 1]}',
               enabled:
                   !updatingStatus &&
-                      !completionPending &&
-                      widget.requestId !=
-                          null &&
-                      (requestCancelled ||
-                          (!waitingForArrivalConfirmation &&
-                              repairReady)),
-              busy:
-                  updatingStatus,
+                  !completionPending &&
+                  widget.requestId != null &&
+                  (requestCancelled ||
+                      (!waitingForArrivalConfirmation && repairReady)),
+              busy: updatingStatus,
               onTap: requestCancelled
                   ? () {
-                      replace(
-                        context,
-                        const ProviderShell(),
-                      );
+                      replace(context, const ProviderShell());
                     }
                   : advanceStatus,
             ),
@@ -1414,101 +955,11 @@ class _RaProviderActiveStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
-
-    final tone =
-        cancelled
-            ? colors.error
-            : status == 3
-                ? raSuccess
-                : colors.primary;
-
-    final icon = cancelled
-        ? Icons.close_rounded
-        : switch (status) {
-            0 =>
-              Icons.handshake_outlined,
-            1 =>
-              Icons.navigation_outlined,
-            2 =>
-              Icons.location_on_outlined,
-            _ =>
-              Icons.task_alt_rounded,
-          };
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: .07),
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(
-          color: tone.withValues(alpha: .17),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 47,
-                height: 47,
-                decoration: BoxDecoration(
-                  color: tone.withValues(
-                    alpha: .11,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  icon,
-                  color: tone,
-                ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style:
-                          GoogleFonts.plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight:
-                            FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style:
-                          GoogleFonts.plusJakartaSans(
-                        fontSize: 9.2,
-                        height: 1.4,
-                        color: colors
-                            .onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (!cancelled) ...[
-            const SizedBox(height: 17),
-            StatusTimeline(
-              statuses:
-                  _ProviderActiveJobScreenState
-                      .statuses,
-              current: status,
-            ),
-          ],
-        ],
-      ),
+    return RaProviderSummaryCard(
+      title: title,
+      message: description,
+      icon: cancelled ? Icons.cancel_outlined : Icons.route_outlined,
+      footer: cancelled ? null : RaProviderJobProgress(current: status),
     );
   }
 }
@@ -1534,8 +985,7 @@ class _RaProviderActiveMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
       children: [
@@ -1545,27 +995,18 @@ class _RaProviderActiveMap extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
-              color: colors.outlineVariant
-                  .withValues(alpha: .45),
+              color: colors.outlineVariant.withValues(alpha: .45),
             ),
           ),
           child: Stack(
             children: [
               Positioned.fill(
                 child: MapMock(
-                  position: LatLng(
-                    latitude,
-                    longitude,
-                  ),
-                  providerPosition:
-                      providerPosition,
-                  routePoints:
-                      roadRoute?.points,
-                  showProviders:
-                      providerPosition != null,
-                  showRoute:
-                      roadRoute != null &&
-                          providerPosition != null,
+                  position: LatLng(latitude, longitude),
+                  providerPosition: providerPosition,
+                  routePoints: roadRoute?.points,
+                  showProviders: providerPosition != null,
+                  showRoute: roadRoute != null && providerPosition != null,
                 ),
               ),
 
@@ -1575,35 +1016,21 @@ class _RaProviderActiveMap extends StatelessWidget {
                   left: 11,
                   right: 11,
                   child: Container(
-                    padding:
-                        const EdgeInsets.all(
-                      11,
-                    ),
+                    padding: const EdgeInsets.all(11),
                     decoration: BoxDecoration(
-                      color: colors.surface
-                          .withValues(
-                        alpha: .95,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(
-                        15,
-                      ),
+                      color: colors.surface.withValues(alpha: .95),
+                      borderRadius: BorderRadius.circular(15),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.route_outlined,
-                          size: 17,
-                        ),
+                        const Icon(Icons.route_outlined, size: 17),
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize: 9,
-                              fontWeight:
-                                  FontWeight.w700,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1627,12 +1054,8 @@ class _RaProviderActiveMap extends StatelessWidget {
                 longitude: longitude,
               );
             },
-            icon: const Icon(
-              Icons.navigation_outlined,
-            ),
-            label: const Text(
-              'Navigate to Driver',
-            ),
+            icon: const Icon(Icons.navigation_outlined),
+            label: const Text('Navigate to Driver'),
           ),
         ),
 
@@ -1670,48 +1093,34 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
+            ? const Color(0xFF0D2237)
             : Colors.white,
         borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(
-            alpha: .45,
-          ),
-        ),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              ProfileInitials(
-                name: name,
-                radius: 23,
-              ),
+              ProfileInitials(name: name, radius: 23),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       name,
-                      style:
-                          GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight:
-                            FontWeight.w800,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      phone.trim().isEmpty
-                          ? 'Phone unavailable'
-                          : phone,
-                      style:
-                          GoogleFonts.plusJakartaSans(
-                        fontSize: 8.7,
-                        color:
-                            colors.onSurfaceVariant,
+                      phone.trim().isEmpty ? 'Phone unavailable' : phone,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1727,15 +1136,9 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
                   onPressed: phone.trim().isEmpty
                       ? null
                       : () {
-                          showCallPrompt(
-                            context,
-                            name: name,
-                            number: phone,
-                          );
+                          showCallPrompt(context, name: name, number: phone);
                         },
-                  icon: const Icon(
-                    Icons.call_outlined,
-                  ),
+                  icon: const Icon(Icons.call_outlined),
                   label: const Text('Call'),
                 ),
               ),
@@ -1748,8 +1151,7 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
                           push(
                             context,
                             ChatScreen(
-                              requestId:
-                                  requestId,
+                              requestId: requestId,
                               peerName: name,
                               peerPhone: phone,
                             ),
@@ -1757,12 +1159,9 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
                         },
                   icon: _UnreadChatIcon(
                     requestId: requestId,
-                    seenField:
-                        'providerMessagesSeenAt',
+                    seenField: 'providerMessagesSeenAt',
                   ),
-                  label: const Text(
-                    'Message',
-                  ),
+                  label: const Text('Message'),
                 ),
               ),
             ],
@@ -1799,8 +1198,7 @@ class _RaProviderActiveSummary extends StatelessWidget {
           if (vehicle.isNotEmpty) ...[
             const _RaProviderActiveDivider(),
             _RaProviderActiveInfo(
-              icon:
-                  Icons.directions_car_outlined,
+              icon: Icons.directions_car_outlined,
               label: 'Vehicle',
               value: vehicle,
             ),
@@ -1846,33 +1244,26 @@ class _RaProviderDocumentationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return _RaProviderActiveSurface(
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextField(
             controller: controller,
             minLines: 3,
             maxLines: 5,
             maxLength: 500,
-            textCapitalization:
-                TextCapitalization.sentences,
+            textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
               labelText: 'Service notes',
               hintText:
                   'Work completed, observations or important information...',
               alignLabelWithHint: true,
               prefixIcon: Padding(
-                padding: EdgeInsets.only(
-                  bottom: 52,
-                ),
-                child: Icon(
-                  Icons.note_alt_outlined,
-                ),
+                padding: EdgeInsets.only(bottom: 52),
+                child: Icon(Icons.note_alt_outlined),
               ),
             ),
           ),
@@ -1883,50 +1274,26 @@ class _RaProviderDocumentationCard extends StatelessWidget {
             SizedBox(
               height: 94,
               child: ListView.separated(
-                scrollDirection:
-                    Axis.horizontal,
+                scrollDirection: Axis.horizontal,
                 itemCount: photos.length,
-                separatorBuilder:
-                    (_, index) =>
-                        const SizedBox(
-                  width: 8,
-                ),
-                itemBuilder:
-                    (context, index) {
+                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
                   return Stack(
                     children: [
                       ClipRRect(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          13,
-                        ),
+                        borderRadius: BorderRadius.circular(13),
                         child: Image.memory(
-                          base64Decode(
-                            photos[index],
-                          ),
+                          base64Decode(photos[index]),
                           width: 94,
                           height: 94,
-                          fit:
-                              BoxFit.cover,
-                          errorBuilder:
-                              (
-                            context,
-                            error,
-                            stackTrace,
-                          ) {
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
                             return Container(
                               width: 94,
                               height: 94,
-                              color: colors
-                                  .surfaceContainerHighest,
-                              alignment:
-                                  Alignment.center,
-                              child:
-                                  const Icon(
-                                Icons
-                                    .broken_image_outlined,
-                              ),
+                              color: colors.surfaceContainerHighest,
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.broken_image_outlined),
                             );
                           },
                         ),
@@ -1935,34 +1302,18 @@ class _RaProviderDocumentationCard extends StatelessWidget {
                       Positioned(
                         top: 4,
                         right: 4,
-                        child:
-                            IconButton.filled(
+                        child: IconButton.filled(
                           onPressed: saving
                               ? null
                               : () {
-                                  onRemovePhoto(
-                                    index,
-                                  );
+                                  onRemovePhoto(index);
                                 },
-                          style: IconButton
-                              .styleFrom(
-                            minimumSize:
-                                const Size(
-                              30,
-                              30,
-                            ),
-                            padding:
-                                EdgeInsets.zero,
-                            backgroundColor:
-                                Colors
-                                    .black54,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(30, 30),
+                            padding: EdgeInsets.zero,
+                            backgroundColor: Colors.black54,
                           ),
-                          icon:
-                              const Icon(
-                            Icons
-                                .close_rounded,
-                            size: 15,
-                          ),
+                          icon: const Icon(Icons.close_rounded, size: 15),
                         ),
                       ),
                     ],
@@ -1978,41 +1329,27 @@ class _RaProviderDocumentationCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: saving ||
-                          photos.length >= 3
-                      ? null
-                      : onAddPhoto,
-                  icon: const Icon(
-                    Icons.add_a_photo_outlined,
-                  ),
+                  onPressed: saving || photos.length >= 3 ? null : onAddPhoto,
+                  icon: const Icon(Icons.add_a_photo_outlined),
                   label: Text(
-                    photos.length >= 3
-                        ? '3 Photos Added'
-                        : 'Add Photo',
+                    photos.length >= 3 ? '3 Photos Added' : 'Add Photo',
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed:
-                      saving ? null : onSave,
+                  onPressed: saving ? null : onSave,
                   icon: saving
                       ? const SizedBox.square(
                           dimension: 16,
-                          child:
-                              CircularProgressIndicator(
+                          child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color:
-                                Colors.white,
+                            color: Colors.white,
                           ),
                         )
-                      : const Icon(
-                          Icons.save_outlined,
-                        ),
-                  label: const Text(
-                    'Save',
-                  ),
+                      : const Icon(Icons.save_outlined),
+                  label: const Text('Save'),
                 ),
               ),
             ],
@@ -2024,27 +1361,22 @@ class _RaProviderDocumentationCard extends StatelessWidget {
 }
 
 class _RaProviderActiveHeading extends StatelessWidget {
-  const _RaProviderActiveHeading({
-    required this.title,
-    required this.subtitle,
-  });
+  const _RaProviderActiveHeading({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 16.5,
+            fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: -.3,
           ),
@@ -2053,7 +1385,7 @@ class _RaProviderActiveHeading extends StatelessWidget {
         Text(
           subtitle,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 9.2,
+            fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
           ),
@@ -2078,8 +1410,7 @@ class _RaProviderActiveNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
       width: double.infinity,
@@ -2087,43 +1418,31 @@ class _RaProviderActiveNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: tone.withValues(alpha: .075),
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(
-          color: tone.withValues(alpha: .18),
-        ),
+        border: Border.all(color: tone.withValues(alpha: .18)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: tone,
-            size: 20,
-          ),
+          Icon(icon, color: tone, size: 20),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 10.5,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 8.8,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
                     height: 1.4,
-                    color:
-                        colors.onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -2136,32 +1455,15 @@ class _RaProviderActiveNotice extends StatelessWidget {
 }
 
 class _RaProviderActiveSurface extends StatelessWidget {
-  const _RaProviderActiveSurface({
-    required this.child,
-  });
+  const _RaProviderActiveSurface({required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(
-            alpha: .45,
-          ),
-        ),
-      ),
-      child: child,
+      child: RaProviderCard(child: child),
     );
   }
 }
@@ -2179,56 +1481,41 @@ class _RaProviderActiveInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 37,
             height: 37,
             decoration: BoxDecoration(
-              color: colors.primary.withValues(
-                alpha: .07,
-              ),
+              color: colors.primary.withValues(alpha: .07),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: colors.primary,
-            ),
+            child: Icon(icon, size: 18, color: colors.primary),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 8,
-                    color:
-                        colors.onSurfaceVariant,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   value,
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 10,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
                     height: 1.4,
-                    fontWeight:
-                        FontWeight.w600,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -2248,10 +1535,9 @@ class _RaProviderActiveDivider extends StatelessWidget {
     return Divider(
       height: 1,
       indent: 47,
-      color: Theme.of(context)
-          .colorScheme
-          .outlineVariant
-          .withValues(alpha: .35),
+      color: Theme.of(
+        context,
+      ).colorScheme.outlineVariant.withValues(alpha: .35),
     );
   }
 }
@@ -2271,23 +1557,14 @@ class _RaProviderActiveBottomBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        18,
-        8,
-        18,
-        12,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors.outlineVariant
-                .withValues(alpha: .45),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
@@ -2295,20 +1572,16 @@ class _RaProviderActiveBottomBar extends StatelessWidget {
         child: SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed:
-                enabled && !busy ? onTap : null,
+            onPressed: enabled && !busy ? onTap : null,
             icon: busy
                 ? const SizedBox.square(
                     dimension: 17,
-                    child:
-                        CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons.arrow_forward_rounded,
-                  ),
+                : const Icon(Icons.arrow_forward_rounded),
             label: Text(label),
           ),
         ),

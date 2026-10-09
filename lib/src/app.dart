@@ -329,8 +329,23 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
   );
 }
 
-void push(BuildContext context, Widget page) =>
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+void push(BuildContext context, Widget page) {
+  final adminStyle = RaAdminTheme.isActive(context);
+  final driverStyle = RaDriverTheme.isActive(context);
+  final providerStyle = RaProviderTheme.isActive(context);
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => adminStyle
+          ? RaAdminTheme(child: page)
+          : driverStyle
+          ? RaDriverTheme(child: page)
+          : providerStyle
+          ? RaProviderTheme(child: page)
+          : page,
+    ),
+  );
+}
+
 void replace(BuildContext context, Widget page) => Navigator.of(
   context,
 ).pushReplacement(MaterialPageRoute(builder: (_) => page));

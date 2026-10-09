@@ -5,15 +5,10 @@ part of '../../screens.dart';
 /// Job list, filtering, pagination and navigation to
 /// [AdminJobMonitorScreen] are handled by [_AdminRecords].
 class AdminJobsScreen extends StatelessWidget {
-  const AdminJobsScreen({
-    super.key,
-  });
+  const AdminJobsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const _AdminRecords(
-      key: ValueKey('jobs'),
-      kind: 'jobs',
-    );
+    return const _AdminRecords(key: ValueKey('jobs'), kind: 'jobs');
   }
 }
