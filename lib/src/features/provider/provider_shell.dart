@@ -60,7 +60,7 @@ class _ApprovedProviderShellState extends State<ApprovedProviderShell> {
           });
         }
       },
-      child: RaScaffold(
+      child: RaProviderScaffold(
         backgroundColor: dark
             ? const Color(0xFF07131E)
             : const Color(0xFFF5F8FC),
@@ -109,7 +109,7 @@ class _ProviderBottomNavigation extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
           child: Container(
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF0D1D2B) : Colors.white,
+              color: dark ? const Color(0xFF0D2237) : Colors.white,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: dark
@@ -139,7 +139,7 @@ class _ProviderBottomNavigation extends StatelessWidget {
                     final selected = states.contains(WidgetState.selected);
 
                     return GoogleFonts.plusJakartaSans(
-                      fontSize: 10.5,
+                      fontSize: 11,
                       height: 1.05,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                       color: selected
@@ -259,7 +259,7 @@ class _ProviderMessageBadge extends StatelessWidget {
       label: Text(
         unread > 99 ? '99+' : '$unread',
         style: GoogleFonts.plusJakartaSans(
-          fontSize: 8,
+          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),

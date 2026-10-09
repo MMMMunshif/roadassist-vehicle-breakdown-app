@@ -139,7 +139,7 @@ class _AdminStatusBadge extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
+                fontSize: 14,
                 height: 1.1,
                 fontWeight: FontWeight.w800,
                 color: tone,

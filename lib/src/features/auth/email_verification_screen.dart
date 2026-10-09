@@ -22,15 +22,19 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     });
 
     try {
-      final verified = await AuthService().refreshEmailVerification();
+      final verified = await AuthService().refreshEmailVerification(
+        role: widget.role,
+      );
 
       if (!mounted) return;
 
       if (!verified) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Email is not verified yet. Open the verification link and try again.',
+              FirebaseAuth.instance.currentUser?.emailVerified == true
+                  ? 'Confirm the email link for this account role. If you only verified your original account, use Resend email.'
+                  : 'Email is not verified yet. Open the verification link and try again.',
             ),
           ),
         );
@@ -69,7 +73,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     });
 
     try {
-      await AuthService().sendVerificationEmail();
+      await AuthService().sendVerificationEmail(role: widget.role);
 
       if (!mounted) return;
 
@@ -89,6 +93,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           backgroundColor: raDanger,
         ),
       );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to send verification email. Please try again.',
+            ),
+          ),
+        );
     } finally {
       if (mounted) {
         setState(() {

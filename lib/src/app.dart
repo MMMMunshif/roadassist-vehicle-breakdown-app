@@ -172,7 +172,9 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
       final isDriver = request['driverId'] == user.uid;
       final isProvider = request['providerId'] == user.uid;
       Widget page;
-      if (data['type'] == 'chat' && (isDriver || isProvider)) {
+      if (data['type'] == 'complaint_review' && (isDriver || isProvider)) {
+        page = DisputeScreen(requestId: snapshot.id);
+      } else if (data['type'] == 'chat' && (isDriver || isProvider)) {
         page = ChatScreen(
           requestId: snapshot.id,
           peerName:
@@ -329,8 +331,23 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
   );
 }
 
-void push(BuildContext context, Widget page) =>
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+void push(BuildContext context, Widget page) {
+  final adminStyle = RaAdminTheme.isActive(context);
+  final driverStyle = RaDriverTheme.isActive(context);
+  final providerStyle = RaProviderTheme.isActive(context);
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => adminStyle
+          ? RaAdminTheme(child: page)
+          : driverStyle
+          ? RaDriverTheme(child: page)
+          : providerStyle
+          ? RaProviderTheme(child: page)
+          : page,
+    ),
+  );
+}
+
 void replace(BuildContext context, Widget page) => Navigator.of(
   context,
 ).pushReplacement(MaterialPageRoute(builder: (_) => page));

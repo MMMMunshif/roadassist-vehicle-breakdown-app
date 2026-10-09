@@ -55,11 +55,15 @@ class _SplashScreenState extends State<SplashScreen>
         final role = accountLastRole(profileData);
 
         if (role == 'provider') {
-          destination = enforceEmailVerification && !user.emailVerified
+          destination =
+              enforceEmailVerification &&
+                  !await AuthService().isRoleEmailVerified(role!)
               ? const EmailVerificationScreen(role: 'provider')
               : const ProviderShell();
         } else if (role == 'driver') {
-          destination = enforceEmailVerification && !user.emailVerified
+          destination =
+              enforceEmailVerification &&
+                  !await AuthService().isRoleEmailVerified(role!)
               ? const EmailVerificationScreen(role: 'driver')
               : const DriverShell();
         } else {

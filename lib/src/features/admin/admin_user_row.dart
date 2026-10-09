@@ -23,20 +23,6 @@ class _AdminUserRowState extends State<_AdminUserRow> {
           .doc(widget.uid)
           .snapshots();
 
-  String _friendly(String value) {
-    final cleaned = value.replaceAll('_', ' ').trim();
-
-    if (cleaned.isEmpty) {
-      return 'Unknown';
-    }
-
-    return cleaned
-        .split(' ')
-        .where((part) => part.isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-        .join(' ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -92,7 +78,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                   child: Text(
                     'Could not load account review.',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -137,8 +123,6 @@ class _AdminUserRowState extends State<_AdminUserRow> {
 
         final email = widget.data['email']?.toString().trim() ?? '';
 
-        final role = widget.data['role']?.toString() ?? 'user';
-
         final accessStatus = moderation['status']?.toString() ?? 'active';
 
         final flagged = moderation['flagged'] == true;
@@ -151,7 +135,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
 
         return Material(
           color: theme.brightness == Brightness.dark
-              ? const Color(0xFF0D1D2B)
+              ? const Color(0xFF0D2237)
               : colors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
@@ -187,7 +171,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: theme.brightness == Brightness.dark
-                                    ? const Color(0xFF0D1D2B)
+                                    ? const Color(0xFF0D2237)
                                     : colors.surface,
                                 width: 2,
                               ),
@@ -211,7 +195,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 16,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -237,7 +221,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
+                              fontSize: 14,
                               color: colors.onSurfaceVariant,
                             ),
                           ),
@@ -281,7 +265,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     color: colors.onSurfaceVariant,
                                   ),
                                 ),
@@ -295,35 +279,9 @@ class _AdminUserRowState extends State<_AdminUserRow> {
 
                   const SizedBox(width: 7),
 
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest.withValues(
-                            alpha: .35,
-                          ),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          _friendly(role),
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 9),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ],
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.onSurfaceVariant,
                   ),
                 ],
               ),

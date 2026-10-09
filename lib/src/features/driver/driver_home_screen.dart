@@ -19,7 +19,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Stream<List<Vehicle>>? homeVehicles;
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      locationProfileSubscription;
+  locationProfileSubscription;
 
   @override
   void initState() {
@@ -28,23 +28,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     if (signedIn) {
       homeVehicles = VehicleService().watchVehicles();
 
-      locationProfileSubscription =
-          AuthService().watchCurrentProfile().listen(
-        (snapshot) {
-          final saved =
-              snapshot.data()?['currentLocationLabel'] as String?;
+      locationProfileSubscription = AuthService().watchCurrentProfile().listen((
+        snapshot,
+      ) {
+        final saved = snapshot.data()?['currentLocationLabel'] as String?;
 
-          if (!mounted ||
-              saved == null ||
-              saved.trim().isEmpty) {
-            return;
-          }
+        if (!mounted || saved == null || saved.trim().isEmpty) {
+          return;
+        }
 
-          setState(() {
-            locationLabel = saved;
-          });
-        },
-      );
+        setState(() {
+          locationLabel = saved;
+        });
+      });
     }
   }
 
@@ -90,24 +86,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         throw const LocationServiceDisabledException();
       }
 
-      var permission =
-          await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
-        permission =
-            await Geolocator.requestPermission();
+        permission = await Geolocator.requestPermission();
       }
 
       if (permission == LocationPermission.denied ||
-          permission ==
-              LocationPermission.deniedForever) {
+          permission == LocationPermission.deniedForever) {
         throw const PermissionDeniedException(
           'Location permission is required.',
         );
       }
 
-      final position =
-          await Geolocator.getCurrentPosition(
+      final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 15),
@@ -119,8 +111,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           '${position.longitude.toStringAsFixed(5)}';
 
       try {
-        final places =
-            await Geocoding().placemarkFromCoordinates(
+        final places = await Geocoding().placemarkFromCoordinates(
           position.latitude,
           position.longitude,
         );
@@ -128,20 +119,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         if (places.isNotEmpty) {
           final place = places.first;
 
-          final resolved = [
-            place.street,
-            place.subLocality,
-            place.locality,
-            place.administrativeArea,
-            place.country,
-          ]
-              .whereType<String>()
-              .where(
-                (item) =>
-                    item.trim().isNotEmpty,
-              )
-              .toSet()
-              .join(', ');
+          final resolved =
+              [
+                    place.street,
+                    place.subLocality,
+                    place.locality,
+                    place.administrativeArea,
+                    place.country,
+                  ]
+                  .whereType<String>()
+                  .where((item) => item.trim().isNotEmpty)
+                  .toSet()
+                  .join(', ');
 
           if (resolved.isNotEmpty) {
             label = resolved;
@@ -160,27 +149,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Current location updated.',
-          ),
-        ),
+        const SnackBar(content: Text('Current location updated.')),
       );
     } catch (error) {
       if (!mounted) return;
 
-      final message =
-          error is LocationServiceDisabledException
-              ? 'Location services are turned off. Enable GPS and try again.'
-              : error is PermissionDeniedException
-                  ? 'Location permission was denied. You can enter your location manually.'
-                  : 'Unable to update your location. Try again or enter it manually.';
+      final message = error is LocationServiceDisabledException
+          ? 'Location services are turned off. Enable GPS and try again.'
+          : error is PermissionDeniedException
+          ? 'Location permission was denied. You can enter your location manually.'
+          : 'Unable to update your location. Try again or enter it manually.';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor:
-              Theme.of(context).colorScheme.error,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } finally {
@@ -194,13 +177,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> enterLocationManually() async {
     final controller = TextEditingController(
-      text: locationLabel == 'Location not set'
-          ? ''
-          : locationLabel,
+      text: locationLabel == 'Location not set' ? '' : locationLabel,
     );
 
-    final value =
-        await showModalBottomSheet<String>(
+    final value = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -209,48 +189,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         final theme = Theme.of(sheetContext);
         final colors = theme.colorScheme;
 
-        final dark =
-            theme.brightness == Brightness.dark;
+        final dark = theme.brightness == Brightness.dark;
 
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext)
-                .viewInsets
-                .bottom,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
           ),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              24,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             decoration: BoxDecoration(
-              color: dark
-                  ? const Color(0xFF0C1B29)
-                  : colors.surface,
-              borderRadius:
-                  const BorderRadius.vertical(
+              color: dark ? const Color(0xFF0C1B29) : colors.surface,
+              borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Center(
                   child: Container(
                     width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: colors
-                          .onSurfaceVariant
-                          .withValues(
-                        alpha: .25,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(999),
+                      color: colors.onSurfaceVariant.withValues(alpha: .25),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
@@ -260,8 +223,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 Row(
                   children: [
                     _DriverHomeIconBox(
-                      icon: Icons
-                          .edit_location_alt_rounded,
+                      icon: Icons.edit_location_alt_rounded,
                       color: colors.primary,
                     ),
 
@@ -269,29 +231,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Set your location',
-                            style: GoogleFonts
-                                .plusJakartaSans(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 18,
-                              fontWeight:
-                                  FontWeight.w800,
-                              color:
-                                  colors.onSurface,
+                              fontWeight: FontWeight.w800,
+                              color: colors.onSurface,
                             ),
                           ),
                           const SizedBox(height: 3),
                           Text(
                             'Enter a street, city or nearby landmark.',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize: 11.5,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
                               height: 1.4,
-                              color: colors
-                                  .onSurfaceVariant,
+                              color: colors.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -305,24 +261,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 TextField(
                   controller: controller,
                   autofocus: true,
-                  textCapitalization:
-                      TextCapitalization.words,
-                  textInputAction:
-                      TextInputAction.done,
-                  decoration:
-                      const InputDecoration(
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
                     labelText: 'Current location',
-                    hintText:
-                        'Street, city or landmark',
-                    prefixIcon: Icon(
-                      Icons.place_outlined,
-                    ),
+                    hintText: 'Street, city or landmark',
+                    prefixIcon: Icon(Icons.place_outlined),
                   ),
                   onSubmitted: (value) {
-                    Navigator.pop(
-                      sheetContext,
-                      value.trim(),
-                    );
+                    Navigator.pop(sheetContext, value.trim());
                   },
                 ),
 
@@ -330,17 +277,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
                 FilledButton.icon(
                   onPressed: () {
-                    Navigator.pop(
-                      sheetContext,
-                      controller.text.trim(),
-                    );
+                    Navigator.pop(sheetContext, controller.text.trim());
                   },
-                  icon: const Icon(
-                    Icons.check_rounded,
-                  ),
-                  label: const Text(
-                    'Save Location',
-                  ),
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Save Location'),
                 ),
               ],
             ),
@@ -351,20 +291,15 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     controller.dispose();
 
-    if (value == null ||
-        value.trim().isEmpty ||
-        !mounted) {
+    if (value == null || value.trim().isEmpty || !mounted) {
       return;
     }
 
-    await saveLocation(
-      value.trim(),
-    );
+    await saveLocation(value.trim());
   }
 
   Future<void> changeHomeLocation() async {
-    final action =
-        await showModalBottomSheet<String>(
+    final action = await showModalBottomSheet<String>(
       context: context,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
@@ -372,24 +307,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         final theme = Theme.of(sheetContext);
         final colors = theme.colorScheme;
 
-        final dark =
-            theme.brightness == Brightness.dark;
+        final dark = theme.brightness == Brightness.dark;
 
         return Container(
-          padding: const EdgeInsets.fromLTRB(
-            18,
-            12,
-            18,
-            24,
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
           decoration: BoxDecoration(
-            color: dark
-                ? const Color(0xFF0C1B29)
-                : colors.surface,
-            borderRadius:
-                const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            color: dark ? const Color(0xFF0C1B29) : colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -399,11 +323,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: colors
-                        .onSurfaceVariant
-                        .withValues(alpha: .25),
-                    borderRadius:
-                        BorderRadius.circular(999),
+                    color: colors.onSurfaceVariant.withValues(alpha: .25),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
@@ -414,9 +335,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Update location',
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: colors.onSurface,
                   ),
@@ -429,12 +349,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'RoadAssist uses this to show relevant nearby providers.',
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 11.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     height: 1.45,
-                    color:
-                        colors.onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -444,29 +362,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               _DriverHomeSheetAction(
                 icon: Icons.my_location_rounded,
                 title: 'Use current GPS',
-                subtitle:
-                    'Get your current device location automatically.',
+                subtitle: 'Get your current device location automatically.',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    'gps',
-                  );
+                  Navigator.pop(sheetContext, 'gps');
                 },
               ),
 
               const SizedBox(height: 10),
 
               _DriverHomeSheetAction(
-                icon:
-                    Icons.edit_location_alt_outlined,
+                icon: Icons.edit_location_alt_outlined,
                 title: 'Enter manually',
-                subtitle:
-                    'Use a street, city or nearby landmark.',
+                subtitle: 'Use a street, city or nearby landmark.',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    'manual',
-                  );
+                  Navigator.pop(sheetContext, 'manual');
                 },
               ),
             ],
@@ -488,225 +397,69 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // HEADER
   // ===========================================================================
 
-  Widget _buildHeader(
-    BuildContext context,
-  ) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
+  Widget _buildHeader(BuildContext context) {
     final hour = DateTime.now().hour;
-
     final greeting = hour < 12
         ? 'Good morning'
         : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
-
-    return StreamBuilder<
-        DocumentSnapshot<
-            Map<String, dynamic>>>(
-      stream: signedIn
-          ? AuthService().watchCurrentProfile()
-          : null,
+        ? 'Good afternoon'
+        : 'Good evening';
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: signedIn ? AuthService().watchCurrentProfile() : null,
       builder: (context, snapshot) {
-        final data =
-            snapshot.data?.data();
-
+        final data = snapshot.data?.data();
         final name =
             data?['displayName'] as String? ??
-                (firebaseReady
-                    ? FirebaseAuth
-                        .instance
-                        .currentUser
-                        ?.displayName
-                    : null) ??
-                'Driver';
-
-        final photo =
-            data?['photoData'] as String?;
-
-        Widget avatar = ProfileInitials(
-          name: name,
-          radius: 22,
-        );
-
-        if (photo != null &&
-            photo.trim().isNotEmpty) {
-          try {
-            avatar = ClipOval(
-              child: Image.memory(
-                base64Decode(photo),
-                width: 44,
-                height: 44,
-                fit: BoxFit.cover,
-                errorBuilder:
-                    (_, error, stack) =>
-                        ProfileInitials(
-                  name: name,
-                  radius: 22,
+            (firebaseReady
+                ? FirebaseAuth.instance.currentUser?.displayName
+                : null) ??
+            'Driver';
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(0, 12, 0, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RaProviderHeader(
+                notifications: _buildNotificationButton(
+                  context,
+                  data?['notificationsSeenAt'] as Timestamp?,
                 ),
               ),
-            );
-          } on FormatException {
-            // Initials remain the fallback.
-          }
-        }
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            20,
-            15,
-            20,
-            16,
-          ),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const BrandMark(
-                    size: 38,
-                  ),
-
-                  const SizedBox(width: 9),
-
-                  Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment:
-                          Alignment.centerLeft,
-                      child: Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Road',
-                              style: TextStyle(
-                                color:
-                                    colors.onSurface,
-                              ),
-                            ),
-                            TextSpan(
-                              text: 'Assist',
-                              style: TextStyle(
-                                color:
-                                    colors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        maxLines: 1,
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 18,
-                          fontWeight:
-                              FontWeight.w800,
-                          letterSpacing: -.6,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  _buildNotificationButton(
-                    context,
-                    data?['notificationsSeenAt']
-                        as Timestamp?,
-                  ),
-
-                  const SizedBox(width: 5),
-
-                  const _WelcomeThemeToggle(),
-                ],
+              const SizedBox(height: 22),
+              Text(
+                '$greeting, $name',
+                style: _providerText(context, size: 14, muted: true),
               ),
-
-              const SizedBox(height: 21),
-
-              Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$greeting,',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 12.5,
-                            fontWeight:
-                                FontWeight.w500,
-                            color: colors
-                                .onSurfaceVariant,
-                          ),
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        Text(
-                          name,
-                          maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis,
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 27,
-                            height: 1.08,
-                            letterSpacing: -.8,
-                            fontWeight:
-                                FontWeight.w800,
-                            color:
-                                colors.onSurface,
-                          ),
-                        ),
-
-                        const SizedBox(height: 6),
-
-                        Text(
-                          'Ready whenever the road gets difficult.',
-                          style: GoogleFonts
-                              .plusJakartaSans(
-                            fontSize: 11.5,
-                            color: colors
-                                .onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+              const SizedBox(height: 5),
+              Text(
+                'Wherever you go,\nwe are here.',
+                style: _providerText(
+                  context,
+                  size: 26,
+                  weight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  avatar: Icon(
+                    Icons.location_on_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  label: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width - 130,
+                    ),
+                    child: Text(
+                      locationLabel,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-
-                  const SizedBox(width: 14),
-
-                  Material(
-                    color: Colors.transparent,
-                    shape: const CircleBorder(),
-                    clipBehavior:
-                        Clip.antiAlias,
-                    child: InkWell(
-                      onTap: () {
-                        push(
-                          context,
-                          const DriverProfileScreen(),
-                        );
-                      },
-                      child: Container(
-                        padding:
-                            const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: colors.primary
-                                .withValues(
-                              alpha: .28,
-                            ),
-                          ),
-                        ),
-                        child: avatar,
-                      ),
-                    ),
-                  ),
-                ],
+                  onPressed: updatingLocation ? null : changeHomeLocation,
+                ),
               ),
             ],
           ),
@@ -715,82 +468,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildNotificationButton(
-    BuildContext context,
-    Timestamp? seenAt,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildNotificationButton(BuildContext context, Timestamp? seenAt) {
+    final colors = Theme.of(context).colorScheme;
 
-    return StreamBuilder<
-        QuerySnapshot<
-            Map<String, dynamic>>>(
-      stream: signedIn
-          ? RequestService()
-              .watchDriverRequests()
-          : null,
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: signedIn ? RequestService().watchDriverRequests() : null,
       builder: (context, snapshot) {
         final count =
-            snapshot.data?.docs.where(
-                  (doc) {
-                    final data = doc.data();
+            snapshot.data?.docs.where((doc) {
+              final data = doc.data();
 
-                    final updatedAt =
-                        data['updatedAt']
-                            as Timestamp?;
+              final updatedAt = data['updatedAt'] as Timestamp?;
 
-                    return data['status'] !=
-                            'searching' &&
-                        (seenAt == null ||
-                            (updatedAt?.compareTo(
-                                      seenAt,
-                                    ) ??
-                                    1) >
-                                0);
-                  },
-                ).length ??
-                0;
+              return data['status'] != 'searching' &&
+                  (seenAt == null || (updatedAt?.compareTo(seenAt) ?? 1) > 0);
+            }).length ??
+            0;
 
         return Badge(
           isLabelVisible: count > 0,
-          label: Text(
-            count > 9 ? '9+' : '$count',
-          ),
+          label: Text(count > 9 ? '9+' : '$count'),
           child: IconButton(
             tooltip: 'Notifications',
             onPressed: () {
               if (!signedIn) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Sign in to view request notifications.',
-                    ),
+                    content: Text('Sign in to view request notifications.'),
                   ),
                 );
 
                 return;
               }
 
-              push(
-                context,
-                const DriverNotificationsScreen(),
-              );
+              push(context, const DriverNotificationsScreen());
             },
             style: IconButton.styleFrom(
-              backgroundColor: colors
-                  .surfaceContainerHighest
-                  .withValues(alpha: .55),
-              foregroundColor:
-                  colors.onSurface,
-              minimumSize:
-                  const Size(42, 42),
+              backgroundColor: colors.surfaceContainerHighest.withValues(
+                alpha: .55,
+              ),
+              foregroundColor: colors.onSurface,
+              minimumSize: const Size(42, 42),
             ),
-            icon: const Icon(
-              Icons
-                  .notifications_none_rounded,
-              size: 21,
-            ),
+            icon: const Icon(Icons.notifications_none_rounded, size: 21),
           ),
         );
       },
@@ -801,271 +521,75 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // HERO
   // ===========================================================================
 
-  Widget _buildAssistanceHero(
-    BuildContext context,
-  ) {
-    final theme = Theme.of(context);
-
-    final dark =
-        theme.brightness == Brightness.dark;
-
-    final start = dark
-        ? const Color(0xFF0B4174)
-        : const Color(0xFF07569E);
-
-    final end = dark
-        ? const Color(0xFF075E58)
-        : const Color(0xFF078B7D);
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius:
-          BorderRadius.circular(27),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          push(
-            context,
-            const AssistanceTypeScreen(),
-          );
-        },
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(27),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                start,
-                end,
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: start.withValues(
-                  alpha: dark ? .24 : .20,
-                ),
-                blurRadius: 26,
-                offset: const Offset(0, 13),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -48,
-                top: -55,
-                child: Container(
-                  width: 190,
-                  height: 190,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white
-                        .withValues(alpha: .055),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                right: -10,
-                bottom: -20,
-                child: Icon(
-                  Icons
-                      .car_repair_rounded,
-                  size: 140,
-                  color: Colors.white
-                      .withValues(alpha: .075),
-                ),
-              ),
-
-              Padding(
-                padding:
-                    const EdgeInsets.all(21),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: Colors.white
-                            .withValues(
-                          alpha: .13,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(999),
-                        border: Border.all(
-                          color: Colors.white
-                              .withValues(
-                            alpha: .12,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize:
-                            MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration:
-                                const BoxDecoration(
-                              color: Color(
-                                0xFF73E6C9,
-                              ),
-                              shape:
-                                  BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 6,
-                          ),
-                          Text(
-                            'ROADSIDE ASSISTANCE',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight:
-                                  FontWeight.w700,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 15),
-
-                    Text(
-                      'Need help\non the road?',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        color: Colors.white,
-                        fontSize: 27,
-                        height: 1.08,
-                        letterSpacing: -.8,
-                        fontWeight:
-                            FontWeight.w800,
-                      ),
-                    ),
-
-                    const SizedBox(height: 9),
-
-                    SizedBox(
-                      width: 255,
-                      child: Text(
-                        'Tell us what happened and find the right roadside support.',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          color: Colors.white
-                              .withValues(
-                            alpha: .82,
-                          ),
-                          fontSize: 11.5,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 19),
-
-                    Material(
-                      color: Colors.white,
-                      borderRadius:
-                          BorderRadius.circular(
-                        15,
-                      ),
-                      child: InkWell(
-                        onTap: () {
-                          push(
-                            context,
-                            const AssistanceTypeScreen(),
-                          );
-                        },
-                        borderRadius:
-                            BorderRadius.circular(
-                          15,
-                        ),
-                        child: Padding(
-                          padding:
-                              const EdgeInsets
-                                  .symmetric(
-                            horizontal: 15,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            mainAxisSize:
-                                MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons
-                                    .add_road_rounded,
-                                color: start,
-                                size: 19,
-                              ),
-                              const SizedBox(
-                                width: 8,
-                              ),
-                              Text(
-                                'Request Assistance',
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  color: start,
-                                  fontSize: 11.5,
-                                  fontWeight:
-                                      FontWeight
-                                          .w700,
-                                ),
-                              ),
-                              const SizedBox(
-                                width: 8,
-                              ),
-                              Icon(
-                                Icons
-                                    .arrow_forward_rounded,
-                                color: start,
-                                size: 17,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _buildAssistanceHero(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF0062DB), Color(0xFF009AF5)],
       ),
-    );
-  }
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.car_repair_outlined,
+              color: Colors.white,
+              size: 30,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Need roadside help?',
+                    style: _providerText(
+                      context,
+                      size: 20,
+                      weight: FontWeight.w700,
+                    ).copyWith(color: Colors.white),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'Find nearby assistance and compare provider quotes.',
+                    style: _providerText(
+                      context,
+                      size: 14,
+                    ).copyWith(color: Colors.white.withValues(alpha: .88)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0062DB),
+          ),
+          onPressed: () => push(context, const AssistanceTypeScreen()),
+          icon: const Icon(Icons.arrow_forward_rounded),
+          label: const Text('Request Assistance'),
+        ),
+      ],
+    ),
+  );
 
-  // ===========================================================================
-  // SAVED VEHICLE
-  // ===========================================================================
-
-  Widget _buildSavedVehicleCard(
-    String? defaultId,
-  ) {
+  Widget _buildSavedVehicleCard(String? defaultId) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
     return StreamBuilder<List<Vehicle>>(
       stream: homeVehicles,
       builder: (context, snapshot) {
-        final vehicles =
-            snapshot.data ??
-                const <Vehicle>[];
+        final vehicles = snapshot.data ?? const <Vehicle>[];
 
         Vehicle? vehicle;
 
@@ -1076,27 +600,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           }
         }
 
-        vehicle ??=
-            vehicles.isEmpty
-                ? null
-                : vehicles.first;
+        vehicle ??= vehicles.isEmpty ? null : vehicles.first;
 
         final selected = vehicle;
 
-        final loading =
-            signedIn &&
-                !snapshot.hasError &&
-                !snapshot.hasData;
+        final loading = signedIn && !snapshot.hasError && !snapshot.hasData;
 
         return _DriverHomeSurface(
           onTap: () {
-            push(
-              context,
-              const VehiclesScreen(),
-            );
+            push(context, const VehiclesScreen());
           },
-          padding:
-              const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
@@ -1104,24 +618,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 height: 70,
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
-                  color: colors
-                      .surfaceContainerHighest
-                      .withValues(alpha: .55),
-                  borderRadius:
-                      BorderRadius.circular(16),
+                  color: colors.surfaceContainerHighest.withValues(alpha: .55),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: selected == null
                     ? Icon(
-                        Icons
-                            .directions_car_outlined,
+                        Icons.directions_car_outlined,
                         size: 36,
                         color: colors.primary,
                       )
                     : VehiclePhotoPreview(
-                        model:
-                            selected.label,
-                        photoData:
-                            selected.photoData,
+                        model: selected.label,
+                        photoData: selected.photoData,
                         height: 70,
                         compact: true,
                       ),
@@ -1131,57 +639,38 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'YOUR VEHICLE',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color: colors
-                                  .onSurfaceVariant,
-                              fontSize: 8.5,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: colors.onSurfaceVariant,
+                              fontSize: 12,
                               letterSpacing: 1,
-                              fontWeight:
-                                  FontWeight.w700,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
 
                         if (selected != null)
                           Container(
-                            padding:
-                                const EdgeInsets
-                                    .symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 7,
                               vertical: 3,
                             ),
-                            decoration:
-                                BoxDecoration(
-                              color: colors
-                                  .primary
-                                  .withValues(
-                                alpha: .09,
-                              ),
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                999,
-                              ),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: .09),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               'Default',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                color: colors
-                                    .primary,
-                                fontSize: 8.5,
-                                fontWeight:
-                                    FontWeight
-                                        .w700,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: colors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -1193,19 +682,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     Text(
                       selected == null
                           ? loading
-                              ? 'Loading vehicle…'
-                              : snapshot.hasError
-                                  ? 'Vehicles unavailable'
-                                  : 'Add a vehicle'
+                                ? 'Loading vehicle…'
+                                : snapshot.hasError
+                                ? 'Vehicles unavailable'
+                                : 'Add a vehicle'
                           : '${selected.make} ${selected.model}',
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight:
-                            FontWeight.w700,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                         color: colors.onSurface,
                       ),
                     ),
@@ -1217,30 +703,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           ? 'Manage saved vehicles'
                           : '${selected.year}  •  ${selected.fuelType}  •  ${selected.transmission}',
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10.5,
-                        color: colors
-                            .onSurfaceVariant,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
 
                     if (selected != null &&
-                        selected.registration
-                            .trim()
-                            .isNotEmpty) ...[
+                        selected.registration.trim().isNotEmpty) ...[
                       const SizedBox(height: 5),
                       Text(
                         selected.registration,
-                        style: GoogleFonts
-                            .plusJakartaSans(
+                        style: GoogleFonts.plusJakartaSans(
                           color: colors.primary,
-                          fontSize: 10.5,
+                          fontSize: 13,
                           letterSpacing: .35,
-                          fontWeight:
-                              FontWeight.w700,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -1252,8 +731,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
               Icon(
                 Icons.chevron_right_rounded,
-                color:
-                    colors.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
                 size: 20,
               ),
             ],
@@ -1267,11 +745,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // QUICK HELP
   // ===========================================================================
 
-  Widget _buildQuickHelp(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildQuickHelp(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     final items = [
       (
@@ -1308,15 +783,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       builder: (context, constraints) {
         const gap = 10.0;
 
-        final singleColumn =
-            constraints.maxWidth < 315;
+        final singleColumn = constraints.maxWidth < 315;
 
-        final cardWidth =
-            singleColumn
-                ? constraints.maxWidth
-                : (constraints.maxWidth -
-                        gap) /
-                    2;
+        final cardWidth = singleColumn
+            ? constraints.maxWidth
+            : (constraints.maxWidth - gap) / 2;
 
         return Wrap(
           spacing: gap,
@@ -1331,14 +802,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   icon: item.$3,
                   tone: item.$5,
                   onTap: () {
-                    push(
-                      context,
-                      BreakdownDetailsScreen(
-                        issues: [
-                          item.$4,
-                        ],
-                      ),
-                    );
+                    push(context, BreakdownDetailsScreen(issues: [item.$4]));
                   },
                 ),
               ),
@@ -1352,16 +816,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // ACTIVE ASSISTANCE
   // ===========================================================================
 
-  Widget _buildMyRequests(
-    BuildContext context,
-  ) {
-    return StreamBuilder<
-        QuerySnapshot<
-            Map<String, dynamic>>>(
-      stream: signedIn
-          ? RequestService()
-              .watchDriverRequests()
-          : null,
+  Widget _buildMyRequests(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: signedIn ? RequestService().watchDriverRequests() : null,
       builder: (context, snapshot) {
         if (!signedIn) {
           return _DriverHomeMessageCard(
@@ -1387,76 +844,49 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           return const _DriverHomeLoadingCard();
         }
 
-        final active =
-            snapshot.data!.docs.where(
-          (request) {
-            return const [
-              'searching',
-              'accepted',
-              'en_route',
-              'arrived',
-            ].contains(
-              request.data()['status'],
-            );
-          },
-        ).toList();
+        final active = snapshot.data!.docs.where((request) {
+          return const [
+            'searching',
+            'accepted',
+            'en_route',
+            'arrived',
+          ].contains(request.data()['status']);
+        }).toList();
 
         if (active.isEmpty) {
-          return _buildNoActiveAssistance(
-            context,
-          );
+          return _buildNoActiveAssistance(context);
         }
 
-        return _buildActiveAssistance(
-          active.first,
-        );
+        return _buildActiveAssistance(active.first);
       },
     );
   }
 
   Widget _buildActiveAssistance(
-    QueryDocumentSnapshot<
-            Map<String, dynamic>>
-        request,
+    QueryDocumentSnapshot<Map<String, dynamic>> request,
   ) {
     final data = request.data();
 
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final dark = theme.brightness == Brightness.dark;
 
-    final status =
-        data['status'] as String? ??
-            'searching';
+    final status = data['status'] as String? ?? 'searching';
 
-    final provider =
-        data['providerName'] as String? ??
-            'Finding a provider';
+    final provider = data['providerName'] as String? ?? 'Finding a provider';
 
-    final phone =
-        data['providerPhone'] as String? ??
-            '';
+    final phone = data['providerPhone'] as String? ?? '';
 
-    final assigned =
-        (data['providerId'] as String? ??
-                '')
-            .trim()
-            .isNotEmpty;
+    final assigned = (data['providerId'] as String? ?? '').trim().isNotEmpty;
 
-    final issue =
-        requestIssueLabel(data);
+    final issue = requestIssueLabel(data);
 
     final label = switch (status) {
-      'searching' =>
-        'Finding providers',
-      'accepted' =>
-        'Request accepted',
-      'en_route' =>
-        'Provider on the way',
-      'arrived' =>
-        'Provider arrived',
+      'searching' => 'Finding providers',
+      'accepted' => 'Request accepted',
+      'en_route' => 'Provider on the way',
+      'arrived' => 'Provider arrived',
       'completed' => 'Completed',
       'cancelled' => 'Cancelled',
       _ => 'Assistance update',
@@ -1468,44 +898,24 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       _ => RaTone.success,
     };
 
-    final draft =
-        requestDraftFromData(data);
+    final draft = requestDraftFromData(data);
 
     void openRequest() {
       if (status == 'searching') {
-        push(
-          context,
-          SearchingScreen(
-            draft: draft,
-            requestId: request.id,
-          ),
-        );
+        push(context, SearchingScreen(draft: draft, requestId: request.id));
 
         return;
       }
 
-      if (const [
-        'accepted',
-        'en_route',
-        'arrived',
-      ].contains(status)) {
-        push(
-          context,
-          TrackingScreen(
-            draft: draft,
-            requestId: request.id,
-          ),
-        );
+      if (const ['accepted', 'en_route', 'arrived'].contains(status)) {
+        push(context, TrackingScreen(draft: draft, requestId: request.id));
 
         return;
       }
 
       push(
         context,
-        RealtimeDriverRequestDetailsScreen(
-          requestId: request.id,
-          data: data,
-        ),
+        RealtimeDriverRequestDetailsScreen(requestId: request.id, data: data),
       );
     }
 
@@ -1518,73 +928,45 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D1D2B)
-            : Colors.white,
-        borderRadius:
-            BorderRadius.circular(23),
+        color: dark ? const Color(0xFF0D2237) : Colors.white,
+        borderRadius: BorderRadius.circular(23),
         border: Border.all(
           color: status == 'searching'
-              ? colors.primary.withValues(
-                  alpha: .22,
-                )
-              : colors.outlineVariant
-                  .withValues(alpha: .48),
+              ? colors.primary.withValues(alpha: .22)
+              : colors.outlineVariant.withValues(alpha: .48),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(
-              alpha: dark ? .13 : .045,
-            ),
+            color: Colors.black.withValues(alpha: dark ? .13 : .045),
             blurRadius: 22,
             offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding:
-                const EdgeInsets.all(17),
+            padding: const EdgeInsets.all(17),
             child: Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 49,
                   height: 49,
                   decoration: BoxDecoration(
-                    color: status ==
-                            'searching'
-                        ? colors.primary
-                            .withValues(
-                            alpha: .10,
-                          )
-                        : raSuccess
-                            .withValues(
-                            alpha: .10,
-                          ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      16,
-                    ),
+                    color: status == 'searching'
+                        ? colors.primary.withValues(alpha: .10)
+                        : raSuccess.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     status == 'searching'
-                        ? Icons
-                            .person_search_rounded
-                        : status ==
-                                'en_route'
-                            ? Icons
-                                .navigation_rounded
-                            : Icons
-                                .handyman_outlined,
-                    color:
-                        status == 'searching'
-                            ? colors.primary
-                            : raSuccess,
+                        ? Icons.person_search_rounded
+                        : status == 'en_route'
+                        ? Icons.navigation_rounded
+                        : Icons.handyman_outlined,
+                    color: status == 'searching' ? colors.primary : raSuccess,
                     size: 23,
                   ),
                 ),
@@ -1593,28 +975,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      StatusPill(
-                        label: label,
-                        tone: tone,
-                      ),
+                      StatusPill(label: label, tone: tone),
 
                       const SizedBox(height: 8),
 
                       Text(
                         provider,
                         maxLines: 1,
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 14.5,
-                          fontWeight:
-                              FontWeight.w700,
-                          color:
-                              colors.onSurface,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: colors.onSurface,
                         ),
                       ),
 
@@ -1623,14 +997,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       Text(
                         issue,
                         maxLines: 2,
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 10.8,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
                           height: 1.4,
-                          color: colors
-                              .onSurfaceVariant,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -1643,93 +1014,57 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           if (timelineIndex >= 0) ...[
             Divider(
               height: 1,
-              color: colors.outlineVariant
-                  .withValues(alpha: .45),
+              color: colors.outlineVariant.withValues(alpha: .45),
             ),
 
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                17,
-                16,
-                17,
-                12,
-              ),
+              padding: const EdgeInsets.fromLTRB(17, 16, 17, 12),
               child: StatusTimeline(
-                statuses: const [
-                  'Accepted',
-                  'On way',
-                  'Arrived',
-                  'Completed',
-                ],
+                statuses: const ['Accepted', 'On way', 'Arrived', 'Completed'],
                 current: timelineIndex,
               ),
             ),
           ],
 
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(
-              17,
-              9,
-              17,
-              17,
-            ),
+            padding: const EdgeInsets.fromLTRB(17, 9, 17, 17),
             child: Column(
               children: [
                 if (assigned) ...[
                   Row(
                     children: [
                       Expanded(
-                        child:
-                            OutlinedButton.icon(
+                        child: OutlinedButton.icon(
                           onPressed: () {
                             push(
                               context,
                               ChatScreen(
-                                requestId:
-                                    request.id,
-                                peerName:
-                                    provider,
-                                peerPhone:
-                                    phone,
+                                requestId: request.id,
+                                peerName: provider,
+                                peerPhone: phone,
                               ),
                             );
                           },
-                          icon: const Icon(
-                            Icons
-                                .chat_bubble_outline_rounded,
-                          ),
-                          label: const Text(
-                            'Message',
-                          ),
+                          icon: const Icon(Icons.chat_bubble_outline_rounded),
+                          label: const Text('Message'),
                         ),
                       ),
 
                       const SizedBox(width: 9),
 
                       Expanded(
-                        child:
-                            OutlinedButton.icon(
-                          onPressed: phone
-                                  .trim()
-                                  .isEmpty
+                        child: OutlinedButton.icon(
+                          onPressed: phone.trim().isEmpty
                               ? null
                               : () {
                                   showCallPrompt(
                                     context,
-                                    name:
-                                        provider,
-                                    number:
-                                        phone,
+                                    name: provider,
+                                    number: phone,
                                   );
                                 },
-                          icon: const Icon(
-                            Icons.call_outlined,
-                          ),
-                          label: const Text(
-                            'Call',
-                          ),
+                          icon: const Icon(Icons.call_outlined),
+                          label: const Text('Call'),
                         ),
                       ),
                     ],
@@ -1744,10 +1079,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     onPressed: openRequest,
                     icon: Icon(
                       status == 'searching'
-                          ? Icons
-                              .search_rounded
-                          : Icons
-                              .near_me_outlined,
+                          ? Icons.search_rounded
+                          : Icons.near_me_outlined,
                     ),
                     label: Text(
                       status == 'searching'
@@ -1764,34 +1097,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     );
   }
 
-  Widget _buildNoActiveAssistance(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  Widget _buildNoActiveAssistance(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return _DriverHomeSurface(
       child: Row(
         children: [
-          _DriverHomeIconBox(
-            icon: Icons.route_outlined,
-            color: colors.primary,
-          ),
+          _DriverHomeIconBox(icon: Icons.route_outlined, color: colors.primary),
 
           const SizedBox(width: 13),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'No active assistance',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 13.5,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: colors.onSurface,
                   ),
                 ),
@@ -1800,12 +1124,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
                 Text(
                   'Everything looks clear. Start a request whenever you need roadside help.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     height: 1.45,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1817,14 +1139,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           IconButton(
             tooltip: 'Request assistance',
             onPressed: () {
-              push(
-                context,
-                const AssistanceTypeScreen(),
-              );
+              push(context, const AssistanceTypeScreen());
             },
-            icon: const Icon(
-              Icons.arrow_forward_rounded,
-            ),
+            icon: const Icon(Icons.arrow_forward_rounded),
           ),
         ],
       ),
@@ -1835,143 +1152,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // LOCATION CARD
   // ===========================================================================
 
-  Widget _buildLocationCard(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
-
-    final hasLocation =
-        locationLabel.trim().isNotEmpty &&
-            locationLabel !=
-                'Location not set';
-
-    return _DriverHomeSurface(
-      onTap: updatingLocation
-          ? null
-          : changeHomeLocation,
-      child: Row(
-        children: [
-          _DriverHomeIconBox(
-            icon: hasLocation
-                ? Icons.location_on_rounded
-                : Icons
-                    .location_searching_rounded,
-            color: colors.primary,
-          ),
-
-          const SizedBox(width: 13),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Current location',
-                        style: GoogleFonts
-                            .plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight:
-                              FontWeight.w700,
-                          color:
-                              colors.onSurface,
-                        ),
-                      ),
-                    ),
-
-                    Text(
-                      hasLocation
-                          ? 'UPDATE'
-                          : 'SET',
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        color: colors.primary,
-                        fontSize: 8.5,
-                        fontWeight:
-                            FontWeight.w700,
-                        letterSpacing: .7,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  locationLabel,
-                  maxLines: 2,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
-                    height: 1.4,
-                    color: colors
-                        .onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          if (updatingLocation)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child:
-                  CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            )
-          else
-            Icon(
-              Icons.chevron_right_rounded,
-              color:
-                  colors.onSurfaceVariant,
-              size: 20,
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // QUICK ACTIONS
-  // ===========================================================================
-
-  Widget _buildQuickActions(
-    BuildContext context,
-  ) {
+  Widget _buildQuickActions(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = 9.0;
 
-        final width =
-            (constraints.maxWidth -
-                    gap * 2) /
-                3;
+        final width = (constraints.maxWidth - gap * 2) / 3;
 
         return Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: width,
               child: _DriverHomeQuickAction(
-                icon:
-                    Icons.person_search_outlined,
+                icon: Icons.person_search_outlined,
                 label: 'Providers',
                 onTap: () {
-                  push(
-                    context,
-                    const ProviderDirectoryScreen(),
-                  );
+                  push(context, const ProviderDirectoryScreen());
                 },
               ),
             ),
@@ -1981,14 +1178,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             SizedBox(
               width: width,
               child: _DriverHomeQuickAction(
-                icon:
-                    Icons.receipt_long_outlined,
+                icon: Icons.receipt_long_outlined,
                 label: 'Requests',
                 onTap: () {
-                  push(
-                    context,
-                    const HistoryScreen(),
-                  );
+                  push(context, const HistoryScreen());
                 },
               ),
             ),
@@ -1998,16 +1191,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             SizedBox(
               width: width,
               child: _DriverHomeQuickAction(
-                icon: Icons
-                    .chat_bubble_outline_rounded,
+                icon: Icons.chat_bubble_outline_rounded,
                 label: 'Messages',
                 onTap: () {
-                  push(
-                    context,
-                    const _ChatInboxScreen(
-                      isProvider: false,
-                    ),
-                  );
+                  push(context, const _ChatInboxScreen(isProvider: false));
                 },
               ),
             ),
@@ -2021,20 +1208,16 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // EMERGENCY
   // ===========================================================================
 
-  Widget _buildEmergencyContacts(
-    BuildContext context,
-  ) {
+  Widget _buildEmergencyContacts(BuildContext context) {
     return Column(
       children: [
         Row(
           children: [
             Expanded(
-              child:
-                  _DriverEmergencyActionCard(
+              child: _DriverEmergencyActionCard(
                 title: 'Police',
                 number: '119',
-                icon:
-                    Icons.local_police_outlined,
+                icon: Icons.local_police_outlined,
                 onTap: () {
                   showCallPrompt(
                     context,
@@ -2048,17 +1231,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             const SizedBox(width: 10),
 
             Expanded(
-              child:
-                  _DriverEmergencyActionCard(
+              child: _DriverEmergencyActionCard(
                 title: 'Ambulance',
                 number: '1990',
-                icon:
-                    Icons.emergency_outlined,
+                icon: Icons.emergency_outlined,
                 onTap: () {
                   showCallPrompt(
                     context,
-                    name:
-                        'Suwa Seriya Ambulance',
+                    name: 'Suwa Seriya Ambulance',
                     number: '1990',
                   );
                 },
@@ -2071,8 +1251,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
         const _DriverHomeSurface(
           padding: EdgeInsets.zero,
-          child:
-              _DriverEmergencyContactTile(),
+          child: _DriverEmergencyContactTile(),
         ),
       ],
     );
@@ -2083,171 +1262,73 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // ===========================================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme = Theme.of(context);
-
-    return ColoredBox(
-      color: theme.scaffoldBackgroundColor,
-      child: SafeArea(
-        bottom: false,
-        child: CustomScrollView(
-          physics:
-              const BouncingScrollPhysics(),
-          slivers: [
-            const SliverToBoxAdapter(
-              child: ServiceNotice(),
+  Widget build(BuildContext context) => RaDriverScaffold(
+    body: SafeArea(
+      bottom: false,
+      child: ListView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
+        children: [
+          const ServiceNotice(),
+          _buildHeader(context),
+          _buildAssistanceHero(context),
+          const SizedBox(height: 14),
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: signedIn ? AuthService().watchCurrentProfile() : null,
+            builder: (context, snapshot) => _buildSavedVehicleCard(
+              snapshot.data?.data()?['defaultVehicleId'] as String?,
             ),
-
-            SliverToBoxAdapter(
-              child: _buildHeader(context),
-            ),
-
-            SliverPadding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                18,
-                0,
-                18,
-                36,
-              ),
-              sliver: SliverList(
-                delegate:
-                    SliverChildListDelegate(
-                  [
-                    StreamBuilder<
-                        DocumentSnapshot<
-                            Map<String,
-                                dynamic>>>(
-                      stream: signedIn
-                          ? AuthService()
-                              .watchCurrentProfile()
-                          : null,
-                      builder:
-                          (context, snapshot) {
-                        return _buildSavedVehicleCard(
-                          snapshot.data
-                                  ?.data()?[
-                              'defaultVehicleId']
-                              as String?,
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    _buildAssistanceHero(
-                      context,
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    _DriverHomeSectionHeader(
-                      title: 'Quick help',
-                      subtitle:
-                          'Start with the problem you are facing',
-                      action: 'View all',
-                      onAction: () {
-                        push(
-                          context,
-                          const AssistanceTypeScreen(),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 11),
-
-                    _buildQuickHelp(context),
-
-                    const SizedBox(height: 28),
-
-                    _DriverHomeSectionHeader(
-                      title:
-                          'Active assistance',
-                      subtitle:
-                          'Live status of your current roadside request',
-                      action: 'Requests',
-                      onAction: () {
-                        push(
-                          context,
-                          const HistoryScreen(),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 11),
-
-                    _buildMyRequests(
-                      context,
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    _buildLocationCard(
-                      context,
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    _buildQuickActions(
-                      context,
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    _DriverHomeSectionHeader(
-                      title:
-                          'Nearby assistance',
-                      subtitle:
-                          'Verified providers currently available',
-                      action: 'See all',
-                      onAction: () {
-                        push(
-                          context,
-                          const ProviderDirectoryScreen(),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 11),
-
-                    const _NearbyProvidersPreview(),
-
-                    const SizedBox(height: 28),
-
-                    const _DriverHomeSectionHeader(
-                      title: 'Emergency',
-                      subtitle:
-                          'Important contacts when immediate help is needed',
-                    ),
-
-                    const SizedBox(height: 11),
-
-                    _buildEmergencyContacts(
-                      context,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          _DriverHomeSectionHeader(
+            title: 'Active assistance',
+            subtitle: 'Follow your current roadside request',
+            action: 'Requests',
+            onAction: () => push(context, const HistoryScreen()),
+          ),
+          const SizedBox(height: 10),
+          _buildMyRequests(context),
+          const SizedBox(height: 24),
+          _DriverHomeSectionHeader(
+            title: 'Nearby assistance',
+            subtitle: 'Online providers within your service area',
+            action: 'See all',
+            onAction: () => push(context, const ProviderDirectoryScreen()),
+          ),
+          const SizedBox(height: 10),
+          const _NearbyProvidersPreview(),
+          const SizedBox(height: 24),
+          _DriverHomeSectionHeader(
+            title: 'Quick Help',
+            subtitle: 'Start with the issue you are facing',
+            action: 'View all',
+            onAction: () => push(context, const AssistanceTypeScreen()),
+          ),
+          const SizedBox(height: 10),
+          _buildQuickHelp(context),
+          const SizedBox(height: 14),
+          _buildQuickActions(context),
+          const SizedBox(height: 24),
+          const _DriverHomeSectionHeader(
+            title: 'Emergency',
+            subtitle: 'Important contacts when you need urgent help',
+          ),
+          const SizedBox(height: 10),
+          _buildEmergencyContacts(context),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 // =============================================================================
 // SURFACE
 // =============================================================================
 
-class _DriverHomeSurface
-    extends StatelessWidget {
+class _DriverHomeSurface extends StatelessWidget {
   const _DriverHomeSurface({
     required this.child,
-    this.padding =
-        const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(16),
     this.onTap,
   });
 
@@ -2258,37 +1339,25 @@ class _DriverHomeSurface
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final dark = theme.brightness == Brightness.dark;
 
     return Material(
-      color: dark
-          ? const Color(0xFF0D1D2B)
-          : Colors.white,
-      borderRadius:
-          BorderRadius.circular(21),
+      color: dark ? const Color(0xFF0D2237) : Colors.white,
+      borderRadius: BorderRadius.circular(21),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(21),
+            borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: dark
-                  ? Colors.white
-                      .withValues(alpha: .07)
-                  : const Color(
-                      0xFFDEE9F2,
-                    ),
+                  ? Colors.white.withValues(alpha: .07)
+                  : const Color(0xFFDEE9F2),
             ),
           ),
-          child: Padding(
-            padding: padding,
-            child: child,
-          ),
+          child: Padding(padding: padding, child: child),
         ),
       ),
     );
@@ -2299,8 +1368,7 @@ class _DriverHomeSurface
 // SECTION HEADER
 // =============================================================================
 
-class _DriverHomeSectionHeader
-    extends StatelessWidget {
+class _DriverHomeSectionHeader extends StatelessWidget {
   const _DriverHomeSectionHeader({
     required this.title,
     this.subtitle,
@@ -2315,26 +1383,21 @@ class _DriverHomeSectionHeader
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 17,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 18,
                   letterSpacing: -.35,
-                  fontWeight:
-                      FontWeight.w800,
+                  fontWeight: FontWeight.w800,
                   color: colors.onSurface,
                 ),
               ),
@@ -2344,14 +1407,11 @@ class _DriverHomeSectionHeader
                 Text(
                   subtitle!,
                   maxLines: 2,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     height: 1.4,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -2365,21 +1425,14 @@ class _DriverHomeSectionHeader
           TextButton(
             onPressed: onAction,
             style: TextButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 4,
-              ),
-              minimumSize:
-                  const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: const Size(0, 36),
             ),
             child: Text(
               action!,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 10.5,
-                fontWeight:
-                    FontWeight.w700,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -2393,8 +1446,7 @@ class _DriverHomeSectionHeader
 // QUICK HELP CARD
 // =============================================================================
 
-class _DriverQuickHelpCard
-    extends StatelessWidget {
+class _DriverQuickHelpCard extends StatelessWidget {
   const _DriverQuickHelpCard({
     required this.title,
     required this.subtitle,
@@ -2414,35 +1466,27 @@ class _DriverQuickHelpCard
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final dark = theme.brightness == Brightness.dark;
 
     return Material(
       color: dark
           ? Color.alphaBlend(
               tone.withValues(alpha: .075),
-              const Color(0xFF0D1D2B),
+              const Color(0xFF0D2237),
             )
           : Colors.white,
-      borderRadius:
-          BorderRadius.circular(19),
+      borderRadius: BorderRadius.circular(19),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Ink(
-          padding:
-              const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(19),
+            borderRadius: BorderRadius.circular(19),
             border: Border.all(
               color: dark
-                  ? tone.withValues(
-                      alpha: .15,
-                    )
-                  : const Color(
-                      0xFFDEE9F2,
-                    ),
+                  ? tone.withValues(alpha: .15)
+                  : const Color(0xFFDEE9F2),
             ),
           ),
           child: Row(
@@ -2451,40 +1495,26 @@ class _DriverQuickHelpCard
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: tone.withValues(
-                    alpha: dark ? .14 : .09,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    13,
-                  ),
+                  color: tone.withValues(alpha: dark ? .14 : .09),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(
-                  icon,
-                  color: tone,
-                  size: 21,
-                ),
+                child: Icon(icon, color: tone, size: 21),
               ),
 
               const SizedBox(width: 10),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight:
-                            FontWeight.w700,
-                        color:
-                            colors.onSurface,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
                       ),
                     ),
 
@@ -2493,13 +1523,10 @@ class _DriverQuickHelpCard
                     Text(
                       subtitle,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9.5,
-                        color: colors
-                            .onSurfaceVariant,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -2517,8 +1544,7 @@ class _DriverQuickHelpCard
 // QUICK ACTION
 // =============================================================================
 
-class _DriverHomeQuickAction
-    extends StatelessWidget {
+class _DriverHomeQuickAction extends StatelessWidget {
   const _DriverHomeQuickAction({
     required this.icon,
     required this.label,
@@ -2534,60 +1560,36 @@ class _DriverHomeQuickAction
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final dark = theme.brightness == Brightness.dark;
 
     return Material(
-      color: dark
-          ? const Color(0xFF0D1D2B)
-          : Colors.white,
-      borderRadius:
-          BorderRadius.circular(18),
+      color: dark ? const Color(0xFF0D2237) : Colors.white,
+      borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          constraints:
-              const BoxConstraints(
-            minHeight: 91,
-          ),
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 5,
-            vertical: 13,
-          ),
+          constraints: const BoxConstraints(minHeight: 91),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 13),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: dark
-                  ? Colors.white
-                      .withValues(alpha: .07)
-                  : const Color(
-                      0xFFDEE9F2,
-                    ),
+                  ? Colors.white.withValues(alpha: .07)
+                  : const Color(0xFFDEE9F2),
             ),
           ),
           child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: colors.primary
-                      .withValues(alpha: .09),
-                  borderRadius:
-                      BorderRadius.circular(
-                    13,
-                  ),
+                  color: colors.primary.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(
-                  icon,
-                  color: colors.primary,
-                  size: 20,
-                ),
+                child: Icon(icon, color: colors.primary, size: 20),
               ),
 
               const SizedBox(height: 8),
@@ -2597,11 +1599,9 @@ class _DriverHomeQuickAction
                 child: Text(
                   label,
                   maxLines: 1,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9.8,
-                    fontWeight:
-                        FontWeight.w600,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     color: colors.onSurface,
                   ),
                 ),
@@ -2618,12 +1618,8 @@ class _DriverHomeQuickAction
 // ICON BOX
 // =============================================================================
 
-class _DriverHomeIconBox
-    extends StatelessWidget {
-  const _DriverHomeIconBox({
-    required this.icon,
-    required this.color,
-  });
+class _DriverHomeIconBox extends StatelessWidget {
+  const _DriverHomeIconBox({required this.icon, required this.color});
 
   final IconData icon;
   final Color color;
@@ -2634,17 +1630,10 @@ class _DriverHomeIconBox
       width: 43,
       height: 43,
       decoration: BoxDecoration(
-        color: color.withValues(
-          alpha: .09,
-        ),
-        borderRadius:
-            BorderRadius.circular(14),
+        color: color.withValues(alpha: .09),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: 21,
-      ),
+      child: Icon(icon, color: color, size: 21),
     );
   }
 }
@@ -2653,8 +1642,7 @@ class _DriverHomeIconBox
 // LOCATION SHEET ITEM
 // =============================================================================
 
-class _DriverHomeSheetAction
-    extends StatelessWidget {
+class _DriverHomeSheetAction extends StatelessWidget {
   const _DriverHomeSheetAction({
     required this.icon,
     required this.title,
@@ -2669,44 +1657,32 @@ class _DriverHomeSheetAction
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: colors
-          .surfaceContainerHighest
-          .withValues(alpha: .36),
-      borderRadius:
-          BorderRadius.circular(18),
+      color: colors.surfaceContainerHighest.withValues(alpha: .36),
+      borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              _DriverHomeIconBox(
-                icon: icon,
-                color: colors.primary,
-              ),
+              _DriverHomeIconBox(icon: icon, color: colors.primary),
 
               const SizedBox(width: 12),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.w700,
-                        color:
-                            colors.onSurface,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
                       ),
                     ),
 
@@ -2714,12 +1690,10 @@ class _DriverHomeSheetAction
 
                     Text(
                       subtitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
                         height: 1.4,
-                        color: colors
-                            .onSurfaceVariant,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -2731,8 +1705,7 @@ class _DriverHomeSheetAction
               Icon(
                 Icons.chevron_right_rounded,
                 size: 20,
-                color:
-                    colors.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ],
           ),
@@ -2746,8 +1719,7 @@ class _DriverHomeSheetAction
 // EMERGENCY CARD
 // =============================================================================
 
-class _DriverEmergencyActionCard
-    extends StatelessWidget {
+class _DriverEmergencyActionCard extends StatelessWidget {
   const _DriverEmergencyActionCard({
     required this.title,
     required this.number,
@@ -2765,33 +1737,25 @@ class _DriverEmergencyActionCard
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final dark = theme.brightness == Brightness.dark;
 
     return Material(
       color: dark
           ? Color.alphaBlend(
-              raDanger.withValues(
-                alpha: .075,
-              ),
-              const Color(0xFF0D1D2B),
+              raDanger.withValues(alpha: .075),
+              const Color(0xFF0D2237),
             )
           : Colors.white,
-      borderRadius:
-          BorderRadius.circular(19),
+      borderRadius: BorderRadius.circular(19),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(19),
+            borderRadius: BorderRadius.circular(19),
             border: Border.all(
-              color: raDanger.withValues(
-                alpha: dark ? .19 : .13,
-              ),
+              color: raDanger.withValues(alpha: dark ? .19 : .13),
             ),
           ),
           child: Row(
@@ -2800,39 +1764,26 @@ class _DriverEmergencyActionCard
                 width: 41,
                 height: 41,
                 decoration: BoxDecoration(
-                  color: raDanger
-                      .withValues(alpha: .09),
-                  borderRadius:
-                      BorderRadius.circular(
-                    13,
-                  ),
+                  color: raDanger.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: Icon(
-                  icon,
-                  color: raDanger,
-                  size: 21,
-                ),
+                child: Icon(icon, color: raDanger, size: 21),
               ),
 
               const SizedBox(width: 10),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10.5,
-                        fontWeight:
-                            FontWeight.w600,
-                        color:
-                            colors.onSurface,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: colors.onSurface,
                       ),
                     ),
 
@@ -2840,11 +1791,9 @@ class _DriverEmergencyActionCard
 
                     Text(
                       number,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 14,
-                        fontWeight:
-                            FontWeight.w800,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
                         color: raDanger,
                       ),
                     ),
@@ -2863,8 +1812,7 @@ class _DriverEmergencyActionCard
 // MESSAGE / EMPTY CARD
 // =============================================================================
 
-class _DriverHomeMessageCard
-    extends StatelessWidget {
+class _DriverHomeMessageCard extends StatelessWidget {
   const _DriverHomeMessageCard({
     required this.icon,
     required this.title,
@@ -2881,31 +1829,24 @@ class _DriverHomeMessageCard
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return _DriverHomeSurface(
       child: Row(
         children: [
-          _DriverHomeIconBox(
-            icon: icon,
-            color: colors.primary,
-          ),
+          _DriverHomeIconBox(icon: icon, color: colors.primary),
 
           const SizedBox(width: 13),
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 12.5,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: colors.onSurface,
                   ),
                 ),
@@ -2914,25 +1855,19 @@ class _DriverHomeMessageCard
 
                 Text(
                   message,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     height: 1.45,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
 
-          if (action != null &&
-              onTap != null) ...[
+          if (action != null && onTap != null) ...[
             const SizedBox(width: 8),
-            TextButton(
-              onPressed: onTap,
-              child: Text(action!),
-            ),
+            TextButton(onPressed: onTap, child: Text(action!)),
           ],
         ],
       ),
@@ -2944,14 +1879,12 @@ class _DriverHomeMessageCard
 // LOADING CARD
 // =============================================================================
 
-class _DriverHomeLoadingCard
-    extends StatelessWidget {
+class _DriverHomeLoadingCard extends StatelessWidget {
   const _DriverHomeLoadingCard();
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return _DriverHomeSurface(
       child: Row(
@@ -2960,17 +1893,12 @@ class _DriverHomeLoadingCard
             width: 43,
             height: 43,
             decoration: BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest,
-              borderRadius:
-                  BorderRadius.circular(14),
+              color: colors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(14),
             ),
             child: const Padding(
               padding: EdgeInsets.all(12),
-              child:
-                  CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
 
@@ -2978,19 +1906,14 @@ class _DriverHomeLoadingCard
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   height: 10,
                   width: 120,
                   decoration: BoxDecoration(
-                    color: colors
-                        .surfaceContainerHighest,
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
-                    ),
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
 
@@ -3000,13 +1923,10 @@ class _DriverHomeLoadingCard
                   height: 8,
                   width: 185,
                   decoration: BoxDecoration(
-                    color: colors
-                        .surfaceContainerHighest
-                        .withValues(alpha: .65),
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
+                    color: colors.surfaceContainerHighest.withValues(
+                      alpha: .65,
                     ),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ],

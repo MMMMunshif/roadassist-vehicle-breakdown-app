@@ -1,3 +1,4 @@
+import '../models/provider_document_correction.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -71,6 +72,8 @@ class AdminService {
     int? verificationRevision,
     DateTime? validUntil,
     List<String>? verificationChecks,
+    List<String>? correctionDocuments,
+    int? expectedApplicationRevision,
   }) async {
     await requireAdmin();
     final actor = FirebaseAuth.instance.currentUser!.uid;
@@ -78,17 +81,54 @@ class AdminService {
     final audit = db.collection('adminAudit').doc();
     await db.runTransaction((tx) async {
       final before = (await tx.get(ref)).data() ?? <String, dynamic>{};
-      if (verification == 'verified') {
-        final application = (await tx.get(db.collection('providerApplications').doc(uid))).data();
-        if (application == null || application['applicationStatus'] == 'withdrawn' || application['revision'] != verificationRevision) {
-          throw StateError('Application withdrawn or changed. Refresh before reviewing.');
+      if (verification == 'verified' || correctionDocuments != null) {
+        final application = (await tx.get(
+          db.collection('providerApplications').doc(uid),
+        )).data();
+        if (verification == 'verified' &&
+            ProviderDocumentCorrection.active(application, before) != null)
+          throw StateError(
+            'Wait for the requested documents to be resubmitted.',
+          );
+        if (application == null ||
+            application['applicationStatus'] == 'withdrawn' ||
+            application['revision'] !=
+                (correctionDocuments != null
+                    ? expectedApplicationRevision
+                    : verificationRevision)) {
+          throw StateError(
+            'Application withdrawn or changed. Refresh before reviewing.',
+          );
         }
       }
 
       final directory = await tx.get(
         db.collection('providerDirectory').doc(uid),
       );
+      if (correctionDocuments != null &&
+          (verification != 'pending' ||
+              correctionDocuments.isEmpty ||
+              correctionDocuments.length > 6 ||
+              correctionDocuments.toSet().length !=
+                  correctionDocuments.length ||
+              !correctionDocuments.every(
+                ProviderDocumentCorrection.labels.containsKey,
+              ) ||
+              reason.trim().length < 10 ||
+              reason.trim().length > 500)) {
+        throw StateError(
+          'Select documents and enter clear instructions (10-500 characters).',
+        );
+      }
       final after = <String, dynamic>{
+        if (correctionDocuments != null)
+          'correctionRequest': {
+            'revision': expectedApplicationRevision,
+            'documents': correctionDocuments,
+            'requestedAt': FieldValue.serverTimestamp(),
+          },
+        if (verification == null && before['correctionRequest'] != null)
+          'correctionRequest': before['correctionRequest'],
         if (before['verificationRevision'] != null)
           'verificationRevision': before['verificationRevision'],
         if (before['validUntil'] != null) 'validUntil': before['validUntil'],
@@ -153,6 +193,11 @@ class AdminService {
         'lastAuditId': audit.id,
       };
       tx.set(ref, after);
+      tx.set(ref.collection('history').doc(audit.id), {
+        'status': status,
+        'decision': decision.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       tx.set(audit, {
         'kind': 'complaint',
         'target': requestId,

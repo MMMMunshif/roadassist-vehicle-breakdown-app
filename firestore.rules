@@ -12,7 +12,19 @@ service cloud.firestore {
 
     function hasRole(uid, role) {
       let profile = get(/databases/$(database)/documents/users/$(uid)).data;
-      return profile.role == role || role in profile.get('roles', []);
+      return (profile.role == role || role in profile.get('roles', []))
+        && (profile.role == role || roleEmailConfirmed(uid, role, profile));
+    }
+
+    function roleEmailConfirmed(uid, role, profile) {
+      let path = /databases/$(database)/documents/roleEmailVerifications/$(uid);
+      return !(role in profile.get('roleEmailRequired', []))
+        || (exists(path) && get(path).data.get(role, {}).get('email', '') == (uid == request.auth.uid ? request.auth.token.get('email', '').lower() : profile.get('email', '').lower()));
+    }
+
+    match /roleEmailVerifications/{uid} {
+      allow read: if authenticated() && request.auth.uid == uid;
+      allow write: if false;
     }
 
     function authenticated() { return request.auth != null; }
@@ -89,7 +101,7 @@ service cloud.firestore {
           && d.keys().hasAll(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails'])
           && d.keys().hasOnly(['legalName','nicNumber','address','businessName','emergencyPhone','experienceYears','services','vehicleTypes','documents','revision','submittedAt','termsAccepted','consentVersion','professionalDetails','customServices'])
           && validCustomServices(d.get('customServices', []), d.services)
-          && validProfessional(d.professionalDetails, d.services)
+          && ((resource != null && resource.data.get('professionalDetails', {}) == d.professionalDetails && resource.data.services == d.services) || validProfessional(d.professionalDetails, d.services))
           && d.legalName is string && d.legalName.size() >= 2 && d.legalName.size() <= 100
           && d.nicNumber is string && d.nicNumber.matches('([0-9]{9}[VX]|[0-9]{12})')
           && d.address is string && d.address.size() >= 5 && d.address.size() <= 300
@@ -108,20 +120,53 @@ service cloud.firestore {
           && (d.professionalDetails.providerType != 'business' || 'businessProof' in d.documents)
           && d.revision is int && d.submittedAt == request.time && d.termsAccepted == true && d.consentVersion == 1;
       }
+      function correctionOnly() {
+        let review = get(/databases/$(database)/documents/accountModeration/$(uid)).data;
+        let correction = review.get('correctionRequest', {});
+        return !('correctionRequest' in review) || (correction.get('revision', -1) == resource.data.revision &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['documents','revision','submittedAt'])
+          && request.resource.data.documents.keys().hasAll(correction.documents)
+          && request.resource.data.documents.diff(resource.data.documents).affectedKeys().hasOnly(correction.documents)
+          && request.resource.data.documents.diff(resource.data.documents).affectedKeys().hasAll(correction.documents));
+      }
       allow read: if (authenticated() && request.auth.uid == uid) || canReviewProviders();
       allow create: if owner() && valid() && request.resource.data.revision == 1;
-      allow update: if owner() && valid() && request.resource.data.revision == resource.data.revision + 1
-        && (resource.data.get('applicationStatus', 'submitted') == 'withdrawn' || !('professionalDetails' in resource.data) || (
-          exists(/databases/$(database)/documents/accountModeration/$(uid))
-          && get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending'
-          && get(/databases/$(database)/documents/accountModeration/$(uid)).data.updatedAt > resource.data.submittedAt));
+      function hasCorrection() {
+        return exists(/databases/$(database)/documents/accountModeration/$(uid))
+          && 'correctionRequest' in get(/databases/$(database)/documents/accountModeration/$(uid)).data;
+      }
+      function validCorrectedDocuments() {
+        let d = request.resource.data.documents;
+        return d is map && d.keys().hasAll(['nicFront','nicBack','selfie','serviceProof'])
+          && d.keys().hasOnly(['nicFront','nicBack','selfie','serviceProof','recoveryProof','businessProof'])
+          && validDocument(d.nicFront) && validDocument(d.nicBack) && validDocument(d.selfie) && validDocument(d.serviceProof)
+          && (!('recoveryProof' in d) || validDocument(d.recoveryProof))
+          && (!('businessProof' in d) || validDocument(d.businessProof));
+      }
+      function withdrawApplication() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicationStatus','withdrawnAt'])
+          && resource.data.get('applicationStatus','submitted') != 'withdrawn'
+          && request.resource.data.get('applicationStatus','submitted') == 'withdrawn'
+          && request.resource.data.withdrawnAt == request.time
+          && (!exists(/databases/$(database)/documents/accountModeration/$(uid))
+            || get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending');
+      }
+      function resubmitApplication() {
+        let withdrawn = resource.data.get('applicationStatus','submitted') == 'withdrawn';
+        let selected = !withdrawn && hasCorrection();
+        return request.resource.data.revision == resource.data.revision + 1
+          && request.resource.data.submittedAt == request.time
+          && (selected ? (
+            get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending'
+            && correctionOnly() && validCorrectedDocuments()) : (
+            (withdrawn || !('professionalDetails' in resource.data) || (
+              exists(/databases/$(database)/documents/accountModeration/$(uid))
+              && get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending'
+              && get(/databases/$(database)/documents/accountModeration/$(uid)).data.updatedAt > resource.data.submittedAt))
+            && valid()));
+      }
       allow update: if owner() && request.auth.token.get('email_verified', false) == true
-        && resource.data.get('applicationStatus', 'submitted') != 'withdrawn'
-        && (!exists(/databases/$(database)/documents/accountModeration/$(uid))
-          || get(/databases/$(database)/documents/accountModeration/$(uid)).data.verification == 'pending')
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['applicationStatus','withdrawnAt'])
-        && request.resource.data.applicationStatus == 'withdrawn'
-        && request.resource.data.withdrawnAt == request.time;
+        && (withdrawApplication() || resubmitApplication());
       allow delete: if false;
     }
     function validCustomService(d, services) {
@@ -164,13 +209,27 @@ service cloud.firestore {
       return a.actor == request.auth.uid && a.kind == kind && a.target == target && a.createdAt == request.time;
     }
 
+    function validCorrection(uid, d) {
+      let c = d.correctionRequest;
+      let app = get(/databases/$(database)/documents/providerApplications/$(uid)).data;
+      return c is map && c.keys().hasOnly(['revision','documents','requestedAt'])
+        && c.keys().hasAll(['revision','documents','requestedAt'])
+        && c.revision is int && c.documents is list && c.documents.size() > 0 && c.documents.size() <= 6
+        && c.documents.toSet().size() == c.documents.size()
+        && c.documents.hasOnly(['selfie','nicFront','nicBack','serviceProof','businessProof','recoveryProof'])
+        && c.requestedAt is timestamp
+        && ((resource != null && c == resource.data.get('correctionRequest', {})) || (
+          d.verification == 'pending' && c.requestedAt == request.time && c.revision == app.revision
+          && app.get('applicationStatus','submitted') != 'withdrawn'));
+    }
     match /accountModeration/{uid} {
       allow read: if (authenticated() && request.auth.uid == uid) || isAdmin();
       allow create, update: if isAdmin()
         && (superAdmin() || (canReviewProviders() && hasRole(uid, 'provider')))
         && exists(/databases/$(database)/documents/users/$(uid))
         && request.resource.data.keys().hasAll(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
-        && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId','verificationRevision','validUntil','verificationChecks'])
+        && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId','verificationRevision','validUntil','verificationChecks','correctionRequest'])
+        && (!('correctionRequest' in request.resource.data) || validCorrection(uid, request.resource.data))
         && request.resource.data.status in ['active','suspended']
         && request.resource.data.verification in ['pending','verified','rejected']
         && request.resource.data.flagged is bool
@@ -184,6 +243,7 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/providerApplications/$(uid))
           && get(/databases/$(database)/documents/providerApplications/$(uid)).data.get('applicationStatus', 'submitted') != 'withdrawn'
           && validProfessional(get(/databases/$(database)/documents/providerApplications/$(uid)).data.professionalDetails, get(/databases/$(database)/documents/providerApplications/$(uid)).data.services)
+          && (resource == null || resource.data.get('correctionRequest', {}).get('revision', -1) != get(/databases/$(database)/documents/providerApplications/$(uid)).data.revision)
           && request.resource.data.verificationRevision == get(/databases/$(database)/documents/providerApplications/$(uid)).data.revision
           && request.resource.data.validUntil is timestamp && request.resource.data.validUntil > request.time && request.resource.data.validUntil <= request.time + duration.value(366, 'd')
           && request.resource.data.verificationChecks is list && request.resource.data.verificationChecks.size() == 4 && request.resource.data.verificationChecks.hasAll(['identity','face','capability','contact'])))
@@ -206,6 +266,17 @@ service cloud.firestore {
         && canSupport()
         && (!('dueAt' in request.resource.data) || (request.resource.data.dueAt is timestamp && request.resource.data.dueAt > request.time && request.resource.data.dueAt <= request.time + duration.value(31, 'd')))
         && validAudit(request.resource.data.lastAuditId, 'complaint', id);
+      match /history/{eventId} {
+        function reviewJob() { return get(/databases/$(database)/documents/requests/$(id)).data; }
+        allow read: if isAdmin() || (signedIn() && (reviewJob().driverId == request.auth.uid || reviewJob().providerId == request.auth.uid));
+        allow create: if canSupport() && isAdmin()
+          && getAfter(/databases/$(database)/documents/complaintReviews/$(id)).data.lastAuditId == eventId
+          && request.resource.data.keys().hasOnly(['status','decision','createdAt'])
+          && request.resource.data.status == getAfter(/databases/$(database)/documents/complaintReviews/$(id)).data.status
+          && request.resource.data.decision == getAfter(/databases/$(database)/documents/complaintReviews/$(id)).data.decision
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
       allow delete: if false;
     }
     match /adminAudit/{id} {
@@ -270,15 +341,24 @@ service cloud.firestore {
         && d.get('roles', [d.role]).hasOnly(['driver', 'provider'])
         && d.role in d.get('roles', [d.role])
         && d.get('lastRole', d.role) in d.get('roles', [d.role]); }
+      function validRoleEmailChange() {
+        let previous = resource.data.get('roles', [resource.data.role]);
+        let required = request.resource.data.get('roleEmailRequired', []);
+        return required is list && required.hasOnly(['driver','provider'])
+          && required.hasAll(resource.data.get('roleEmailRequired', []))
+          && required.hasAll(request.resource.data.get('roles', [resource.data.role]).removeAll(previous));
+      }
       allow create: if authenticated() && !accountBlocked(userId) && request.auth.uid == userId
         && request.resource.data.role in ['driver','provider']
         && validName(request.resource.data) && validEmail(request.resource.data)
         && validPhone(request.resource.data) && validRoles(request.resource.data)
+        && request.resource.data.get('roleEmailRequired', []).hasAll(request.resource.data.get('roles', [request.resource.data.role]).removeAll([request.resource.data.role]))
         && request.resource.data.get('online', false) == false
         && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
       allow read: if isAdmin() || (authenticated() && request.auth.uid == userId);
       allow update: if authenticated() && !accountBlocked(userId)
         && request.auth.uid == userId
+        && validRoleEmailChange()
         && request.resource.data.role == resource.data.role
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName']) || validName(request.resource.data))
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) || validEmail(request.resource.data))
@@ -384,13 +464,46 @@ service cloud.firestore {
     }
 
     match /requests/{requestId} {
+      function validCompletionReport(report) {
+        return report is map && report.keys().hasOnly(['problem','repairs','parts','advice'])
+          && report.problem is string && report.problem.size() >= 10 && report.problem.size() <= 500
+          && report.repairs is string && report.repairs.size() >= 10 && report.repairs.size() <= 500
+          && report.parts is string && report.parts.size() > 0 && report.parts.size() <= 500
+          && report.advice is string && report.advice.size() <= 500;
+      }
+      function discountStart() {
+        let id = request.resource.data.pendingDiscountId;
+        let offer = getAfter(/databases/$(database)/documents/requests/$(requestId)/completionDiscounts/$(id)).data;
+        return resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('completionState','') == 'pending'
+          && resource.data.get('pendingDiscountId',null) == null && id is string
+          && offer.status == 'pending' && offer.previousTotal == resource.data.finalCost
+          && offer.createdAt == request.time
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDiscountId','updatedAt']);
+      }
+      function discountDecision() {
+        let id = resource.data.get('pendingDiscountId','');
+        let before = get(/databases/$(database)/documents/requests/$(requestId)/completionDiscounts/$(id)).data;
+        let offer = getAfter(/databases/$(database)/documents/requests/$(requestId)/completionDiscounts/$(id)).data;
+        return resource.data.providerId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('completionState','') == 'pending' && id is string && id.size() > 0
+          && before.status == 'pending' && before.previousTotal == resource.data.finalCost
+          && offer.status in ['accepted','declined'] && offer.decidedBy == request.auth.uid
+          && offer.decidedAt == request.time && request.resource.data.pendingDiscountId == null
+          && request.resource.data.finalCost == (offer.status == 'accepted' ? before.requestedTotal : resource.data.finalCost)
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDiscountId','finalCost','updatedAt']);
+      }
+
       allow read: if isAdmin();
       allow create: if signedIn() && newRequestsAllowed(request.resource.data.issues)
         && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
         && isDriver()
         && request.resource.data.driverId == request.auth.uid
         && request.resource.data.arrivalVerificationRequired == true
-        && !request.resource.data.keys().hasAny(['arrivalConfirmedBy','arrivalConfirmedAt','arrivalConfirmationMethod','arrivalConfirmationReason','arrivalDistanceMeters'])
+        && (!('jobStartCodeRequired' in request.resource.data) || request.resource.data.jobStartCodeRequired == true)
+        && !request.resource.data.keys().hasAny(['arrivalConfirmedBy','arrivalConfirmedAt','arrivalConfirmationMethod','arrivalConfirmationReason','arrivalDistanceMeters','jobStartCodeVerifiedAt','workStartedAt'])
         && request.resource.data.providerId == null
         && request.resource.data.status == 'searching'
         && (!('workflowVersion' in request.resource.data) || request.resource.data.workflowVersion == 2)
@@ -456,7 +569,7 @@ service cloud.firestore {
           'driverId', 'driverName', 'driverPhone', 'providerId',
           'preferredProviderId', 'preferredProviderName', 'rejectedBy',
           'status', 'issue', 'issues', 'vehicleType', 'modelYear', 'registration',
-          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'partsPreference', 'arrivalVerificationRequired',
+          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'partsPreference', 'arrivalVerificationRequired', 'jobStartCodeRequired',
           'description', 'notes', 'priority', 'vehiclePhotoUrls',
           'photoAnnotations', 'locationLabel', 'landmark',
           'locationAccuracyMeters', 'latitude', 'longitude', 'serviceFee', 'dispatchFee',
@@ -469,7 +582,41 @@ service cloud.firestore {
         || (isProvider() && resource.data.status == 'searching')
       );
 
-      allow update: if signedIn() && (
+      // Completion and price agreement have a separate bounded evaluation path.
+      allow update: if resource.data.status == 'arrived'
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny(['completionState','completionReport','pendingDiscountId'])
+        && signedIn() && (
+        (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('completionState','') == 'pending'
+          && resource.data.get('pendingDiscountId',null) == null
+          && request.resource.data.get('pendingDiscountId',null) is string && discountStart())
+        || (resource.data.providerId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('completionState','') == 'pending'
+          && resource.data.get('pendingDiscountId',null) is string && discountDecision())
+        || (resource.data.providerId == request.auth.uid && resource.data.status == 'arrived'
+          && (!resource.data.get('arrivalVerificationRequired',false) || resource.data.get('arrivalConfirmedBy','') == resource.data.driverId)
+          && resource.data.get('completionState','') != 'pending'
+          && request.resource.data.completionState == 'pending'
+          && request.resource.data.completionSubmittedAt == request.time && request.resource.data.updatedAt == request.time
+          && resource.data.serviceNotes is string && resource.data.serviceNotes.size() >= 10
+          && resource.data.servicePhotoData is list && resource.data.servicePhotoData.size() > 0
+          && request.resource.data.finalCost is int && request.resource.data.finalCost >= 0 && request.resource.data.finalCost <= resource.data.estimatedCost
+          && resource.data.get('pendingRepairId',null) == null
+          && (resource.data.get('approvedQuoteType','direct') != 'inspection' || resource.data.get('approvedRepairId',null) is string)
+          && (!('completionReport' in request.resource.data) || validCompletionReport(request.resource.data.completionReport))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completionState','completionSubmittedAt','finalCost','completionReport','updatedAt']))
+        || (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
+          && resource.data.get('completionState','') == 'pending'
+          && resource.data.get('pendingDiscountId',null) == null
+          && (!exists(/databases/$(database)/documents/requests/$(requestId)/disputes/case) || (exists(/databases/$(database)/documents/complaintReviews/$(requestId)) && get(/databases/$(database)/documents/complaintReviews/$(requestId)).data.status in ['resolved','dismissed']))
+          && request.resource.data.status == 'completed' && request.resource.data.completionState == 'confirmed'
+          && request.resource.data.driverCompletedAt == request.time && request.resource.data.completedAt == request.time && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completionState','driverCompletedAt','completedAt','updatedAt']))
+      );
+
+      allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['completionState','completionReport','pendingDiscountId'])
+        && signedIn() && (
         (resource.data.status == 'completed'
           && resource.data.driverId == request.auth.uid
           && (!('driverReportedPayment' in resource.data) || resource.data.driverReportedPayment != true)
@@ -550,16 +697,23 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationType','cancellationReason']))
         ||
-        // A driver may only cancel their own active request.
+        // Preserve older builds while recording a validated reason in new builds.
         (resource.data.driverId == request.auth.uid
           && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
+          && resource.data.get('completionState','') != 'pending'
           && request.resource.data.status == 'cancelled'
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'status', 'cancelledAt', 'updatedAt'
-          ]))
+          && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
+          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt'])
+            || (request.resource.data.cancelledBy == request.auth.uid
+              && request.resource.data.cancellationType == 'driver_cancellation'
+              && request.resource.data.cancellationReason is string
+              && request.resource.data.cancellationReason.size() >= 10 && request.resource.data.cancellationReason.size() <= 500
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationReason','cancellationType']))))
         // A driver may rate only their own completed request.
         || (resource.data.driverId == request.auth.uid
           && resource.data.status == 'completed'
+          && !('driverRating' in resource.data)
+          && request.resource.data.ratedAt == request.time && request.resource.data.updatedAt == request.time
           && request.resource.data.driverRating is int
           && request.resource.data.driverRating >= 1
           && request.resource.data.driverRating <= 5
@@ -651,6 +805,7 @@ service cloud.firestore {
             'fallbackStartedAt', 'updatedAt'
           ]))
         || (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
+          && !resource.data.get('jobStartCodeRequired',false)
           && resource.data.get('arrivalConfirmedBy',null) == null
           && request.resource.data.arrivalConfirmedBy == request.auth.uid
           && request.resource.data.arrivalConfirmedAt == request.time && request.resource.data.updatedAt == request.time
@@ -659,24 +814,6 @@ service cloud.firestore {
           && (request.resource.data.arrivalConfirmationMethod != 'manual_driver' || request.resource.data.arrivalConfirmationReason.size() >= 10)
           && (request.resource.data.arrivalDistanceMeters == null || (request.resource.data.arrivalDistanceMeters is number && request.resource.data.arrivalDistanceMeters >= 0 && request.resource.data.arrivalDistanceMeters <= 21000000))
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['arrivalConfirmedBy','arrivalConfirmedAt','arrivalConfirmationMethod','arrivalConfirmationReason','arrivalDistanceMeters','updatedAt']))
-        || (resource.data.providerId == request.auth.uid && resource.data.status == 'arrived'
-          && (!resource.data.get('arrivalVerificationRequired',false) || resource.data.get('arrivalConfirmedBy','') == resource.data.driverId)
-          && resource.data.get('completionState','') != 'pending'
-          && request.resource.data.completionState == 'pending'
-          && request.resource.data.completionSubmittedAt == request.time && request.resource.data.updatedAt == request.time
-          && resource.data.serviceNotes is string && resource.data.serviceNotes.size() >= 10
-          && resource.data.servicePhotoData is list && resource.data.servicePhotoData.size() > 0
-          && request.resource.data.finalCost is int && request.resource.data.finalCost >= 0 && request.resource.data.finalCost <= resource.data.estimatedCost
-          && resource.data.get('pendingRepairId',null) == null
-          && (resource.data.get('approvedQuoteType','direct') != 'inspection' || resource.data.get('approvedRepairId',null) is string)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['completionState','completionSubmittedAt','finalCost','updatedAt']))
-        || (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
-          && resource.data.get('completionState','') == 'pending'
-          && (!exists(/databases/$(database)/documents/requests/$(requestId)/disputes/case) || (exists(/databases/$(database)/documents/complaintReviews/$(requestId)) && get(/databases/$(database)/documents/complaintReviews/$(requestId)).data.status in ['resolved','dismissed']))
-          && request.resource.data.status == 'completed' && request.resource.data.completionState == 'confirmed'
-          && request.resource.data.driverCompletedAt == request.time && request.resource.data.completedAt == request.time && request.resource.data.updatedAt == request.time
-          && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completionState','driverCompletedAt','completedAt','updatedAt']))
         // Assigned provider: strict job-status progression.
         || (resource.data.providerId == request.auth.uid
           && ((resource.data.status == 'accepted'
@@ -728,6 +865,30 @@ service cloud.firestore {
            && d.get('warrantyTerms', null) is string && d.warrantyTerms.size() <= 500
            && (d.warrantyDays == 0 ? d.warrantyTerms == '' : d.warrantyTerms.size() >= 10));
       }
+      match /completionDiscounts/{discountId} {
+        function job() { return get(/databases/$(database)/documents/requests/$(requestId)).data; }
+        function nextJob() { return getAfter(/databases/$(database)/documents/requests/$(requestId)).data; }
+        allow read: if signedIn() && (isAdmin() || job().driverId == request.auth.uid || job().providerId == request.auth.uid);
+        allow create: if signedIn() && job().driverId == request.auth.uid
+          && job().status == 'arrived' && job().get('completionState','') == 'pending'
+          && job().get('pendingDiscountId',null) == null && nextJob().pendingDiscountId == discountId
+          && request.resource.data.keys().hasOnly(['driverId','providerId','previousTotal','requestedTotal','reason','status','createdAt'])
+          && request.resource.data.driverId == job().driverId && request.resource.data.providerId == job().providerId
+          && request.resource.data.previousTotal == job().finalCost
+          && request.resource.data.requestedTotal is int && request.resource.data.requestedTotal >= 0
+          && request.resource.data.requestedTotal < job().finalCost
+          && request.resource.data.reason is string && request.resource.data.reason.size() >= 10 && request.resource.data.reason.size() <= 500
+          && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time;
+        allow update: if signedIn() && job().providerId == request.auth.uid
+          && job().status == 'arrived' && job().get('completionState','') == 'pending'
+          && job().get('pendingDiscountId',null) == discountId && nextJob().pendingDiscountId == null
+          && resource.data.status == 'pending' && resource.data.previousTotal == job().finalCost
+          && request.resource.data.status in ['accepted','declined']
+          && nextJob().finalCost == (request.resource.data.status == 'accepted' ? resource.data.requestedTotal : job().finalCost)
+          && request.resource.data.decidedBy == request.auth.uid && request.resource.data.decidedAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','decidedBy','decidedAt']);
+      }
+
       match /quotes/{providerId} {
         allow read: if isAdmin();
         function parent() {

@@ -315,7 +315,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
     final dark = theme.brightness == Brightness.dark;
 
-    return RaScaffold(
+    return RaProviderScaffold(
       backgroundColor: dark ? const Color(0xFF07131E) : const Color(0xFFF5F8FC),
       body: !signedIn
           ? const SafeArea(
@@ -820,7 +820,7 @@ class _RaProviderActiveJob extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -830,7 +830,7 @@ class _RaProviderActiveJob extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 11,
+                            fontSize: 13,
                             color: colors.onSurfaceVariant,
                           ),
                         ),
@@ -865,7 +865,7 @@ class _RaProviderActiveJob extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
+                          fontSize: 13,
                           height: 1.4,
                           color: colors.onSurfaceVariant,
                         ),
@@ -1025,7 +1025,7 @@ class _RaProviderRequestCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1045,7 +1045,7 @@ class _RaProviderRequestCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: colors.primary,
                       ),
@@ -1067,7 +1067,7 @@ class _RaProviderRequestCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 10.5,
+                                fontSize: 13,
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
@@ -1297,7 +1297,7 @@ class _RaProviderRevenueChart extends StatelessWidget {
           Text(
             'LAST 7 DAYS',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: .8,
               color: colors.onSurfaceVariant,
@@ -1342,7 +1342,7 @@ class _RaProviderRevenueChart extends StatelessWidget {
                           Text(
                             _dayLabel(now.subtract(Duration(days: 6 - index))),
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10,
+                              fontSize: 13,
                               color: colors.onSurfaceVariant,
                             ),
                           ),
@@ -1394,7 +1394,7 @@ class _RaProviderServices extends StatelessWidget {
         padding: const EdgeInsets.all(17),
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
-              ? const Color(0xFF0D1D2B)
+              ? const Color(0xFF0D2237)
               : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
@@ -1425,7 +1425,7 @@ class _RaProviderServices extends StatelessWidget {
                   Text(
                     'Services not configured',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1433,7 +1433,7 @@ class _RaProviderServices extends StatelessWidget {
                   Text(
                     'Add the roadside services you provide from your profile.',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
+                      fontSize: 13,
                       height: 1.4,
                       color: colors.onSurfaceVariant,
                     ),
@@ -1522,7 +1522,7 @@ class _RaProviderLoadingCard extends StatelessWidget {
 class _RaProviderActiveWorkScreen extends StatelessWidget {
   const _RaProviderActiveWorkScreen();
   @override
-  Widget build(BuildContext context) => RaScaffold(
+  Widget build(BuildContext context) => RaProviderScaffold(
     appBar: AppBar(title: const Text('Active work')),
     body: const SingleChildScrollView(
       padding: EdgeInsets.all(16),

@@ -1,3 +1,7 @@
+import 'job_start_service.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../models/completion_report.dart';
 import '../models/provider_availability.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,9 +27,41 @@ class RequestService {
     return user.uid;
   }
 
-  Future<String> createRequest(RequestDraft draft) async {
+  Future<void> _requireConnection() async {
+    final results = await Connectivity().checkConnectivity();
+    if (results.isEmpty || results.every((r) => r == ConnectivityResult.none)) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unavailable',
+        message: 'Reconnect before updating this job.',
+      );
+    }
+  }
+
+  Future<String?> findSubmittedRequest(String id) async {
+    final matches = await _requests
+        .where('driverId', isEqualTo: _userId)
+        .where(FieldPath.documentId, isEqualTo: id)
+        .get(const GetOptions(source: Source.server))
+        .timeout(const Duration(seconds: 12));
+    return matches.docs.isEmpty ? null : matches.docs.first.id;
+  }
+
+  Future<String> createRequest(
+    RequestDraft draft, {
+    String? submissionId,
+  }) async {
+    await _requireConnection();
+    final document = _requests.doc(submissionId);
+    if (submissionId != null &&
+        await findSubmittedRequest(submissionId) != null)
+      return submissionId;
+
     final settings =
-        (await _firestore.collection('appSettings').doc('operations').get())
+        (await _firestore
+                .collection('appSettings')
+                .doc('operations')
+                .get(const GetOptions(source: Source.server)))
             .data();
     if (settings?['maintenance'] == true)
       throw StateError(
@@ -39,7 +75,9 @@ class RequestService {
       );
     final driverRequests = await _requests
         .where('driverId', isEqualTo: _userId)
-        .get();
+        .get(const GetOptions(source: Source.server));
+    if (driverRequests.docs.any((request) => request.id == document.id))
+      return document.id;
     final hasActiveRequest = driverRequests.docs.any((request) {
       return const [
         'searching',
@@ -51,7 +89,6 @@ class RequestService {
     if (hasActiveRequest) {
       throw StateError('Complete or cancel your active request first.');
     }
-    final document = _requests.doc();
     final profileReference = _firestore.collection('users').doc(_userId);
     await _firestore.runTransaction((transaction) async {
       final profile = await transaction.get(profileReference);
@@ -60,6 +97,7 @@ class RequestService {
         final activeRequest = await transaction.get(
           _requests.doc(activeRequestId),
         );
+        if (activeRequestId == document.id && activeRequest.exists) return;
         if (activeRequest.exists &&
             const [
               'searching',
@@ -81,6 +119,7 @@ class RequestService {
         'status': 'searching',
         'workflowVersion': 2,
         'arrivalVerificationRequired': true,
+        if (JobStartService.enabled) 'jobStartCodeRequired': true,
         'issue': draft.primaryIssue,
         'issues': draft.issues,
         'vehicleType': draft.vehicleType,
@@ -322,7 +361,8 @@ class RequestService {
                 provider.data() ?? {},
                 DateTime.now(),
                 locationUpdatedAt:
-                    (provider.data()?['locationUpdatedAt'] as Timestamp?)?.toDate(),
+                    (provider.data()?['locationUpdatedAt'] as Timestamp?)
+                        ?.toDate(),
                 overrideUntil:
                     (provider.data()?['hoursOverrideUntil'] as Timestamp?)
                         ?.toDate(),
@@ -353,6 +393,7 @@ class RequestService {
   }
 
   Future<void> proposeRepair(String id, Map<String, dynamic> quote) async {
+    await _requireConnection();
     final ref = _requests.doc(id);
     final revision = ref.collection('repairQuotes').doc();
     final service = quote['serviceFee'] as int;
@@ -497,6 +538,7 @@ class RequestService {
   }
 
   Future<void> advanceProviderStatus(String id, String nextStatus) async {
+    await _requireConnection();
     const transitions = {'accepted': 'en_route', 'en_route': 'arrived'};
     await _firestore.runTransaction((transaction) async {
       final reference = _requests.doc(id);
@@ -525,6 +567,8 @@ class RequestService {
           data?['status'] != 'arrived' ||
           data?['arrivalConfirmedBy'] != null)
         throw StateError('Arrival confirmation is not available.');
+      if (data?['jobStartCodeRequired'] == true)
+        throw StateError('Use the job start code to confirm arrival.');
       final lat = data?['providerLatitude'] as num?,
           lng = data?['providerLongitude'] as num?;
       final updated = (data?['providerLocationUpdatedAt'] as Timestamp?)
@@ -562,7 +606,13 @@ class RequestService {
     });
   }
 
-  Future<void> completeProviderJob(String id, int finalCost) async {
+  Future<void> completeProviderJob(
+    String id,
+    int finalCost, {
+    required CompletionReport report,
+  }) async {
+    await _requireConnection();
+    report.validate();
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final data = (await tx.get(ref)).data();
@@ -570,6 +620,9 @@ class RequestService {
           data?['status'] != 'arrived' ||
           data?['completionState'] == 'pending')
         throw StateError('Completion is not available.');
+      if (data?['jobStartCodeRequired'] == true &&
+          data?['jobStartCodeVerifiedAt'] == null)
+        throw StateError('Verify the driver job start code first.');
       if (data?['arrivalVerificationRequired'] == true &&
           data?['arrivalConfirmedBy'] != data?['driverId'])
         throw StateError(
@@ -590,6 +643,7 @@ class RequestService {
         );
       tx.update(ref, {
         'completionState': 'pending',
+        'completionReport': report.toMap(),
         'completionSubmittedAt': FieldValue.serverTimestamp(),
         'finalCost': finalCost,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -597,7 +651,79 @@ class RequestService {
     });
   }
 
-  Future<void> confirmJobCompletion(String id) async {
+  Future<void> requestCompletionDiscount(
+    String id,
+    int amount,
+    String reason,
+  ) async {
+    if (amount < 0 || reason.trim().length < 10 || reason.trim().length > 500) {
+      throw ArgumentError(
+        'Enter a valid amount and a reason of 10?500 characters.',
+      );
+    }
+    final ref = _requests.doc(id);
+    final proposal = ref.collection('completionDiscounts').doc();
+    await _firestore.runTransaction((tx) async {
+      final data = (await tx.get(ref)).data();
+      final current = data?['finalCost'];
+      if (data?['driverId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['completionState'] != 'pending' ||
+          data?['pendingDiscountId'] != null ||
+          current is! int ||
+          amount >= current) {
+        throw StateError(
+          'A discount can be requested only while reviewing completion, below the proposed final total.',
+        );
+      }
+      tx.set(proposal, {
+        'driverId': data!['driverId'],
+        'providerId': data['providerId'],
+        'previousTotal': current,
+        'requestedTotal': amount,
+        'reason': reason.trim(),
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(ref, {
+        'pendingDiscountId': proposal.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> respondCompletionDiscount(
+    String id,
+    String proposalId, {
+    required bool accept,
+  }) async {
+    final ref = _requests.doc(id);
+    final proposal = ref.collection('completionDiscounts').doc(proposalId);
+    await _firestore.runTransaction((tx) async {
+      final data = (await tx.get(ref)).data();
+      final offer = (await tx.get(proposal)).data();
+      if (data?['providerId'] != _userId ||
+          data?['status'] != 'arrived' ||
+          data?['completionState'] != 'pending' ||
+          data?['pendingDiscountId'] != proposalId ||
+          offer?['status'] != 'pending' ||
+          offer?['previousTotal'] != data?['finalCost']) {
+        throw StateError('This discount request is no longer pending.');
+      }
+      tx.update(proposal, {
+        'status': accept ? 'accepted' : 'declined',
+        'decidedBy': _userId,
+        'decidedAt': FieldValue.serverTimestamp(),
+      });
+      tx.update(ref, {
+        'pendingDiscountId': null,
+        if (accept) 'finalCost': offer!['requestedTotal'],
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> confirmJobCompletion(String id, {int? expectedFinalCost}) async {
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final data = (await tx.get(ref)).data();
@@ -606,6 +732,17 @@ class RequestService {
           data?['status'] != 'arrived' ||
           data?['completionState'] != 'pending')
         throw StateError('No completion is awaiting your confirmation.');
+      if (data?['pendingDiscountId'] != null) {
+        throw StateError(
+          'Wait for the provider to respond to your discount request.',
+        );
+      }
+      if (expectedFinalCost != null &&
+          data?['finalCost'] != expectedFinalCost) {
+        throw StateError(
+          'The final amount changed. Review it before confirming.',
+        );
+      }
       final review = await tx.get(
         _firestore.collection('complaintReviews').doc(id),
       );
@@ -673,7 +810,11 @@ class RequestService {
     });
   }
 
-  Future<void> cancelRequest(String id) async {
+  Future<void> cancelRequest(String id, {String reason = ''}) async {
+    await _requireConnection();
+    final value = reason.trim();
+    if (value.isNotEmpty && (value.length < 10 || value.length > 500))
+      throw ArgumentError('Give a cancellation reason of 10-500 characters.');
     await _firestore.runTransaction((transaction) async {
       final reference = _requests.doc(id);
       final profileReference = _firestore.collection('users').doc(_userId);
@@ -684,7 +825,9 @@ class RequestService {
         throw StateError('Only the request driver can cancel this request.');
       }
       final status = data?['status'] as String?;
-      if (status == 'completed' || status == 'cancelled') {
+      if (status == 'completed' ||
+          status == 'cancelled' ||
+          data?['completionState'] == 'pending') {
         throw StateError('This request can no longer be cancelled.');
       }
       final providerId = data?['providerId'] as String?;
@@ -696,6 +839,11 @@ class RequestService {
           : await transaction.get(directoryReference);
       transaction.update(reference, {
         'status': 'cancelled',
+        if (value.isNotEmpty) ...{
+          'cancelledBy': _userId,
+          'cancellationReason': value,
+          'cancellationType': 'driver_cancellation',
+        },
         'cancelledAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -755,6 +903,8 @@ class RequestService {
       if (data?['status'] != 'completed') {
         throw StateError('Only completed requests can be rated.');
       }
+      if (data?['driverRating'] != null)
+        throw StateError('This job already has a rating.');
       transaction.update(reference, {
         'driverRating': rating,
         'ratedAt': FieldValue.serverTimestamp(),
@@ -804,35 +954,57 @@ class RequestService {
     String requestId, {
     required double latitude,
     required double longitude,
-  }) => _requests.doc(requestId).update({
-    'providerLatitude': latitude,
-    'providerLongitude': longitude,
-    'providerLocationUpdatedAt': FieldValue.serverTimestamp(),
-  });
+  }) async {
+    await _requireConnection();
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude.abs() > 90 ||
+        longitude.abs() > 180)
+      throw ArgumentError('Invalid coordinates.');
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(requestId);
+      final data = (await tx.get(ref)).data();
+      if (data?['providerId'] != _userId ||
+          !['accepted', 'en_route', 'arrived'].contains(data?['status']))
+        throw StateError('Location sharing is limited to your active job.');
+      tx.update(ref, {
+        'providerLatitude': latitude,
+        'providerLongitude': longitude,
+        'providerLocationUpdatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
 
   Future<void> updateProviderDocumentation(
     String requestId, {
     required String serviceNotes,
     required List<String> servicePhotoData,
   }) async {
+    await _requireConnection();
     if (serviceNotes.length > 500 || servicePhotoData.length > 3) {
       throw ArgumentError('Service documentation is too large.');
     }
     final reference = _requests.doc(requestId);
-    final request = await reference.get();
-    final data = request.data();
-    if (!request.exists || data?['providerId'] != _userId) {
-      throw StateError('This job is not assigned to this provider.');
-    }
-    if (!const ['accepted', 'en_route', 'arrived'].contains(data?['status'])) {
-      throw StateError(
-        'Documentation can only be updated during an active job.',
-      );
-    }
-    await reference.update({
-      'serviceNotes': serviceNotes.trim(),
-      'servicePhotoData': servicePhotoData,
-      'documentationUpdatedAt': FieldValue.serverTimestamp(),
+    await _firestore.runTransaction((transaction) async {
+      final request = await transaction.get(reference);
+      final data = request.data();
+      if (!request.exists || data?['providerId'] != _userId) {
+        throw StateError('This job is not assigned to this provider.');
+      }
+      if (!const [
+        'accepted',
+        'en_route',
+        'arrived',
+      ].contains(data?['status'])) {
+        throw StateError(
+          'Documentation can only be updated during an active job.',
+        );
+      }
+      transaction.update(reference, {
+        'serviceNotes': serviceNotes.trim(),
+        'servicePhotoData': servicePhotoData,
+        'documentationUpdatedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 }

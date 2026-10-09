@@ -1,15 +1,12 @@
 part of '../../screens.dart';
 
 class _ChatInboxScreen extends StatefulWidget {
-  const _ChatInboxScreen({
-    required this.isProvider,
-  });
+  const _ChatInboxScreen({required this.isProvider});
 
   final bool isProvider;
 
   @override
-  State<_ChatInboxScreen> createState() =>
-      _ChatInboxScreenState();
+  State<_ChatInboxScreen> createState() => _ChatInboxScreenState();
 }
 
 class _ChatInboxScreenState extends State<_ChatInboxScreen> {
@@ -25,17 +22,14 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     super.initState();
 
     if (signedIn) {
-      inbox = ChatInboxController(
-        isProvider: widget.isProvider,
-      );
+      inbox = ChatInboxController(isProvider: widget.isProvider);
     }
 
     searchController.addListener(() {
       if (!mounted) return;
 
       setState(() {
-        searchQuery =
-            searchController.text.trim().toLowerCase();
+        searchQuery = searchController.text.trim().toLowerCase();
       });
     });
   }
@@ -48,21 +42,12 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
   }
 
   String peerNameFor(Map<String, dynamic> job) {
-    return job[
-                widget.isProvider
-                    ? 'driverName'
-                    : 'providerName']
-            as String? ??
-        (widget.isProvider
-            ? 'Driver'
-            : 'Service Provider');
+    return job[widget.isProvider ? 'driverName' : 'providerName'] as String? ??
+        (widget.isProvider ? 'Driver' : 'Service Provider');
   }
 
   String peerPhoneFor(Map<String, dynamic> job) {
-    return job[
-                widget.isProvider
-                    ? 'driverPhone'
-                    : 'providerPhone']
+    return job[widget.isProvider ? 'driverPhone' : 'providerPhone']
             as String? ??
         '';
   }
@@ -83,35 +68,24 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     return switch (status) {
       'completed' => RaTone.success,
       'cancelled' => RaTone.danger,
-      'accepted' ||
-      'en_route' ||
-      'arrived' =>
-        RaTone.success,
+      'accepted' || 'en_route' || 'arrived' => RaTone.success,
       _ => RaTone.info,
     };
   }
 
-  String lastMessagePreview(
-    Map<String, dynamic> message,
-  ) {
+  String lastMessagePreview(Map<String, dynamic> message) {
     final imageData = message['imageData'];
 
-    if (imageData != null &&
-        imageData.toString().isNotEmpty) {
+    if (imageData != null && imageData.toString().isNotEmpty) {
       return '📷 Photo';
     }
 
-    final text =
-        message['text']?.toString().trim() ?? '';
+    final text = message['text']?.toString().trim() ?? '';
 
-    return text.isEmpty
-        ? 'Conversation update'
-        : text;
+    return text.isEmpty ? 'Conversation update' : text;
   }
 
-  DateTime? messageTime(
-    Map<String, dynamic> message,
-  ) {
+  DateTime? messageTime(Map<String, dynamic> message) {
     final value = message['createdAt'];
 
     if (value is Timestamp) {
@@ -131,30 +105,18 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     final local = time.toLocal();
     final now = DateTime.now();
 
-    final today = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    );
+    final today = DateTime(now.year, now.month, now.day);
 
-    final date = DateTime(
-      local.year,
-      local.month,
-      local.day,
-    );
+    final date = DateTime(local.year, local.month, local.day);
 
-    final difference =
-        today.difference(date).inDays;
+    final difference = today.difference(date).inDays;
 
     if (difference == 0) {
-      final hour =
-          local.hour % 12 == 0 ? 12 : local.hour % 12;
+      final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
 
-      final minute =
-          local.minute.toString().padLeft(2, '0');
+      final minute = local.minute.toString().padLeft(2, '0');
 
-      final period =
-          local.hour >= 12 ? 'PM' : 'AM';
+      final period = local.hour >= 12 ? 'PM' : 'AM';
 
       return '$hour:$minute $period';
     }
@@ -164,15 +126,7 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     }
 
     if (difference < 7) {
-      const weekdays = [
-        'Mon',
-        'Tue',
-        'Wed',
-        'Thu',
-        'Fri',
-        'Sat',
-        'Sun',
-      ];
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
       return weekdays[local.weekday - 1];
     }
@@ -200,22 +154,16 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     );
   }
 
-  List<String> visibleThreads(
-    ChatInboxController controller,
-  ) {
+  List<String> visibleThreads(ChatInboxController controller) {
     final ids = controller.threadIds.where((id) {
       final job = controller.jobs[id];
-      final messages =
-          controller.conversations[id];
+      final messages = controller.conversations[id];
 
-      if (job == null ||
-          messages == null ||
-          messages.isEmpty) {
+      if (job == null || messages == null || messages.isEmpty) {
         return false;
       }
 
-      if (unreadOnly &&
-          controller.unreadFor(id) == 0) {
+      if (unreadOnly && controller.unreadFor(id) == 0) {
         return false;
       }
 
@@ -223,16 +171,11 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
         return true;
       }
 
-      final peer =
-          peerNameFor(job).toLowerCase();
+      final peer = peerNameFor(job).toLowerCase();
 
-      final issue =
-          requestIssueLabel(job).toLowerCase();
+      final issue = requestIssueLabel(job).toLowerCase();
 
-      final last =
-          lastMessagePreview(
-            messages.last,
-          ).toLowerCase();
+      final last = lastMessagePreview(messages.last).toLowerCase();
 
       return peer.contains(searchQuery) ||
           issue.contains(searchQuery) ||
@@ -240,21 +183,17 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     }).toList();
 
     ids.sort((a, b) {
-      final unreadA =
-          controller.unreadFor(a);
+      final unreadA = controller.unreadFor(a);
 
-      final unreadB =
-          controller.unreadFor(b);
+      final unreadB = controller.unreadFor(b);
 
       if (unreadA != unreadB) {
         return unreadB.compareTo(unreadA);
       }
 
-      final messagesA =
-          controller.conversations[a];
+      final messagesA = controller.conversations[a];
 
-      final messagesB =
-          controller.conversations[b];
+      final messagesB = controller.conversations[b];
 
       if (messagesA == null ||
           messagesA.isEmpty ||
@@ -263,14 +202,11 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
         return 0;
       }
 
-      final timeA =
-          messageTime(messagesA.last);
+      final timeA = messageTime(messagesA.last);
 
-      final timeB =
-          messageTime(messagesB.last);
+      final timeB = messageTime(messagesB.last);
 
-      if (timeA == null &&
-          timeB == null) {
+      if (timeA == null && timeB == null) {
         return 0;
       }
 
@@ -291,15 +227,13 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
     final controller = inbox;
 
     return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        automaticallyImplyLeading:
-            Navigator.of(context).canPop(),
+        automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Text(
           'Messages',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
+            fontSize: providerFontSize(context, 20),
             fontWeight: FontWeight.w800,
             letterSpacing: -.5,
           ),
@@ -311,72 +245,47 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
               child: EmptyState(
                 icon: Icons.login_outlined,
                 title: 'Sign in required',
-                message:
-                    'Sign in to view your RoadAssist conversations.',
+                message: 'Sign in to view your RoadAssist conversations.',
               ),
             )
           : AnimatedBuilder(
               animation: controller,
               builder: (context, _) {
-                final ids =
-                    visibleThreads(controller);
+                final ids = visibleThreads(controller);
 
                 return ListView(
-                  physics:
-                      const BouncingScrollPhysics(),
-                  padding:
-                      const EdgeInsets.fromLTRB(
-                    18,
-                    8,
-                    18,
-                    32,
-                  ),
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
                   children: [
                     _RaInboxHero(
-                      unread:
-                          controller.unread,
-                      isProvider:
-                          widget.isProvider,
+                      unread: controller.unread,
+                      isProvider: widget.isProvider,
                     ),
 
                     const SizedBox(height: 18),
 
                     TextField(
-                      controller:
-                          searchController,
-                      textInputAction:
-                          TextInputAction.search,
+                      controller: searchController,
+                      textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
                         hintText: widget.isProvider
                             ? 'Search drivers or conversations'
                             : 'Search providers or conversations',
-                        prefixIcon:
-                            const Icon(
-                          Icons.search_rounded,
-                        ),
-                        suffixIcon:
-                            searchQuery.isEmpty
-                                ? null
-                                : IconButton(
-                                    tooltip:
-                                        'Clear search',
-                                    onPressed:
-                                        searchController
-                                            .clear,
-                                    icon:
-                                        const Icon(
-                                      Icons
-                                          .close_rounded,
-                                    ),
-                                  ),
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: searchQuery.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Clear search',
+                                onPressed: searchController.clear,
+                                icon: const Icon(Icons.close_rounded),
+                              ),
                       ),
                     ),
 
                     const SizedBox(height: 11),
 
                     _RaInboxFilterBar(
-                      unreadOnly:
-                          unreadOnly,
+                      unreadOnly: unreadOnly,
                       onChanged: (value) {
                         setState(() {
                           unreadOnly = value;
@@ -393,52 +302,31 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
                             unreadOnly
                                 ? 'Unread conversations'
                                 : 'Conversations',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              fontSize: 17,
-                              fontWeight:
-                                  FontWeight
-                                      .w800,
-                              letterSpacing:
-                                  -.35,
-                              color: colors
-                                  .onSurface,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: providerFontSize(context, 17),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.35,
+                              color: colors.onSurface,
                             ),
                           ),
                         ),
 
-                        if (controller.unread >
-                            0)
+                        if (controller.unread > 0)
                           Container(
-                            padding:
-                                const EdgeInsets
-                                    .symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 8,
                               vertical: 4,
                             ),
-                            decoration:
-                                BoxDecoration(
-                              color: colors
-                                  .primary
-                                  .withValues(
-                                alpha: .08,
-                              ),
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                999,
-                              ),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: .08),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               '${controller.unread} unread',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize: 9,
-                                fontWeight:
-                                    FontWeight
-                                        .w700,
-                                color: colors
-                                    .primary,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: providerFontSize(context, 9),
+                                fontWeight: FontWeight.w700,
+                                color: colors.primary,
                               ),
                             ),
                           ),
@@ -447,57 +335,36 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
 
                     const SizedBox(height: 11),
 
-                    if (controller.hasError)
-                      const _RaInboxError(),
+                    if (controller.hasError) const _RaInboxError(),
 
                     if (controller.loading) ...[
-                      const LinearProgressIndicator(
-                        minHeight: 3,
-                      ),
-                      const SizedBox(
-                        height: 12,
-                      ),
+                      const LinearProgressIndicator(minHeight: 3),
+                      const SizedBox(height: 12),
                     ],
 
                     if (!controller.loading &&
                         ids.isEmpty &&
                         !controller.hasError)
                       _RaInboxEmpty(
-                        searching:
-                            searchQuery.isNotEmpty,
-                        unreadOnly:
-                            unreadOnly,
+                        searching: searchQuery.isNotEmpty,
+                        unreadOnly: unreadOnly,
                       )
                     else
-                      for (var i = 0;
-                          i < ids.length;
-                          i++) ...[
+                      for (var i = 0; i < ids.length; i++) ...[
                         _RaInboxConversationCard(
-                          requestId:
-                              ids[i],
-                          controller:
-                              controller,
-                          isProvider:
-                              widget.isProvider,
+                          requestId: ids[i],
+                          controller: controller,
+                          isProvider: widget.isProvider,
                           onTap: () {
                             openThread(ids[i]);
                           },
-                          statusLabel:
-                              statusLabel,
-                          statusTone:
-                              statusTone,
-                          lastMessagePreview:
-                              lastMessagePreview,
-                          timeLabel:
-                              timeLabel,
-                          messageTime:
-                              messageTime,
+                          statusLabel: statusLabel,
+                          statusTone: statusTone,
+                          lastMessagePreview: lastMessagePreview,
+                          timeLabel: timeLabel,
+                          messageTime: messageTime,
                         ),
-                        if (i !=
-                            ids.length - 1)
-                          const SizedBox(
-                            height: 9,
-                          ),
+                        if (i != ids.length - 1) const SizedBox(height: 9),
                       ],
                   ],
                 );
@@ -512,19 +379,22 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
 // =============================================================================
 
 class _RaInboxHero extends StatelessWidget {
-  const _RaInboxHero({
-    required this.unread,
-    required this.isProvider,
-  });
+  const _RaInboxHero({required this.unread, required this.isProvider});
 
   final int unread;
   final bool isProvider;
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness ==
-            Brightness.dark;
+    if (RaProviderTheme.isActive(context)) {
+      return RaProviderSummaryCard(
+        title: unread > 0 ? '$unread unread messages' : 'You are all caught up',
+        message: 'Stay connected with drivers throughout each roadside job.',
+        icon: Icons.forum_outlined,
+      );
+    }
+
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -533,17 +403,10 @@ class _RaInboxHero extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: dark
-              ? const [
-                  Color(0xFF0C477B),
-                  Color(0xFF08655D),
-                ]
-              : const [
-                  Color(0xFF075BA8),
-                  Color(0xFF078C7E),
-                ],
+              ? const [Color(0xFF0C477B), Color(0xFF08655D)]
+              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
         ),
-        borderRadius:
-            BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
         children: [
@@ -551,10 +414,8 @@ class _RaInboxHero extends StatelessWidget {
             width: 51,
             height: 51,
             decoration: BoxDecoration(
-              color: Colors.white
-                  .withValues(alpha: .13),
-              borderRadius:
-                  BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: .13),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
               Icons.forum_outlined,
@@ -567,19 +428,16 @@ class _RaInboxHero extends StatelessWidget {
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   unread > 0
                       ? '$unread unread ${unread == 1 ? 'message' : 'messages'}'
                       : 'You’re all caught up',
-                  style: GoogleFonts
-                      .plusJakartaSans(
+                  style: GoogleFonts.plusJakartaSans(
                     color: Colors.white,
-                    fontSize: 15,
-                    fontWeight:
-                        FontWeight.w800,
+                    fontSize: providerFontSize(context, 15),
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
 
@@ -589,13 +447,9 @@ class _RaInboxHero extends StatelessWidget {
                   isProvider
                       ? 'Stay connected with drivers throughout each roadside job.'
                       : 'Stay connected with your provider throughout roadside assistance.',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    color: Colors.white
-                        .withValues(
-                      alpha: .78,
-                    ),
-                    fontSize: 10,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white.withValues(alpha: .78),
+                    fontSize: providerFontSize(context, 10),
                     height: 1.4,
                   ),
                 ),
@@ -613,27 +467,20 @@ class _RaInboxHero extends StatelessWidget {
 // =============================================================================
 
 class _RaInboxFilterBar extends StatelessWidget {
-  const _RaInboxFilterBar({
-    required this.unreadOnly,
-    required this.onChanged,
-  });
+  const _RaInboxFilterBar({required this.unreadOnly, required this.onChanged});
 
   final bool unreadOnly;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: colors
-            .surfaceContainerHighest
-            .withValues(alpha: .45),
-        borderRadius:
-            BorderRadius.circular(15),
+        color: colors.surfaceContainerHighest.withValues(alpha: .45),
+        borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
         children: [
@@ -651,8 +498,7 @@ class _RaInboxFilterBar extends StatelessWidget {
           Expanded(
             child: _RaInboxFilterButton(
               label: 'Unread',
-              icon: Icons
-                  .mark_chat_unread_outlined,
+              icon: Icons.mark_chat_unread_outlined,
               selected: unreadOnly,
               onTap: () {
                 onChanged(true);
@@ -665,8 +511,7 @@ class _RaInboxFilterBar extends StatelessWidget {
   }
 }
 
-class _RaInboxFilterButton
-    extends StatelessWidget {
+class _RaInboxFilterButton extends StatelessWidget {
   const _RaInboxFilterButton({
     required this.label,
     required this.icon,
@@ -685,48 +530,30 @@ class _RaInboxFilterButton
     final colors = theme.colorScheme;
 
     return Material(
-      color: selected
-          ? colors.surface
-          : Colors.transparent,
-      borderRadius:
-          BorderRadius.circular(12),
+      color: selected ? colors.surface : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding:
-              const EdgeInsets.symmetric(
-            vertical: 10,
-            horizontal: 6,
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
           child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
                 size: 16,
-                color: selected
-                    ? colors.primary
-                    : colors
-                        .onSurfaceVariant,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
               ),
 
               const SizedBox(width: 6),
 
               Text(
                 label,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 10.5,
-                  fontWeight: selected
-                      ? FontWeight.w700
-                      : FontWeight.w500,
-                  color: selected
-                      ? colors.primary
-                      : colors
-                          .onSurfaceVariant,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: providerFontSize(context, 10.5),
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? colors.primary : colors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -741,8 +568,7 @@ class _RaInboxFilterButton
 // CONVERSATION CARD
 // =============================================================================
 
-class _RaInboxConversationCard
-    extends StatelessWidget {
+class _RaInboxConversationCard extends StatelessWidget {
   const _RaInboxConversationCard({
     required this.requestId,
     required this.controller,
@@ -761,145 +587,94 @@ class _RaInboxConversationCard
 
   final VoidCallback onTap;
 
-  final String Function(String)
-      statusLabel;
+  final String Function(String) statusLabel;
 
-  final RaTone Function(String)
-      statusTone;
+  final RaTone Function(String) statusTone;
 
-  final String Function(
-    Map<String, dynamic>,
-  ) lastMessagePreview;
+  final String Function(Map<String, dynamic>) lastMessagePreview;
 
-  final String Function(DateTime?)
-      timeLabel;
+  final String Function(DateTime?) timeLabel;
 
-  final DateTime? Function(
-    Map<String, dynamic>,
-  ) messageTime;
+  final DateTime? Function(Map<String, dynamic>) messageTime;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final dark =
-        theme.brightness == Brightness.dark;
+    final dark = theme.brightness == Brightness.dark;
 
-    final job =
-        controller.jobs[requestId]!;
+    final job = controller.jobs[requestId]!;
 
-    final messages =
-        controller.conversations[
-            requestId]!;
+    final messages = controller.conversations[requestId]!;
 
     final last = messages.last;
 
-    final unread =
-        controller.unreadFor(requestId);
+    final unread = controller.unreadFor(requestId);
 
     final peer =
-        job[
-                isProvider
-                    ? 'driverName'
-                    : 'providerName']
-            as String? ??
-        (isProvider
-            ? 'Driver'
-            : 'Service Provider');
+        job[isProvider ? 'driverName' : 'providerName'] as String? ??
+        (isProvider ? 'Driver' : 'Service Provider');
 
-    final status =
-        job['status'] as String? ?? '';
+    final status = job['status'] as String? ?? '';
 
-    final issue =
-        requestIssueLabel(job);
+    final issue = requestIssueLabel(job);
 
-    final preview =
-        lastMessagePreview(last);
+    final preview = lastMessagePreview(last);
 
-    final sentAt =
-        timeLabel(messageTime(last));
+    final sentAt = timeLabel(messageTime(last));
 
     return Material(
-      color: dark
-          ? const Color(0xFF0D1D2B)
-          : Colors.white,
-      borderRadius:
-          BorderRadius.circular(19),
+      color: dark ? const Color(0xFF0D1D2B) : Colors.white,
+      borderRadius: BorderRadius.circular(19),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(19),
+            borderRadius: BorderRadius.circular(19),
             border: Border.all(
               color: unread > 0
-                  ? colors.primary
-                      .withValues(alpha: .25)
-                  : colors.outlineVariant
-                      .withValues(alpha: .46),
+                  ? colors.primary.withValues(alpha: .25)
+                  : colors.outlineVariant.withValues(alpha: .46),
             ),
           ),
           child: Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  ProfileInitials(
-                    name: peer,
-                    radius: 23,
-                  ),
+                  ProfileInitials(name: peer, radius: 23),
 
                   if (unread > 0)
                     Positioned(
                       right: -2,
                       top: -2,
                       child: Container(
-                        constraints:
-                            const BoxConstraints(
+                        constraints: const BoxConstraints(
                           minWidth: 18,
                           minHeight: 18,
                         ),
-                        padding:
-                            const EdgeInsets
-                                .symmetric(
-                          horizontal: 4,
-                        ),
-                        decoration:
-                            BoxDecoration(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
                           color: raDanger,
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            999,
-                          ),
-                          border:
-                              Border.all(
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
                             color: dark
-                                ? const Color(
-                                    0xFF0D1D2B,
-                                  )
+                                ? const Color(0xFF0D1D2B)
                                 : Colors.white,
                             width: 2,
                           ),
                         ),
                         child: Center(
                           child: Text(
-                            unread > 99
-                                ? '99+'
-                                : '$unread',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color:
-                                  Colors.white,
-                              fontSize: 7.5,
-                              fontWeight:
-                                  FontWeight
-                                      .w700,
+                            unread > 99 ? '99+' : '$unread',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: Colors.white,
+                              fontSize: providerFontSize(context, 7.5),
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -912,8 +687,7 @@ class _RaInboxConversationCard
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
@@ -921,20 +695,13 @@ class _RaInboxConversationCard
                           child: Text(
                             peer,
                             maxLines: 1,
-                            overflow:
-                                TextOverflow
-                                    .ellipsis,
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color: colors
-                                  .onSurface,
-                              fontSize: 12.5,
-                              fontWeight:
-                                  unread > 0
-                                      ? FontWeight
-                                          .w800
-                                      : FontWeight
-                                          .w700,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: colors.onSurface,
+                              fontSize: providerFontSize(context, 12.5),
+                              fontWeight: unread > 0
+                                  ? FontWeight.w800
+                                  : FontWeight.w700,
                             ),
                           ),
                         ),
@@ -942,17 +709,12 @@ class _RaInboxConversationCard
                         if (sentAt.isNotEmpty)
                           Text(
                             sentAt,
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color: colors
-                                  .onSurfaceVariant,
-                              fontSize: 8.5,
-                              fontWeight:
-                                  unread > 0
-                                      ? FontWeight
-                                          .w700
-                                      : FontWeight
-                                          .w400,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: colors.onSurfaceVariant,
+                              fontSize: providerFontSize(context, 8.5),
+                              fontWeight: unread > 0
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
                             ),
                           ),
                       ],
@@ -963,30 +725,20 @@ class _RaInboxConversationCard
                     Row(
                       children: [
                         StatusPill(
-                          label: statusLabel(
-                            status,
-                          ),
-                          tone: statusTone(
-                            status,
-                          ),
+                          label: statusLabel(status),
+                          tone: statusTone(status),
                         ),
 
-                        const SizedBox(
-                          width: 7,
-                        ),
+                        const SizedBox(width: 7),
 
                         Expanded(
                           child: Text(
                             issue,
                             maxLines: 1,
-                            overflow:
-                                TextOverflow
-                                    .ellipsis,
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color: colors
-                                  .onSurfaceVariant,
-                              fontSize: 9,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: colors.onSurfaceVariant,
+                              fontSize: providerFontSize(context, 9),
                             ),
                           ),
                         ),
@@ -998,20 +750,16 @@ class _RaInboxConversationCard
                     Text(
                       preview,
                       maxLines: 2,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10.5,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: providerFontSize(context, 10.5),
                         height: 1.35,
                         color: unread > 0
                             ? colors.onSurface
-                            : colors
-                                .onSurfaceVariant,
-                        fontWeight:
-                            unread > 0
-                                ? FontWeight.w600
-                                : FontWeight.w400,
+                            : colors.onSurfaceVariant,
+                        fontWeight: unread > 0
+                            ? FontWeight.w600
+                            : FontWeight.w400,
                       ),
                     ),
                   ],
@@ -1023,8 +771,7 @@ class _RaInboxConversationCard
               Icon(
                 Icons.chevron_right_rounded,
                 size: 19,
-                color:
-                    colors.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ],
           ),
@@ -1043,46 +790,30 @@ class _RaInboxError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      margin:
-          const EdgeInsets.only(
-        bottom: 12,
-      ),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: colors.error
-            .withValues(alpha: .07),
-        borderRadius:
-            BorderRadius.circular(16),
-        border: Border.all(
-          color: colors.error
-              .withValues(alpha: .12),
-        ),
+        color: colors.error.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.error.withValues(alpha: .12)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.cloud_off_outlined,
-            color: colors.error,
-            size: 19,
-          ),
+          Icon(Icons.cloud_off_outlined, color: colors.error, size: 19),
 
           const SizedBox(width: 9),
 
           Expanded(
             child: Text(
               'Some conversations could not be loaded. Check your connection.',
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 10,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 10),
                 height: 1.4,
-                color:
-                    colors.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ),
@@ -1097,10 +828,7 @@ class _RaInboxError extends StatelessWidget {
 // =============================================================================
 
 class _RaInboxEmpty extends StatelessWidget {
-  const _RaInboxEmpty({
-    required this.searching,
-    required this.unreadOnly,
-  });
+  const _RaInboxEmpty({required this.searching, required this.unreadOnly});
 
   final bool searching;
   final bool unreadOnly;
@@ -1110,28 +838,23 @@ class _RaInboxEmpty extends StatelessWidget {
     if (searching) {
       return const EmptyState(
         icon: Icons.search_off_rounded,
-        title:
-            'No conversations found',
-        message:
-            'Try another provider, driver or message search.',
+        title: 'No conversations found',
+        message: 'Try another provider, driver or message search.',
       );
     }
 
     if (unreadOnly) {
       return const EmptyState(
-        icon:
-            Icons.mark_chat_read_outlined,
+        icon: Icons.mark_chat_read_outlined,
         title: 'No unread messages',
-        message:
-            'You have read all of your current conversations.',
+        message: 'You have read all of your current conversations.',
       );
     }
 
     return const EmptyState(
       icon: Icons.forum_outlined,
       title: 'No conversations yet',
-      message:
-          'Messages connected to roadside requests will appear here.',
+      message: 'Messages connected to roadside requests will appear here.',
     );
   }
 }

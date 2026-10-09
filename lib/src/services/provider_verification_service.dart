@@ -1,3 +1,4 @@
+import '../models/provider_document_correction.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/account_roles.dart';
@@ -46,6 +47,34 @@ class ProviderVerificationService {
     });
   }
 
+  Future<void> submitCorrections({
+    required int revision,
+    required Map<String, String> replacements,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || !user.emailVerified)
+      throw StateError('Verify your email first.');
+    await user.getIdToken(true);
+    final ref = db.collection('providerApplications').doc(user.uid);
+    await db.runTransaction((tx) async {
+      final previous = (await tx.get(ref)).data();
+      final moderation = (await tx.get(
+        db.collection('accountModeration').doc(user.uid),
+      )).data();
+      final request = ProviderDocumentCorrection.active(previous, moderation);
+      if (request == null || request.revision != revision)
+        throw StateError(
+          'This correction request changed. Refresh and try again.',
+        );
+      final updated = request.replaceDocuments(previous!, replacements);
+      tx.set(ref, {
+        ...updated,
+        'revision': revision + 1,
+        'submittedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   Future<void> submit(Map<String, dynamic> details) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || !user.emailVerified) {
@@ -55,6 +84,11 @@ class ProviderVerificationService {
     final ref = db.collection('providerApplications').doc(user.uid);
     await db.runTransaction((tx) async {
       final previous = (await tx.get(ref)).data();
+      final moderation = (await tx.get(
+        db.collection('accountModeration').doc(user.uid),
+      )).data();
+      if (ProviderDocumentCorrection.active(previous, moderation) != null)
+        throw StateError('Use the requested document correction form.');
       tx.set(ref, {
         ...details,
         'revision': ((previous?['revision'] as num?)?.toInt() ?? 0) + 1,

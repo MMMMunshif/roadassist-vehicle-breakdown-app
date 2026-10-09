@@ -5,9 +5,7 @@ part of '../../screens.dart';
 /// Completed-job payment state and payment attention filtering
 /// are handled by [_AdminOperationsPanel].
 class AdminPaymentsScreen extends StatelessWidget {
-  const AdminPaymentsScreen({
-    super.key,
-  });
+  const AdminPaymentsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

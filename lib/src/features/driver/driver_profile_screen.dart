@@ -1,17 +1,13 @@
 part of '../../screens.dart';
 
 class DriverProfileScreen extends StatefulWidget {
-  const DriverProfileScreen({
-    super.key,
-  });
+  const DriverProfileScreen({super.key});
 
   @override
-  State<DriverProfileScreen> createState() =>
-      _DriverProfileScreenState();
+  State<DriverProfileScreen> createState() => _DriverProfileScreenState();
 }
 
-class _DriverProfileScreenState
-    extends State<DriverProfileScreen> {
+class _DriverProfileScreenState extends State<DriverProfileScreen> {
   String name = firebaseReady
       ? FirebaseAuth.instance.currentUser?.displayName ?? 'Driver'
       : 'Driver';
@@ -27,7 +23,7 @@ class _DriverProfileScreenState
   bool profileLoadFailed = false;
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-      profileSubscription;
+  profileSubscription;
 
   bool get emailVerified =>
       firebaseReady &&
@@ -37,10 +33,8 @@ class _DriverProfileScreenState
   void initState() {
     super.initState();
 
-    if (firebaseReady &&
-        FirebaseAuth.instance.currentUser != null) {
-      profileSubscription =
-          AuthService().watchCurrentProfile().listen(
+    if (firebaseReady && FirebaseAuth.instance.currentUser != null) {
+      profileSubscription = AuthService().watchCurrentProfile().listen(
         (snapshot) {
           if (!mounted) {
             return;
@@ -49,23 +43,19 @@ class _DriverProfileScreenState
           final data = snapshot.data();
 
           setState(() {
-            name =
-                data?['displayName'] as String? ?? name;
+            name = data?['displayName'] as String? ?? name;
 
             emergencyContact =
-                data?['emergencyContact'] as String? ??
-                    emergencyContact;
+                data?['emergencyContact'] as String? ?? emergencyContact;
 
-            phone =
-                data?['phone'] as String? ?? phone;
+            phone = data?['phone'] as String? ?? phone;
 
             email =
                 data?['email'] as String? ??
-                    FirebaseAuth.instance.currentUser?.email ??
-                    '';
+                FirebaseAuth.instance.currentUser?.email ??
+                '';
 
-            photoData =
-                data?['photoData'] as String?;
+            photoData = data?['photoData'] as String?;
 
             loadingProfile = false;
             profileLoadFailed = false;
@@ -93,23 +83,15 @@ class _DriverProfileScreenState
     super.dispose();
   }
 
-  Widget profileAvatar({
-    double radius = 48,
-  }) {
-    final source =
-        photoData?.trim() ?? '';
+  Widget profileAvatar({double radius = 48}) {
+    final source = photoData?.trim() ?? '';
 
     if (source.isEmpty) {
-      return ProfileInitials(
-        name: name,
-        radius: radius,
-      );
+      return ProfileInitials(name: name, radius: radius);
     }
 
     try {
-      final clean = source.contains(',')
-          ? source.split(',').last
-          : source;
+      final clean = source.contains(',') ? source.split(',').last : source;
 
       return ClipOval(
         child: Image.memory(
@@ -117,23 +99,13 @@ class _DriverProfileScreenState
           width: radius * 2,
           height: radius * 2,
           fit: BoxFit.cover,
-          errorBuilder: (
-            context,
-            error,
-            stackTrace,
-          ) {
-            return ProfileInitials(
-              name: name,
-              radius: radius,
-            );
+          errorBuilder: (context, error, stackTrace) {
+            return ProfileInitials(name: name, radius: radius);
           },
         ),
       );
     } catch (_) {
-      return ProfileInitials(
-        name: name,
-        radius: radius,
-      );
+      return ProfileInitials(name: name, radius: radius);
     }
   }
 
@@ -142,70 +114,49 @@ class _DriverProfileScreenState
       return;
     }
 
-    final source =
-        await showModalBottomSheet<ImageSource>(
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              18,
-              0,
-              18,
-              18,
-            ),
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   'Profile photo',
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Choose how you want to update your RoadAssist profile photo.',
-                  style:
-                      GoogleFonts.plusJakartaSans(
-                    fontSize: 8.7,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     height: 1.4,
-                    color: Theme.of(sheetContext)
-                        .colorScheme
-                        .onSurfaceVariant,
+                    color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 15),
                 _RaDriverProfileSourceTile(
-                  icon:
-                      Icons.photo_library_outlined,
+                  icon: Icons.photo_library_outlined,
                   title: 'Photo Library',
-                  subtitle:
-                      'Choose an existing photo',
+                  subtitle: 'Choose an existing photo',
                   onTap: () {
-                    Navigator.pop(
-                      sheetContext,
-                      ImageSource.gallery,
-                    );
+                    Navigator.pop(sheetContext, ImageSource.gallery);
                   },
                 ),
                 const SizedBox(height: 8),
                 _RaDriverProfileSourceTile(
-                  icon:
-                      Icons.camera_alt_outlined,
+                  icon: Icons.camera_alt_outlined,
                   title: 'Camera',
-                  subtitle:
-                      'Take a new profile photo',
+                  subtitle: 'Take a new profile photo',
                   onTap: () {
-                    Navigator.pop(
-                      sheetContext,
-                      ImageSource.camera,
-                    );
+                    Navigator.pop(sheetContext, ImageSource.camera);
                   },
                 ),
               ],
@@ -215,23 +166,17 @@ class _DriverProfileScreenState
       },
     );
 
-    if (source == null ||
-        !mounted) {
+    if (source == null || !mounted) {
       return;
     }
 
-    final navigator =
-        Navigator.of(context);
+    final navigator = Navigator.of(context);
 
     final XFile? photo;
 
-    if (source ==
-        ImageSource.camera) {
+    if (source == ImageSource.camera) {
       photo = await navigator.push<XFile>(
-        MaterialPageRoute(
-          builder: (_) =>
-              const CameraCaptureScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
       );
     } else {
       photo = await ImagePicker().pickImage(
@@ -241,8 +186,7 @@ class _DriverProfileScreenState
       );
     }
 
-    if (photo == null ||
-        !mounted) {
+    if (photo == null || !mounted) {
       return;
     }
 
@@ -251,16 +195,9 @@ class _DriverProfileScreenState
     });
 
     try {
-      final encoded =
-          await PhotoUploadService()
-              .prepareProfilePhoto(
-        photo,
-      );
+      final encoded = await PhotoUploadService().prepareProfilePhoto(photo);
 
-      await AuthService()
-          .updateCurrentProfile({
-        'photoData': encoded,
-      });
+      await AuthService().updateCurrentProfile({'photoData': encoded});
 
       if (!mounted) {
         return;
@@ -270,27 +207,17 @@ class _DriverProfileScreenState
         photoData = encoded;
       });
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Profile photo updated.',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile photo updated.')));
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to update photo: $error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to update photo: $error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -301,104 +228,70 @@ class _DriverProfileScreenState
   }
 
   Future<void> editProfile() async {
-    final formKey =
-        GlobalKey<FormState>();
+    final formKey = GlobalKey<FormState>();
 
-    final nameController =
-        TextEditingController(
-      text:
-          name == 'Driver' ? '' : name,
+    final nameController = TextEditingController(
+      text: name == 'Driver' ? '' : name,
     );
 
-    final phoneController =
-        TextEditingController(
-      text:
-          phone == 'Not added' ? '' : phone,
+    final phoneController = TextEditingController(
+      text: phone == 'Not added' ? '' : phone,
     );
 
-    final emergencyController =
-        TextEditingController(
-      text: emergencyContact ==
-              'Not added'
-          ? ''
-          : emergencyContact,
+    final emergencyController = TextEditingController(
+      text: emergencyContact == 'Not added' ? '' : emergencyContact,
     );
 
-    final saved =
-        await showModalBottomSheet<bool>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
       builder: (sheetContext) {
-        final colors =
-            Theme.of(sheetContext)
-                .colorScheme;
+        final colors = Theme.of(sheetContext).colorScheme;
 
         return Padding(
           padding: EdgeInsets.fromLTRB(
             18,
             0,
             18,
-            MediaQuery.of(sheetContext)
-                    .viewInsets
-                    .bottom +
-                18,
+            MediaQuery.of(sheetContext).viewInsets.bottom + 18,
           ),
           child: Form(
             key: formKey,
             child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .stretch,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     children: [
                       Container(
                         width: 45,
                         height: 45,
-                        decoration:
-                            BoxDecoration(
-                          color: colors.primary
-                              .withValues(
-                            alpha: .08,
-                          ),
-                          borderRadius:
-                              BorderRadius.circular(
-                            14,
-                          ),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: .08),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(
-                          Icons.edit_outlined,
-                          color: colors.primary,
-                        ),
+                        child: Icon(Icons.edit_outlined, color: colors.primary),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Edit profile',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize: 17,
-                                fontWeight:
-                                    FontWeight
-                                        .w800,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Keep your contact details accurate for roadside assistance.',
-                              style: GoogleFonts
-                                  .plusJakartaSans(
-                                fontSize: 8.5,
-                                color: colors
-                                    .onSurfaceVariant,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -408,24 +301,15 @@ class _DriverProfileScreenState
                   ),
                   const SizedBox(height: 20),
                   TextFormField(
-                    controller:
-                        nameController,
-                    textCapitalization:
-                        TextCapitalization.words,
-                    textInputAction:
-                        TextInputAction.next,
-                    decoration:
-                        const InputDecoration(
+                    controller: nameController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
                       labelText: 'Full name',
-                      prefixIcon: Icon(
-                        Icons.person_outline,
-                      ),
+                      prefixIcon: Icon(Icons.person_outline),
                     ),
                     validator: (value) {
-                      if (value == null ||
-                          value
-                              .trim()
-                              .isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Enter your name';
                       }
 
@@ -434,50 +318,28 @@ class _DriverProfileScreenState
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
-                    controller:
-                        phoneController,
-                    keyboardType:
-                        TextInputType.phone,
-                    textInputAction:
-                        TextInputAction.next,
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Phone number',
-                      hintText:
-                          '07X XXX XXXX',
-                      prefixIcon: Icon(
-                        Icons.phone_outlined,
-                      ),
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Phone number',
+                      hintText: '07X XXX XXXX',
+                      prefixIcon: Icon(Icons.phone_outlined),
                     ),
-                    validator:
-                        validateSriLankaPhone,
+                    validator: validateSriLankaPhone,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
-                    controller:
-                        emergencyController,
-                    textCapitalization:
-                        TextCapitalization
-                            .words,
-                    textInputAction:
-                        TextInputAction.done,
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Emergency contact',
-                      hintText:
-                          'Name or contact number',
-                      prefixIcon: Icon(
-                        Icons
-                            .contact_emergency_outlined,
-                      ),
+                    controller: emergencyController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Emergency contact',
+                      hintText: 'Name or contact number',
+                      prefixIcon: Icon(Icons.contact_emergency_outlined),
                     ),
                     validator: (value) {
-                      if (value == null ||
-                          value
-                              .trim()
-                              .isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Enter an emergency contact';
                       }
 
@@ -487,52 +349,33 @@ class _DriverProfileScreenState
                   const SizedBox(height: 9),
                   Text(
                     'Saved vehicles are managed separately under My Vehicles.',
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 7.8,
-                      color: colors
-                          .onSurfaceVariant,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(height: 20),
                   Row(
                     children: [
                       Expanded(
-                        child:
-                            OutlinedButton(
+                        child: OutlinedButton(
                           onPressed: () {
-                            Navigator.pop(
-                              sheetContext,
-                              false,
-                            );
+                            Navigator.pop(sheetContext, false);
                           },
-                          child: const Text(
-                            'Cancel',
-                          ),
+                          child: const Text('Cancel'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 2,
-                        child:
-                            FilledButton.icon(
+                        child: FilledButton.icon(
                           onPressed: () {
-                            if (formKey
-                                    .currentState
-                                    ?.validate() ??
-                                false) {
-                              Navigator.pop(
-                                sheetContext,
-                                true,
-                              );
+                            if (formKey.currentState?.validate() ?? false) {
+                              Navigator.pop(sheetContext, true);
                             }
                           },
-                          icon: const Icon(
-                            Icons.check_rounded,
-                          ),
-                          label: const Text(
-                            'Save Changes',
-                          ),
+                          icon: const Icon(Icons.check_rounded),
+                          label: const Text('Save Changes'),
                         ),
                       ),
                     ],
@@ -545,28 +388,18 @@ class _DriverProfileScreenState
       },
     );
 
-    if (saved == true &&
-        mounted) {
+    if (saved == true && mounted) {
       try {
-        final updatedName =
-            nameController.text.trim();
+        final updatedName = nameController.text.trim();
 
-        final updatedPhone =
-            normalizeSriLankaPhone(
-          phoneController.text,
-        );
+        final updatedPhone = normalizeSriLankaPhone(phoneController.text);
 
-        final updatedEmergency =
-            emergencyController.text.trim();
+        final updatedEmergency = emergencyController.text.trim();
 
-        await AuthService()
-            .updateCurrentProfile({
-          'displayName':
-              updatedName,
-          'phone':
-              updatedPhone,
-          'emergencyContact':
-              updatedEmergency,
+        await AuthService().updateCurrentProfile({
+          'displayName': updatedName,
+          'phone': updatedPhone,
+          'emergencyContact': updatedEmergency,
         });
 
         if (!mounted) {
@@ -576,30 +409,19 @@ class _DriverProfileScreenState
         setState(() {
           name = updatedName;
           phone = updatedPhone;
-          emergencyContact =
-              updatedEmergency;
+          emergencyContact = updatedEmergency;
         });
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Profile updated.',
-            ),
-          ),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Profile updated.')));
       } catch (error) {
         if (!mounted) {
           return;
         }
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-          SnackBar(
-            content: Text(
-              'Unable to update profile: $error',
-            ),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to update profile: $error')),
         );
       }
     }
@@ -610,74 +432,48 @@ class _DriverProfileScreenState
   }
 
   Future<void> signOut() async {
-    final confirmed =
-        await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        final colors =
-            Theme.of(dialogContext)
-                .colorScheme;
+        final colors = Theme.of(dialogContext).colorScheme;
 
         return AlertDialog(
           icon: Container(
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: colors.error
-                  .withValues(
-                alpha: .08,
-              ),
-              borderRadius:
-                  BorderRadius.circular(
-                17,
-              ),
+              color: colors.error.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(17),
             ),
-            child: Icon(
-              Icons.logout_rounded,
-              color: colors.error,
-            ),
+            child: Icon(Icons.logout_rounded, color: colors.error),
           ),
-          title: const Text(
-            'Sign out of RoadAssist?',
-          ),
+          title: const Text('Sign out of RoadAssist?'),
           content: const Text(
             'You will need to sign in again to access your requests, messages and saved vehicles.',
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
+                Navigator.pop(dialogContext, false);
               },
-              child:
-                  const Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             FilledButton(
-              style:
-                  FilledButton.styleFrom(
-                backgroundColor:
-                    colors.error,
-                foregroundColor:
-                    colors.onError,
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
               ),
               onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
+                Navigator.pop(dialogContext, true);
               },
-              child:
-                  const Text('Sign Out'),
+              child: const Text('Sign Out'),
             ),
           ],
         );
       },
     );
 
-    if (confirmed != true ||
-        !mounted) {
+    if (confirmed != true || !mounted) {
       return;
     }
 
@@ -689,66 +485,49 @@ class _DriverProfileScreenState
       return;
     }
 
-    replace(
-      context,
-      const WelcomeScreen(),
-    );
+    replace(context, const WelcomeScreen());
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     if (!signedIn) {
-      return RaScaffold(
+      return RaDriverScaffold(
         appBar: AppBar(
-          automaticallyImplyLeading:
-              false,
-          title: const Text(
-            'Profile',
-          ),
+          automaticallyImplyLeading: false,
+          title: const RaDriverAppBarTitle('Profile'),
         ),
         body: const Padding(
           padding: EdgeInsets.all(18),
           child: EmptyState(
             icon: Icons.login_outlined,
             title: 'Sign in required',
-            message:
-                'Sign in to manage your RoadAssist profile.',
+            message: 'Sign in to manage your RoadAssist profile.',
           ),
         ),
       );
     }
 
-    return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    return RaDriverScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        automaticallyImplyLeading:
-            false,
+        automaticallyImplyLeading: false,
         titleSpacing: 18,
-        title: Text(
+        title: RaDriverAppBarTitle(
           'Profile',
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 19,
-            fontWeight:
-                FontWeight.w800,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
           ),
         ),
         actions: [
           IconButton(
             tooltip: 'Edit profile',
-            onPressed: loadingProfile
-                ? null
-                : editProfile,
-            icon: const Icon(
-              Icons.edit_outlined,
-            ),
+            onPressed: loadingProfile ? null : editProfile,
+            icon: const Icon(Icons.edit_outlined),
           ),
           const SizedBox(width: 5),
         ],
@@ -756,9 +535,7 @@ class _DriverProfileScreenState
       body: RefreshIndicator(
         onRefresh: () async {
           try {
-            await FirebaseAuth
-                .instance.currentUser
-                ?.reload();
+            await FirebaseAuth.instance.currentUser?.reload();
 
             if (mounted) {
               setState(() {});
@@ -766,29 +543,18 @@ class _DriverProfileScreenState
           } catch (_) {}
         },
         child: ListView(
-          physics:
-              const AlwaysScrollableScrollPhysics(),
-          padding:
-              const EdgeInsets.fromLTRB(
-            18,
-            8,
-            18,
-            32,
-          ),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
           children: [
             if (loadingProfile) ...[
-              const LinearProgressIndicator(
-                minHeight: 3,
-              ),
+              const LinearProgressIndicator(minHeight: 3),
               const SizedBox(height: 12),
             ],
 
             if (profileLoadFailed) ...[
               _RaDriverProfileNotice(
-                icon:
-                    Icons.cloud_off_outlined,
-                title:
-                    'Profile sync unavailable',
+                icon: Icons.cloud_off_outlined,
+                title: 'Profile sync unavailable',
                 message:
                     'Some profile information may be outdated. Check your connection and try again.',
                 tone: colors.error,
@@ -799,25 +565,18 @@ class _DriverProfileScreenState
             _RaDriverProfileHero(
               name: name,
               email: email,
-              emailVerified:
-                  emailVerified,
-              avatar:
-                  profileAvatar(),
-              uploading:
-                  uploadingProfilePhoto,
-              onPhoto:
-                  changeProfilePhoto,
-              onEdit:
-                  editProfile,
+              emailVerified: emailVerified,
+              avatar: profileAvatar(radius: 30),
+              uploading: uploadingProfilePhoto,
+              onPhoto: changeProfilePhoto,
+              onEdit: editProfile,
             ),
 
             const SizedBox(height: 23),
 
             const _RaDriverProfileHeading(
-              title:
-                  'Personal information',
-              subtitle:
-                  'Contact information used during assistance.',
+              title: 'Personal information',
+              subtitle: 'Contact information used during assistance.',
             ),
 
             const SizedBox(height: 10),
@@ -826,35 +585,21 @@ class _DriverProfileScreenState
               child: Column(
                 children: [
                   _RaDriverProfileInfoRow(
-                    icon:
-                        Icons.person_outline,
-                    label:
-                        'Full name',
-                    value:
-                        name,
+                    icon: Icons.person_outline,
+                    label: 'Full name',
+                    value: name,
                   ),
-                  const Divider(
-                    height: 1,
-                  ),
+                  const Divider(height: 1),
                   _RaDriverProfileInfoRow(
-                    icon:
-                        Icons.phone_outlined,
-                    label:
-                        'Phone',
-                    value:
-                        phone,
+                    icon: Icons.phone_outlined,
+                    label: 'Phone',
+                    value: phone,
                   ),
-                  const Divider(
-                    height: 1,
-                  ),
+                  const Divider(height: 1),
                   _RaDriverProfileInfoRow(
-                    icon:
-                        Icons.email_outlined,
-                    label:
-                        'Email',
-                    value: email.isEmpty
-                        ? 'Not available'
-                        : email,
+                    icon: Icons.email_outlined,
+                    label: 'Email',
+                    value: email.isEmpty ? 'Not available' : email,
                   ),
                 ],
               ),
@@ -863,8 +608,7 @@ class _DriverProfileScreenState
             const SizedBox(height: 23),
 
             const _RaDriverProfileHeading(
-              title:
-                  'Roadside setup',
+              title: 'Roadside setup',
               subtitle:
                   'Prepare important information before you need assistance.',
             ),
@@ -874,39 +618,25 @@ class _DriverProfileScreenState
             Row(
               children: [
                 Expanded(
-                  child:
-                      _RaDriverProfileQuickCard(
-                    icon: Icons
-                        .directions_car_outlined,
-                    title:
-                        'My Vehicles',
-                    subtitle:
-                        'Manage saved vehicles',
+                  child: _RaDriverProfileQuickCard(
+                    icon: Icons.directions_car_outlined,
+                    title: 'My Vehicles',
+                    subtitle: 'Manage saved vehicles',
                     onTap: () {
-                      push(
-                        context,
-                        const VehiclesScreen(),
-                      );
+                      push(context, const VehiclesScreen());
                     },
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child:
-                      _RaDriverProfileQuickCard(
-                    icon: Icons
-                        .contact_emergency_outlined,
-                    title:
-                        'Emergency',
-                    subtitle: emergencyContact ==
-                            'Not added'
+                  child: _RaDriverProfileQuickCard(
+                    icon: Icons.contact_emergency_outlined,
+                    title: 'Emergency',
+                    subtitle: emergencyContact == 'Not added'
                         ? 'Add a contact'
                         : emergencyContact,
                     onTap: () {
-                      push(
-                        context,
-                        const EmergencyScreen(),
-                      );
+                      push(context, const EmergencyScreen());
                     },
                   ),
                 ),
@@ -917,8 +647,7 @@ class _DriverProfileScreenState
 
             const _RaDriverProfileHeading(
               title: 'Settings',
-              subtitle:
-                  'Manage your RoadAssist preferences and security.',
+              subtitle: 'Manage your RoadAssist preferences and security.',
             ),
 
             const SizedBox(height: 10),
@@ -928,93 +657,50 @@ class _DriverProfileScreenState
               child: Column(
                 children: [
                   _RaDriverProfileMenuTile(
-                    icon: Icons
-                        .notifications_none_rounded,
-                    title:
-                        'Notification Settings',
-                    subtitle:
-                        'Control background alerts and permissions',
+                    icon: Icons.notifications_none_rounded,
+                    title: 'Notification Settings',
+                    subtitle: 'Control background alerts and permissions',
+                    onTap: () {
+                      push(context, const NotificationSettingsScreen());
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _RaDriverProfileMenuTile(
+                    icon: Icons.palette_outlined,
+                    title: 'Appearance',
+                    subtitle: 'Light, dark or system theme',
+                    onTap: () {
+                      push(context, const AppearanceScreen());
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _RaDriverProfileMenuTile(
+                    icon: Icons.security_outlined,
+                    title: 'Account & Security',
+                    subtitle: 'Password, verification and account deletion',
+                    onTap: () {
+                      push(context, const AccountSecurityScreen());
+                    },
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _RaDriverProfileMenuTile(
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Privacy & Safety',
+                    subtitle: 'How RoadAssist uses and protects information',
                     onTap: () {
                       push(
                         context,
-                        const NotificationSettingsScreen(),
+                        const PrivacySafetyScreen(isProvider: false),
                       );
                     },
                   ),
-                  const Divider(
-                    height: 1,
-                    indent: 56,
-                  ),
+                  const Divider(height: 1, indent: 56),
                   _RaDriverProfileMenuTile(
-                    icon:
-                        Icons.palette_outlined,
-                    title:
-                        'Appearance',
-                    subtitle:
-                        'Light, dark or system theme',
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help & Support',
+                    subtitle: 'Get assistance using RoadAssist',
                     onTap: () {
-                      push(
-                        context,
-                        const AppearanceScreen(),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 56,
-                  ),
-                  _RaDriverProfileMenuTile(
-                    icon:
-                        Icons.security_outlined,
-                    title:
-                        'Account & Security',
-                    subtitle:
-                        'Password, verification and account deletion',
-                    onTap: () {
-                      push(
-                        context,
-                        const AccountSecurityScreen(),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 56,
-                  ),
-                  _RaDriverProfileMenuTile(
-                    icon: Icons
-                        .privacy_tip_outlined,
-                    title:
-                        'Privacy & Safety',
-                    subtitle:
-                        'How RoadAssist uses and protects information',
-                    onTap: () {
-                      push(
-                        context,
-                        const PrivacySafetyScreen(
-                          isProvider: false,
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 56,
-                  ),
-                  _RaDriverProfileMenuTile(
-                    icon:
-                        Icons.help_outline_rounded,
-                    title:
-                        'Help & Support',
-                    subtitle:
-                        'Get assistance using RoadAssist',
-                    onTap: () {
-                      push(
-                        context,
-                        const SupportScreen(
-                          isProvider: false,
-                        ),
-                      );
+                      push(context, const SupportScreen(isProvider: false));
                     },
                   ),
                 ],
@@ -1024,25 +710,13 @@ class _DriverProfileScreenState
             const SizedBox(height: 20),
 
             OutlinedButton.icon(
-              style:
-                  OutlinedButton.styleFrom(
-                foregroundColor:
-                    colors.error,
-                side: BorderSide(
-                  color: colors.error
-                      .withValues(
-                    alpha: .38,
-                  ),
-                ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colors.error,
+                side: BorderSide(color: colors.error.withValues(alpha: .38)),
               ),
-              onPressed:
-                  signOut,
-              icon:
-                  const Icon(
-                Icons.logout_rounded,
-              ),
-              label:
-                  const Text('Sign Out'),
+              onPressed: signOut,
+              icon: const Icon(Icons.logout_rounded),
+              label: const Text('Sign Out'),
             ),
 
             const SizedBox(height: 18),
@@ -1050,14 +724,11 @@ class _DriverProfileScreenState
             Center(
               child: Text(
                 'ROADASSIST',
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 7,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
                   letterSpacing: .8,
-                  fontWeight:
-                      FontWeight.w800,
-                  color: colors
-                      .onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ),
@@ -1068,8 +739,7 @@ class _DriverProfileScreenState
   }
 }
 
-class _RaDriverProfileHero
-    extends StatelessWidget {
+class _RaDriverProfileHero extends StatelessWidget {
   const _RaDriverProfileHero({
     required this.name,
     required this.email,
@@ -1089,228 +759,116 @@ class _RaDriverProfileHero
   final VoidCallback onEdit;
 
   @override
-  Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness ==
-            Brightness.dark;
-
-    return Container(
-      padding:
-          const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [
-                  Color(0xFF0A497F),
-                  Color(0xFF075A68),
-                ]
-              : const [
-                  Color(0xFF075BA8),
-                  Color(0xFF078C7E),
-                ],
-        ),
-        borderRadius:
-            BorderRadius.circular(24),
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  avatar,
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Material(
-                      color: Colors.white,
-                      shape:
-                          const CircleBorder(),
-                      child: InkWell(
-                        customBorder:
-                            const CircleBorder(),
-                        onTap: uploading
-                            ? null
-                            : onPhoto,
-                        child: SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: uploading
-                              ? const Padding(
-                                  padding:
-                                      EdgeInsets.all(
-                                    8,
-                                  ),
-                                  child:
-                                      CircularProgressIndicator(
-                                    strokeWidth:
-                                        2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons
-                                      .camera_alt_outlined,
-                                  size: 17,
-                                  color:
-                                      Color(
-                                    0xFF075BA8,
-                                  ),
+  Widget build(BuildContext context) => RaProviderCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                avatar,
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Material(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: uploading ? null : onPhoto,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: uploading
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
                                 ),
-                        ),
+                              )
+                            : const Icon(
+                                Icons.camera_alt_outlined,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                       ),
                     ),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _providerText(
+                      context,
+                      size: 20,
+                      weight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    email.isEmpty ? 'Driver account' : email,
+                    style: _providerText(context, size: 13, muted: true),
+                  ),
+                  const SizedBox(height: 10),
+                  StatusPill(
+                    label: emailVerified
+                        ? 'Email verified'
+                        : 'Email not verified',
+                    tone: emailVerified ? RaTone.success : RaTone.warning,
+                  ),
                 ],
               ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 2,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight:
-                            FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      email.isEmpty
-                          ? 'Driver account'
-                          : email,
-                      maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        color:
-                            Colors.white70,
-                        fontSize: 8.3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: Colors.white
-                            .withValues(
-                          alpha: .12,
-                        ),
-                        borderRadius:
-                            BorderRadius.circular(
-                          999,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize:
-                            MainAxisSize.min,
-                        children: [
-                          Icon(
-                            emailVerified
-                                ? Icons
-                                    .verified_outlined
-                                : Icons
-                                    .mark_email_unread_outlined,
-                            size: 13,
-                            color:
-                                Colors.white,
-                          ),
-                          const SizedBox(
-                            width: 4,
-                          ),
-                          Text(
-                            emailVerified
-                                ? 'Email verified'
-                                : 'Email verification pending',
-                            style: GoogleFonts
-                                .plusJakartaSans(
-                              color:
-                                  Colors.white,
-                              fontSize: 6.8,
-                              fontWeight:
-                                  FontWeight
-                                      .w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip:
-                    'Edit profile',
-                onPressed:
-                    onEdit,
-                color:
-                    Colors.white,
-                icon: const Icon(
-                  Icons.edit_outlined,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        OutlinedButton.icon(
+          onPressed: onEdit,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Edit Profile'),
+        ),
+      ],
+    ),
+  );
 }
 
-class _RaDriverProfileHeading
-    extends StatelessWidget {
-  const _RaDriverProfileHeading({
-    required this.title,
-    required this.subtitle,
-  });
+class _RaDriverProfileHeading extends StatelessWidget {
+  const _RaDriverProfileHeading({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 14.5,
-            fontWeight:
-                FontWeight.w800,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style:
-              GoogleFonts.plusJakartaSans(
-            fontSize: 8.3,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
             height: 1.4,
-            color:
-                colors.onSurfaceVariant,
+            color: colors.onSurfaceVariant,
           ),
         ),
       ],
@@ -1318,12 +876,10 @@ class _RaDriverProfileHeading
   }
 }
 
-class _RaDriverProfileSurface
-    extends StatelessWidget {
+class _RaDriverProfileSurface extends StatelessWidget {
   const _RaDriverProfileSurface({
     required this.child,
-    this.padding =
-        const EdgeInsets.all(14),
+    this.padding = const EdgeInsets.all(14),
   });
 
   final Widget child;
@@ -1331,26 +887,18 @@ class _RaDriverProfileSurface
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: theme.brightness ==
-                Brightness.dark
-            ? const Color(0xFF0D1D2B)
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: theme
-              .colorScheme
-              .outlineVariant
-              .withValues(
-            alpha: .45,
-          ),
+          color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
         ),
       ),
       child: child,
@@ -1358,8 +906,7 @@ class _RaDriverProfileSurface
   }
 }
 
-class _RaDriverProfileInfoRow
-    extends StatelessWidget {
+class _RaDriverProfileInfoRow extends StatelessWidget {
   const _RaDriverProfileInfoRow({
     required this.icon,
     required this.label,
@@ -1372,30 +919,20 @@ class _RaDriverProfileInfoRow
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 9,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: colors.primary,
-          ),
+          Icon(icon, size: 18, color: colors.primary),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 8.2,
-                color: colors
-                    .onSurfaceVariant,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ),
@@ -1403,16 +940,12 @@ class _RaDriverProfileInfoRow
           Flexible(
             child: Text(
               value,
-              textAlign:
-                  TextAlign.right,
+              textAlign: TextAlign.right,
               maxLines: 2,
-              overflow:
-                  TextOverflow.ellipsis,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 9,
-                fontWeight:
-                    FontWeight.w700,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -1422,8 +955,7 @@ class _RaDriverProfileInfoRow
   }
 }
 
-class _RaDriverProfileQuickCard
-    extends StatelessWidget {
+class _RaDriverProfileQuickCard extends StatelessWidget {
   const _RaDriverProfileQuickCard({
     required this.icon,
     required this.title,
@@ -1438,78 +970,52 @@ class _RaDriverProfileQuickCard
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Material(
-      color: theme.brightness ==
-              Brightness.dark
-          ? const Color(0xFF0D1D2B)
+      color: theme.brightness == Brightness.dark
+          ? const Color(0xFF0D2237)
           : colors.surface,
       shape: RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.circular(18),
-        side: BorderSide(
-          color: colors.outlineVariant
-              .withValues(alpha: .45),
-        ),
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
-      clipBehavior:
-          Clip.antiAlias,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding:
-              const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(14),
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 39,
                 height: 39,
-                decoration:
-                    BoxDecoration(
-                  color: colors.primary
-                      .withValues(
-                    alpha: .075,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    12,
-                  ),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: .075),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color: colors.primary,
-                  size: 19,
-                ),
+                child: Icon(icon, color: colors.primary, size: 19),
               ),
               const SizedBox(height: 12),
               Text(
                 title,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 10,
-                  fontWeight:
-                      FontWeight.w800,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
                 subtitle,
                 maxLines: 2,
-                overflow:
-                    TextOverflow.ellipsis,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 7.7,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
                   height: 1.35,
-                  color: colors
-                      .onSurfaceVariant,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -1520,8 +1026,7 @@ class _RaDriverProfileQuickCard
   }
 }
 
-class _RaDriverProfileMenuTile
-    extends StatelessWidget {
+class _RaDriverProfileMenuTile extends StatelessWidget {
   const _RaDriverProfileMenuTile({
     required this.icon,
     required this.title,
@@ -1536,63 +1041,42 @@ class _RaDriverProfileMenuTile
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return ListTile(
-      contentPadding:
-          const EdgeInsets.symmetric(
-        horizontal: 13,
-        vertical: 2,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 2),
       leading: Container(
         width: 39,
         height: 39,
-        decoration:
-            BoxDecoration(
-          color: colors.primary
-              .withValues(
-            alpha: .07,
-          ),
-          borderRadius:
-              BorderRadius.circular(12),
+        decoration: BoxDecoration(
+          color: colors.primary.withValues(alpha: .07),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: colors.primary,
-        ),
+        child: Icon(icon, size: 18, color: colors.primary),
       ),
       title: Text(
         title,
-        style:
-            GoogleFonts.plusJakartaSans(
-          fontSize: 9.6,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 12,
           fontWeight: FontWeight.w700,
         ),
       ),
       subtitle: Text(
         subtitle,
         maxLines: 1,
-        overflow:
-            TextOverflow.ellipsis,
-        style:
-            GoogleFonts.plusJakartaSans(
-          fontSize: 7.4,
-          color:
-              colors.onSurfaceVariant,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 12,
+          color: colors.onSurfaceVariant,
         ),
       ),
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-      ),
+      trailing: const Icon(Icons.chevron_right_rounded),
       onTap: onTap,
     );
   }
 }
 
-class _RaDriverProfileSourceTile
-    extends StatelessWidget {
+class _RaDriverProfileSourceTile extends StatelessWidget {
   const _RaDriverProfileSourceTile({
     required this.icon,
     required this.title,
@@ -1607,59 +1091,43 @@ class _RaDriverProfileSourceTile
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: colors
-          .surfaceContainerHighest
-          .withValues(alpha: .28),
-      borderRadius:
-          BorderRadius.circular(16),
+      color: colors.surfaceContainerHighest.withValues(alpha: .28),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding:
-              const EdgeInsets.all(13),
+          padding: const EdgeInsets.all(13),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: colors.primary,
-              ),
+              Icon(icon, color: colors.primary),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 9.7,
-                        fontWeight:
-                            FontWeight.w700,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 7.7,
-                        color: colors
-                            .onSurfaceVariant,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-              ),
+              const Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),
@@ -1668,8 +1136,7 @@ class _RaDriverProfileSourceTile
   }
 }
 
-class _RaDriverProfileNotice
-    extends StatelessWidget {
+class _RaDriverProfileNotice extends StatelessWidget {
   const _RaDriverProfileNotice({
     required this.icon,
     required this.title,
@@ -1685,50 +1152,32 @@ class _RaDriverProfileNotice
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color:
-            tone.withValues(alpha: .07),
-        borderRadius:
-            BorderRadius.circular(15),
-        border: Border.all(
-          color:
-              tone.withValues(alpha: .18),
-        ),
+        color: tone.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: tone.withValues(alpha: .18)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            color: tone,
-            size: 19,
-          ),
+          Icon(icon, color: tone, size: 19),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9.3,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 8,
-                    height: 1.4,
-                  ),
+                  style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.4),
                 ),
               ],
             ),

@@ -10,6 +10,8 @@ class TestUser extends Fake implements User {
   @override
   String get uid => 'same-user';
   @override
+  String get email => 'same@example.com';
+  @override
   bool get emailVerified => true;
 }
 
@@ -63,7 +65,8 @@ class Ref extends Fake implements DocumentReference<Map<String, dynamic>> {
   @override
   Future<DocumentSnapshot<Map<String, dynamic>>> get([
     GetOptions? options,
-  ]) async => Snapshot(collectionName == 'users' ? db.profile : null);
+  ]) async =>
+      Snapshot(collectionName == 'users' ? db.profile : db.confirmations);
   @override
   Future<void> set(Map<String, dynamic> data, [SetOptions? options]) async {
     db.profile.addAll(data);
@@ -87,12 +90,34 @@ class TestDb extends Fake implements FirebaseFirestore {
         'email': 'same@example.com',
       };
   final Map<String, dynamic> profile;
+  Map<String, dynamic>? confirmations;
   @override
   CollectionReference<Map<String, dynamic>> collection(String path) =>
       Col(this, path);
 }
 
 void main() {
+  test(
+    'existing verified role stays usable while additional role awaits email confirmation',
+    () async {
+      final db = TestDb('provider');
+      db.profile.addAll({
+        'roles': ['provider', 'driver'],
+        'roleEmailRequired': ['driver'],
+      });
+      final service = AuthService(auth: TestAuth(), firestore: db);
+      expect(await service.isRoleEmailVerified('provider'), true);
+      expect(await service.isRoleEmailVerified('driver'), false);
+      db.confirmations = {
+        'driver': {'email': 'wrong@example.com'},
+      };
+      expect(await service.isRoleEmailVerified('driver'), false);
+      db.confirmations = {
+        'driver': {'email': 'same@example.com'},
+      };
+      expect(await service.isRoleEmailVerified('driver'), true);
+    },
+  );
   test('legacy primary role is retained and last role must be enrolled', () {
     expect(accountRoles({'role': 'driver'}), ['driver']);
     expect(
@@ -129,6 +154,7 @@ void main() {
         expect(accountRoles(db.profile), containsAll(['driver', 'provider']));
         expect(db.profile['role'], first);
         expect(db.profile['lastRole'], other);
+        expect(db.profile['roleEmailRequired'], [other]);
         expect(db.profile['displayName'], 'Original Name');
         expect(db.profile['phone'], '+94771234567');
         expect(db.profile['online'], false);

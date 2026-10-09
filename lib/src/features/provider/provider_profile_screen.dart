@@ -445,20 +445,23 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     for (final service in availableServices)
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        title: Text(service),
-                        value: selected.contains(service),
-                        onChanged: (checked) {
-                          setDialogState(() {
-                            if (checked == true) {
-                              selected.add(service);
-                            } else {
-                              selected.remove(service);
-                            }
-                          });
-                        },
+                      Material(
+                        color: Colors.transparent,
+                        child: CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.trailing,
+                          title: Text(service),
+                          value: selected.contains(service),
+                          onChanged: (checked) {
+                            setDialogState(() {
+                              if (checked == true) {
+                                selected.add(service);
+                              } else {
+                                selected.remove(service);
+                              }
+                            });
+                          },
+                        ),
                       ),
                   ],
                 ),
@@ -612,7 +615,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return RaScaffold(
+    return RaProviderScaffold(
       body: !signedIn
           ? const SafeArea(
               child: Padding(

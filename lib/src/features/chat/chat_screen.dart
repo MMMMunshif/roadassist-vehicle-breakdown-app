@@ -13,8 +13,7 @@ class ChatScreen extends StatefulWidget {
   final String peerPhone;
 
   @override
-  State<ChatScreen> createState() =>
-      _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
 // =============================================================================
@@ -26,54 +25,39 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   Map<String, dynamic> requestData,
 ) async {
   final quoteNavigator = Navigator.of(context, rootNavigator: true);
-  final quoteThemes = InheritedTheme.capture(from: context, to: quoteNavigator.context);
+  final quoteThemes = InheritedTheme.capture(
+    from: context,
+    to: quoteNavigator.context,
+  );
   var distanceKm =
-      (requestData['providerDistanceKm'] as num?)
-              ?.toDouble() ??
-          0.0;
+      (requestData['providerDistanceKm'] as num?)?.toDouble() ?? 0.0;
 
-  final driverLatitude =
-      (requestData['latitude'] as num?)
-          ?.toDouble();
+  final driverLatitude = (requestData['latitude'] as num?)?.toDouble();
 
-  final driverLongitude =
-      (requestData['longitude'] as num?)
-          ?.toDouble();
+  final driverLongitude = (requestData['longitude'] as num?)?.toDouble();
 
-  final revision =
-      requestData['repairRevision'] == true;
+  final revision = requestData['repairRevision'] == true;
 
-  if (!revision &&
-      driverLatitude != null &&
-      driverLongitude != null) {
+  if (!revision && driverLatitude != null && driverLongitude != null) {
     try {
-      var permission =
-          await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
 
-      if (permission ==
-          LocationPermission.denied) {
-        permission =
-            await Geolocator
-                .requestPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
 
-      if (permission !=
-              LocationPermission.denied &&
-          permission !=
-              LocationPermission
-                  .deniedForever) {
-        final providerPosition =
-            await Geolocator
-                .getCurrentPosition();
+      if (permission != LocationPermission.denied &&
+          permission != LocationPermission.deniedForever) {
+        final providerPosition = await Geolocator.getCurrentPosition();
 
         distanceKm =
             Geolocator.distanceBetween(
-                  providerPosition.latitude,
-                  providerPosition.longitude,
-                  driverLatitude,
-                  driverLongitude,
-                ) /
-                1000;
+              providerPosition.latitude,
+              providerPosition.longitude,
+              driverLatitude,
+              driverLongitude,
+            ) /
+            1000;
       }
     } catch (_) {
       // Provider can still enter the travel price manually.
@@ -84,51 +68,36 @@ Future<Map<String, dynamic>?> requestProviderQuote(
     return null;
   }
 
-  final desired =
-      (requestData['proposedTotal'] as num?)
-          ?.toInt();
+  final desired = (requestData['proposedTotal'] as num?)?.toInt();
 
   final previousTravel = revision
-      ? (requestData['dispatchFee'] as num?)
-              ?.toInt() ??
-          0
+      ? (requestData['dispatchFee'] as num?)?.toInt() ?? 0
       : 0;
 
   final previousExtra = revision
-      ? (requestData['extraFee'] as num?)
-              ?.toInt() ??
-          0
+      ? (requestData['extraFee'] as num?)?.toInt() ?? 0
       : 0;
 
-  final keepFees = desired == null ||
-      desired >=
-          previousTravel + previousExtra;
+  final keepFees = desired == null || desired >= previousTravel + previousExtra;
 
-  final serviceController =
-      TextEditingController(
+  final serviceController = TextEditingController(
     text:
         '${desired == null ? (requestData['serviceFee'] as num?)?.toInt() ?? 0 : desired - (keepFees ? previousTravel + previousExtra : 0)}',
   );
 
-  final travelController =
-      TextEditingController(
-    text:
-        '${keepFees ? previousTravel : 0}',
+  final travelController = TextEditingController(
+    text: '${keepFees ? previousTravel : 0}',
   );
 
-  final extraController =
-      TextEditingController(
+  final extraController = TextEditingController(
     text: '${keepFees ? previousExtra : 0}',
   );
 
-  final notesController =
-      TextEditingController();
+  final notesController = TextEditingController();
 
-  final reasonController =
-      TextEditingController();
+  final reasonController = TextEditingController();
 
-  final warrantyController =
-      TextEditingController();
+  final warrantyController = TextEditingController();
 
   var warrantyDays = 0;
   var inspectionOnly = false;
@@ -138,15 +107,8 @@ Future<Map<String, dynamic>?> requestProviderQuote(
 
   final evidence = <String>[];
 
-  int amount(
-    TextEditingController controller,
-  ) {
-    return int.tryParse(
-          controller.text
-              .replaceAll(',', '')
-              .trim(),
-        ) ??
-        0;
+  int amount(TextEditingController controller) {
+    return int.tryParse(controller.text.replaceAll(',', '').trim()) ?? 0;
   }
 
   Future<void> addEvidence(
@@ -154,8 +116,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
     StateSetter setDialogState,
     ImageSource source,
   ) async {
-    if (preparingPhoto ||
-        evidence.length >= 2) {
+    if (preparingPhoto || evidence.length >= 2) {
       return;
     }
 
@@ -165,32 +126,21 @@ Future<Map<String, dynamic>?> requestProviderQuote(
     });
 
     try {
-      final photo =
-          source == ImageSource.camera
-              ? await Navigator.of(
-                  dialogContext,
-                ).push<XFile>(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        const CameraCaptureScreen(),
-                  ),
-                )
-              : await ImagePicker()
-                  .pickImage(
-                  source: source,
-                  imageQuality: 70,
-                  maxWidth: 1200,
-                );
+      final photo = source == ImageSource.camera
+          ? await Navigator.of(dialogContext).push<XFile>(
+              MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+            )
+          : await ImagePicker().pickImage(
+              source: source,
+              imageQuality: 70,
+              maxWidth: 1200,
+            );
 
       if (photo == null) {
         return;
       }
 
-      final encoded =
-          await PhotoUploadService()
-              .prepareVehiclePhoto(
-        photo,
-      );
+      final encoded = await PhotoUploadService().prepareVehiclePhoto(photo);
 
       if (!dialogContext.mounted) {
         return;
@@ -224,80 +174,56 @@ Future<Map<String, dynamic>?> requestProviderQuote(
     barrierDismissible: false,
     builder: (dialogContext) {
       return StatefulBuilder(
-        builder: (
-          context,
-          setDialogState,
-        ) {
-          final theme =
-              Theme.of(context);
+        builder: (context, setDialogState) {
+          final theme = Theme.of(context);
 
-          final colors =
-              theme.colorScheme;
+          final colors = theme.colorScheme;
 
           final total =
               amount(serviceController) +
-                  amount(travelController) +
-                  amount(extraController);
+              amount(travelController) +
+              amount(extraController);
 
           final revisionError = revision
               ? validateRepairRevision(
                   previousTotal:
-                      (requestData[
-                                  'estimatedCost']
-                              as num?)
-                          ?.toInt() ??
-                      0,
+                      (requestData['estimatedCost'] as num?)?.toInt() ?? 0,
                   total: total,
-                  reason:
-                      reasonController.text,
+                  reason: reasonController.text,
                   photos: evidence,
                 )
               : null;
 
           final warrantyInvalid =
               !inspectionOnly &&
-                  warrantyDays > 0 &&
-                  warrantyController.text
-                          .trim()
-                          .length <
-                      10;
+              warrantyDays > 0 &&
+              warrantyController.text.trim().length < 10;
 
           final notesInvalid =
-              requestData[
-                      'workflowVersion'] ==
-                  2 &&
-              notesController.text
-                  .trim()
-                  .isEmpty;
+              requestData['workflowVersion'] == 2 &&
+              notesController.text.trim().isEmpty;
 
-          final invalidTotal = revision
-              ? total < 0
-              : total <= 0;
+          final invalidTotal = revision ? total < 0 : total <= 0;
 
           final canSubmit =
               !invalidTotal &&
-                  !preparingPhoto &&
-                  !warrantyInvalid &&
-                  revisionError == null &&
-                  !notesInvalid &&
-                  total <= 10000000;
+              !preparingPhoto &&
+              !warrantyInvalid &&
+              revisionError == null &&
+              !notesInvalid &&
+              total <= 10000000;
 
           Widget moneyField({
             required String label,
             required IconData icon,
-            required TextEditingController
-                controller,
+            required TextEditingController controller,
           }) {
             return TextField(
               controller: controller,
-              keyboardType:
-                  TextInputType.number,
+              keyboardType: TextInputType.number,
               inputFormatters: [
-                FilteringTextInputFormatter
-                    .digitsOnly,
-                LengthLimitingTextInputFormatter(
-                  7,
-                ),
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(7),
               ],
               onChanged: (_) {
                 setDialogState(() {});
@@ -311,100 +237,63 @@ Future<Map<String, dynamic>?> requestProviderQuote(
           }
 
           return Dialog(
-            insetPadding:
-                const EdgeInsets.symmetric(
+            insetPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 22,
             ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: 560,
-                maxHeight:
-                    MediaQuery.sizeOf(context)
-                            .height *
-                        .92,
+                maxHeight: MediaQuery.sizeOf(context).height * .92,
               ),
               child: Column(
                 children: [
                   Padding(
-                    padding:
-                        const EdgeInsets
-                            .fromLTRB(
-                      18,
-                      18,
-                      10,
-                      14,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(18, 18, 10, 14),
                     child: Row(
                       children: [
                         Container(
                           width: 48,
                           height: 48,
-                          decoration:
-                              BoxDecoration(
-                            color: colors
-                                .primary
-                                .withValues(
-                              alpha: .09,
-                            ),
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              15,
-                            ),
+                          decoration: BoxDecoration(
+                            color: colors.primary.withValues(alpha: .09),
+                            borderRadius: BorderRadius.circular(15),
                           ),
                           child: Icon(
                             revision
-                                ? Icons
-                                    .change_circle_outlined
-                                : Icons
-                                    .request_quote_outlined,
-                            color: colors
-                                .primary,
+                                ? Icons.change_circle_outlined
+                                : Icons.request_quote_outlined,
+                            color: colors.primary,
                           ),
                         ),
 
-                        const SizedBox(
-                          width: 12,
-                        ),
+                        const SizedBox(width: 12),
 
                         Expanded(
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment
-                                    .start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 revision
                                     ? 'Revise approved quote'
                                     : 'Create service offer',
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  fontSize:
-                                      17,
-                                  fontWeight:
-                                      FontWeight
-                                          .w800,
-                                  color: colors
-                                      .onSurface,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: providerFontSize(context, 17),
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.onSurface,
                                 ),
                               ),
 
-                              const SizedBox(
-                                height: 3,
-                              ),
+                              const SizedBox(height: 3),
 
                               Text(
                                 revision
                                     ? 'Explain every change before asking for driver approval.'
                                     : 'Send a clear itemized offer before the driver selects you.',
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  fontSize:
-                                      9.5,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: providerFontSize(context, 9.5),
                                   height: 1.4,
-                                  color: colors
-                                      .onSurfaceVariant,
+                                  color: colors.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -413,18 +302,12 @@ Future<Map<String, dynamic>?> requestProviderQuote(
 
                         IconButton(
                           tooltip: 'Close',
-                          onPressed:
-                              preparingPhoto
-                                  ? null
-                                  : () {
-                                      Navigator.pop(
-                                        dialogContext,
-                                      );
-                                    },
-                          icon: const Icon(
-                            Icons
-                                .close_rounded,
-                          ),
+                          onPressed: preparingPhoto
+                              ? null
+                              : () {
+                                  Navigator.pop(dialogContext);
+                                },
+                          icon: const Icon(Icons.close_rounded),
                         ),
                       ],
                     ),
@@ -432,402 +315,252 @@ Future<Map<String, dynamic>?> requestProviderQuote(
 
                   Divider(
                     height: 1,
-                    color: colors
-                        .outlineVariant
-                        .withValues(
-                      alpha: .45,
-                    ),
+                    color: colors.outlineVariant.withValues(alpha: .45),
                   ),
 
                   Expanded(
-                    child:
-                        SingleChildScrollView(
-                      padding:
-                          const EdgeInsets
-                              .all(
-                        18,
-                      ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(18),
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .stretch,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           _RaChatQuoteSummary(
-                            issue:
-                                requestIssueLabel(
-                              requestData,
-                            ),
-                            distanceKm:
-                                distanceKm,
-                            vehicle:
-                                requestData[
-                                            'modelYear']
-                                        as String? ??
-                                    '',
+                            issue: requestIssueLabel(requestData),
+                            distanceKm: distanceKm,
+                            vehicle: requestData['modelYear'] as String? ?? '',
                             description:
-                                requestData[
-                                            'description']
-                                        as String? ??
-                                    '',
+                                requestData['description'] as String? ?? '',
                             partsPreference:
-                                requestData[
-                                            'partsPreference']
-                                        as String? ??
-                                    'discuss',
-                            photoData:
-                                requestVehiclePhoto(
-                              requestData,
-                            ),
+                                requestData['partsPreference'] as String? ??
+                                'discuss',
+                            photoData: requestVehiclePhoto(requestData),
                           ),
 
-                          const SizedBox(
-                            height: 20,
-                          ),
+                          const SizedBox(height: 20),
 
-                          if (requestData[
-                                      'workflowVersion'] ==
-                                  2 &&
+                          if (requestData['workflowVersion'] == 2 &&
                               !revision) ...[
                             Container(
-                              decoration:
-                                  BoxDecoration(
-                                color: colors
-                                    .secondaryContainer
-                                    .withValues(
+                              decoration: BoxDecoration(
+                                color: colors.secondaryContainer.withValues(
                                   alpha: .30,
                                 ),
-                                borderRadius:
-                                    BorderRadius
-                                        .circular(
-                                  17,
-                                ),
+                                borderRadius: BorderRadius.circular(17),
                               ),
-                              child:
-                                  SwitchListTile(
-                                contentPadding:
-                                    const EdgeInsets
-                                        .symmetric(
-                                  horizontal:
-                                      14,
-                                  vertical: 3,
-                                ),
-                                value:
-                                    inspectionOnly,
-                                secondary:
-                                    const Icon(
-                                  Icons
-                                      .search_rounded,
-                                ),
-                                title: const Text(
-                                  'Inspection required',
-                                ),
-                                subtitle:
-                                    const Text(
-                                  'Repair work will require a separate approved revision.',
-                                ),
-                                onChanged:
-                                    (value) {
-                                  setDialogState(
-                                    () {
-                                      inspectionOnly =
-                                          value;
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: SwitchListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 3,
+                                    ),
+                                    value: inspectionOnly,
+                                    secondary: const Icon(Icons.search_rounded),
+                                    title: const Text('Inspection required'),
+                                    subtitle: const Text(
+                                      'Repair work will require a separate approved revision.',
+                                    ),
+                                    onChanged: (value) {
+                                      setDialogState(() {
+                                        inspectionOnly = value;
 
-                                      if (value) {
-                                        warrantyDays =
-                                            0;
-                                      }
+                                        if (value) {
+                                          warrantyDays = 0;
+                                        }
+                                      });
                                     },
-                                  );
-                                },
+                                  ),
+                                ),
                               ),
                             ),
 
-                            const SizedBox(
-                              height: 20,
-                            ),
+                            const SizedBox(height: 20),
                           ],
 
                           if (revision) ...[
                             _RaChatQuoteNotice(
-                              icon: Icons
-                                  .history_rounded,
+                              icon: Icons.history_rounded,
                               title:
                                   'Previously approved: Rs. ${requestData['estimatedCost'] ?? 0}',
                               message:
                                   'The new total replaces the old amount. Extra work should not begin until the driver approves it.',
                             ),
-                            const SizedBox(
-                              height: 20,
-                            ),
+                            const SizedBox(height: 20),
                           ],
 
                           const _RaChatSectionTitle(
-                            icon: Icons
-                                .payments_outlined,
-                            title:
-                                'Price breakdown',
+                            icon: Icons.payments_outlined,
+                            title: 'Price breakdown',
                             subtitle:
                                 'Keep every charge separate and easy to understand.',
                           ),
 
-                          const SizedBox(
-                            height: 12,
-                          ),
+                          const SizedBox(height: 12),
 
                           moneyField(
                             label: inspectionOnly
                                 ? 'Visit / inspection charge'
                                 : 'Service / labour charge',
-                            icon:
-                                Icons.build_outlined,
-                            controller:
-                                serviceController,
+                            icon: Icons.build_outlined,
+                            controller: serviceController,
                           ),
 
-                          const SizedBox(
-                            height: 10,
-                          ),
+                          const SizedBox(height: 10),
 
                           moneyField(
-                            label:
-                                'Travel / distance charge',
-                            icon:
-                                Icons.route_outlined,
-                            controller:
-                                travelController,
+                            label: 'Travel / distance charge',
+                            icon: Icons.route_outlined,
+                            controller: travelController,
                           ),
 
-                          const SizedBox(
-                            height: 10,
-                          ),
+                          const SizedBox(height: 10),
 
                           moneyField(
-                            label:
-                                'Other stated charges',
-                            icon: Icons
-                                .add_card_outlined,
-                            controller:
-                                extraController,
+                            label: 'Other stated charges',
+                            icon: Icons.add_card_outlined,
+                            controller: extraController,
                           ),
 
-                          const SizedBox(
-                            height: 22,
-                          ),
+                          const SizedBox(height: 22),
 
                           const _RaChatSectionTitle(
-                            icon: Icons
-                                .description_outlined,
-                            title:
-                                'Offer details',
+                            icon: Icons.description_outlined,
+                            title: 'Offer details',
                             subtitle:
                                 'State exactly what is included and excluded.',
                           ),
 
-                          const SizedBox(
-                            height: 12,
-                          ),
+                          const SizedBox(height: 12),
 
                           TextField(
-                            controller:
-                                notesController,
+                            controller: notesController,
                             maxLength: 200,
                             minLines: 2,
                             maxLines: 4,
                             onChanged: (_) {
-                              setDialogState(
-                                () {},
-                              );
+                              setDialogState(() {});
                             },
-                            decoration:
-                                InputDecoration(
-                              labelText:
-                                  'Included work, parts and exclusions',
-                              alignLabelWithHint:
-                                  true,
-                              errorText:
-                                  notesInvalid
-                                      ? 'Add the work included in this offer.'
-                                      : null,
+                            decoration: InputDecoration(
+                              labelText: 'Included work, parts and exclusions',
+                              alignLabelWithHint: true,
+                              errorText: notesInvalid
+                                  ? 'Add the work included in this offer.'
+                                  : null,
                             ),
                           ),
 
-                          const SizedBox(
-                            height: 10,
-                          ),
+                          const SizedBox(height: 10),
 
-                          DropdownButtonFormField<
-                              int>(
-                            initialValue:
-                                warrantyDays,
-                            decoration:
-                                const InputDecoration(
-                              labelText:
-                                  'Service warranty',
-                              prefixIcon: Icon(
-                                Icons
-                                    .verified_user_outlined,
-                              ),
+                          DropdownButtonFormField<int>(
+                            initialValue: warrantyDays,
+                            decoration: const InputDecoration(
+                              labelText: 'Service warranty',
+                              prefixIcon: Icon(Icons.verified_user_outlined),
                             ),
-                            items: const [
-                              0,
-                              7,
-                              14,
-                              30,
-                              90,
-                              180,
-                              365,
-                            ]
+                            items: const [0, 7, 14, 30, 90, 180, 365]
                                 .map(
-                                  (days) =>
-                                      DropdownMenuItem<
-                                          int>(
-                                    value:
-                                        days,
+                                  (days) => DropdownMenuItem<int>(
+                                    value: days,
                                     child: Text(
-                                      days ==
-                                              0
+                                      days == 0
                                           ? 'No service warranty'
                                           : '$days days',
                                     ),
                                   ),
                                 )
                                 .toList(),
-                            onChanged:
-                                inspectionOnly
-                                    ? null
-                                    : (value) {
-                                        setDialogState(
-                                          () {
-                                            warrantyDays =
-                                                value ??
-                                                    0;
-                                          },
-                                        );
-                                      },
+                            onChanged: inspectionOnly
+                                ? null
+                                : (value) {
+                                    setDialogState(() {
+                                      warrantyDays = value ?? 0;
+                                    });
+                                  },
                           ),
 
-                          if (warrantyDays > 0 &&
-                              !inspectionOnly) ...[
-                            const SizedBox(
-                              height: 10,
-                            ),
+                          if (warrantyDays > 0 && !inspectionOnly) ...[
+                            const SizedBox(height: 10),
 
                             TextField(
-                              controller:
-                                  warrantyController,
+                              controller: warrantyController,
                               maxLength: 500,
                               minLines: 2,
                               maxLines: 4,
                               onChanged: (_) {
-                                setDialogState(
-                                  () {},
-                                );
+                                setDialogState(() {});
                               },
-                              decoration:
-                                  InputDecoration(
-                                labelText:
-                                    'Warranty coverage',
-                                alignLabelWithHint:
-                                    true,
-                                errorText:
-                                    warrantyInvalid
-                                        ? 'Describe warranty coverage in at least 10 characters.'
-                                        : null,
+                              decoration: InputDecoration(
+                                labelText: 'Warranty coverage',
+                                alignLabelWithHint: true,
+                                errorText: warrantyInvalid
+                                    ? 'Describe warranty coverage in at least 10 characters.'
+                                    : null,
                               ),
                             ),
                           ],
 
                           if (revision) ...[
-                            const SizedBox(
-                              height: 22,
-                            ),
+                            const SizedBox(height: 22),
 
                             const _RaChatSectionTitle(
-                              icon: Icons
-                                  .change_circle_outlined,
-                              title:
-                                  'Reason for revision',
+                              icon: Icons.change_circle_outlined,
+                              title: 'Reason for revision',
                               subtitle:
                                   'Explain what changed after inspection or repair began.',
                             ),
 
-                            const SizedBox(
-                              height: 12,
-                            ),
+                            const SizedBox(height: 12),
 
                             TextField(
-                              controller:
-                                  reasonController,
+                              controller: reasonController,
                               maxLength: 300,
                               minLines: 2,
                               maxLines: 4,
                               onChanged: (_) {
-                                setDialogState(
-                                  () {},
-                                );
+                                setDialogState(() {});
                               },
-                              decoration:
-                                  const InputDecoration(
-                                labelText:
-                                    'Reason for price / work change',
-                                alignLabelWithHint:
-                                    true,
+                              decoration: const InputDecoration(
+                                labelText: 'Reason for price / work change',
+                                alignLabelWithHint: true,
                               ),
                             ),
 
-                            const SizedBox(
-                              height: 12,
-                            ),
+                            const SizedBox(height: 12),
 
                             _RaChatQuoteEvidence(
-                              evidence:
-                                  evidence,
-                              busy:
-                                  preparingPhoto,
-                              error:
-                                  evidenceError,
+                              evidence: evidence,
+                              busy: preparingPhoto,
+                              error: evidenceError,
                               onGallery: () {
                                 addEvidence(
                                   dialogContext,
                                   setDialogState,
-                                  ImageSource
-                                      .gallery,
+                                  ImageSource.gallery,
                                 );
                               },
                               onCamera: () {
                                 addEvidence(
                                   dialogContext,
                                   setDialogState,
-                                  ImageSource
-                                      .camera,
+                                  ImageSource.camera,
                                 );
                               },
-                              onRemove:
-                                  (index) {
-                                setDialogState(
-                                  () {
-                                    evidence
-                                        .removeAt(
-                                      index,
-                                    );
-                                  },
-                                );
+                              onRemove: (index) {
+                                setDialogState(() {
+                                  evidence.removeAt(index);
+                                });
                               },
                             ),
 
-                            if (revisionError !=
-                                null) ...[
-                              const SizedBox(
-                                height: 10,
-                              ),
+                            if (revisionError != null) ...[
+                              const SizedBox(height: 10),
 
                               _RaChatQuoteNotice(
-                                icon: Icons
-                                    .error_outline_rounded,
-                                title:
-                                    'Revision incomplete',
-                                message:
-                                    revisionError,
+                                icon: Icons.error_outline_rounded,
+                                title: 'Revision incomplete',
+                                message: revisionError,
                                 error: true,
                               ),
                             ],
@@ -839,184 +572,122 @@ Future<Map<String, dynamic>?> requestProviderQuote(
 
                   Divider(
                     height: 1,
-                    color: colors
-                        .outlineVariant
-                        .withValues(
-                      alpha: .45,
-                    ),
+                    color: colors.outlineVariant.withValues(alpha: .45),
                   ),
 
                   Padding(
-                    padding:
-                        const EdgeInsets
-                            .all(
-                      16,
-                    ),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
                         Container(
-                          padding:
-                              const EdgeInsets
-                                  .all(
-                            13,
-                          ),
-                          decoration:
-                              BoxDecoration(
-                            color: colors
-                                .primary
-                                .withValues(
-                              alpha: .07,
-                            ),
-                            borderRadius:
-                                BorderRadius
-                                    .circular(
-                              16,
-                            ),
+                          padding: const EdgeInsets.all(13),
+                          decoration: BoxDecoration(
+                            color: colors.primary.withValues(alpha: .07),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Row(
                             children: [
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       revision
                                           ? 'New full total'
                                           : inspectionOnly
-                                              ? 'Inspection total'
-                                              : 'Quoted total',
-                                      style: GoogleFonts
-                                          .plusJakartaSans(
-                                        fontSize:
-                                            9,
-                                        color: colors
-                                            .onSurfaceVariant,
+                                          ? 'Inspection total'
+                                          : 'Quoted total',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: providerFontSize(context, 9),
+                                        color: colors.onSurfaceVariant,
                                       ),
                                     ),
-                                    const SizedBox(
-                                      height: 3,
-                                    ),
+                                    const SizedBox(height: 3),
                                     Text(
                                       revision
                                           ? 'Replaces the previous approved amount'
                                           : 'Driver reviews this before selection',
-                                      style: GoogleFonts
-                                          .plusJakartaSans(
-                                        fontSize:
-                                            8.5,
-                                        color: colors
-                                            .onSurfaceVariant,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: providerFontSize(
+                                          context,
+                                          8.5,
+                                        ),
+                                        color: colors.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
 
-                              const SizedBox(
-                                width: 12,
-                              ),
+                              const SizedBox(width: 12),
 
                               Text(
                                 'Rs. $total',
-                                style: GoogleFonts
-                                    .plusJakartaSans(
-                                  fontSize:
-                                      17,
-                                  fontWeight:
-                                      FontWeight
-                                          .w800,
-                                  color: colors
-                                      .primary,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: providerFontSize(context, 17),
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.primary,
                                 ),
                               ),
                             ],
                           ),
                         ),
 
-                        const SizedBox(
-                          height: 11,
-                        ),
+                        const SizedBox(height: 11),
 
                         Row(
                           children: [
                             Expanded(
-                              child:
-                                  OutlinedButton(
-                                onPressed:
-                                    preparingPhoto
-                                        ? null
-                                        : () {
-                                            Navigator.pop(
-                                              dialogContext,
-                                            );
-                                          },
-                                child:
-                                    const Text(
-                                  'Cancel',
-                                ),
+                              child: OutlinedButton(
+                                onPressed: preparingPhoto
+                                    ? null
+                                    : () {
+                                        Navigator.pop(dialogContext);
+                                      },
+                                child: const Text('Cancel'),
                               ),
                             ),
 
-                            const SizedBox(
-                              width: 9,
-                            ),
+                            const SizedBox(width: 9),
 
                             Expanded(
                               flex: 2,
-                              child:
-                                  FilledButton.icon(
-                                onPressed:
-                                    canSubmit
-                                        ? () {
-                                            Navigator.pop(
-                                              dialogContext,
-                                              {
-                                                'serviceFee':
-                                                    amount(serviceController),
-                                                'travelFee':
-                                                    amount(travelController),
-                                                'extraFee':
-                                                    amount(extraController),
-                                                'providerDistanceKm':
-                                                    distanceKm,
-                                                'quoteNotes':
-                                                    notesController.text.trim(),
-                                                'quoteType':
-                                                    inspectionOnly
-                                                        ? 'inspection'
-                                                        : 'direct',
-                                                'warrantyDays':
-                                                    inspectionOnly
-                                                        ? 0
-                                                        : warrantyDays,
-                                                'warrantyTerms':
-                                                    inspectionOnly ||
-                                                            warrantyDays == 0
-                                                        ? ''
-                                                        : warrantyController.text.trim(),
-                                                if (revision)
-                                                  'changeReason':
-                                                      reasonController.text.trim(),
-                                                if (revision)
-                                                  'evidencePhotoData':
-                                                      List<String>.from(
-                                                    evidence,
-                                                  ),
-                                              },
-                                            );
-                                          }
-                                        : null,
-                                icon:
-                                    const Icon(
-                                  Icons
-                                      .send_rounded,
-                                ),
+                              child: FilledButton.icon(
+                                onPressed: canSubmit
+                                    ? () {
+                                        Navigator.pop(dialogContext, {
+                                          'serviceFee': amount(
+                                            serviceController,
+                                          ),
+                                          'travelFee': amount(travelController),
+                                          'extraFee': amount(extraController),
+                                          'providerDistanceKm': distanceKm,
+                                          'quoteNotes': notesController.text
+                                              .trim(),
+                                          'quoteType': inspectionOnly
+                                              ? 'inspection'
+                                              : 'direct',
+                                          'warrantyDays': inspectionOnly
+                                              ? 0
+                                              : warrantyDays,
+                                          'warrantyTerms':
+                                              inspectionOnly ||
+                                                  warrantyDays == 0
+                                              ? ''
+                                              : warrantyController.text.trim(),
+                                          if (revision)
+                                            'changeReason': reasonController
+                                                .text
+                                                .trim(),
+                                          if (revision)
+                                            'evidencePhotoData':
+                                                List<String>.from(evidence),
+                                        });
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.send_rounded),
                                 label: Text(
-                                  revision
-                                      ? 'Send Revision'
-                                      : 'Send Offer',
+                                  revision ? 'Send Revision' : 'Send Offer',
                                 ),
                               ),
                             ),
@@ -1034,7 +705,10 @@ Future<Map<String, dynamic>?> requestProviderQuote(
     },
   );
 
-  final result = await Navigator.of(context, rootNavigator: true).push(quoteRoute);
+  final result = await Navigator.of(
+    context,
+    rootNavigator: true,
+  ).push(quoteRoute);
   await quoteRoute.completed;
 
   serviceController.dispose();
@@ -1047,8 +721,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
   return result;
 }
 
-class _RaChatSectionTitle
-    extends StatelessWidget {
+class _RaChatSectionTitle extends StatelessWidget {
   const _RaChatSectionTitle({
     required this.icon,
     required this.title,
@@ -1061,55 +734,42 @@ class _RaChatSectionTitle
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: colors.primary
-                .withValues(alpha: .08),
-            borderRadius:
-                BorderRadius.circular(12),
+            color: colors.primary.withValues(alpha: .08),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: colors.primary,
-            size: 19,
-          ),
+          child: Icon(icon, color: colors.primary, size: 19),
         ),
 
         const SizedBox(width: 10),
 
         Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight:
-                      FontWeight.w700,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: providerFontSize(context, 12),
+                  fontWeight: FontWeight.w700,
                   color: colors.onSurface,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 9,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: providerFontSize(context, 9),
                   height: 1.4,
-                  color: colors
-                      .onSurfaceVariant,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -1120,8 +780,7 @@ class _RaChatSectionTitle
   }
 }
 
-class _RaChatQuoteSummary
-    extends StatelessWidget {
+class _RaChatQuoteSummary extends StatelessWidget {
   const _RaChatQuoteSummary({
     required this.issue,
     required this.distanceKm,
@@ -1140,85 +799,59 @@ class _RaChatQuoteSummary
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colors
-            .surfaceContainerHighest
-            .withValues(alpha: .34),
-        borderRadius:
-            BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .45),
-        ),
+        color: colors.surfaceContainerHighest.withValues(alpha: .34),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
                 child: Text(
                   issue,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 13,
-                    fontWeight:
-                        FontWeight.w800,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 13),
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
 
               if (distanceKm > 0)
                 Container(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
+                  padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
                   ),
-                  decoration:
-                      BoxDecoration(
-                    color: colors.primary
-                        .withValues(
-                      alpha: .08,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
-                    ),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     '${distanceKm.toStringAsFixed(1)} km',
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 8,
-                      fontWeight:
-                          FontWeight.w700,
-                      color:
-                          colors.primary,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: providerFontSize(context, 8),
+                      fontWeight: FontWeight.w700,
+                      color: colors.primary,
                     ),
                   ),
                 ),
             ],
           ),
 
-          if (vehicle
-              .trim()
-              .isNotEmpty) ...[
+          if (vehicle.trim().isNotEmpty) ...[
             const SizedBox(height: 7),
             Text(
               vehicle,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 9.5,
-                color:
-                    colors.onSurfaceVariant,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 9.5),
+                color: colors.onSurfaceVariant,
               ),
             ),
           ],
@@ -1226,8 +859,7 @@ class _RaChatQuoteSummary
           const SizedBox(height: 11),
 
           ClipRRect(
-            borderRadius:
-                BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(14),
             child: VehiclePhotoPreview(
               model: vehicle,
               photoData: photoData,
@@ -1235,28 +867,22 @@ class _RaChatQuoteSummary
             ),
           ),
 
-          if (description
-              .trim()
-              .isNotEmpty) ...[
+          if (description.trim().isNotEmpty) ...[
             const SizedBox(height: 11),
             Text(
               'DRIVER DESCRIPTION',
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 8,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 8),
                 letterSpacing: .7,
-                fontWeight:
-                    FontWeight.w700,
-                color:
-                    colors.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                color: colors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               description,
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 10,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 10),
                 height: 1.4,
               ),
             ),
@@ -1266,11 +892,9 @@ class _RaChatQuoteSummary
 
           Text(
             'Parts preference: ${partsPreference.replaceAll('_', ' ')}',
-            style:
-                GoogleFonts.plusJakartaSans(
-              fontSize: 9,
-              color:
-                  colors.onSurfaceVariant,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: providerFontSize(context, 9),
+              color: colors.onSurfaceVariant,
             ),
           ),
         ],
@@ -1279,8 +903,7 @@ class _RaChatQuoteSummary
   }
 }
 
-class _RaChatQuoteNotice
-    extends StatelessWidget {
+class _RaChatQuoteNotice extends StatelessWidget {
   const _RaChatQuoteNotice({
     required this.icon,
     required this.title,
@@ -1295,53 +918,39 @@ class _RaChatQuoteNotice
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final tone =
-        error ? colors.error : raGold;
+    final tone = error ? colors.error : raGold;
 
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color:
-            tone.withValues(alpha: .08),
-        borderRadius:
-            BorderRadius.circular(16),
+        color: tone.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 19,
-            color: tone,
-          ),
+          Icon(icon, size: 19, color: tone),
           const SizedBox(width: 9),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 10.5),
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 9,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 9),
                     height: 1.4,
-                    color: colors
-                        .onSurfaceVariant,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1353,8 +962,7 @@ class _RaChatQuoteNotice
   }
 }
 
-class _RaChatQuoteEvidence
-    extends StatelessWidget {
+class _RaChatQuoteEvidence extends StatelessWidget {
   const _RaChatQuoteEvidence({
     required this.evidence,
     required this.busy,
@@ -1374,37 +982,30 @@ class _RaChatQuoteEvidence
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final canAdd =
-        !busy && evidence.length < 2;
+    final canAdd = !busy && evidence.length < 2;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             Expanded(
               child: Text(
                 'Photo evidence',
-                style: GoogleFonts
-                    .plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight:
-                      FontWeight.w700,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: providerFontSize(context, 11),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             Text(
               '${evidence.length}/2',
-              style:
-                  GoogleFonts.plusJakartaSans(
-                fontSize: 8.5,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 8.5),
                 color: colors.primary,
-                fontWeight:
-                    FontWeight.w700,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -1416,27 +1017,17 @@ class _RaChatQuoteEvidence
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed:
-                    canAdd ? onGallery : null,
-                icon: const Icon(
-                  Icons
-                      .photo_library_outlined,
-                ),
-                label:
-                    const Text('Gallery'),
+                onPressed: canAdd ? onGallery : null,
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('Gallery'),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed:
-                    canAdd ? onCamera : null,
-                icon: const Icon(
-                  Icons
-                      .camera_alt_outlined,
-                ),
-                label:
-                    const Text('Camera'),
+                onPressed: canAdd ? onCamera : null,
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: const Text('Camera'),
               ),
             ),
           ],
@@ -1444,9 +1035,7 @@ class _RaChatQuoteEvidence
 
         if (busy) ...[
           const SizedBox(height: 8),
-          const LinearProgressIndicator(
-            minHeight: 3,
-          ),
+          const LinearProgressIndicator(minHeight: 3),
         ],
 
         if (evidence.isNotEmpty) ...[
@@ -1456,9 +1045,7 @@ class _RaChatQuoteEvidence
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (var index = 0;
-                  index < evidence.length;
-                  index++)
+              for (var index = 0; index < evidence.length; index++)
                 _RaChatEvidencePhoto(
                   data: evidence[index],
                   onRemove: () {
@@ -1473,9 +1060,8 @@ class _RaChatQuoteEvidence
           const SizedBox(height: 8),
           Text(
             error!,
-            style:
-                GoogleFonts.plusJakartaSans(
-              fontSize: 9,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: providerFontSize(context, 9),
               color: colors.error,
             ),
           ),
@@ -1485,12 +1071,8 @@ class _RaChatQuoteEvidence
   }
 }
 
-class _RaChatEvidencePhoto
-    extends StatelessWidget {
-  const _RaChatEvidencePhoto({
-    required this.data,
-    required this.onRemove,
-  });
+class _RaChatEvidencePhoto extends StatelessWidget {
+  const _RaChatEvidencePhoto({required this.data, required this.onRemove});
 
   final String data;
   final VoidCallback onRemove;
@@ -1500,16 +1082,9 @@ class _RaChatEvidencePhoto
     Widget image;
 
     try {
-      image = Image.memory(
-        base64Decode(data),
-        fit: BoxFit.cover,
-      );
+      image = Image.memory(base64Decode(data), fit: BoxFit.cover);
     } on FormatException {
-      image = const Center(
-        child: Icon(
-          Icons.broken_image_outlined,
-        ),
-      );
+      image = const Center(child: Icon(Icons.broken_image_outlined));
     }
 
     return SizedBox(
@@ -1519,8 +1094,7 @@ class _RaChatEvidencePhoto
         children: [
           Positioned.fill(
             child: ClipRRect(
-              borderRadius:
-                  BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(14),
               child: image,
             ),
           ),
@@ -1528,23 +1102,14 @@ class _RaChatEvidencePhoto
             top: 4,
             right: 4,
             child: IconButton.filled(
-              visualDensity:
-                  VisualDensity.compact,
+              visualDensity: VisualDensity.compact,
               iconSize: 15,
-              style:
-                  IconButton.styleFrom(
-                backgroundColor:
-                    Colors.black
-                        .withValues(
-                  alpha: .58,
-                ),
-                foregroundColor:
-                    Colors.white,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black.withValues(alpha: .58),
+                foregroundColor: Colors.white,
               ),
               onPressed: onRemove,
-              icon: const Icon(
-                Icons.close_rounded,
-              ),
+              icon: const Icon(Icons.close_rounded),
             ),
           ),
         ],
@@ -1557,19 +1122,12 @@ class _RaChatEvidencePhoto
 // CHAT
 // =============================================================================
 
-class _ChatScreenState
-    extends State<ChatScreen>
-    with WidgetsBindingObserver {
-  final controller =
-      TextEditingController();
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+  final controller = TextEditingController();
 
-  final scrollController =
-      ScrollController();
+  final scrollController = ScrollController();
 
-  StreamSubscription<
-          QuerySnapshot<
-              Map<String, dynamic>>>?
-      messageListener;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? messageListener;
 
   final messages = <String>[];
   final senderIds = <String>[];
@@ -1583,101 +1141,72 @@ class _ChatScreenState
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance
-        .addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
 
-    controller.addListener(
-      _composerChanged,
-    );
+    controller.addListener(_composerChanged);
 
     if (widget.requestId != null) {
       _markSeen();
 
       messageListener = RequestService()
-          .watchMessages(
-            widget.requestId!,
-          )
-          .listen(
-        (snapshot) {
-          if (!mounted) return;
+          .watchMessages(widget.requestId!)
+          .listen((snapshot) {
+            if (!mounted) return;
 
-          setState(() {
-            messages
-              ..clear()
-              ..addAll(
-                snapshot.docs.map(
-                  (doc) =>
-                      doc.data()['text']
-                          as String? ??
-                      '',
-                ),
-              );
+            setState(() {
+              messages
+                ..clear()
+                ..addAll(
+                  snapshot.docs.map(
+                    (doc) => doc.data()['text'] as String? ?? '',
+                  ),
+                );
 
-            senderIds
-              ..clear()
-              ..addAll(
-                snapshot.docs.map(
-                  (doc) =>
-                      doc.data()['senderId']
-                          as String? ??
-                      '',
-                ),
-              );
+              senderIds
+                ..clear()
+                ..addAll(
+                  snapshot.docs.map(
+                    (doc) => doc.data()['senderId'] as String? ?? '',
+                  ),
+                );
 
-            messageImages
-              ..clear()
-              ..addAll(
-                snapshot.docs.map(
-                  (doc) =>
-                      doc.data()['imageData']
-                          as String?,
-                ),
-              );
+              messageImages
+                ..clear()
+                ..addAll(
+                  snapshot.docs.map(
+                    (doc) => doc.data()['imageData'] as String?,
+                  ),
+                );
 
-            messageTimes
-              ..clear()
-              ..addAll(
-                snapshot.docs.map(
-                  (doc) {
-                    final value =
-                        doc.data()[
-                            'createdAt'];
+              messageTimes
+                ..clear()
+                ..addAll(
+                  snapshot.docs.map((doc) {
+                    final value = doc.data()['createdAt'];
 
-                    if (value
-                        is Timestamp) {
-                      return value
-                          .toDate();
+                    if (value is Timestamp) {
+                      return value.toDate();
                     }
 
-                    if (value
-                        is DateTime) {
+                    if (value is DateTime) {
                       return value;
                     }
 
                     return null;
-                  },
-                ),
-              );
-          });
+                  }),
+                );
+            });
 
-          WidgetsBinding.instance
-              .addPostFrameCallback(
-            (_) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
               _scrollLatest();
-            },
-          );
+            });
 
-          if (ModalRoute.of(context)
-                      ?.isCurrent ==
-                  true &&
-              WidgetsBinding.instance
-                      .lifecycleState ==
-                  AppLifecycleState
-                      .resumed) {
-            _markSeen();
-          }
-        },
-      );
+            if (ModalRoute.of(context)?.isCurrent == true &&
+                WidgetsBinding.instance.lifecycleState ==
+                    AppLifecycleState.resumed) {
+              _markSeen();
+            }
+          });
     }
   }
 
@@ -1686,13 +1215,7 @@ class _ChatScreenState
 
     if (id == null) return;
 
-    unawaited(
-      RequestService()
-          .markChatSeen(id)
-          .catchError(
-        (Object _) {},
-      ),
-    );
+    unawaited(RequestService().markChatSeen(id).catchError((Object _) {}));
   }
 
   void _composerChanged() {
@@ -1702,27 +1225,19 @@ class _ChatScreenState
   }
 
   @override
-  void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
-    if (state ==
-            AppLifecycleState.resumed &&
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
         mounted &&
-        ModalRoute.of(context)
-                ?.isCurrent ==
-            true) {
+        ModalRoute.of(context)?.isCurrent == true) {
       _markSeen();
     }
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance
-        .removeObserver(this);
+    WidgetsBinding.instance.removeObserver(this);
 
-    controller.removeListener(
-      _composerChanged,
-    );
+    controller.removeListener(_composerChanged);
 
     messageListener?.cancel();
 
@@ -1738,79 +1253,45 @@ class _ChatScreenState
     }
 
     scrollController.animateTo(
-      scrollController
-          .position.maxScrollExtent,
-      duration: const Duration(
-        milliseconds: 260,
-      ),
+      scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
     );
   }
 
-  Future<void>
-      _openAttachmentSheet() async {
-    if (widget.requestId == null ||
-        attachingPhoto) {
+  Future<void> _openAttachmentSheet() async {
+    if (widget.requestId == null || attachingPhoto) {
       return;
     }
 
-    final action = await showModalBottomSheet<
-        _RaChatAttachmentAction>(
+    final action = await showModalBottomSheet<_RaChatAttachmentAction>(
       context: context,
       useSafeArea: true,
-      backgroundColor:
-          Colors.transparent,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        final theme =
-            Theme.of(sheetContext);
+        final theme = Theme.of(sheetContext);
 
-        final colors =
-            theme.colorScheme;
+        final colors = theme.colorScheme;
 
-        final dark =
-            theme.brightness ==
-                Brightness.dark;
+        final dark = theme.brightness == Brightness.dark;
 
         return Container(
-          padding:
-              const EdgeInsets.fromLTRB(
-            18,
-            12,
-            18,
-            24,
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
           decoration: BoxDecoration(
-            color: dark
-                ? const Color(
-                    0xFF0D1D2B,
-                  )
-                : colors.surface,
-            borderRadius:
-                const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            color: dark ? const Color(0xFF0D1D2B) : colors.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
                 child: Container(
                   width: 42,
                   height: 4,
-                  decoration:
-                      BoxDecoration(
-                    color: colors
-                        .onSurfaceVariant
-                        .withValues(
-                      alpha: .24,
-                    ),
-                    borderRadius:
-                        BorderRadius.circular(
-                      999,
-                    ),
+                  decoration: BoxDecoration(
+                    color: colors.onSurfaceVariant.withValues(alpha: .24),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
@@ -1819,11 +1300,9 @@ class _ChatScreenState
 
               Text(
                 'Share with ${widget.peerName}',
-                style:
-                    GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight:
-                      FontWeight.w800,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: providerFontSize(context, 18),
+                  fontWeight: FontWeight.w800,
                   color: colors.onSurface,
                 ),
               ),
@@ -1832,62 +1311,42 @@ class _ChatScreenState
 
               Text(
                 'Choose what you want to send in this roadside conversation.',
-                style:
-                    GoogleFonts.plusJakartaSans(
-                  fontSize: 9.5,
-                  color: colors
-                      .onSurfaceVariant,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: providerFontSize(context, 9.5),
+                  color: colors.onSurfaceVariant,
                 ),
               ),
 
               const SizedBox(height: 17),
 
               _RaChatAttachmentTile(
-                icon: Icons
-                    .photo_library_outlined,
+                icon: Icons.photo_library_outlined,
                 title: 'Photo library',
-                subtitle:
-                    'Choose an existing photo',
+                subtitle: 'Choose an existing photo',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    _RaChatAttachmentAction
-                        .gallery,
-                  );
+                  Navigator.pop(sheetContext, _RaChatAttachmentAction.gallery);
                 },
               ),
 
               const SizedBox(height: 8),
 
               _RaChatAttachmentTile(
-                icon: Icons
-                    .camera_alt_outlined,
+                icon: Icons.camera_alt_outlined,
                 title: 'Camera',
-                subtitle:
-                    'Capture a new photo',
+                subtitle: 'Capture a new photo',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    _RaChatAttachmentAction
-                        .camera,
-                  );
+                  Navigator.pop(sheetContext, _RaChatAttachmentAction.camera);
                 },
               ),
 
               const SizedBox(height: 8),
 
               _RaChatAttachmentTile(
-                icon:
-                    Icons.my_location_outlined,
+                icon: Icons.my_location_outlined,
                 title: 'Current location',
-                subtitle:
-                    'Share your current map position',
+                subtitle: 'Share your current map position',
                 onTap: () {
-                  Navigator.pop(
-                    sheetContext,
-                    _RaChatAttachmentAction
-                        .location,
-                  );
+                  Navigator.pop(sheetContext, _RaChatAttachmentAction.location);
                 },
               ),
             ],
@@ -1902,47 +1361,32 @@ class _ChatScreenState
 
     switch (action) {
       case _RaChatAttachmentAction.gallery:
-        await _attachPhoto(
-          ImageSource.gallery,
-        );
+        await _attachPhoto(ImageSource.gallery);
       case _RaChatAttachmentAction.camera:
-        await _attachPhoto(
-          ImageSource.camera,
-        );
+        await _attachPhoto(ImageSource.camera);
       case _RaChatAttachmentAction.location:
         await shareCurrentLocation();
     }
   }
 
-  Future<void> _attachPhoto(
-    ImageSource source,
-  ) async {
-    final requestId =
-        widget.requestId;
+  Future<void> _attachPhoto(ImageSource source) async {
+    final requestId = widget.requestId;
 
-    if (requestId == null ||
-        attachingPhoto) {
+    if (requestId == null || attachingPhoto) {
       return;
     }
 
-    final navigator =
-        Navigator.of(context);
+    final navigator = Navigator.of(context);
 
-    final photo =
-        source == ImageSource.camera
-            ? await navigator.push<XFile>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const CameraCaptureScreen(),
-                ),
-              )
-            : await ImagePicker()
-                .pickImage(
-                source:
-                    ImageSource.gallery,
-                imageQuality: 75,
-                maxWidth: 1400,
-              );
+    final photo = source == ImageSource.camera
+        ? await navigator.push<XFile>(
+            MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+          )
+        : await ImagePicker().pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 75,
+            maxWidth: 1400,
+          );
 
     if (photo == null || !mounted) {
       return;
@@ -1953,28 +1397,15 @@ class _ChatScreenState
     });
 
     try {
-      final imageData =
-          await PhotoUploadService()
-              .prepareChatPhoto(
-        photo,
-      );
+      final imageData = await PhotoUploadService().prepareChatPhoto(photo);
 
-      await RequestService()
-          .sendChatPhoto(
-        requestId,
-        imageData,
-      );
+      await RequestService().sendChatPhoto(requestId, imageData);
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to send photo: $error',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to send photo: $error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -1984,36 +1415,25 @@ class _ChatScreenState
     }
   }
 
-  Future<void>
-      shareCurrentLocation() async {
-    final requestId =
-        widget.requestId;
+  Future<void> shareCurrentLocation() async {
+    final requestId = widget.requestId;
 
     if (requestId == null) {
       return;
     }
 
     try {
-      var permission =
-          await Geolocator
-              .checkPermission();
+      var permission = await Geolocator.checkPermission();
 
-      if (permission ==
-          LocationPermission.denied) {
-        permission =
-            await Geolocator
-                .requestPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
 
-      if (permission ==
-              LocationPermission.denied ||
-          permission ==
-              LocationPermission
-                  .deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               'Location permission is required before sharing your location.',
@@ -2024,43 +1444,29 @@ class _ChatScreenState
         return;
       }
 
-      final position =
-          await Geolocator
-              .getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition();
 
       final mapLink =
           'Current location: https://www.google.com/maps/search/?api=1&query=${position.latitude},${position.longitude}';
 
-      await RequestService()
-          .sendMessage(
-        requestId,
-        mapLink,
-      );
+      await RequestService().sendMessage(requestId, mapLink);
     } catch (_) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to share current location.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to share current location.')),
       );
     }
   }
 
   Future<void> _sendMessage() async {
-    final text =
-        controller.text.trim();
+    final text = controller.text.trim();
 
-    if (text.isEmpty ||
-        sendingMessage) {
+    if (text.isEmpty || sendingMessage) {
       return;
     }
 
-    final requestId =
-        widget.requestId;
+    final requestId = widget.requestId;
 
     if (requestId == null) {
       controller.clear();
@@ -2069,17 +1475,12 @@ class _ChatScreenState
         messages.add(text);
         senderIds.add('local-me');
         messageImages.add(null);
-        messageTimes.add(
-          DateTime.now(),
-        );
+        messageTimes.add(DateTime.now());
       });
 
-      WidgetsBinding.instance
-          .addPostFrameCallback(
-        (_) {
-          _scrollLatest();
-        },
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollLatest();
+      });
 
       return;
     }
@@ -2089,11 +1490,7 @@ class _ChatScreenState
     });
 
     try {
-      await RequestService()
-          .sendMessage(
-        requestId,
-        text,
-      );
+      await RequestService().sendMessage(requestId, text);
 
       if (mounted) {
         controller.clear();
@@ -2101,8 +1498,7 @@ class _ChatScreenState
     } catch (_) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'Message could not be sent. Check your connection and try again.',
@@ -2120,26 +1516,18 @@ class _ChatScreenState
 
   bool _isMine(int index) {
     if (widget.requestId == null) {
-      return senderIds[index] ==
-          'local-me';
+      return senderIds[index] == 'local-me';
     }
 
-    return senderIds[index] ==
-        FirebaseAuth
-            .instance.currentUser?.uid;
+    return senderIds[index] == FirebaseAuth.instance.currentUser?.uid;
   }
 
-  bool _showDateSeparator(
-    int index,
-  ) {
-    if (index < 0 ||
-        index >=
-            messageTimes.length) {
+  bool _showDateSeparator(int index) {
+    if (index < 0 || index >= messageTimes.length) {
       return false;
     }
 
-    final current =
-        messageTimes[index];
+    final current = messageTimes[index];
 
     if (current == null) {
       return false;
@@ -2149,39 +1537,25 @@ class _ChatScreenState
       return true;
     }
 
-    final previous =
-        messageTimes[index - 1];
+    final previous = messageTimes[index - 1];
 
     if (previous == null) {
       return true;
     }
 
-    return current.year !=
-            previous.year ||
-        current.month !=
-            previous.month ||
+    return current.year != previous.year ||
+        current.month != previous.month ||
         current.day != previous.day;
   }
 
-  String _dateLabel(
-    DateTime value,
-  ) {
+  String _dateLabel(DateTime value) {
     final now = DateTime.now();
 
-    final today = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    );
+    final today = DateTime(now.year, now.month, now.day);
 
-    final date = DateTime(
-      value.year,
-      value.month,
-      value.day,
-    );
+    final date = DateTime(value.year, value.month, value.day);
 
-    final days =
-        today.difference(date).inDays;
+    final days = today.difference(date).inDays;
 
     if (days == 0) {
       return 'Today';
@@ -2209,81 +1583,44 @@ class _ChatScreenState
     return '${value.day} ${months[value.month - 1]} ${value.year}';
   }
 
-  String _timeLabel(
-    DateTime? value,
-  ) {
+  String _timeLabel(DateTime? value) {
     if (value == null) {
       return '';
     }
 
-    final hour =
-        value.hour % 12 == 0
-            ? 12
-            : value.hour % 12;
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
 
-    final minute = value.minute
-        .toString()
-        .padLeft(
-          2,
-          '0',
-        );
+    final minute = value.minute.toString().padLeft(2, '0');
 
-    final period =
-        value.hour >= 12
-            ? 'PM'
-            : 'AM';
+    final period = value.hour >= 12 ? 'PM' : 'AM';
 
     return '$hour:$minute $period';
   }
 
   Widget _jobContext() {
-    final requestId =
-        widget.requestId;
+    final requestId = widget.requestId;
 
     if (requestId == null) {
       return const SizedBox.shrink();
     }
 
-    return StreamBuilder<
-        DocumentSnapshot<
-            Map<String, dynamic>>>(
-      stream: RequestService()
-          .watchRequest(
-        requestId,
-      ),
-      builder: (
-        context,
-        snapshot,
-      ) {
-        final data =
-            snapshot.data?.data();
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: RequestService().watchRequest(requestId),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
 
         if (data == null) {
-          return const SizedBox
-              .shrink();
+          return const SizedBox.shrink();
         }
 
         final vehicle = [
-          data['modelYear']
-                  as String? ??
-              '',
-          data['registration']
-                  as String? ??
-              '',
-        ]
-            .where(
-              (value) => value
-                  .trim()
-                  .isNotEmpty,
-            )
-            .join(' • ');
+          data['modelYear'] as String? ?? '',
+          data['registration'] as String? ?? '',
+        ].where((value) => value.trim().isNotEmpty).join(' • ');
 
         return _RaChatJobCard(
-          issue:
-              requestIssueLabel(data),
-          status:
-              data['status'] as String? ??
-                  '',
+          issue: requestIssueLabel(data),
+          status: data['status'] as String? ?? '',
           vehicle: vehicle,
         );
       },
@@ -2296,8 +1633,7 @@ class _ChatScreenState
     final colors = theme.colorScheme;
 
     return RaScaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         toolbarHeight: 70,
         titleSpacing: 4,
@@ -2306,25 +1642,17 @@ class _ChatScreenState
             Stack(
               clipBehavior: Clip.none,
               children: [
-                ProfileInitials(
-                  name: widget.peerName,
-                  radius: 20,
-                ),
+                ProfileInitials(name: widget.peerName, radius: 20),
                 Positioned(
                   right: -1,
                   bottom: -1,
                   child: Container(
                     width: 11,
                     height: 11,
-                    decoration:
-                        BoxDecoration(
+                    decoration: BoxDecoration(
                       color: raSuccess,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color:
-                            colors.surface,
-                        width: 2,
-                      ),
+                      border: Border.all(color: colors.surface, width: 2),
                     ),
                   ),
                 ),
@@ -2335,21 +1663,16 @@ class _ChatScreenState
 
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.peerName,
                     maxLines: 1,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 13,
-                      fontWeight:
-                          FontWeight.w800,
-                      color:
-                          colors.onSurface,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: providerFontSize(context, 13),
+                      fontWeight: FontWeight.w800,
+                      color: colors.onSurface,
                     ),
                   ),
 
@@ -2358,13 +1681,10 @@ class _ChatScreenState
                   Text(
                     'RoadAssist conversation',
                     maxLines: 1,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 8.5,
-                      color: colors
-                          .onSurfaceVariant,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: providerFontSize(context, 8.5),
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -2373,23 +1693,17 @@ class _ChatScreenState
           ],
         ),
         actions: [
-          if (widget.peerPhone
-              .trim()
-              .isNotEmpty)
+          if (widget.peerPhone.trim().isNotEmpty)
             IconButton(
-              tooltip:
-                  'Call ${widget.peerName}',
+              tooltip: 'Call ${widget.peerName}',
               onPressed: () {
                 showCallPrompt(
                   context,
                   name: widget.peerName,
-                  number:
-                      widget.peerPhone,
+                  number: widget.peerPhone,
                 );
               },
-              icon: const Icon(
-                Icons.call_outlined,
-              ),
+              icon: const Icon(Icons.call_outlined),
             ),
 
           const SizedBox(width: 5),
@@ -2403,73 +1717,34 @@ class _ChatScreenState
 
             Expanded(
               child: messages.isEmpty
-                  ? _RaChatEmpty(
-                      peerName:
-                          widget.peerName,
-                    )
+                  ? _RaChatEmpty(peerName: widget.peerName)
                   : ListView.builder(
-                      controller:
-                          scrollController,
+                      controller: scrollController,
                       keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior
-                              .onDrag,
-                      padding:
-                          const EdgeInsets
-                              .fromLTRB(
-                        16,
-                        15,
-                        16,
-                        20,
-                      ),
-                      itemCount:
-                          messages.length,
-                      itemBuilder: (
-                        context,
-                        index,
-                      ) {
-                        final mine =
-                            _isMine(
-                          index,
-                        );
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 15, 16, 20),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final mine = _isMine(index);
 
-                        final date = index <
-                                messageTimes
-                                    .length
-                            ? messageTimes[
-                                index]
+                        final date = index < messageTimes.length
+                            ? messageTimes[index]
                             : null;
 
-                        final image = index <
-                                messageImages
-                                    .length
-                            ? messageImages[
-                                index]
+                        final image = index < messageImages.length
+                            ? messageImages[index]
                             : null;
 
                         return Column(
                           children: [
-                            if (_showDateSeparator(
-                                  index,
-                                ) &&
-                                date !=
-                                    null)
-                              _RaChatDateDivider(
-                                label:
-                                    _dateLabel(
-                                  date,
-                                ),
-                              ),
+                            if (_showDateSeparator(index) && date != null)
+                              _RaChatDateDivider(label: _dateLabel(date)),
 
                             _RaChatBubble(
-                              text:
-                                  messages[index],
-                              imageData:
-                                  image,
+                              text: messages[index],
+                              imageData: image,
                               mine: mine,
-                              time:
-                                  _timeLabel(
-                                date,
-                              ),
+                              time: _timeLabel(date),
                             ),
                           ],
                         );
@@ -2480,12 +1755,9 @@ class _ChatScreenState
             _RaChatComposer(
               controller: controller,
               busy: sendingMessage,
-              attaching:
-                  attachingPhoto,
-              canAttach:
-                  widget.requestId != null,
-              onAttach:
-                  _openAttachmentSheet,
+              attaching: attachingPhoto,
+              canAttach: widget.requestId != null,
+              onAttach: _openAttachmentSheet,
               onSend: _sendMessage,
             ),
           ],
@@ -2495,14 +1767,9 @@ class _ChatScreenState
   }
 }
 
-enum _RaChatAttachmentAction {
-  gallery,
-  camera,
-  location,
-}
+enum _RaChatAttachmentAction { gallery, camera, location }
 
-class _RaChatJobCard
-    extends StatelessWidget {
+class _RaChatJobCard extends StatelessWidget {
   const _RaChatJobCard({
     required this.issue,
     required this.status,
@@ -2515,8 +1782,7 @@ class _RaChatJobCard
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     final label = switch (status) {
       'searching' => 'Searching',
@@ -2531,60 +1797,38 @@ class _RaChatJobCard
     final tone = switch (status) {
       'completed' => RaTone.success,
       'cancelled' => RaTone.danger,
-      'accepted' ||
-      'en_route' ||
-      'arrived' =>
-        RaTone.success,
+      'accepted' || 'en_route' || 'arrived' => RaTone.success,
       _ => RaTone.info,
     };
 
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        10,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
           bottom: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(alpha: .45),
+            color: colors.outlineVariant.withValues(alpha: .45),
           ),
         ),
       ),
       child: Container(
-        padding:
-            const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: colors.primary
-              .withValues(alpha: .055),
-          borderRadius:
-              BorderRadius.circular(16),
+          color: colors.primary.withValues(alpha: .055),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
             Container(
               width: 38,
               height: 38,
-              decoration:
-                  BoxDecoration(
-                color: colors.primary
-                    .withValues(
-                  alpha: .10,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  12,
-                ),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                Icons
-                    .car_repair_outlined,
+                Icons.car_repair_outlined,
                 size: 18,
                 color: colors.primary,
               ),
@@ -2594,37 +1838,26 @@ class _RaChatJobCard
 
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     issue,
                     maxLines: 1,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: GoogleFonts
-                        .plusJakartaSans(
-                      fontSize: 10.5,
-                      fontWeight:
-                          FontWeight.w700,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: providerFontSize(context, 10.5),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (vehicle
-                      .isNotEmpty) ...[
-                    const SizedBox(
-                      height: 2,
-                    ),
+                  if (vehicle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
                       vehicle,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow
-                              .ellipsis,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.5,
-                        color: colors
-                            .onSurfaceVariant,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: providerFontSize(context, 8.5),
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -2634,10 +1867,7 @@ class _RaChatJobCard
 
             const SizedBox(width: 7),
 
-            StatusPill(
-              label: label,
-              tone: tone,
-            ),
+            StatusPill(label: label, tone: tone),
           ],
         ),
       ),
@@ -2645,8 +1875,7 @@ class _RaChatJobCard
   }
 }
 
-class _RaChatAttachmentTile
-    extends StatelessWidget {
+class _RaChatAttachmentTile extends StatelessWidget {
   const _RaChatAttachmentTile({
     required this.icon,
     required this.title,
@@ -2661,18 +1890,13 @@ class _RaChatAttachmentTile
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Material(
-      color: colors
-          .surfaceContainerHighest
-          .withValues(alpha: .33),
-      borderRadius:
-          BorderRadius.circular(17),
+      color: colors.surfaceContainerHighest.withValues(alpha: .33),
+      borderRadius: BorderRadius.circular(17),
       child: InkWell(
-        borderRadius:
-            BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(17),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(13),
@@ -2681,59 +1905,39 @@ class _RaChatAttachmentTile
               Container(
                 width: 40,
                 height: 40,
-                decoration:
-                    BoxDecoration(
-                  color: colors.primary
-                      .withValues(
-                    alpha: .08,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    12,
-                  ),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color: colors.primary,
-                  size: 19,
-                ),
+                child: Icon(icon, color: colors.primary, size: 19),
               ),
 
               const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 10.8,
-                        fontWeight:
-                            FontWeight.w700,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: providerFontSize(context, 10.8),
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: GoogleFonts
-                          .plusJakartaSans(
-                        fontSize: 8.7,
-                        color: colors
-                            .onSurfaceVariant,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: providerFontSize(context, 8.7),
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              Icon(
-                Icons.chevron_right_rounded,
-                color:
-                    colors.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
             ],
           ),
         ),
@@ -2742,56 +1946,35 @@ class _RaChatAttachmentTile
   }
 }
 
-class _RaChatDateDivider
-    extends StatelessWidget {
-  const _RaChatDateDivider({
-    required this.label,
-  });
+class _RaChatDateDivider extends StatelessWidget {
+  const _RaChatDateDivider({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
           Expanded(
-            child: Divider(
-              color: colors
-                  .outlineVariant
-                  .withValues(alpha: .55),
-            ),
+            child: Divider(color: colors.outlineVariant.withValues(alpha: .55)),
           ),
           Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
               label,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 8.5,
-                fontWeight:
-                    FontWeight.w600,
-                color: colors
-                    .onSurfaceVariant,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 8.5),
+                fontWeight: FontWeight.w600,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ),
           Expanded(
-            child: Divider(
-              color: colors
-                  .outlineVariant
-                  .withValues(alpha: .55),
-            ),
+            child: Divider(color: colors.outlineVariant.withValues(alpha: .55)),
           ),
         ],
       ),
@@ -2813,105 +1996,58 @@ class _RaChatBubble extends StatelessWidget {
   final String time;
 
   bool get isLocation =>
-      text.startsWith(
-        'Current location: http://',
-      ) ||
-      text.startsWith(
-        'Current location: https://',
-      );
+      text.startsWith('Current location: http://') ||
+      text.startsWith('Current location: https://');
 
-  String get locationUrl => isLocation
-      ? text
-          .substring(
-            'Current location: '.length,
-          )
-          .trim()
-      : '';
+  String get locationUrl =>
+      isLocation ? text.substring('Current location: '.length).trim() : '';
 
-  Future<void> openLocation(
-    BuildContext context,
-  ) async {
-    final uri =
-        Uri.tryParse(locationUrl);
+  Future<void> openLocation(BuildContext context) async {
+    final uri = Uri.tryParse(locationUrl);
 
     if (uri == null) return;
 
-    final opened = await launchUrl(
-      uri,
-      mode:
-          LaunchMode.externalApplication,
-    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
-    if (!opened &&
-        context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to open the shared location.',
-          ),
-        ),
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open the shared location.')),
       );
     }
   }
 
-  void openImage(
-    BuildContext context,
-    String data,
-  ) {
+  void openImage(BuildContext context, String data) {
     try {
-      final bytes =
-          base64Decode(data);
+      final bytes = base64Decode(data);
 
       showDialog<void>(
         context: context,
-        barrierColor: Colors.black
-            .withValues(alpha: .90),
-        builder: (
-          dialogContext,
-        ) {
+        barrierColor: Colors.black.withValues(alpha: .90),
+        builder: (dialogContext) {
           return Dialog.fullscreen(
-            backgroundColor:
-                Colors.black,
+            backgroundColor: Colors.black,
             child: SafeArea(
               child: Stack(
                 children: [
                   Center(
-                    child:
-                        InteractiveViewer(
+                    child: InteractiveViewer(
                       minScale: .8,
                       maxScale: 4,
-                      child: Image.memory(
-                        bytes,
-                        fit:
-                            BoxFit.contain,
-                      ),
+                      child: Image.memory(bytes, fit: BoxFit.contain),
                     ),
                   ),
                   Positioned(
                     top: 8,
                     right: 8,
-                    child:
-                        IconButton.filled(
-                      style: IconButton
-                          .styleFrom(
-                        backgroundColor:
-                            Colors.white
-                                .withValues(
-                          alpha: .14,
-                        ),
-                        foregroundColor:
-                            Colors.white,
+                    child: IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: .14),
+                        foregroundColor: Colors.white,
                       ),
                       onPressed: () {
-                        Navigator.pop(
-                          dialogContext,
-                        );
+                        Navigator.pop(dialogContext);
                       },
-                      icon: const Icon(
-                        Icons
-                            .close_rounded,
-                      ),
+                      icon: const Icon(Icons.close_rounded),
                     ),
                   ),
                 ],
@@ -2921,13 +2057,8 @@ class _RaChatBubble extends StatelessWidget {
         },
       );
     } on FormatException {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'This photo could not be displayed.',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This photo could not be displayed.')),
       );
     }
   }
@@ -2939,133 +2070,70 @@ class _RaChatBubble extends StatelessWidget {
 
     final bubbleColor = mine
         ? colors.primary
-        : theme.brightness ==
-                Brightness.dark
-            ? const Color(0xFF122435)
-            : Colors.white;
+        : theme.brightness == Brightness.dark
+        ? const Color(0xFF122435)
+        : Colors.white;
 
     return Align(
-      alignment: mine
-          ? Alignment.centerRight
-          : Alignment.centerLeft,
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth:
-              MediaQuery.sizeOf(context)
-                      .width *
-                  .76,
+          maxWidth: MediaQuery.sizeOf(context).width * .76,
         ),
-        margin:
-            const EdgeInsets.only(
-          bottom: 7,
-        ),
+        margin: const EdgeInsets.only(bottom: 7),
         decoration: BoxDecoration(
           color: bubbleColor,
-          borderRadius:
-              BorderRadius.only(
-            topLeft:
-                const Radius.circular(
-              19,
-            ),
-            topRight:
-                const Radius.circular(
-              19,
-            ),
-            bottomLeft:
-                Radius.circular(
-              mine ? 19 : 5,
-            ),
-            bottomRight:
-                Radius.circular(
-              mine ? 5 : 19,
-            ),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(19),
+            topRight: const Radius.circular(19),
+            bottomLeft: Radius.circular(mine ? 19 : 5),
+            bottomRight: Radius.circular(mine ? 5 : 19),
           ),
           border: mine
               ? null
-              : Border.all(
-                  color: colors
-                      .outlineVariant
-                      .withValues(
-                    alpha: .43,
-                  ),
-                ),
+              : Border.all(color: colors.outlineVariant.withValues(alpha: .43)),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (imageData != null &&
-                imageData!.isNotEmpty)
+            if (imageData != null && imageData!.isNotEmpty)
               GestureDetector(
                 onTap: () {
-                  openImage(
-                    context,
-                    imageData!,
-                  );
+                  openImage(context, imageData!);
                 },
-                child:
-                    _RaChatImageMessage(
-                  data: imageData!,
-                ),
+                child: _RaChatImageMessage(data: imageData!),
               )
             else if (isLocation)
               InkWell(
                 onTap: () {
-                  openLocation(
-                    context,
-                  );
+                  openLocation(context);
                 },
-                child:
-                    _RaChatLocationMessage(
-                  mine: mine,
-                ),
+                child: _RaChatLocationMessage(mine: mine),
               )
             else
               Padding(
-                padding:
-                    const EdgeInsets
-                        .fromLTRB(
-                  13,
-                  10,
-                  13,
-                  7,
-                ),
+                padding: const EdgeInsets.fromLTRB(13, 10, 13, 7),
                 child: Text(
                   text,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 10.5),
                     height: 1.4,
-                    color: mine
-                        ? colors.onPrimary
-                        : colors.onSurface,
+                    color: mine ? colors.onPrimary : colors.onSurface,
                   ),
                 ),
               ),
 
             if (time.isNotEmpty)
               Padding(
-                padding:
-                    const EdgeInsets
-                        .fromLTRB(
-                  13,
-                  3,
-                  13,
-                  7,
-                ),
+                padding: const EdgeInsets.fromLTRB(13, 3, 13, 7),
                 child: Text(
                   time,
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 7.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 7.5),
                     color: mine
-                        ? colors.onPrimary
-                            .withValues(
-                            alpha: .68,
-                          )
-                        : colors
-                            .onSurfaceVariant,
+                        ? colors.onPrimary.withValues(alpha: .68)
+                        : colors.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -3076,11 +2144,8 @@ class _RaChatBubble extends StatelessWidget {
   }
 }
 
-class _RaChatImageMessage
-    extends StatelessWidget {
-  const _RaChatImageMessage({
-    required this.data,
-  });
+class _RaChatImageMessage extends StatelessWidget {
+  const _RaChatImageMessage({required this.data});
 
   final String data;
 
@@ -3092,57 +2157,35 @@ class _RaChatImageMessage
         width: 245,
         height: 185,
         fit: BoxFit.cover,
-        errorBuilder: (
-          _,
-          __,
-          ___,
-        ) =>
-            const SizedBox(
+        errorBuilder: (_, __, ___) => const SizedBox(
           width: 245,
           height: 150,
-          child: Center(
-            child: Icon(
-              Icons
-                  .broken_image_outlined,
-            ),
-          ),
+          child: Center(child: Icon(Icons.broken_image_outlined)),
         ),
       );
     } on FormatException {
       return const SizedBox(
         width: 245,
         height: 150,
-        child: Center(
-          child: Icon(
-            Icons
-                .broken_image_outlined,
-          ),
-        ),
+        child: Center(child: Icon(Icons.broken_image_outlined)),
       );
     }
   }
 }
 
-class _RaChatLocationMessage
-    extends StatelessWidget {
-  const _RaChatLocationMessage({
-    required this.mine,
-  });
+class _RaChatLocationMessage extends StatelessWidget {
+  const _RaChatLocationMessage({required this.mine});
 
   final bool mine;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final foreground = mine
-        ? colors.onPrimary
-        : colors.onSurface;
+    final foreground = mine ? colors.onPrimary : colors.onSurface;
 
     final secondary = mine
-        ? colors.onPrimary
-            .withValues(alpha: .72)
+        ? colors.onPrimary.withValues(alpha: .72)
         : colors.onSurfaceVariant;
 
     return Padding(
@@ -3154,18 +2197,13 @@ class _RaChatLocationMessage
             height: 43,
             decoration: BoxDecoration(
               color: mine
-                  ? Colors.white
-                      .withValues(alpha: .13)
-                  : colors.primary
-                      .withValues(alpha: .08),
-              borderRadius:
-                  BorderRadius.circular(13),
+                  ? Colors.white.withValues(alpha: .13)
+                  : colors.primary.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(13),
             ),
             child: Icon(
               Icons.location_on_rounded,
-              color: mine
-                  ? colors.onPrimary
-                  : colors.primary,
+              color: mine ? colors.onPrimary : colors.primary,
             ),
           ),
 
@@ -3173,25 +2211,21 @@ class _RaChatLocationMessage
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Shared location',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 10.5,
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 10.5),
+                    fontWeight: FontWeight.w700,
                     color: foreground,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Tap to open in Maps',
-                  style: GoogleFonts
-                      .plusJakartaSans(
-                    fontSize: 8.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: providerFontSize(context, 8.5),
                     color: secondary,
                   ),
                 ),
@@ -3199,49 +2233,33 @@ class _RaChatLocationMessage
             ),
           ),
 
-          Icon(
-            Icons.open_in_new_rounded,
-            size: 16,
-            color: secondary,
-          ),
+          Icon(Icons.open_in_new_rounded, size: 16, color: secondary),
         ],
       ),
     );
   }
 }
 
-class _RaChatEmpty
-    extends StatelessWidget {
-  const _RaChatEmpty({
-    required this.peerName,
-  });
+class _RaChatEmpty extends StatelessWidget {
+  const _RaChatEmpty({required this.peerName});
 
   final String peerName;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Center(
       child: SingleChildScrollView(
-        padding:
-            const EdgeInsets.all(25),
+        padding: const EdgeInsets.all(25),
         child: Column(
           children: [
             Container(
               width: 74,
               height: 74,
-              decoration:
-                  BoxDecoration(
-                color: colors.primary
-                    .withValues(
-                  alpha: .08,
-                ),
-                borderRadius:
-                    BorderRadius.circular(
-                  24,
-                ),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(
                 Icons.forum_outlined,
@@ -3254,13 +2272,10 @@ class _RaChatEmpty
 
             Text(
               'Start the conversation',
-              textAlign:
-                  TextAlign.center,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 17,
-                fontWeight:
-                    FontWeight.w800,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 17),
+                fontWeight: FontWeight.w800,
                 color: colors.onSurface,
               ),
             ),
@@ -3269,14 +2284,11 @@ class _RaChatEmpty
 
             Text(
               'Message $peerName about this roadside assistance job. You can also share photos or your current location.',
-              textAlign:
-                  TextAlign.center,
-              style: GoogleFonts
-                  .plusJakartaSans(
-                fontSize: 10,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: providerFontSize(context, 10),
                 height: 1.5,
-                color: colors
-                    .onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ],
@@ -3286,8 +2298,7 @@ class _RaChatEmpty
   }
 }
 
-class _RaChatComposer
-    extends StatelessWidget {
+class _RaChatComposer extends StatelessWidget {
   const _RaChatComposer({
     required this.controller,
     required this.busy,
@@ -3308,53 +2319,32 @@ class _RaChatComposer
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final hasText =
-        controller.text.trim().isNotEmpty;
+    final hasText = controller.text.trim().isNotEmpty;
 
     return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        8,
-        8,
-        8,
-        11,
-      ),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 11),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(alpha: .45),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
         top: false,
         child: Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             IconButton.filledTonal(
               tooltip: 'Attach',
-              onPressed: canAttach &&
-                      !attaching
-                  ? onAttach
-                  : null,
+              onPressed: canAttach && !attaching ? onAttach : null,
               icon: attaching
                   ? const SizedBox.square(
                       dimension: 17,
-                      child:
-                          CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(
-                      Icons.add_rounded,
-                    ),
+                  : const Icon(Icons.add_rounded),
             ),
 
             const SizedBox(width: 7),
@@ -3364,55 +2354,29 @@ class _RaChatComposer
                 controller: controller,
                 minLines: 1,
                 maxLines: 5,
-                textCapitalization:
-                    TextCapitalization
-                        .sentences,
-                decoration:
-                    InputDecoration(
-                  hintText:
-                      'Message…',
+                textCapitalization: TextCapitalization.sentences,
+                decoration: InputDecoration(
+                  hintText: 'Message…',
                   filled: true,
-                  fillColor: colors
-                      .surfaceContainerHighest
-                      .withValues(
+                  fillColor: colors.surfaceContainerHighest.withValues(
                     alpha: .40,
                   ),
-                  contentPadding:
-                      const EdgeInsets
-                          .symmetric(
+                  contentPadding: const EdgeInsets.symmetric(
                     horizontal: 15,
                     vertical: 11,
                   ),
-                  border:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(
-                      22,
-                    ),
-                    borderSide:
-                        BorderSide.none,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
                   ),
-                  enabledBorder:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(
-                      22,
-                    ),
-                    borderSide:
-                        BorderSide.none,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
                   ),
-                  focusedBorder:
-                      OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(
-                      22,
-                    ),
-                    borderSide:
-                        BorderSide(
-                      color: colors.primary
-                          .withValues(
-                        alpha: .35,
-                      ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(
+                      color: colors.primary.withValues(alpha: .35),
                     ),
                   ),
                 ),
@@ -3423,27 +2387,20 @@ class _RaChatComposer
 
             IconButton.filled(
               tooltip: 'Send',
-              onPressed: hasText &&
-                      !busy
+              onPressed: hasText && !busy
                   ? () {
-                      unawaited(
-                        onSend(),
-                      );
+                      unawaited(onSend());
                     }
                   : null,
               icon: busy
                   ? SizedBox.square(
                       dimension: 17,
-                      child:
-                          CircularProgressIndicator(
+                      child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: colors
-                            .onPrimary,
+                        color: colors.onPrimary,
                       ),
                     )
-                  : const Icon(
-                      Icons.send_rounded,
-                    ),
+                  : const Icon(Icons.send_rounded),
             ),
           ],
         ),
