@@ -730,3 +730,50 @@ test('selective corrections bind revision and lock unselected fields and documen
   batch.set(doc(admin,'adminAudit/after-correction'),{kind:'account',target:'provider',actor:'admin',reason:after.reason,before,after,createdAt:serverTimestamp()});
   await assertSucceeds(batch.commit());
 });
+
+test('private job start challenge cannot be read or written by either participant', async()=>{
+  await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'jobStartChallenges/r1'),{digest:'secret',salt:'private',expiresAtMs:Date.now()+600000}));
+  for (const uid of ['driver','provider','other']) {
+    const db=env.authenticatedContext(uid,{email_verified:true}).firestore();
+    await assertFails(getDoc(doc(db,'jobStartChallenges/r1')));
+    await assertFails(setDoc(doc(db,'jobStartChallenges/r1'),{code:'123456'}));
+  }
+});
+test('code-required jobs cannot bypass start verification through direct arrival confirmation', async()=>{
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'arrived',jobStartCodeRequired:true,arrivalVerificationRequired:true}));
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(db,'requests/r1'),{arrivalConfirmedBy:'driver',arrivalConfirmedAt:serverTimestamp(),arrivalConfirmationMethod:'manual_driver',arrivalConfirmationReason:'Physically met this provider.',arrivalDistanceMeters:null,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),{jobStartCodeVerifiedAt:serverTimestamp()}));
+});
+test('cancellation records a bounded driver reason and cannot hide pending completion', async()=>{
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  const changes={status:'cancelled',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp(),cancelledBy:'driver',cancellationType:'driver_cancellation',cancellationReason:'A family member provided assistance.'};
+  await assertFails(updateDoc(doc(db,'requests/r1'),{...changes,cancellationReason:'x'}));
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),changes));
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'arrived',completionState:'pending'}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),changes));
+});
+test('completed job rating is immutable after the first rating', async()=>{
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'completed',providerId:'provider'}));
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{driverRating:5,ratedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'requests/r1'),{driverRating:1,ratedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+test('complaint history is participant-readable, admin-paired and immutable',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'completed'});
+    await setDoc(doc(c.firestore(),'requests/r1/disputes/case'),{status:'open'});
+  });
+  const admin=administrator(), id='history-audit';
+  const after={status:'under_review',priority:'high',assignedTo:'admin',decision:'Reviewing evidence with both participants.',updatedAt:serverTimestamp(),lastAuditId:id};
+  const batch=writeBatch(admin);
+  batch.set(doc(admin,'complaintReviews/r1'),after);
+  batch.set(doc(admin,`adminAudit/${id}`),{kind:'complaint',target:'r1',actor:'admin',reason:after.decision,before:{},after,createdAt:serverTimestamp()});
+  batch.set(doc(admin,`complaintReviews/r1/history/${id}`),{status:after.status,decision:after.decision,createdAt:serverTimestamp()});
+  await assertSucceeds(batch.commit());
+  const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(getDoc(doc(driver,`complaintReviews/r1/history/${id}`)));
+  await assertFails(getDoc(doc(env.authenticatedContext('other',{email_verified:true}).firestore(),`complaintReviews/r1/history/${id}`)));
+  await assertFails(updateDoc(doc(admin,`complaintReviews/r1/history/${id}`),{decision:'Changed history'}));
+  await assertFails(setDoc(doc(driver,'complaintReviews/r1/history/forged'),{status:'resolved',decision:'Forged support review',createdAt:serverTimestamp()}));
+});

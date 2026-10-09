@@ -546,12 +546,12 @@ class _RaRealtimeRequestBody extends StatelessWidget {
               );
 
               final rating = FilledButton.icon(
-                onPressed: onRate,
+                onPressed: data['driverRating'] == null ? onRate : null,
                 icon: const Icon(Icons.star_outline_rounded),
                 label: Text(
                   data['driverRating'] == null
                       ? 'Rate Service'
-                      : 'Update Rating',
+                      : 'Rated ${data['driverRating']}/5',
                 ),
               );
 

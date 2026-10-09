@@ -23,6 +23,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   bool cancelled = false;
 
   bool arrivalNeedsConfirmation = false;
+  bool jobStartCodeRequired = false;
+  DateTime? providerLocationUpdatedAt;
+  Timer? freshnessClock;
   String arrivalLocationHint = '';
 
   bool completionPending = false;
@@ -43,6 +46,53 @@ class _TrackingScreenState extends State<TrackingScreen> {
   bool confirmingArrival = false;
   bool confirmingCompletion = false;
   bool replacingProvider = false;
+  bool cancellingRequest = false;
+
+  Future<void> cancelBeforeArrival() async {
+    final id = widget.requestId;
+    if (id == null || cancellingRequest || status >= 2 || cancelled) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel assistance?'),
+        content: const Text(
+          'Your provider will be notified and this job will move to cancelled history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel request'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final reason = await _adminReason(
+      context,
+      'Reason for cancelling assistance',
+    );
+    if (reason == null || !mounted) return;
+    setState(() {
+      cancellingRequest = true;
+    });
+    try {
+      await RequestService().cancelRequest(id, reason: reason);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to cancel: $error')));
+    } finally {
+      if (mounted)
+        setState(() {
+          cancellingRequest = false;
+        });
+    }
+  }
 
   final statuses = const ['Accepted', 'En Route', 'Arrived', 'Completed'];
 
@@ -52,6 +102,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
   void initState() {
     super.initState();
 
+    freshnessClock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
     final requestId = widget.requestId;
 
     if (requestId == null) {
@@ -75,6 +128,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   @override
   void dispose() {
+    freshnessClock?.cancel();
     requestListener?.cancel();
     super.dispose();
   }
@@ -125,6 +179,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     setState(() {
       status = nextStatus;
+      jobStartCodeRequired = data['jobStartCodeRequired'] == true;
+      providerLocationUpdatedAt =
+          (data['providerLocationUpdatedAt'] as Timestamp?)?.toDate();
 
       cancelled = value == 'cancelled';
 
@@ -347,6 +404,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return 'Waiting for provider location';
     }
 
+    if (!LocationFreshness.isFresh(providerLocationUpdatedAt, DateTime.now()))
+      return 'Last known provider position';
+
     if (routeLoading) {
       return 'Updating driving route';
     }
@@ -445,7 +505,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           ),
                         ),
 
-                        if (roadRoute != null && !cancelled && status < 3) ...[
+                        if (roadRoute != null &&
+                            !cancelled &&
+                            status < 3 &&
+                            LocationFreshness.isFresh(
+                              providerLocationUpdatedAt,
+                              DateTime.now(),
+                            )) ...[
                           const SizedBox(height: 2),
                           Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
@@ -781,6 +847,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   Widget buildArrivalConfirmation(BuildContext context) {
+    if (jobStartCodeRequired && widget.requestId != null)
+      return JobStartCodePanel(requestId: widget.requestId!, isProvider: false);
     final theme = Theme.of(context);
 
     final colors = theme.colorScheme;
@@ -1096,6 +1164,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   ],
 
                   buildMap(context),
+                  const SizedBox(height: 10),
+                  LiveLocationStatus(
+                    updatedAt: providerLocationUpdatedAt,
+                    hasPosition: providerPosition != null,
+                    distanceKm: providerPosition == null
+                        ? null
+                        : Geolocator.distanceBetween(
+                                providerPosition!.latitude,
+                                providerPosition!.longitude,
+                                widget.draft.latitude,
+                                widget.draft.longitude,
+                              ) /
+                              1000,
+                  ),
 
                   if (requestError != null) ...[
                     const SizedBox(height: 11),
@@ -1133,6 +1215,18 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   const SizedBox(height: 14),
 
                   buildProviderCard(context),
+                  if (!cancelled && status < 2 && widget.requestId != null) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: cancellingRequest ? null : cancelBeforeArrival,
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: Text(
+                        cancellingRequest
+                            ? 'Cancelling...'
+                            : 'Cancel assistance',
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 18),
 

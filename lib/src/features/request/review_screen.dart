@@ -11,6 +11,64 @@ class ReviewScreen extends StatefulWidget {
 
 class _ReviewScreenState extends State<ReviewScreen> {
   bool submitting = false;
+  bool offline = false;
+  bool checkingSubmission = false;
+  String? connectionNotice;
+  late final RequestDraftStore draftStore = RequestDraftStore();
+
+  Future<void> refreshConnection() async {
+    final results = await Connectivity().checkConnectivity();
+    if (mounted)
+      setState(() {
+        offline =
+            results.isEmpty ||
+            results.every((r) => r == ConnectivityResult.none);
+      });
+  }
+
+  Future<void> reconcileSubmission() async {
+    if (submitting || !mounted) return;
+    final id = await draftStore.submissionId();
+    if (id == null || !mounted) return;
+    if (FirebaseAuth.instance.currentUser == null) return;
+    setState(() {
+      submitting = true;
+      checkingSubmission = true;
+      connectionNotice = 'Checking whether your last request was received...';
+    });
+    try {
+      final received = await RequestService().findSubmittedRequest(id);
+      if (!mounted) return;
+      if (received != null) {
+        await draftStore.clear();
+        if (mounted)
+          replace(
+            context,
+            RealtimeDriverRequestDetailsScreen(
+              requestId: received,
+              data: const {},
+            ),
+          );
+      } else {
+        setState(() {
+          connectionNotice =
+              'Connection restored. Review your draft and tap Submit when ready.';
+        });
+      }
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          connectionNotice =
+              'Unable to confirm submission. Reconnect and try again safely.';
+        });
+    } finally {
+      if (mounted)
+        setState(() {
+          submitting = false;
+          checkingSubmission = false;
+        });
+    }
+  }
 
   StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
 
@@ -26,17 +84,25 @@ class _ReviewScreenState extends State<ReviewScreen> {
   void initState() {
     super.initState();
 
+    unawaited(draftStore.save(widget.draft));
+    unawaited(
+      refreshConnection().then((_) {
+        if (!offline) return reconcileSubmission();
+      }),
+    );
     connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       results,
-    ) async {
-      if (!mounted ||
-          results.every((result) => result == ConnectivityResult.none)) {
-        return;
-      }
-
-      if (await RequestDraftStore().hasPendingSubmission() && mounted) {
-        await submitRequest(autoRetry: true);
-      }
+    ) {
+      if (!mounted) return;
+      final disconnected =
+          results.isEmpty || results.every((r) => r == ConnectivityResult.none);
+      setState(() {
+        offline = disconnected;
+        if (!disconnected)
+          connectionNotice =
+              'Connection restored. Review and submit when ready.';
+      });
+      if (!disconnected) unawaited(reconcileSubmission());
     });
   }
 
@@ -75,32 +141,47 @@ class _ReviewScreenState extends State<ReviewScreen> {
       return;
     }
 
-    final connections = await Connectivity().checkConnectivity();
-
-    if (connections.every((result) => result == ConnectivityResult.none)) {
-      await RequestDraftStore().save(widget.draft);
-
-      await RequestDraftStore().setPendingSubmission(true);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'You are offline. Your request has been saved and will retry when connected.',
-          ),
-        ),
-      );
-
-      return;
-    }
-
     setState(() {
       submitting = true;
     });
-
     try {
-      final requestId = await RequestService().createRequest(widget.draft);
+      final connections = await Connectivity().checkConnectivity();
+
+      if (connections.every((result) => result == ConnectivityResult.none)) {
+        await RequestDraftStore().save(widget.draft);
+
+        await RequestDraftStore().setPendingSubmission(true);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'You are offline. Your draft is saved. Reconnect, review and submit when ready.',
+            ),
+          ),
+        );
+
+        return;
+      }
+
+      setState(() {
+        submitting = true;
+      });
+
+      await draftStore.save(widget.draft);
+      var submissionId = await draftStore.submissionId();
+      if (submissionId == null) {
+        submissionId = FirebaseFirestore.instance
+            .collection('requests')
+            .doc()
+            .id;
+        await draftStore.setSubmissionId(submissionId);
+      }
+      await draftStore.setPendingSubmission(true);
+      final requestId = await RequestService()
+          .createRequest(widget.draft, submissionId: submissionId)
+          .timeout(const Duration(seconds: 30));
 
       await RequestDraftStore().clear();
 
@@ -122,12 +203,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
       );
 
       final networkError =
+          error is TimeoutException ||
           error is FirebaseException &&
-          const [
-            'unavailable',
-            'deadline-exceeded',
-            'network-request-failed',
-          ].contains(error.code);
+              const [
+                'unavailable',
+                'deadline-exceeded',
+                'network-request-failed',
+              ].contains(error.code);
 
       if (networkError) {
         await RequestDraftStore().save(widget.draft);
@@ -143,7 +225,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             activeRequestExists
                 ? 'Complete or cancel your current request before creating another.'
                 : networkError
-                ? 'Connection lost. Your request has been saved and will retry automatically.'
+                ? 'Connection lost. Your draft is saved. Reconnect to check submission before retrying.'
                 : 'Unable to create the request. Please try again.',
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
@@ -352,6 +434,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
+                  if (offline || connectionNotice != null) ...[
+                    InlineMessage(
+                      icon: offline
+                          ? Icons.wifi_off_rounded
+                          : Icons.sync_rounded,
+                      text: offline
+                          ? 'You are offline. Your draft is saved on this device. Connect before submitting.'
+                          : connectionNotice!,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   const _RaReviewProgress(),
 
                   const SizedBox(height: 16),
@@ -557,8 +650,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ),
 
             _RaReviewBottomBar(
-              ready: readyToSubmit,
+              ready: readyToSubmit && !offline,
               submitting: submitting,
+              offline: offline,
+              checking: checkingSubmission,
               onSubmit: () {
                 unawaited(submitRequest());
               },
@@ -1131,8 +1226,12 @@ class _RaReviewBottomBar extends StatelessWidget {
     required this.ready,
     required this.submitting,
     required this.onSubmit,
+    this.offline = false,
+    this.checking = false,
   });
 
+  final bool offline;
+  final bool checking;
   final bool ready;
   final bool submitting;
 
@@ -1164,8 +1263,12 @@ class _RaReviewBottomBar extends StatelessWidget {
                 )
               : const Icon(Icons.send_rounded),
           label: Text(
-            submitting
-                ? 'Sending Request…'
+            checking
+                ? 'Checking request status...'
+                : offline
+                ? 'Connect to submit'
+                : submitting
+                ? 'Sending request...'
                 : ready
                 ? 'Request Roadside Assistance'
                 : 'Complete Request Details',

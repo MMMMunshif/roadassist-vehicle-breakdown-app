@@ -769,13 +769,19 @@ class _SearchingScreenState extends State<SearchingScreen>
       return;
     }
 
+    final reason = await _adminReason(
+      context,
+      'Reason for cancelling assistance',
+    );
+    if (reason == null || !mounted) return;
+
     setState(() {
       cancelling = true;
     });
 
     try {
       if (widget.requestId != null) {
-        await RequestService().cancelRequest(widget.requestId!);
+        await RequestService().cancelRequest(widget.requestId!, reason: reason);
       }
 
       if (!mounted) return;

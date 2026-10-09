@@ -86,10 +86,16 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     return 'Saved ${value.day}/${value.month}/${value.year} at $hour:$minute';
   }
 
-  void resumeSavedRequest() {
+  void resumeSavedRequest() async {
     final draft = savedDraft;
 
     if (draft == null) return;
+    final submissionId = await draftStore.submissionId();
+    if (!mounted) return;
+    if (submissionId != null) {
+      push(context, ReviewScreen(draft: draft));
+      return;
+    }
 
     if (draft.preferredProviderId.isNotEmpty) {
       push(context, ReviewScreen(draft: draft));

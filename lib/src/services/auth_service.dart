@@ -156,7 +156,11 @@ class AuthService {
     if (professional == null) return;
     await updateCurrentProfile({
       'services': application['services'],
-      'additionalServiceNames': (application['customServices'] as List? ?? []).whereType<Map>().map((item) => item['name']).whereType<String>().toList(),
+      'additionalServiceNames': (application['customServices'] as List? ?? [])
+          .whereType<Map>()
+          .map((item) => item['name'])
+          .whereType<String>()
+          .toList(),
       'serviceRadius':
           professional['radiusKm'].toString() + ' km from current location',
     });
@@ -294,36 +298,65 @@ class AuthService {
     required String password,
     required String role,
   }) async {
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    final profile = await _firestore
-        .collection('users')
-        .doc(credential.user!.uid)
-        .get();
-    if (!profile.exists || accountRoles(profile.data()).isEmpty) {
-      await _auth.signOut();
-      throw FirebaseAuthException(
-        code: 'wrong-role',
-        message: 'This account is not registered as a $role.',
-      );
-    }
     if (role != 'driver' && role != 'provider') {
       throw ArgumentError('Unsupported account role.');
     }
-    final roles = {...accountRoles(profile.data()), role}.toList();
-    // Signing in with the existing password proves ownership before enrollment.
-    await updateCurrentProfile({
-      'roles': roles,
-      'lastRole': role,
-      'online': false,
-    });
-    if (accountHasRole(profile.data(), 'provider')) {
-      unawaited(syncProviderDirectory().catchError((_) {}));
+    try {
+      var expired = false;
+      final login = _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      // Dart timeouts do not cancel Firebase operations. Clean up a late
+      // successful login as well, so it cannot restore an invalid session.
+      final credential = await login
+          .then((value) async {
+            if (expired) {
+              await _auth.signOut();
+              throw TimeoutException('Sign-in expired. Please try again.');
+            }
+            return value;
+          })
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () {
+              expired = true;
+              throw TimeoutException('Sign-in expired. Please try again.');
+            },
+          );
+      final user = credential.user;
+      if (user == null) {
+        throw FirebaseAuthException(code: 'session-unavailable');
+      }
+      // Never accept a cached profile after an account has been deleted.
+      final profile = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 15));
+      if (!profile.exists || accountRoles(profile.data()).isEmpty) {
+        throw FirebaseAuthException(
+          code: 'account-not-found',
+          message:
+              'This account no longer exists. Please create a new account.',
+        );
+      }
+      final roles = {...accountRoles(profile.data()), role}.toList();
+      await updateCurrentProfile({
+        'roles': roles,
+        'lastRole': role,
+        'online': false,
+      }).timeout(const Duration(seconds: 10));
+      if (accountHasRole(profile.data(), 'provider')) {
+        unawaited(syncProviderDirectory().catchError((_) {}));
+      }
+      _startBackgroundSetup(role);
+      return credential;
+    } catch (_) {
+      // A Firebase login alone is insufficient: the app profile must be valid.
+      await _auth.signOut();
+      rethrow;
     }
-    _startBackgroundSetup(role);
-    return credential;
   }
 
   Future<UserCredential> register({
@@ -421,7 +454,13 @@ class AuthService {
     }
     batch.delete(profileRef);
     await batch.commit();
-    await user.delete();
+    try {
+      await user.delete();
+    } finally {
+      // The profile has already been removed. Do not retain a partial session
+      // even if Firebase Auth deletion fails; the login guard rejects it.
+      await _auth.signOut();
+    }
   }
 
   void _startBackgroundSetup(String role) {
