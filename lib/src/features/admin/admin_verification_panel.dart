@@ -16,6 +16,10 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
   int? displayedRevision;
 
   bool busy = false;
+  bool sendingEmail = false;
+  bool emailFailed = false;
+  bool emailRequested = false;
+  String? emailApprovalId;
 
   String? message;
 
@@ -29,6 +33,7 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
   };
 
   Future<void> _act(Map<String, dynamic> application, String action) async {
+    if (busy || sendingEmail) return;
     ProviderCorrectionDraft? correction;
     String? reason;
     if (action == 'pending') {
@@ -80,32 +85,13 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
         verificationChecks: action == 'verified' ? checks.toList() : null,
       );
 
-      if (action == 'verified') {
-        try {
-          await AdminService().sendApprovalEmail(widget.uid);
-
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            message =
-                'Provider approved. The approval email was accepted by the email service.';
-          });
-        } catch (_) {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            message =
-                'Provider approval was saved, but the approval email could not be delivered. You can retry the email below.';
-          });
-        }
-      } else if (mounted) {
+      if (mounted) {
         setState(() {
-          message =
-              'Decision saved. The provider can see the updated verification result in the app.';
+          emailFailed = false;
+          emailRequested = false;
+          message = action == 'verified'
+              ? 'Provider approved. You can send an approval email separately below.'
+              : 'Decision saved. The provider can see the updated verification result in the app.';
         });
       }
     } catch (error) {
@@ -114,7 +100,11 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
       }
 
       setState(() {
-        message = error is StateError
+        message = error is TimeoutException
+            ? 'Decision confirmation timed out. Refresh the account status before retrying; the save may still complete.'
+            : error is FirebaseException
+            ? 'Decision could not be saved (${error.code}). Check admin permission and connection.'
+            : error is StateError
             ? error.message
             : 'Decision could not be saved. Check your admin permission and the current application revision.';
       });
@@ -122,18 +112,19 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
       if (mounted) {
         setState(() {
           busy = false;
+          sendingEmail = false;
         });
       }
     }
   }
 
-  Future<void> _retryApprovalEmail() async {
-    if (busy) {
+  Future<void> _sendApprovalEmail() async {
+    if (busy || sendingEmail) {
       return;
     }
 
     setState(() {
-      busy = true;
+      sendingEmail = true;
       message = null;
     });
 
@@ -146,7 +137,9 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
 
       setState(() {
         message =
-            'Approval email accepted, or it was already sent for this approval.';
+            'Email service acknowledged the request. It may already be sent or still in progress; inbox delivery is not confirmed.';
+        emailRequested = true;
+        emailFailed = false;
       });
     } catch (_) {
       if (!mounted) {
@@ -156,11 +149,12 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
       setState(() {
         message =
             'Approval email is currently unavailable. Verification state was not changed.';
+        emailFailed = true;
       });
     } finally {
       if (mounted) {
         setState(() {
-          busy = false;
+          sendingEmail = false;
         });
       }
     }
@@ -477,137 +471,243 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
 
             const SizedBox(height: 20),
 
-            _RaAdminVerificationChecklistHeader(
-              completed: checks.length,
-              total: checklist.length,
-            ),
+            StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('accountModeration')
+                  .doc(widget.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const InlineMessage(
+                    icon: Icons.error_outline,
+                    text:
+                        'Unable to load the saved review. Reopen this account before making a decision.',
+                  );
+                }
+                if (!snapshot.hasData) return const LinearProgressIndicator();
+                final review = snapshot.data?.data() ?? <String, dynamic>{};
+                final approvalId = review['lastAuditId']?.toString();
+                if (emailApprovalId != approvalId) {
+                  emailApprovalId = approvalId;
+                  emailRequested = false;
+                  emailFailed = false;
+                }
+                final expiry = review['validUntil'];
+                final approved =
+                    review['verification'] == 'verified' &&
+                    review['status'] == 'active' &&
+                    review['verificationRevision'] == revision &&
+                    expiry is Timestamp &&
+                    expiry.toDate().isAfter(DateTime.now());
+                if (approved) {
+                  final savedChecks =
+                      (review['verificationChecks'] as List? ?? const [])
+                          .whereType<String>()
+                          .toSet();
+                  String dateText(Object? value) {
+                    if (value is! Timestamp) return 'Not recorded';
+                    final date = value.toDate().toLocal();
+                    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+                  }
 
-            const SizedBox(height: 10),
-
-            _RaAdminVerificationSurface(
-              child: Column(
-                children: [
-                  for (final entry in checklist.entries)
-                    Material(
-                      color: Colors.transparent,
-                      child: CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        value: checks.contains(entry.key),
-                        onChanged: busy
-                            ? null
-                            : (selected) {
-                                setState(() {
-                                  if (selected == true) {
-                                    checks.add(entry.key);
-                                  } else {
-                                    checks.remove(entry.key);
-                                  }
-                                });
-                              },
-                        title: Text(
-                          entry.value,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            height: 1.35,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            OutlinedButton.icon(
-              onPressed: busy ? null : _selectValidityDate,
-              icon: const Icon(Icons.event_available_outlined),
-              label: Text(
-                'Valid until ${validUntil.day.toString().padLeft(2, '0')}/${validUntil.month.toString().padLeft(2, '0')}/${validUntil.year}',
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 620;
-
-                final approve = FilledButton.icon(
-                  onPressed:
-                      busy ||
-                          professional is! Map ||
-                          checks.length != checklist.length
-                      ? null
-                      : () {
-                          _act(application, 'verified');
-                        },
-                  icon: const Icon(Icons.verified_outlined),
-                  label: const Text('Approve Provider'),
-                );
-
-                final corrections = OutlinedButton.icon(
-                  onPressed: busy
-                      ? null
-                      : () {
-                          _act(application, 'pending');
-                        },
-                  icon: const Icon(Icons.edit_note_outlined),
-                  label: const Text('Request Corrections'),
-                );
-
-                final reject = OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: colors.error,
-                    side: BorderSide(
-                      color: colors.error.withValues(alpha: .55),
-                    ),
-                  ),
-                  onPressed: busy
-                      ? null
-                      : () {
-                          _act(application, 'rejected');
-                        },
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Reject'),
-                );
-
-                if (compact) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      approve,
-                      const SizedBox(height: 8),
-                      corrections,
-                      const SizedBox(height: 8),
-                      reject,
+                      _RaAdminVerificationNotice(
+                        icon: Icons.verified_outlined,
+                        title: 'Provider approved',
+                        message:
+                            'Reviewed: ${dateText(review['updatedAt'])} ? Valid until: ${dateText(expiry)}',
+                        tone: colors.primary,
+                      ),
+                      const SizedBox(height: 10),
+                      _RaAdminVerificationSurface(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: ExpansionTile(
+                            title: const Text('View completed review'),
+                            subtitle: Text(
+                              '${savedChecks.length}/${checklist.length} checks recorded',
+                            ),
+                            children: [
+                              for (final entry in checklist.entries)
+                                ListTile(
+                                  leading: Icon(
+                                    savedChecks.contains(entry.key)
+                                        ? Icons.check_circle_outline
+                                        : Icons.info_outline,
+                                  ),
+                                  title: Text(entry.value),
+                                  subtitle: savedChecks.contains(entry.key)
+                                      ? null
+                                      : const Text(
+                                          'Not recorded in saved review',
+                                        ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          onPressed: busy || sendingEmail || emailRequested
+                              ? null
+                              : _sendApprovalEmail,
+                          icon: const Icon(Icons.forward_to_inbox_outlined),
+                          label: Text(
+                            sendingEmail
+                                ? 'Sending approval email?'
+                                : emailRequested
+                                ? 'Email request completed'
+                                : emailFailed
+                                ? 'Retry Email'
+                                : 'Send Approval Email',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Email notification is separate from approval. The provider can already use the approved account.',
+                      ),
+                      if (sendingEmail)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 10),
+                          child: LinearProgressIndicator(),
+                        ),
                     ],
                   );
                 }
-
-                return Row(
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(flex: 2, child: approve),
-                    const SizedBox(width: 8),
-                    Expanded(flex: 2, child: corrections),
-                    const SizedBox(width: 8),
-                    Expanded(child: reject),
+                    _RaAdminVerificationChecklistHeader(
+                      completed: checks.length,
+                      total: checklist.length,
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    _RaAdminVerificationSurface(
+                      child: Column(
+                        children: [
+                          for (final entry in checklist.entries)
+                            Material(
+                              color: Colors.transparent,
+                              child: CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                value: checks.contains(entry.key),
+                                onChanged: busy
+                                    ? null
+                                    : (selected) {
+                                        setState(() {
+                                          if (selected == true) {
+                                            checks.add(entry.key);
+                                          } else {
+                                            checks.remove(entry.key);
+                                          }
+                                        });
+                                      },
+                                title: Text(
+                                  entry.value,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : _selectValidityDate,
+                      icon: const Icon(Icons.event_available_outlined),
+                      label: Text(
+                        'Valid until ${validUntil.day.toString().padLeft(2, '0')}/${validUntil.month.toString().padLeft(2, '0')}/${validUntil.year}',
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 620;
+
+                        final approve = FilledButton.icon(
+                          onPressed:
+                              busy ||
+                                  sendingEmail ||
+                                  professional is! Map ||
+                                  checks.length != checklist.length
+                              ? null
+                              : () {
+                                  _act(application, 'verified');
+                                },
+                          icon: const Icon(Icons.verified_outlined),
+                          label: const Text('Approve Provider'),
+                        );
+
+                        final corrections = OutlinedButton.icon(
+                          onPressed: busy || sendingEmail
+                              ? null
+                              : () {
+                                  _act(application, 'pending');
+                                },
+                          icon: const Icon(Icons.edit_note_outlined),
+                          label: const Text('Request Corrections'),
+                        );
+
+                        final reject = OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colors.error,
+                            side: BorderSide(
+                              color: colors.error.withValues(alpha: .55),
+                            ),
+                          ),
+                          onPressed: busy || sendingEmail
+                              ? null
+                              : () {
+                                  _act(application, 'rejected');
+                                },
+                          icon: const Icon(Icons.cancel_outlined),
+                          label: const Text('Reject'),
+                        );
+
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              approve,
+                              const SizedBox(height: 8),
+                              corrections,
+                              const SizedBox(height: 8),
+                              reject,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(flex: 2, child: approve),
+                            const SizedBox(width: 8),
+                            Expanded(flex: 2, child: corrections),
+                            const SizedBox(width: 8),
+                            Expanded(child: reject),
+                          ],
+                        );
+                      },
+                    ),
                   ],
                 );
               },
-            ),
-
-            const SizedBox(height: 8),
-
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: busy ? null : _retryApprovalEmail,
-                icon: const Icon(Icons.forward_to_inbox_outlined),
-                label: const Text('Retry Approval Email'),
-              ),
             ),
 
             if (busy) ...[

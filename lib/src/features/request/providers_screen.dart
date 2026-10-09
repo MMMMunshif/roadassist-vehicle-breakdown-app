@@ -36,6 +36,23 @@ String _providerAvailabilityStatus(Map<String, dynamic> data) {
   );
 }
 
+String _providerAvailabilityExplanation(Map<String, dynamic> data) {
+  if (data['online'] != true)
+    return 'Turn on availability from your dashboard when you are ready to help.';
+  final updated = (data['locationUpdatedAt'] as Timestamp?)?.toDate();
+  if (!ProviderAvailability.hasFreshLocation(updated, DateTime.now())) {
+    return 'Your online switch is on, but your live location is missing or expired. Allow browser location access, then pull down on the dashboard to refresh your location.';
+  }
+  final status = _providerAvailabilityStatus(data);
+  if (status == 'Busy')
+    return 'Complete your active job before accepting another request.';
+  if (status == 'Paused')
+    return 'Requests are paused. Resume accepting requests from your availability settings.';
+  if (status == 'Outside working hours')
+    return 'Your configured working hours are closed. Update your working hours or use the availability override.';
+  return 'Your availability is being updated.';
+}
+
 bool _providerLocationOutdated(Map<String, dynamic> data) {
   final updated = (data['locationUpdatedAt'] as Timestamp?)?.toDate();
 
