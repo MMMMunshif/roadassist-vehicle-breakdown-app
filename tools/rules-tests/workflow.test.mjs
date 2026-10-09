@@ -560,7 +560,7 @@ test('unverified drivers cannot access vehicles or assistance requests', async (
 
 test('owner may add provider role but cannot grant admin or remove driver role', async () => {
   const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
-  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],lastRole:'provider',online:false}));
+  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],roleEmailRequired:['provider'],lastRole:'provider',online:false}));
   await assertFails(updateDoc(doc(db,'users/driver'),{roles:['driver','provider','admin']}));
   await assertFails(updateDoc(doc(db,'users/driver'),{roles:['provider']}));
   await assertFails(updateDoc(doc(db,'users/driver'),{role:'provider'}));
@@ -601,7 +601,9 @@ test('new unverified account profile is allowed but malformed registration is re
 
 test('driver-first dual-role account may submit provider documents while approval remains required', async () => {
   const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
-  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],lastRole:'provider',online:false}));
+  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],roleEmailRequired:['provider'],lastRole:'provider',online:false}));
+  await assertFails(setDoc(doc(db,'providerApplications/driver'),application()));
+  await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(),'roleEmailVerifications/driver'),{provider:{email:''}}));
   await assertSucceeds(setDoc(doc(db,'providerApplications/driver'),application()));
   await assertFails(setDoc(doc(db,'requests/r2/quotes/driver'),{...offer(),providerId:'driver'}));
   await assertSucceeds(getDoc(doc(db,'requests/r1')));
@@ -776,4 +778,20 @@ test('complaint history is participant-readable, admin-paired and immutable',asy
   await assertFails(getDoc(doc(env.authenticatedContext('other',{email_verified:true}).firestore(),`complaintReviews/r1/history/${id}`)));
   await assertFails(updateDoc(doc(admin,`complaintReviews/r1/history/${id}`),{decision:'Changed history'}));
   await assertFails(setDoc(doc(driver,'complaintReviews/r1/history/forged'),{status:'resolved',decision:'Forged support review',createdAt:serverTimestamp()}));
+});
+
+
+test('new role requires server confirmation and clients cannot forge or clear it', async () => {
+  const db = env.authenticatedContext('driver', {email_verified:true,email:'driver@example.com'}).firestore();
+  await assertFails(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],lastRole:'provider'}));
+  await assertSucceeds(updateDoc(doc(db,'users/driver'),{roles:['driver','provider'],roleEmailRequired:['provider'],lastRole:'provider',online:false}));
+  await assertFails(updateDoc(doc(db,'users/driver'),{roleEmailRequired:[]}));
+  await assertFails(setDoc(doc(db,'roleEmailVerifications/driver'),{provider:{email:'driver@example.com'}}));
+  await assertFails(getDoc(doc(db,'roleEmailChallenges/private-token')));
+  await assertFails(setDoc(doc(db,'providerApplications/driver'),application()));
+  await assertSucceeds(getDoc(doc(db,'requests/r1'))); // Existing driver role remains usable.
+  await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(),'roleEmailVerifications/driver'),{provider:{email:'wrong@example.com'}}));
+  await assertFails(setDoc(doc(db,'providerApplications/driver'),application()));
+  await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(),'roleEmailVerifications/driver'),{provider:{email:'driver@example.com'}}));
+  await assertSucceeds(setDoc(doc(db,'providerApplications/driver'),application()));
 });

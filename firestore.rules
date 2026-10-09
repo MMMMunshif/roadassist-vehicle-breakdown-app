@@ -12,7 +12,19 @@ service cloud.firestore {
 
     function hasRole(uid, role) {
       let profile = get(/databases/$(database)/documents/users/$(uid)).data;
-      return profile.role == role || role in profile.get('roles', []);
+      return (profile.role == role || role in profile.get('roles', []))
+        && (profile.role == role || roleEmailConfirmed(uid, role, profile));
+    }
+
+    function roleEmailConfirmed(uid, role, profile) {
+      let path = /databases/$(database)/documents/roleEmailVerifications/$(uid);
+      return !(role in profile.get('roleEmailRequired', []))
+        || (exists(path) && get(path).data.get(role, {}).get('email', '') == (uid == request.auth.uid ? request.auth.token.get('email', '').lower() : profile.get('email', '').lower()));
+    }
+
+    match /roleEmailVerifications/{uid} {
+      allow read: if authenticated() && request.auth.uid == uid;
+      allow write: if false;
     }
 
     function authenticated() { return request.auth != null; }
@@ -329,15 +341,24 @@ service cloud.firestore {
         && d.get('roles', [d.role]).hasOnly(['driver', 'provider'])
         && d.role in d.get('roles', [d.role])
         && d.get('lastRole', d.role) in d.get('roles', [d.role]); }
+      function validRoleEmailChange() {
+        let previous = resource.data.get('roles', [resource.data.role]);
+        let required = request.resource.data.get('roleEmailRequired', []);
+        return required is list && required.hasOnly(['driver','provider'])
+          && required.hasAll(resource.data.get('roleEmailRequired', []))
+          && required.hasAll(request.resource.data.get('roles', [resource.data.role]).removeAll(previous));
+      }
       allow create: if authenticated() && !accountBlocked(userId) && request.auth.uid == userId
         && request.resource.data.role in ['driver','provider']
         && validName(request.resource.data) && validEmail(request.resource.data)
         && validPhone(request.resource.data) && validRoles(request.resource.data)
+        && request.resource.data.get('roleEmailRequired', []).hasAll(request.resource.data.get('roles', [request.resource.data.role]).removeAll([request.resource.data.role]))
         && request.resource.data.get('online', false) == false
         && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time;
       allow read: if isAdmin() || (authenticated() && request.auth.uid == userId);
       allow update: if authenticated() && !accountBlocked(userId)
         && request.auth.uid == userId
+        && validRoleEmailChange()
         && request.resource.data.role == resource.data.role
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName']) || validName(request.resource.data))
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email']) || validEmail(request.resource.data))

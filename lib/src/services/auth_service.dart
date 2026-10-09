@@ -13,6 +13,8 @@ class AuthService {
     : _auth = auth ?? FirebaseAuth.instance,
       _firestore = firestore ?? FirebaseFirestore.instance;
 
+  bool verificationEmailDeliveryFailed = false;
+
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
@@ -57,7 +59,7 @@ class AuthService {
     }
   }
 
-  Future<void> sendVerificationEmail() async {
+  Future<void> sendVerificationEmail({String? role}) async {
     final user = currentUser;
     if (user == null) throw StateError('Authentication is required.');
     final idToken = await user.getIdToken(true);
@@ -68,7 +70,7 @@ class AuthService {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $idToken',
           },
-          body: '{}',
+          body: jsonEncode({if (role != null) 'role': role}),
         )
         .timeout(const Duration(seconds: 35));
     final body = response.body.isEmpty
@@ -83,7 +85,7 @@ class AuthService {
     }
   }
 
-  Future<bool> refreshEmailVerification() async {
+  Future<bool> refreshEmailVerification({String? role}) async {
     final user = currentUser;
     if (user == null) return false;
     await user.reload();
@@ -95,7 +97,27 @@ class AuthService {
     }
     // Document submission rules read email_verified from the ID token.
     await refreshed.getIdToken(true);
-    return true;
+    return role == null || await isRoleEmailVerified(role);
+  }
+
+  Future<bool> isRoleEmailVerified(String role) async {
+    final user = currentUser;
+    if (user == null || !user.emailVerified) return false;
+    final profile = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+    if (!profile.exists || !accountHasRole(profile.data(), role)) return false;
+    if (!((profile.data()?['roleEmailRequired'] as List?) ?? const []).contains(
+      role,
+    ))
+      return true;
+    final verified = await _firestore
+        .collection('roleEmailVerifications')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+    final record = verified.data()?[role];
+    return record is Map && record['email'] == user.email?.toLowerCase();
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchCurrentProfile() {
@@ -344,13 +366,27 @@ class AuthService {
       final roles = {...accountRoles(profile.data()), role}.toList();
       await updateCurrentProfile({
         'roles': roles,
+        'roleEmailRequired': {
+          ...((profile.data()?['roleEmailRequired'] as List?) ?? const [])
+              .whereType<String>(),
+          if (role != profile.data()?['role']) role,
+        }.toList(),
         'lastRole': role,
         'online': false,
       }).timeout(const Duration(seconds: 10));
       if (accountHasRole(profile.data(), 'provider')) {
         unawaited(syncProviderDirectory().catchError((_) {}));
       }
-      _startBackgroundSetup(role);
+      if (role != profile.data()?['role'] &&
+          !((profile.data()?['roleEmailRequired'] as List?) ?? const [])
+              .contains(role)) {
+        try {
+          await sendVerificationEmail(role: role);
+        } catch (_) {
+          verificationEmailDeliveryFailed = true;
+        }
+      }
+      if (await isRoleEmailVerified(role)) _startBackgroundSetup(role);
       return credential;
     } catch (_) {
       // A Firebase login alone is insufficient: the app profile must be valid.
@@ -399,11 +435,21 @@ class AuthService {
       }
       await updateCurrentProfile({
         'roles': {...accountRoles(profile.data()), role}.toList(),
+        'roleEmailRequired': {
+          ...((profile.data()?['roleEmailRequired'] as List?) ?? const [])
+              .whereType<String>(),
+          role,
+        }.toList(),
         'lastRole': role,
         'online': false,
       });
       if (accountHasRole(profile.data(), 'provider')) {
         unawaited(syncProviderDirectory().catchError((_) {}));
+      }
+      try {
+        await sendVerificationEmail(role: role);
+      } catch (_) {
+        verificationEmailDeliveryFailed = true;
       }
       return credential;
     }
@@ -420,8 +466,9 @@ class AuthService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     try {
-      await sendVerificationEmail();
+      await sendVerificationEmail(role: role);
     } catch (_) {
+      verificationEmailDeliveryFailed = true;
       // Account creation must remain usable when Firebase email delivery is
       // temporarily unavailable. Verification can be resent from the app.
     }
