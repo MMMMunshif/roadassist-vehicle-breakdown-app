@@ -8,6 +8,9 @@
     },
     "api/job-start-code.mjs": {
       "maxDuration": 30
+    },
+    "api/confirm-role-email.mjs": {
+      "maxDuration": 30
     }
   }
 }

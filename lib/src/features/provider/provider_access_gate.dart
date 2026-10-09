@@ -39,6 +39,14 @@ class ProviderShell extends StatelessWidget {
       return const EmailVerificationScreen(role: 'provider');
     }
 
+    return RoleEmailGate(
+      role: 'provider',
+      child: Builder(builder: _buildProviderAccess),
+    );
+  }
+
+  Widget _buildProviderAccess(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser!;
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('providerApplications')

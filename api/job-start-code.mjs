@@ -20,6 +20,11 @@ export default async function handler(req, res) {
       const error = validateParticipant(job.data(), actor, action);
       if (error) return {status:403,message:error};
       if (!profile.exists || moderation.data()?.status === 'suspended' || moderation.data()?.verification === 'rejected') return {status:403,message:'Account access is unavailable.'};
+      const role = action === 'issue' ? 'driver' : 'provider';
+      if ((profile.data()?.roleEmailRequired ?? []).includes(role)) {
+        const roleEmail = await tx.get(db.doc(`roleEmailVerifications/${actor.uid}`));
+        if (roleEmail.data()?.[role]?.email !== actor.email?.toLowerCase()) return {status:403,message:'Verify email for this account role first.'};
+      }
       const data = secret.data(), now = Date.now();
       if (action === 'verify' && (moderation.data()?.verification !== 'verified' || moderation.data()?.status !== 'active' || (moderation.data()?.validUntil?.toMillis() ?? 0) <= now || !application?.exists || application.data().applicationStatus === 'withdrawn' || application.data().revision !== moderation.data()?.verificationRevision)) return {status:403,message:'Current provider approval is required.'};
       if (action === 'issue') {

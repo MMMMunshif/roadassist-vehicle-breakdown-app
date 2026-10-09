@@ -49,7 +49,10 @@ class _DriverShellState extends State<DriverShell> {
         if (enforceEmailVerification && user != null && !user.emailVerified) {
           return const EmailVerificationScreen(role: 'driver');
         }
-        return RaDriverTheme(child: Builder(builder: _buildDashboard));
+        return RoleEmailGate(
+          role: 'driver',
+          child: RaDriverTheme(child: Builder(builder: _buildDashboard)),
+        );
       },
     );
   }

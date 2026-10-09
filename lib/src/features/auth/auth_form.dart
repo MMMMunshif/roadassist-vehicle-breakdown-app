@@ -79,11 +79,12 @@ class _AuthFormState extends State<_AuthForm> {
       loading = true;
     });
 
+    final service = authService;
     try {
       final role = widget.isProvider ? 'provider' : 'driver';
 
       if (registerMode) {
-        await authService
+        await service
             .register(
               email: emailController.text,
               password: passwordController.text,
@@ -93,7 +94,7 @@ class _AuthFormState extends State<_AuthForm> {
             )
             .timeout(const Duration(seconds: 45));
       } else {
-        await authService.signIn(
+        await service.signIn(
           email: emailController.text,
           password: passwordController.text,
           role: role,
@@ -102,12 +103,12 @@ class _AuthFormState extends State<_AuthForm> {
 
       if (registerMode && registrationPhotoData != null) {
         try {
-          await authService
+          await service
               .updateCurrentProfile({'photoData': registrationPhotoData})
               .timeout(const Duration(seconds: 15));
         } catch (_) {
           if (!widget.isProvider) {
-            await authService.signOut();
+            await service.signOut();
           }
 
           rethrow;
@@ -125,8 +126,18 @@ class _AuthFormState extends State<_AuthForm> {
         );
       }
 
-      if (enforceEmailVerification && !user.emailVerified) {
+      if (enforceEmailVerification &&
+          !await service.isRoleEmailVerified(role)) {
         replace(context, EmailVerificationScreen(role: role));
+        if (service.verificationEmailDeliveryFailed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Account saved, but the verification email could not be sent. Please use Resend email.',
+              ),
+            ),
+          );
+        }
       } else {
         replace(
           context,

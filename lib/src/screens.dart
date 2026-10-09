@@ -178,3 +178,5 @@ part 'features/admin/admin_team_screen.dart';
 part 'features/chat/chat_inbox_screen.dart';
 
 part 'features/auth/auth_visuals.dart';
+
+part 'features/auth/role_email_gate.dart';
