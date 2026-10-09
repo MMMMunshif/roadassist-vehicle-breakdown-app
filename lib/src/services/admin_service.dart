@@ -193,6 +193,11 @@ class AdminService {
         'lastAuditId': audit.id,
       };
       tx.set(ref, after);
+      tx.set(ref.collection('history').doc(audit.id), {
+        'status': status,
+        'decision': decision.trim(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       tx.set(audit, {
         'kind': 'complaint',
         'target': requestId,

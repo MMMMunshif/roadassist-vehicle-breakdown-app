@@ -172,7 +172,9 @@ class _RoadAssistAppState extends State<RoadAssistApp> {
       final isDriver = request['driverId'] == user.uid;
       final isProvider = request['providerId'] == user.uid;
       Widget page;
-      if (data['type'] == 'chat' && (isDriver || isProvider)) {
+      if (data['type'] == 'complaint_review' && (isDriver || isProvider)) {
+        page = DisputeScreen(requestId: snapshot.id);
+      } else if (data['type'] == 'chat' && (isDriver || isProvider)) {
         page = ChatScreen(
           requestId: snapshot.id,
           peerName:

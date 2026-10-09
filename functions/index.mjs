@@ -89,3 +89,11 @@ export const notifyChatMessage = onDocumentCreated({document:'requests/{requestI
   if (!uid) return;
   await sendTo(uid,{type:'chat',title:'New RoadAssist message',body:'Open RoadAssist to read your message.'},event.id,event.params.requestId);
 });
+export const notifyComplaintReview = onDocumentWritten({document:'complaintReviews/{requestId}',retry:true}, async event => {
+  if (!event.data || !event.data.after.exists) return;
+  const before=event.data.before.data(), after=event.data.after.data();
+  if (before?.lastAuditId === after.lastAuditId) return;
+  const job=(await db.doc(`requests/${event.params.requestId}`).get()).data();
+  if (!job) return;
+  for (const uid of new Set([job.driverId,job.providerId].filter(Boolean))) await sendTo(uid,{type:'complaint_review',title:'Support review updated',body:'Open your service problem report to view the support decision.'},event.id,event.params.requestId);
+});

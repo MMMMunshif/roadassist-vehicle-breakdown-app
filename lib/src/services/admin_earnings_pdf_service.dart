@@ -1,4 +1,4 @@
-import 'package:image/image.dart' as img;
+﻿import 'package:image/image.dart' as img;
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -7,17 +7,10 @@ import '../models/admin_earnings_report.dart';
 class AdminEarningsPdfService {
   static Future<Uint8List> generate(AdminEarningsReport report) async {
     final logo = await rootBundle.load('assets/images/roadassist_logo.png');
-    final background = await rootBundle.load(
-      'assets/images/welcome_background_light.png',
-    );
     final font = pw.Font.ttf(
-      await rootBundle.load('assets/fonts/Manrope-Variable.ttf'),
+      await rootBundle.load('assets/fonts/PlusJakartaSans-Variable.ttf'),
     );
-    final decodedBackground = img.decodeImage(background.buffer.asUint8List())!;
     final decodedLogo = img.decodeImage(logo.buffer.asUint8List())!;
-    final backgroundImage = pw.MemoryImage(
-      img.encodeJpg(img.copyResize(decodedBackground, width: 900), quality: 70),
-    );
     final logoImage = pw.MemoryImage(
       img.encodePng(img.copyResize(decodedLogo, width: 600)),
     );
@@ -38,18 +31,10 @@ class AdminEarningsPdfService {
         pageTheme: pw.PageTheme(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
-          theme: pw.ThemeData.withFont(base: font),
+          theme: pw.ThemeData.withFont(base: font, bold: font),
           buildBackground: (_) => pw.FullPage(
             ignoreMargins: true,
-            child: pw.Opacity(
-              opacity: .08,
-              child: pw.Image(
-                backgroundImage,
-                fit: pw.BoxFit.cover,
-                width: PdfPageFormat.a4.width,
-                height: PdfPageFormat.a4.height,
-              ),
-            ),
+            child: pw.SvgImage(svg: _roadBackground),
           ),
         ),
         header: (context) => pw.Column(
@@ -57,10 +42,14 @@ class AdminEarningsPdfService {
           children: [
             pw.Image(logoImage, width: 175, height: 55, fit: pw.BoxFit.contain),
             pw.SizedBox(height: 12),
-            text('PROVIDER EARNINGS REPORT', size: 20),
+            text('Provider Earnings', size: 23),
             pw.SizedBox(height: 6),
-            text('Period: ${report.period} | Currency: LKR'),
-            text('Generated: ${report.generatedLabel}'),
+            text('${report.period} | Monthly service report | LKR'),
+            text('Generated: ${report.generatedLabel}', size: 8),
+            text(
+              'Report: RA-${report.period.replaceAll(' ', '-')} | ${report.jobs} completed jobs',
+              size: 8,
+            ),
             pw.Divider(color: blue),
             pw.SizedBox(height: 8),
           ],
@@ -75,20 +64,32 @@ class AdminEarningsPdfService {
           ],
         ),
         build: (_) => [
-          text('Completed jobs: ${report.jobs}', size: 13),
-          pw.SizedBox(height: 6),
-          text(
-            'Total service earnings: ${AdminEarningsReport.money(report.billedCents)}',
-            size: 16,
+          pw.Row(
+            children: [
+              pw.Expanded(
+                child: _metric('Service earnings', report.billedCents, navy),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: _metric(
+                  'Confirmed payments',
+                  report.confirmedCents,
+                  PdfColor.fromHex('#008C78'),
+                ),
+              ),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: _metric(
+                  'Unconfirmed',
+                  report.billedCents - report.confirmedCents,
+                  navy,
+                ),
+              ),
+            ],
           ),
-          pw.SizedBox(height: 6),
-          text(
-            'Provider-confirmed payments: ${AdminEarningsReport.money(report.confirmedCents)}',
-          ),
-          text(
-            'Unconfirmed amount: ${AdminEarningsReport.money(report.billedCents - report.confirmedCents)}',
-          ),
-          pw.SizedBox(height: 16),
+          pw.SizedBox(height: 20),
+          text('Provider summary / Monthly earnings', size: 15),
+          pw.SizedBox(height: 10),
           pw.TableHelper.fromTextArray(
             headers: [
               'Provider details',
@@ -111,10 +112,22 @@ class AdminEarningsPdfService {
                   (row.confirmedCents / 100).toStringAsFixed(2),
                 ],
             ],
-            headerDecoration: pw.BoxDecoration(color: blue),
-            headerStyle: pw.TextStyle(color: PdfColors.white, fontSize: 9),
-            cellStyle: const pw.TextStyle(fontSize: 9),
-            cellPadding: const pw.EdgeInsets.all(7),
+            headerDecoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('#EAF3FB'),
+            ),
+            headerStyle: pw.TextStyle(
+              color: navy,
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+            ),
+            cellStyle: pw.TextStyle(fontSize: 10, color: navy),
+            cellPadding: const pw.EdgeInsets.all(9),
+            oddRowDecoration: const pw.BoxDecoration(color: PdfColors.white),
+            rowDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#F5FAFE')),
+            border: pw.TableBorder.all(
+              color: PdfColor.fromHex('#DBE7F1'),
+              width: .5,
+            ),
             columnWidths: {
               0: const pw.FlexColumnWidth(2.5),
               1: const pw.FlexColumnWidth(1.1),
@@ -127,33 +140,99 @@ class AdminEarningsPdfService {
             pw.SizedBox(height: 18),
             text('Completed job breakdown', size: 15),
             pw.SizedBox(height: 8),
-            pw.TableHelper.fromTextArray(
-              headers: [
-                'Completed / Provider',
-                'Driver / Vehicle',
-                'Service',
-                'Final bill (LKR)',
-                'Payment',
-              ],
-              data: [
-                for (final job in report.details)
-                  [
-                    '${AdminEarningsReport.sriLanka(job['completedAt'] as DateTime).toIso8601String().substring(0, 16).replaceFirst('T', ' ')}\n${report.rows.firstWhere((row) => row.providerId == job['providerId']).name}',
-                    '${job['driverName'] ?? 'Driver name not recorded'}\n${job['registration'] ?? 'Registration not recorded'}',
-                    job['issues'] is List
-                        ? (job['issues'] as List).join(', ')
-                        : job['issue']?.toString() ?? 'Service not recorded',
-                    ((job['amountCents'] as int) / 100).toStringAsFixed(2),
-                    job['providerConfirmedPayment'] == true
-                        ? 'Confirmed'
-                        : 'Unconfirmed',
+            for (final job in report.details) ...[
+              pw.Container(
+                padding: const pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.white,
+                  borderRadius: pw.BorderRadius.circular(10),
+                  border: pw.Border.all(
+                    color: PdfColor.fromHex('#DBE7F1'),
+                    width: .6,
+                  ),
+                ),
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Expanded(
+                      flex: 2,
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          text(
+                            AdminEarningsReport.sriLanka(
+                                  job['completedAt'] as DateTime,
+                                )
+                                .toIso8601String()
+                                .substring(0, 16)
+                                .replaceFirst('T', ' '),
+                          ),
+                          pw.SizedBox(height: 4),
+                          text(
+                            report.rows
+                                .firstWhere(
+                                  (row) => row.providerId == job['providerId'],
+                                )
+                                .name,
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(width: 10),
+                    pw.Expanded(
+                      flex: 3,
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          text(
+                            'Driver: ${job['driverName'] ?? 'Not recorded'}',
+                          ),
+                          text(
+                            'Vehicle: ${job['registration'] ?? 'Not recorded'}',
+                          ),
+                          pw.SizedBox(height: 4),
+                          text(
+                            job['issues'] is List
+                                ? (job['issues'] as List).join(', ')
+                                : job['issue']?.toString() ??
+                                      'Service not recorded',
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(width: 10),
+                    pw.Expanded(
+                      flex: 2,
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          text('Final bill', size: 8),
+                          text(
+                            AdminEarningsReport.money(
+                              job['amountCents'] as int,
+                            ),
+                            size: 13,
+                          ),
+                          pw.SizedBox(height: 6),
+                          pw.Text(
+                            job['providerConfirmedPayment'] == true
+                                ? 'Payment confirmed'
+                                : 'Unconfirmed',
+                            style: pw.TextStyle(
+                              fontSize: 8,
+                              color: job['providerConfirmedPayment'] == true
+                                  ? PdfColor.fromHex('#008C78')
+                                  : navy,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
-              ],
-              headerDecoration: pw.BoxDecoration(color: blue),
-              headerStyle: pw.TextStyle(color: PdfColors.white, fontSize: 9),
-              cellStyle: const pw.TextStyle(fontSize: 9),
-              cellPadding: const pw.EdgeInsets.all(6),
-            ),
+                ),
+              ),
+              pw.SizedBox(height: 8),
+            ],
           ],
           pw.SizedBox(height: 16),
           text(
@@ -170,4 +249,41 @@ class AdminEarningsPdfService {
     );
     return doc.save();
   }
+
+  static pw.Widget _metric(String label, int cents, PdfColor color) =>
+      pw.Container(
+        padding: const pw.EdgeInsets.all(12),
+        decoration: pw.BoxDecoration(
+          color: PdfColors.white,
+          borderRadius: pw.BorderRadius.circular(9),
+          border: pw.Border.all(color: PdfColor.fromHex('#DBE7F1'), width: .6),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(label, style: const pw.TextStyle(fontSize: 8)),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              AdminEarningsReport.money(cents),
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  static String get _roadBackground {
+    final curves = StringBuffer();
+    for (var i = 0; i < 9; i++) {
+      final x = 595 * (.12 + i * .15);
+      curves.write(
+        '<path d="M $x 0 C ${x + 110} 109 ${x - 150} 168 ${x - 40} 303 C ${x + 100} 438 ${x - 90} 631 ${x + 50} 842" fill="none" stroke="#E0F0FA" stroke-width="1"/>',
+      );
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="595" height="842" viewBox="0 0 595 842"><rect width="595" height="842" fill="#F7FBFF"/><path d="M464 0 C690 101 286 135 535 236" fill="none" stroke="#E4F6FC" stroke-width="28"/><path d="M464 0 C690 101 286 135 535 236" fill="none" stroke="#BDE6F8" stroke-width="1.5" stroke-dasharray="8 11"/>$curves</svg>';
+  }
 }
+

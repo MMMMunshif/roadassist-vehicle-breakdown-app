@@ -15,7 +15,8 @@ class ProviderActiveJobScreen extends StatefulWidget {
       _ProviderActiveJobScreenState();
 }
 
-class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
+class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
+    with WidgetsBindingObserver {
   static const backendStatuses = [
     'accepted',
     'en_route',
@@ -30,6 +31,58 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   late Map<String, dynamic> requestData;
 
   StreamSubscription<Position>? locationSubscription;
+  Timer? locationHeartbeat;
+  bool foreground = true;
+  bool publishingPosition = false;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    if (foreground) unawaited(publishFreshPosition());
+  }
+
+  Future<void> publishFreshPosition() async {
+    final id = widget.requestId;
+    if (!mounted ||
+        !foreground ||
+        offline ||
+        publishingPosition ||
+        id == null ||
+        requestCancelled ||
+        status >= 3)
+      return;
+    publishingPosition = true;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      if (!mounted || !foreground || requestCancelled || status >= 3) return;
+      await RequestService().updateProviderLocation(
+        id,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      if (mounted)
+        setState(() {
+          currentProviderPosition = LatLng(
+            position.latitude,
+            position.longitude,
+          );
+          locationMessage = null;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          locationMessage =
+              'Live location could not refresh. Check GPS and connection.';
+        });
+    } finally {
+      publishingPosition = false;
+    }
+  }
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   requestSubscription;
@@ -47,12 +100,32 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
 
   Map<String, dynamic>? completionReportDraft;
   bool updatingStatus = false;
+  bool offline = false;
+  DateTime? lastSynced;
+  StreamSubscription<List<ConnectivityResult>>? connectionSubscription;
+
+  void onConnection(List<ConnectivityResult> results) {
+    if (mounted)
+      setState(() {
+        offline =
+            results.isEmpty ||
+            results.every((r) => r == ConnectivityResult.none);
+      });
+  }
+
   bool savingDocumentation = false;
   bool requestCancelled = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.requestId != null) {
+      unawaited(Connectivity().checkConnectivity().then(onConnection));
+      connectionSubscription = Connectivity().onConnectivityChanged.listen(
+        onConnection,
+      );
+    }
 
     requestData = Map<String, dynamic>.from(widget.requestData);
 
@@ -95,6 +168,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    locationHeartbeat?.cancel();
+    connectionSubscription?.cancel();
     locationSubscription?.cancel();
 
     requestSubscription?.cancel();
@@ -115,6 +191,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
 
     setState(() {
       requestData = data;
+      if (!snapshot.metadata.isFromCache) lastSynced = DateTime.now();
 
       requestCancelled = data['status'] == 'cancelled';
 
@@ -132,6 +209,10 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
         serviceNotesController.text = notes;
       }
     });
+    if (requestCancelled || status >= 3) {
+      locationSubscription?.cancel();
+      locationHeartbeat?.cancel();
+    }
   }
 
   Future<void> startLocationSharing() async {
@@ -174,6 +255,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
       }
 
       await locationSubscription?.cancel();
+      locationHeartbeat?.cancel();
+      locationHeartbeat = Timer.periodic(const Duration(seconds: 45), (_) {
+        unawaited(publishFreshPosition());
+      });
+      unawaited(publishFreshPosition());
 
       locationSubscription =
           Geolocator.getPositionStream(
@@ -193,12 +279,22 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                 });
               }
 
+              if (!foreground || offline || requestCancelled || status >= 3)
+                return;
               unawaited(
-                RequestService().updateProviderLocation(
-                  requestId,
-                  latitude: position.latitude,
-                  longitude: position.longitude,
-                ),
+                RequestService()
+                    .updateProviderLocation(
+                      requestId,
+                      latitude: position.latitude,
+                      longitude: position.longitude,
+                    )
+                    .catchError((_) {
+                      if (mounted)
+                        setState(() {
+                          locationMessage =
+                              'Live position could not be shared. Check your connection.';
+                        });
+                    }),
               );
 
               unawaited(refreshProviderRoute(point));
@@ -297,6 +393,13 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   }
 
   Future<void> addDocumentationPhoto() async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
+      return;
+    }
+
     final requestId = widget.requestId;
 
     if (requestId == null || savingDocumentation || servicePhotos.length >= 3) {
@@ -382,6 +485,13 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   }
 
   Future<void> removeDocumentationPhoto(int index) async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
+      return;
+    }
+
     final requestId = widget.requestId;
 
     if (requestId == null ||
@@ -427,6 +537,13 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   }
 
   Future<void> saveDocumentation() async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
+      return;
+    }
+
     final requestId = widget.requestId;
 
     if (requestId == null || savingDocumentation) {
@@ -465,6 +582,13 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
   }
 
   Future<void> advanceStatus() async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
+      return;
+    }
+
     final requestId = widget.requestId;
 
     if (requestId == null || updatingStatus || requestCancelled) {
@@ -793,6 +917,24 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
+                  if (status == 2 &&
+                      data['jobStartCodeRequired'] == true &&
+                      data['arrivalConfirmedBy'] == null &&
+                      widget.requestId != null) ...[
+                    JobStartCodePanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  if (offline) ...[
+                    InlineMessage(
+                      icon: Icons.wifi_off_rounded,
+                      text:
+                          'Connection lost. ${lastSynced == null ? 'Showing available job details.' : 'Last synced at ${lastSynced!.hour.toString().padLeft(2, '0')}:${lastSynced!.minute.toString().padLeft(2, '0')}.'} Reconnect before updating job status or sending a bill.',
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   _RaProviderActiveStatusCard(
                     title: _statusTitle(),
                     description: _statusDescription(),
@@ -921,6 +1063,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen> {
                   ? 'Finish Job'
                   : 'Mark as ${statuses[status + 1]}',
               enabled:
+                  !offline &&
                   !updatingStatus &&
                   !completionPending &&
                   widget.requestId != null &&

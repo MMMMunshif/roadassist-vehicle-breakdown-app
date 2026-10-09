@@ -1,10 +1,7 @@
 part of '../../screens.dart';
 
 class _AuthForm extends StatefulWidget {
-  const _AuthForm({
-    required this.isProvider,
-    this.initialRegisterMode = false,
-  });
+  const _AuthForm({required this.isProvider, this.initialRegisterMode = false});
 
   final bool isProvider;
   final bool initialRegisterMode;
@@ -67,14 +64,10 @@ class _AuthFormState extends State<_AuthForm> {
       return;
     }
 
-    if (registerMode &&
-        !widget.isProvider &&
-        registrationPhotoData == null) {
+    if (registerMode && !widget.isProvider && registrationPhotoData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'A profile photo is required to continue as a driver.',
-          ),
+          content: Text('A profile photo is required to continue as a driver.'),
           backgroundColor: raDanger,
         ),
       );
@@ -96,34 +89,22 @@ class _AuthFormState extends State<_AuthForm> {
               password: passwordController.text,
               role: role,
               displayName: nameController.text,
-              phone: normalizeSriLankaPhone(
-                phoneController.text,
-              ),
+              phone: normalizeSriLankaPhone(phoneController.text),
             )
-            .timeout(
-              const Duration(seconds: 45),
-            );
+            .timeout(const Duration(seconds: 45));
       } else {
-        await authService
-            .signIn(
-              email: emailController.text,
-              password: passwordController.text,
-              role: role,
-            )
-            .timeout(
-              const Duration(seconds: 30),
-            );
+        await authService.signIn(
+          email: emailController.text,
+          password: passwordController.text,
+          role: role,
+        );
       }
 
       if (registerMode && registrationPhotoData != null) {
         try {
           await authService
-              .updateCurrentProfile({
-                'photoData': registrationPhotoData,
-              })
-              .timeout(
-                const Duration(seconds: 15),
-              );
+              .updateCurrentProfile({'photoData': registrationPhotoData})
+              .timeout(const Duration(seconds: 15));
         } catch (_) {
           if (!widget.isProvider) {
             await authService.signOut();
@@ -145,53 +126,37 @@ class _AuthFormState extends State<_AuthForm> {
       }
 
       if (enforceEmailVerification && !user.emailVerified) {
-        replace(
-          context,
-          EmailVerificationScreen(
-            role: role,
-          ),
-        );
+        replace(context, EmailVerificationScreen(role: role));
       } else {
         replace(
           context,
-          widget.isProvider
-              ? const ProviderShell()
-              : const DriverShell(),
+          widget.isProvider ? const ProviderShell() : const DriverShell(),
         );
       }
     } on FirebaseAuthException catch (error) {
       if (!mounted) return;
 
       final message = switch (error.code) {
-        'email-already-in-use' =>
-          'An account already exists for this email.',
-        'invalid-credential' =>
-          'Incorrect email or password.',
-        'invalid-email' =>
-          'Enter a valid email address.',
-        'weak-password' =>
-          'Use a password with at least 6 characters.',
-        'user-disabled' =>
-          'This account has been disabled. Contact support.',
+        'email-already-in-use' => 'An account already exists for this email.',
+        'invalid-credential' || 'user-not-found' || 'wrong-password' =>
+          'Email or password is incorrect, or this account no longer exists.',
+        'account-not-found' =>
+          'This account no longer exists. Please create a new account.',
+        'invalid-email' => 'Enter a valid email address.',
+        'weak-password' => 'Use a password with at least 6 characters.',
+        'user-disabled' => 'This account has been disabled. Contact support.',
         'too-many-requests' =>
           'Too many attempts. Wait a few minutes and try again.',
         'network-request-failed' =>
           'Network unavailable. Check your internet connection.',
         'operation-not-allowed' =>
           'Email sign-in is not enabled for this Firebase project.',
-        'wrong-role' =>
-          error.message ??
-              'This account has a different role.',
-        _ =>
-          error.message ??
-              'Authentication failed. Please try again.',
+        'wrong-role' => error.message ?? 'This account has a different role.',
+        _ => error.message ?? 'Authentication failed. Please try again.',
       };
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: raDanger,
-        ),
+        SnackBar(content: Text(message), backgroundColor: raDanger),
       );
     } on TimeoutException {
       if (!mounted) return;
@@ -209,9 +174,7 @@ class _AuthFormState extends State<_AuthForm> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Unable to connect to Firebase. Please try again.',
-          ),
+          content: Text('Unable to connect to Firebase. Please try again.'),
           backgroundColor: raDanger,
         ),
       );
@@ -237,9 +200,7 @@ class _AuthFormState extends State<_AuthForm> {
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.only(
-              bottom: 10,
-            ),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: const [
@@ -266,9 +227,7 @@ class _AuthFormState extends State<_AuthForm> {
 
     final photo = source == ImageSource.camera
         ? await navigator.push<XFile>(
-            MaterialPageRoute(
-              builder: (_) => const CameraCaptureScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
           )
         : await ImagePicker().pickImage(
             source: ImageSource.gallery,
@@ -285,8 +244,7 @@ class _AuthFormState extends State<_AuthForm> {
     });
 
     try {
-      final encoded =
-          await PhotoUploadService().prepareProfilePhoto(photo);
+      final encoded = await PhotoUploadService().prepareProfilePhoto(photo);
 
       if (mounted) {
         setState(() {
@@ -297,11 +255,7 @@ class _AuthFormState extends State<_AuthForm> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to prepare photo: $error',
-          ),
-        ),
+        SnackBar(content: Text('Unable to prepare photo: $error')),
       );
     } finally {
       if (mounted) {
@@ -317,9 +271,7 @@ class _AuthFormState extends State<_AuthForm> {
   // ============================================================
 
   Future<void> resetPassword() async {
-    final controller = TextEditingController(
-      text: emailController.text.trim(),
-    );
+    final controller = TextEditingController(text: emailController.text.trim());
 
     final email = await showModalBottomSheet<String>(
       context: context,
@@ -336,23 +288,14 @@ class _AuthFormState extends State<_AuthForm> {
             bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
           ),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(
-              22,
-              14,
-              22,
-              24,
-            ),
+            padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
             decoration: BoxDecoration(
-              color: dark
-                  ? const Color(0xFF0B1B29)
-                  : colors.surface,
+              color: dark ? const Color(0xFF0B1B29) : colors.surface,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(30),
               ),
               border: Border.all(
-                color: colors.outlineVariant.withValues(
-                  alpha: .45,
-                ),
+                color: colors.outlineVariant.withValues(alpha: .45),
               ),
             ),
             child: Column(
@@ -364,9 +307,7 @@ class _AuthFormState extends State<_AuthForm> {
                     width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: colors.onSurfaceVariant.withValues(
-                        alpha: .25,
-                      ),
+                      color: colors.onSurfaceVariant.withValues(alpha: .25),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -438,18 +379,13 @@ class _AuthFormState extends State<_AuthForm> {
                     ),
                     decoration: const InputDecoration(
                       hintText: 'name@email.com',
-                      prefixIcon: Icon(
-                        Icons.alternate_email_rounded,
-                      ),
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
                     ),
                     onSubmitted: (_) {
-                      Navigator.pop(
-                        sheetContext,
-                        controller.text.trim(),
-                      );
+                      Navigator.pop(sheetContext, controller.text.trim());
                     },
                   ),
                 ),
@@ -463,10 +399,7 @@ class _AuthFormState extends State<_AuthForm> {
                   label: 'Send reset link',
                   loading: false,
                   onPressed: () {
-                    Navigator.pop(
-                      sheetContext,
-                      controller.text.trim(),
-                    );
+                    Navigator.pop(sheetContext, controller.text.trim());
                   },
                 ),
               ],
@@ -478,9 +411,7 @@ class _AuthFormState extends State<_AuthForm> {
 
     controller.dispose();
 
-    if (email == null ||
-        email.isEmpty ||
-        !mounted) {
+    if (email == null || email.isEmpty || !mounted) {
       return;
     }
 
@@ -488,10 +419,7 @@ class _AuthFormState extends State<_AuthForm> {
 
     if (validation != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(validation),
-          backgroundColor: raDanger,
-        ),
+        SnackBar(content: Text(validation), backgroundColor: raDanger),
       );
 
       return;
@@ -514,10 +442,7 @@ class _AuthFormState extends State<_AuthForm> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            error.message ??
-                'Unable to send reset email.',
-          ),
+          content: Text(error.message ?? 'Unable to send reset email.'),
           backgroundColor: raDanger,
         ),
       );
@@ -537,9 +462,7 @@ class _AuthFormState extends State<_AuthForm> {
       key: const Key('auth_profile_photo_section'),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: dark
-            ? const Color(0xFF0D2132)
-            : const Color(0xFFF4F9FD),
+        color: dark ? const Color(0xFF0D2132) : const Color(0xFFF4F9FD),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: registrationPhotoData != null
@@ -583,9 +506,7 @@ class _AuthFormState extends State<_AuthForm> {
                           size: 32,
                         )
                       : Image.memory(
-                          base64Decode(
-                            registrationPhotoData!,
-                          ),
+                          base64Decode(registrationPhotoData!),
                           fit: BoxFit.cover,
                         ),
                 ),
@@ -638,9 +559,7 @@ class _AuthFormState extends State<_AuthForm> {
                   children: [
                     Expanded(
                       child: Text(
-                        widget.isProvider
-                            ? 'Profile photo'
-                            : 'Driver photo',
+                        widget.isProvider ? 'Profile photo' : 'Driver photo',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -656,8 +575,7 @@ class _AuthFormState extends State<_AuthForm> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFA52F)
-                              .withValues(alpha: .12),
+                          color: const Color(0xFFFFA52F).withValues(alpha: .12),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -677,8 +595,8 @@ class _AuthFormState extends State<_AuthForm> {
                 Text(
                   registrationPhotoData == null
                       ? widget.isProvider
-                          ? 'Optional now. You can add one later.'
-                          : 'Add a clear photo before creating your account.'
+                            ? 'Optional now. You can add one later.'
+                            : 'Add a clear photo before creating your account.'
                       : 'Photo ready. Tap the camera to change it.',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11.5,
@@ -723,34 +641,21 @@ class _AuthFormState extends State<_AuthForm> {
     final dark = theme.brightness == Brightness.dark;
 
     return RaScaffold(
-      backgroundColor: dark
-          ? const Color(0xFF06121D)
-          : const Color(0xFFF5F9FC),
+      backgroundColor: dark ? const Color(0xFF06121D) : const Color(0xFFF5F9FC),
       body: Stack(
         children: [
           Positioned.fill(
             child: IgnorePointer(
-              child: _AuthBackdrop(
-                dark: dark,
-                accent: roleAccent,
-              ),
+              child: _AuthBackdrop(dark: dark, accent: roleAccent),
             ),
           ),
 
           SafeArea(
             child: ListView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(
-                20,
-                14,
-                20,
-                34,
-              ),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 34),
               children: [
-                _AuthTopBar(
-                  accent: roleAccent,
-                ),
+                _AuthTopBar(accent: roleAccent),
 
                 const SizedBox(height: 27),
 
@@ -782,12 +687,7 @@ class _AuthFormState extends State<_AuthForm> {
                 const SizedBox(height: 17),
 
                 Container(
-                  padding: const EdgeInsets.fromLTRB(
-                    18,
-                    19,
-                    18,
-                    20,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(18, 19, 18, 20),
                   decoration: BoxDecoration(
                     color: dark
                         ? const Color(0xE80B1A28)
@@ -800,9 +700,7 @@ class _AuthFormState extends State<_AuthForm> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: dark ? .20 : .06,
-                        ),
+                        color: Colors.black.withValues(alpha: dark ? .20 : .06),
                         blurRadius: 30,
                         offset: const Offset(0, 14),
                       ),
@@ -812,8 +710,7 @@ class _AuthFormState extends State<_AuthForm> {
                     key: formKey,
                     child: AutofillGroup(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.stretch,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Row(
                             children: [
@@ -842,15 +739,13 @@ class _AuthFormState extends State<_AuthForm> {
 
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       registerMode
                                           ? 'Create $roleName account'
                                           : '$roleName sign in',
-                                      style:
-                                          GoogleFonts.plusJakartaSans(
+                                      style: GoogleFonts.plusJakartaSans(
                                         fontSize: 18,
                                         height: 1.15,
                                         fontWeight: FontWeight.w800,
@@ -865,12 +760,10 @@ class _AuthFormState extends State<_AuthForm> {
                                       registerMode
                                           ? 'A few details and you are ready to go.'
                                           : 'Welcome back. Enter your account details.',
-                                      style:
-                                          GoogleFonts.plusJakartaSans(
+                                      style: GoogleFonts.plusJakartaSans(
                                         fontSize: 11.5,
                                         height: 1.4,
-                                        color:
-                                            colors.onSurfaceVariant,
+                                        color: colors.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -886,41 +779,30 @@ class _AuthFormState extends State<_AuthForm> {
 
                             const SizedBox(height: 21),
 
-                            const _PremiumFieldLabel(
-                              'FULL NAME',
-                            ),
+                            const _PremiumFieldLabel('FULL NAME'),
 
                             const SizedBox(height: 7),
 
                             _PremiumField(
                               child: TextFormField(
                                 controller: nameController,
-                                autofillHints: const [
-                                  AutofillHints.name,
-                                ],
-                                textCapitalization:
-                                    TextCapitalization.words,
-                                textInputAction:
-                                    TextInputAction.next,
-                                style:
-                                    GoogleFonts.plusJakartaSans(
+                                autofillHints: const [AutofillHints.name],
+                                textCapitalization: TextCapitalization.words,
+                                textInputAction: TextInputAction.next,
+                                style: GoogleFonts.plusJakartaSans(
                                   fontWeight: FontWeight.w500,
                                 ),
-                                decoration:
-                                    const InputDecoration(
+                                decoration: const InputDecoration(
                                   hintText: 'Your full name',
                                   prefixIcon: Icon(
                                     Icons.person_outline_rounded,
                                   ),
                                   border: InputBorder.none,
-                                  enabledBorder:
-                                      InputBorder.none,
-                                  focusedBorder:
-                                      InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
                                 ),
                                 validator: (value) {
-                                  final name =
-                                      value?.trim() ?? '';
+                                  final name = value?.trim() ?? '';
 
                                   if (name.isEmpty) {
                                     return 'Enter your full name';
@@ -940,9 +822,7 @@ class _AuthFormState extends State<_AuthForm> {
 
                             const SizedBox(height: 16),
 
-                            const _PremiumFieldLabel(
-                              'PHONE NUMBER',
-                            ),
+                            const _PremiumFieldLabel('PHONE NUMBER'),
 
                             const SizedBox(height: 7),
 
@@ -952,87 +832,59 @@ class _AuthFormState extends State<_AuthForm> {
                                 autofillHints: const [
                                   AutofillHints.telephoneNumber,
                                 ],
-                                keyboardType:
-                                    TextInputType.phone,
-                                textInputAction:
-                                    TextInputAction.next,
-                                style:
-                                    GoogleFonts.plusJakartaSans(
+                                keyboardType: TextInputType.phone,
+                                textInputAction: TextInputAction.next,
+                                style: GoogleFonts.plusJakartaSans(
                                   fontWeight: FontWeight.w500,
                                 ),
-                                decoration:
-                                    const InputDecoration(
+                                decoration: const InputDecoration(
                                   hintText: '+94 77 123 4567',
-                                  prefixIcon: Icon(
-                                    Icons.phone_outlined,
-                                  ),
+                                  prefixIcon: Icon(Icons.phone_outlined),
                                   border: InputBorder.none,
-                                  enabledBorder:
-                                      InputBorder.none,
-                                  focusedBorder:
-                                      InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
                                 ),
-                                validator:
-                                    validateSriLankaPhone,
+                                validator: validateSriLankaPhone,
                               ),
                             ),
 
                             const SizedBox(height: 16),
                           ],
 
-                          const _PremiumFieldLabel(
-                            'EMAIL ADDRESS',
-                          ),
+                          const _PremiumFieldLabel('EMAIL ADDRESS'),
 
                           const SizedBox(height: 7),
 
                           _PremiumField(
                             child: TextFormField(
-                              key: const Key(
-                                'auth_email_field',
-                              ),
+                              key: const Key('auth_email_field'),
                               controller: emailController,
-                              autofillHints: const [
-                                AutofillHints.email,
-                              ],
-                              keyboardType:
-                                  TextInputType.emailAddress,
-                              textInputAction:
-                                  TextInputAction.next,
-                              style:
-                                  GoogleFonts.plusJakartaSans(
+                              autofillHints: const [AutofillHints.email],
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w500,
                               ),
-                              decoration:
-                                  const InputDecoration(
+                              decoration: const InputDecoration(
                                 hintText: 'name@email.com',
-                                prefixIcon: Icon(
-                                  Icons.alternate_email_rounded,
-                                ),
+                                prefixIcon: Icon(Icons.alternate_email_rounded),
                                 border: InputBorder.none,
-                                enabledBorder:
-                                    InputBorder.none,
-                                focusedBorder:
-                                    InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
                               ),
-                              validator:
-                                  validateEmailAddress,
+                              validator: validateEmailAddress,
                             ),
                           ),
 
                           const SizedBox(height: 16),
 
-                          const _PremiumFieldLabel(
-                            'PASSWORD',
-                          ),
+                          const _PremiumFieldLabel('PASSWORD'),
 
                           const SizedBox(height: 7),
 
                           _PremiumField(
                             child: TextFormField(
-                              key: const Key(
-                                'auth_password_field',
-                              ),
+                              key: const Key('auth_password_field'),
                               controller: passwordController,
                               obscureText: obscure,
                               autofillHints: [
@@ -1040,29 +892,23 @@ class _AuthFormState extends State<_AuthForm> {
                                     ? AutofillHints.newPassword
                                     : AutofillHints.password,
                               ],
-                              textInputAction:
-                                  TextInputAction.done,
+                              textInputAction: TextInputAction.done,
                               onFieldSubmitted: (_) {
                                 if (!loading) {
                                   authenticate();
                                 }
                               },
-                              style:
-                                  GoogleFonts.plusJakartaSans(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w500,
                               ),
-                              decoration:
-                                  InputDecoration(
-                                hintText:
-                                    'Enter your password',
+                              decoration: InputDecoration(
+                                hintText: 'Enter your password',
                                 prefixIcon: const Icon(
                                   Icons.lock_outline_rounded,
                                 ),
                                 border: InputBorder.none,
-                                enabledBorder:
-                                    InputBorder.none,
-                                focusedBorder:
-                                    InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
                                 suffixIcon: IconButton(
                                   tooltip: obscure
                                       ? 'Show password'
@@ -1075,31 +921,24 @@ class _AuthFormState extends State<_AuthForm> {
                                   icon: Icon(
                                     obscure
                                         ? Icons.visibility_outlined
-                                        : Icons
-                                            .visibility_off_outlined,
+                                        : Icons.visibility_off_outlined,
                                   ),
                                 ),
                               ),
                               validator: (value) {
-                                final password =
-                                    value ?? '';
+                                final password = value ?? '';
 
                                 if (password.length < 6) {
                                   return 'Enter at least 6 characters';
                                 }
 
-                                if (registerMode &&
-                                    password.length < 8) {
+                                if (registerMode && password.length < 8) {
                                   return 'New passwords need at least 8 characters';
                                 }
 
                                 if (registerMode &&
-                                    (!RegExp(
-                                          r'[A-Za-z]',
-                                        ).hasMatch(password) ||
-                                        !RegExp(
-                                          r'\d',
-                                        ).hasMatch(password))) {
+                                    (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+                                        !RegExp(r'\d').hasMatch(password))) {
                                   return 'Include at least one letter and one number';
                                 }
 
@@ -1112,19 +951,14 @@ class _AuthFormState extends State<_AuthForm> {
                             const SizedBox(height: 8),
 
                             Row(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Padding(
-                                  padding:
-                                      const EdgeInsets.only(
-                                    top: 1,
-                                  ),
+                                  padding: const EdgeInsets.only(top: 1),
                                   child: Icon(
                                     Icons.info_outline_rounded,
                                     size: 14,
-                                    color:
-                                        colors.onSurfaceVariant,
+                                    color: colors.onSurfaceVariant,
                                   ),
                                 ),
 
@@ -1133,12 +967,10 @@ class _AuthFormState extends State<_AuthForm> {
                                 Expanded(
                                   child: Text(
                                     'Use 8+ characters with at least one letter and one number.',
-                                    style:
-                                        GoogleFonts.plusJakartaSans(
+                                    style: GoogleFonts.plusJakartaSans(
                                       fontSize: 10.5,
                                       height: 1.4,
-                                      color:
-                                          colors.onSurfaceVariant,
+                                      color: colors.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
@@ -1150,29 +982,22 @@ class _AuthFormState extends State<_AuthForm> {
                             const SizedBox(height: 6),
 
                             Align(
-                              alignment:
-                                  Alignment.centerRight,
+                              alignment: Alignment.centerRight,
                               child: TextButton(
-                                key: const Key(
-                                  'auth_forgot_password',
-                                ),
-                                onPressed:
-                                    loading ? null : resetPassword,
+                                key: const Key('auth_forgot_password'),
+                                onPressed: loading ? null : resetPassword,
                                 style: TextButton.styleFrom(
                                   foregroundColor: roleAccent,
-                                  padding:
-                                      const EdgeInsets.symmetric(
+                                  padding: const EdgeInsets.symmetric(
                                     horizontal: 3,
                                     vertical: 7,
                                   ),
                                 ),
                                 child: Text(
                                   'Forgot password?',
-                                  style:
-                                      GoogleFonts.plusJakartaSans(
+                                  style: GoogleFonts.plusJakartaSans(
                                     fontSize: 11.5,
-                                    fontWeight:
-                                        FontWeight.w700,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -1183,9 +1008,7 @@ class _AuthFormState extends State<_AuthForm> {
                             const SizedBox(height: 18),
 
                           _GradientAuthButton(
-                            key: const Key(
-                              'auth_submit_button',
-                            ),
+                            key: const Key('auth_submit_button'),
                             accent: roleAccent,
                             accentStrong: roleAccentStrong,
                             icon: registerMode
@@ -1193,16 +1016,15 @@ class _AuthFormState extends State<_AuthForm> {
                                 : Icons.login_rounded,
                             label: loading
                                 ? registerMode
-                                    ? 'Creating accountâ€¦'
-                                    : 'Signing inâ€¦'
+                                      ? 'Creating accountâ€¦'
+                                      : 'Signing inâ€¦'
                                 : registerMode
-                                    ? 'Create $roleName Account'
-                                    : widget.isProvider
-                                        ? 'Continue to Provider Dashboard'
-                                        : 'Sign In as Driver',
+                                ? 'Create $roleName Account'
+                                : widget.isProvider
+                                ? 'Continue to Provider Dashboard'
+                                : 'Sign In as Driver',
                             loading: loading,
-                            onPressed:
-                                loading ? null : authenticate,
+                            onPressed: loading ? null : authenticate,
                           ),
                         ],
                       ),
@@ -1222,10 +1044,7 @@ class _AuthFormState extends State<_AuthForm> {
 
                   _EmergencyGuestButton(
                     onTap: () {
-                      replace(
-                        context,
-                        const DriverShell(),
-                      );
+                      replace(context, const DriverShell());
                     },
                   ),
                 ],
@@ -1236,9 +1055,7 @@ class _AuthFormState extends State<_AuthForm> {
                   child: Text(
                     'RoadAssist â€¢ Sri Lanka',
                     style: GoogleFonts.plusJakartaSans(
-                      color: colors.onSurfaceVariant.withValues(
-                        alpha: .65,
-                      ),
+                      color: colors.onSurfaceVariant.withValues(alpha: .65),
                       fontSize: 9.5,
                       letterSpacing: .7,
                       fontWeight: FontWeight.w500,
@@ -1259,9 +1076,7 @@ class _AuthFormState extends State<_AuthForm> {
 // ============================================================
 
 class _AuthTopBar extends StatelessWidget {
-  const _AuthTopBar({
-    required this.accent,
-  });
+  const _AuthTopBar({required this.accent});
 
   final Color accent;
 
@@ -1294,22 +1109,15 @@ class _AuthTopBar extends StatelessWidget {
                   : const SizedBox.shrink(),
             ),
 
-            SizedBox(
-              width: compact ? 4 : 8,
-            ),
+            SizedBox(width: compact ? 4 : 8),
 
             Expanded(
               child: Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _WelcomeBrandLogo(
-                    size: logoSize,
-                  ),
+                  _WelcomeBrandLogo(size: logoSize),
 
-                  SizedBox(
-                    width: brandGap,
-                  ),
+                  SizedBox(width: brandGap),
 
                   Flexible(
                     child: FittedBox(
@@ -1320,24 +1128,18 @@ class _AuthTopBar extends StatelessWidget {
                           children: [
                             TextSpan(
                               text: 'Road',
-                              style: TextStyle(
-                                color: colors.onSurface,
-                              ),
+                              style: TextStyle(color: colors.onSurface),
                             ),
                             TextSpan(
                               text: 'Assist',
-                              style: TextStyle(
-                                color: accent,
-                              ),
+                              style: TextStyle(color: accent),
                             ),
                           ],
                         ),
                         maxLines: 1,
-                        style:
-                            GoogleFonts.plusJakartaSans(
+                        style: GoogleFonts.plusJakartaSans(
                           fontSize: brandFontSize,
-                          fontWeight:
-                              FontWeight.w800,
+                          fontWeight: FontWeight.w800,
                           letterSpacing: -.6,
                         ),
                       ),
@@ -1347,9 +1149,7 @@ class _AuthTopBar extends StatelessWidget {
               ),
             ),
 
-            SizedBox(
-              width: compact ? 4 : 8,
-            ),
+            SizedBox(width: compact ? 4 : 8),
 
             FittedBox(
               fit: BoxFit.scaleDown,
@@ -1375,25 +1175,17 @@ class _AuthCircleAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness == Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: dark
-            ? Colors.white.withValues(alpha: .055)
-            : Colors.white,
+        color: dark ? Colors.white.withValues(alpha: .055) : Colors.white,
         shape: const CircleBorder(),
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: SizedBox.expand(
-            child: Icon(
-              icon,
-              size: 20,
-            ),
-          ),
+          child: SizedBox.expand(child: Icon(icon, size: 20)),
         ),
       ),
     );
@@ -1423,34 +1215,29 @@ class _AuthHero extends StatelessWidget {
 
     final title = registerMode
         ? isProvider
-            ? 'Grow your roadside\nservice business.'
-            : 'Roadside help starts\nwith your account.'
+              ? 'Grow your roadside\nservice business.'
+              : 'Roadside help starts\nwith your account.'
         : isProvider
-            ? 'Welcome back,\nservice professional.'
-            : 'Get back on the road\nwith confidence.';
+        ? 'Welcome back,\nservice professional.'
+        : 'Get back on the road\nwith confidence.';
 
     final body = registerMode
         ? isProvider
-            ? 'Create your provider profile, complete verification and start receiving eligible assistance requests.'
-            : 'Save your vehicles, request roadside help, compare provider quotes and follow every job live.'
+              ? 'Create your provider profile, complete verification and start receiving eligible assistance requests.'
+              : 'Save your vehicles, request roadside help, compare provider quotes and follow every job live.'
         : isProvider
-            ? 'Manage requests, quotes, active jobs, earnings and customer conversations from one place.'
-            : 'Access your vehicles, assistance requests, messages, invoices and roadside history.';
+        ? 'Manage requests, quotes, active jobs, earnings and customer conversations from one place.'
+        : 'Access your vehicles, assistance requests, messages, invoices and roadside history.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 6,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: accent.withValues(alpha: .11),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: accent.withValues(alpha: .20),
-            ),
+            border: Border.all(color: accent.withValues(alpha: .20)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1509,9 +1296,7 @@ class _AuthHero extends StatelessWidget {
           children: [
             _AuthMiniBadge(
               icon: Icons.verified_user_outlined,
-              text: isProvider
-                  ? 'Verified professionals'
-                  : 'Secure assistance',
+              text: isProvider ? 'Verified professionals' : 'Secure assistance',
               accent: accent,
             ),
             _AuthMiniBadge(
@@ -1546,22 +1331,14 @@ class _AuthMiniBadge extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: 210,
-      ),
+      constraints: const BoxConstraints(maxWidth: 210),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(
-              top: 1,
-            ),
-            child: Icon(
-              icon,
-              size: 13,
-              color: accent,
-            ),
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 13, color: accent),
           ),
 
           const SizedBox(width: 5),
@@ -1619,19 +1396,13 @@ class _AuthModeSwitcher extends StatelessWidget {
             ? Colors.white.withValues(alpha: .05)
             : const Color(0xFFE9F1F7),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(
-            alpha: .30,
-          ),
-        ),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .30)),
       ),
       child: Row(
         children: [
           Expanded(
             child: _AuthModeButton(
-              key: const Key(
-                'auth_sign_in_tab',
-              ),
+              key: const Key('auth_sign_in_tab'),
               label: 'Sign In',
               selected: !registerMode,
               accent: accent,
@@ -1641,9 +1412,7 @@ class _AuthModeSwitcher extends StatelessWidget {
 
           Expanded(
             child: _AuthModeButton(
-              key: const Key(
-                'auth_create_account_tab',
-              ),
+              key: const Key('auth_create_account_tab'),
               label: 'Create Account',
               selected: registerMode,
               accent: accent,
@@ -1672,26 +1441,21 @@ class _AuthModeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark =
-        Theme.of(context).brightness == Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedContainer(
-      duration: const Duration(
-        milliseconds: 180,
-      ),
+      duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
         color: selected
             ? dark
-                ? const Color(0xFF13283A)
-                : Colors.white
+                  ? const Color(0xFF13283A)
+                  : Colors.white
             : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         boxShadow: selected
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: dark ? .15 : .05,
-                  ),
+                  color: Colors.black.withValues(alpha: dark ? .15 : .05),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -1704,10 +1468,7 @@ class _AuthModeButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 11,
-              horizontal: 8,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
             child: Text(
               label,
               textAlign: TextAlign.center,
@@ -1715,14 +1476,10 @@ class _AuthModeButton extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 12,
-                fontWeight: selected
-                    ? FontWeight.w700
-                    : FontWeight.w600,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                 color: selected
                     ? accent
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -1737,9 +1494,7 @@ class _AuthModeButton extends StatelessWidget {
 // ============================================================
 
 class _PremiumField extends StatelessWidget {
-  const _PremiumField({
-    required this.child,
-  });
+  const _PremiumField({required this.child});
 
   final Widget child;
 
@@ -1755,19 +1510,13 @@ class _PremiumField extends StatelessWidget {
             ? Colors.white.withValues(alpha: .045)
             : const Color(0xFFF6F9FC),
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(
-            alpha: .50,
-          ),
-        ),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .50)),
       ),
       child: Theme(
         data: theme.copyWith(
-          inputDecorationTheme:
-              theme.inputDecorationTheme.copyWith(
+          inputDecorationTheme: theme.inputDecorationTheme.copyWith(
             filled: false,
-            contentPadding:
-                const EdgeInsets.symmetric(
+            contentPadding: const EdgeInsets.symmetric(
               horizontal: 14,
               vertical: 15,
             ),
@@ -1780,9 +1529,7 @@ class _PremiumField extends StatelessWidget {
 }
 
 class _PremiumFieldLabel extends StatelessWidget {
-  const _PremiumFieldLabel(
-    this.text,
-  );
+  const _PremiumFieldLabel(this.text);
 
   final String text;
 
@@ -1791,9 +1538,7 @@ class _PremiumFieldLabel extends StatelessWidget {
     return Text(
       text,
       style: GoogleFonts.plusJakartaSans(
-        color: Theme.of(context)
-            .colorScheme
-            .onSurfaceVariant,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 9,
         letterSpacing: 1.05,
         fontWeight: FontWeight.w700,
@@ -1831,9 +1576,7 @@ class _GradientAuthButton extends StatelessWidget {
     final disabled = onPressed == null;
 
     return AnimatedOpacity(
-      duration: const Duration(
-        milliseconds: 160,
-      ),
+      duration: const Duration(milliseconds: 160),
       opacity: disabled ? .55 : 1,
       child: Material(
         color: Colors.transparent,
@@ -1844,37 +1587,25 @@ class _GradientAuthButton extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [
-                accent,
-                accentStrong,
-              ],
+              colors: [accent, accentStrong],
             ),
             borderRadius: BorderRadius.circular(17),
             boxShadow: disabled
                 ? null
                 : [
                     BoxShadow(
-                      color: accent.withValues(
-                        alpha: .23,
-                      ),
+                      color: accent.withValues(alpha: .23),
                       blurRadius: 20,
-                      offset: const Offset(
-                        0,
-                        8,
-                      ),
+                      offset: const Offset(0, 8),
                     ),
                   ],
           ),
           child: InkWell(
             onTap: onPressed,
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 15,
-                horizontal: 18,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18),
               child: Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (loading)
                     const SizedBox.square(
@@ -1885,11 +1616,7 @@ class _GradientAuthButton extends StatelessWidget {
                       ),
                     )
                   else
-                    Icon(
-                      icon,
-                      size: 19,
-                      color: Colors.white,
-                    ),
+                    Icon(icon, size: 19, color: Colors.white),
 
                   const SizedBox(width: 9),
 
@@ -1900,8 +1627,7 @@ class _GradientAuthButton extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         color: Colors.white,
                         fontSize: 13,
-                        fontWeight:
-                            FontWeight.w700,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: -.15,
                       ),
                     ),
@@ -1921,10 +1647,7 @@ class _GradientAuthButton extends StatelessWidget {
 // ============================================================
 
 class _AuthSecurityNote extends StatelessWidget {
-  const _AuthSecurityNote({
-    required this.isProvider,
-    required this.accent,
-  });
+  const _AuthSecurityNote({required this.isProvider, required this.accent});
 
   final bool isProvider;
   final Color accent;
@@ -1942,15 +1665,10 @@ class _AuthSecurityNote extends StatelessWidget {
             ? Colors.white.withValues(alpha: .035)
             : Colors.white.withValues(alpha: .68),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(
-            alpha: .34,
-          ),
-        ),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .34)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 34,
@@ -1960,9 +1678,7 @@ class _AuthSecurityNote extends StatelessWidget {
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(
-              isProvider
-                  ? Icons.verified_user_outlined
-                  : Icons.shield_outlined,
+              isProvider ? Icons.verified_user_outlined : Icons.shield_outlined,
               color: accent,
               size: 18,
             ),
@@ -1993,16 +1709,13 @@ class _AuthSecurityNote extends StatelessWidget {
 // ============================================================
 
 class _EmergencyGuestButton extends StatelessWidget {
-  const _EmergencyGuestButton({
-    required this.onTap,
-  });
+  const _EmergencyGuestButton({required this.onTap});
 
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Material(
       color: Colors.transparent,
@@ -2010,21 +1723,12 @@ class _EmergencyGuestButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(17),
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 13,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFA62B)
-                .withValues(
-              alpha: .075,
-            ),
+            color: const Color(0xFFFFA62B).withValues(alpha: .075),
             borderRadius: BorderRadius.circular(17),
             border: Border.all(
-              color: const Color(0xFFFFA62B)
-                  .withValues(
-                alpha: .20,
-              ),
+              color: const Color(0xFFFFA62B).withValues(alpha: .20),
             ),
           ),
           child: Row(
@@ -2042,8 +1746,7 @@ class _EmergencyGuestButton extends StatelessWidget {
                   'Need urgent help? Continue as guest',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11.5,
-                    fontWeight:
-                        FontWeight.w600,
+                    fontWeight: FontWeight.w600,
                     color: colors.onSurface,
                   ),
                 ),
@@ -2052,8 +1755,7 @@ class _EmergencyGuestButton extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_rounded,
                 size: 17,
-                color:
-                    colors.onSurfaceVariant,
+                color: colors.onSurfaceVariant,
               ),
             ],
           ),
@@ -2068,10 +1770,7 @@ class _EmergencyGuestButton extends StatelessWidget {
 // ============================================================
 
 class _AuthBackdrop extends StatelessWidget {
-  const _AuthBackdrop({
-    required this.dark,
-    required this.accent,
-  });
+  const _AuthBackdrop({required this.dark, required this.accent});
 
   final bool dark;
   final Color accent;
@@ -2090,9 +1789,7 @@ class _AuthBackdrop extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  accent.withValues(
-                    alpha: dark ? .13 : .10,
-                  ),
+                  accent.withValues(alpha: dark ? .13 : .10),
                   accent.withValues(alpha: 0),
                 ],
               ),
@@ -2110,11 +1807,7 @@ class _AuthBackdrop extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  const Color(0xFF3978FF)
-                      .withValues(
-                    alpha:
-                        dark ? .08 : .055,
-                  ),
+                  const Color(0xFF3978FF).withValues(alpha: dark ? .08 : .055),
                   Colors.transparent,
                 ],
               ),

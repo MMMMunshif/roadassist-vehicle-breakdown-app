@@ -66,6 +66,7 @@ flutter:
         - asset: assets/fonts/Manrope-Variable.ttf
 
   assets:
+    - assets/fonts/PlusJakartaSans-Variable.ttf
     - assets/images/
 
 flutter_launcher_icons:
