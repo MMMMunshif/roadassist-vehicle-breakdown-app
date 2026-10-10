@@ -418,7 +418,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     const SizedBox(height: 20),
 
                     _RaProviderSectionHeader(
-                      action: 'View all',
+                      action: 'Open active work',
                       onAction: () =>
                           push(context, const _RaProviderActiveWorkScreen()),
                       icon: Icons.route_outlined,
@@ -438,7 +438,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                       title: 'New requests',
                       subtitle:
                           'Roadside requests matching your configured services.',
-                      action: 'View all',
+                      action: 'Browse requests',
                       onAction: () {
                         _openProviderRequests(context);
                       },
