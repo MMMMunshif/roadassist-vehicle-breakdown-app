@@ -449,9 +449,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     if (_providerAvailabilityStatus(availability) != 'Online')
                       const RaProviderEmptyCard(
                         icon: Icons.notifications_none_rounded,
-                        title: 'Go online to see matching requests',
+                        title: 'Your request inbox is paused',
                         message:
-                            'Requests match your services and availability.',
+                            'Go online to receive requests matching your services and availability.',
                       )
                     else
                       _RaProviderRequestPreviewList(services: providerServices),
