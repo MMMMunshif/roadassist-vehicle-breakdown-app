@@ -28,6 +28,16 @@ class VehicleService {
             s.docs.map((d) => Vehicle.fromJson(d.id, d.data())).toList()
               ..sort((a, b) => a.label.compareTo(b.label)),
       );
+
+  Stream<List<Vehicle>> watchArchivedVehicles() => _vehicles
+      .where('archived', isEqualTo: true)
+      .snapshots()
+      .map(
+        (s) =>
+            s.docs.map((d) => Vehicle.fromJson(d.id, d.data())).toList()
+              ..sort((a, b) => a.label.compareTo(b.label)),
+      );
+
   Future<void> save(Vehicle vehicle) async {
     if (vehicle.label.length > 50) {
       throw ArgumentError(
@@ -58,7 +68,21 @@ class VehicleService {
       'archived': true,
       'updatedAt': FieldValue.serverTimestamp(),
     });
-    if (owner.data()?['defaultVehicleId'] == id)
+    if (owner.data()?['defaultVehicleId'] == id) {
       tx.update(_owner, {'defaultVehicleId': null});
+    }
+  });
+
+  Future<void> restore(String id) => _db.runTransaction((tx) async {
+    final ref = _vehicles.doc(id);
+    final vehicle = await tx.get(ref);
+    if (!vehicle.exists || vehicle.data()?['archived'] != true) {
+      throw StateError('This archived vehicle is no longer available.');
+    }
+
+    tx.update(ref, {
+      'archived': false,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   });
 }

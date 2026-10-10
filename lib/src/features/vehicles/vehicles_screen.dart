@@ -12,8 +12,10 @@ class VehiclesScreen extends StatefulWidget {
 class _VehiclesScreenState extends State<VehiclesScreen> {
   late final VehicleService service;
   late Stream<List<Vehicle>> vehicles;
+  late Stream<List<Vehicle>> archivedVehicles;
 
   bool busy = false;
+  bool showingArchived = false;
 
   @override
   void initState() {
@@ -22,6 +24,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     if (signedIn) {
       service = VehicleService();
       vehicles = service.watchVehicles();
+      archivedVehicles = service.watchArchivedVehicles();
     }
   }
 
@@ -106,7 +109,15 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     await action(() => service.archive(vehicle.id));
   }
 
-  Widget vehicleCard(Vehicle vehicle, bool isDefault) {
+  Future<void> restoreVehicle(Vehicle vehicle) async {
+    await action(() => service.restore(vehicle.id));
+  }
+
+  Widget vehicleCard(
+    Vehicle vehicle,
+    bool isDefault, {
+    required bool archived,
+  }) {
     final theme = Theme.of(context);
 
     final colors = theme.colorScheme;
@@ -132,7 +143,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: busy
+        onTap: busy || archived
             ? null
             : () {
                 if (widget.selecting) {
@@ -228,34 +239,51 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                             if (value == 'archive') {
                               await archiveVehicle(vehicle);
                             }
+
+                            if (value == 'restore') {
+                              await restoreVehicle(vehicle);
+                            }
                           },
-                          itemBuilder: (_) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: Icon(Icons.edit_outlined),
-                                title: Text('Edit'),
-                              ),
-                            ),
-                            if (!isDefault)
-                              const PopupMenuItem(
-                                value: 'default',
-                                child: ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: Icon(Icons.star_outline_rounded),
-                                  title: Text('Set as default'),
-                                ),
-                              ),
-                            const PopupMenuItem(
-                              value: 'archive',
-                              child: ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: Icon(Icons.archive_outlined),
-                                title: Text('Archive'),
-                              ),
-                            ),
-                          ],
+                          itemBuilder: (_) => archived
+                              ? [
+                                  const PopupMenuItem(
+                                    value: 'restore',
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(Icons.unarchive_outlined),
+                                      title: Text('Restore'),
+                                    ),
+                                  ),
+                                ]
+                              : [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(Icons.edit_outlined),
+                                      title: Text('Edit'),
+                                    ),
+                                  ),
+                                  if (!isDefault)
+                                    const PopupMenuItem(
+                                      value: 'default',
+                                      child: ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: Icon(
+                                          Icons.star_outline_rounded,
+                                        ),
+                                        title: Text('Set as default'),
+                                      ),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'archive',
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(Icons.archive_outlined),
+                                      title: Text('Archive'),
+                                    ),
+                                  ),
+                                ],
                         ),
                     ],
                   ),
@@ -296,7 +324,9 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          widget.selecting
+                          archived
+                              ? 'Archived vehicle ? restore to use it'
+                              : widget.selecting
                               ? 'Tap to use this vehicle'
                               : 'Tap to edit vehicle details',
                           style: GoogleFonts.plusJakartaSans(
@@ -359,7 +389,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             )
           : null,
       body: StreamBuilder<List<Vehicle>>(
-        stream: vehicles,
+        stream: showingArchived ? archivedVehicles : vehicles,
         builder: (context, vehicleSnapshot) {
           if (vehicleSnapshot.hasError) {
             return const Padding(
@@ -391,8 +421,34 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   _RaVehiclesHero(
                     count: items.length,
                     selecting: widget.selecting,
+                    archived: showingArchived,
                   ),
                   const SizedBox(height: 19),
+                  if (!widget.selecting) ...[
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.directions_car_outlined),
+                          label: Text('Active'),
+                        ),
+                        ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.archive_outlined),
+                          label: Text('Archived'),
+                        ),
+                      ],
+                      selected: {showingArchived},
+                      onSelectionChanged: busy
+                          ? null
+                          : (selection) {
+                              setState(() {
+                                showingArchived = selection.single;
+                              });
+                            },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (busy) ...[
                     const LinearProgressIndicator(minHeight: 3),
                     const SizedBox(height: 12),
@@ -400,11 +456,16 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   if (items.isEmpty)
                     _RaVehiclesEmpty(
                       selecting: widget.selecting,
+                      archived: showingArchived,
                       onAdd: widget.selecting ? null : () => edit(),
                     )
                   else
                     for (var index = 0; index < items.length; index++) ...[
-                      vehicleCard(items[index], defaultId == items[index].id),
+                      vehicleCard(
+                        items[index],
+                        defaultId == items[index].id,
+                        archived: showingArchived,
+                      ),
                       if (index != items.length - 1) const SizedBox(height: 10),
                     ],
                 ],
@@ -418,10 +479,15 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
 }
 
 class _RaVehiclesHero extends StatelessWidget {
-  const _RaVehiclesHero({required this.count, required this.selecting});
+  const _RaVehiclesHero({
+    required this.count,
+    required this.selecting,
+    required this.archived,
+  });
 
   final int count;
   final bool selecting;
+  final bool archived;
 
   @override
   Widget build(BuildContext context) {
@@ -460,7 +526,11 @@ class _RaVehiclesHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  selecting ? 'Which vehicle needs help?' : 'Your vehicles',
+                  selecting
+                      ? 'Which vehicle needs help?'
+                      : archived
+                      ? 'Archived vehicles'
+                      : 'Your vehicles',
                   style: GoogleFonts.plusJakartaSans(
                     color: Colors.white,
                     fontSize: 18,
@@ -471,6 +541,10 @@ class _RaVehiclesHero extends StatelessWidget {
                 Text(
                   selecting
                       ? 'Select a saved vehicle to fill request details automatically.'
+                      : archived
+                      ? count == 0
+                            ? 'Archived vehicles appear here. Restore one to use it again.'
+                            : '$count archived ${count == 1 ? 'vehicle' : 'vehicles'}. Restore a vehicle to make it active again.'
                       : count == 0
                       ? 'Save a vehicle once and reuse it when requesting roadside assistance.'
                       : '$count saved ${count == 1 ? 'vehicle' : 'vehicles'} ready for roadside requests.',
@@ -524,9 +598,14 @@ class _RaVehicleChip extends StatelessWidget {
 }
 
 class _RaVehiclesEmpty extends StatelessWidget {
-  const _RaVehiclesEmpty({required this.selecting, required this.onAdd});
+  const _RaVehiclesEmpty({
+    required this.selecting,
+    required this.archived,
+    required this.onAdd,
+  });
 
   final bool selecting;
+  final bool archived;
   final VoidCallback? onAdd;
 
   @override
@@ -535,8 +614,10 @@ class _RaVehiclesEmpty extends StatelessWidget {
       children: [
         EmptyState(
           icon: Icons.directions_car_outlined,
-          title: 'No saved vehicles',
-          message: selecting
+          title: archived ? 'No archived vehicles' : 'No saved vehicles',
+          message: archived
+              ? 'Vehicles you archive will appear here. You can restore them whenever you need.'
+              : selecting
               ? 'Add a vehicle from your profile before selecting one for this request.'
               : 'Add your first vehicle so RoadAssist can reuse its details during future requests.',
         ),
