@@ -349,6 +349,7 @@ service cloud.firestore {
           && required.hasAll(request.resource.data.get('roles', [resource.data.role]).removeAll(previous));
       }
       allow create: if authenticated() && !accountBlocked(userId) && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(['authIdentity'])
         && request.resource.data.role in ['driver','provider']
         && validName(request.resource.data) && validEmail(request.resource.data)
         && validPhone(request.resource.data) && validRoles(request.resource.data)
@@ -358,6 +359,10 @@ service cloud.firestore {
       allow read: if isAdmin() || (authenticated() && request.auth.uid == userId);
       allow update: if authenticated() && !accountBlocked(userId)
         && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['authIdentity'])
+        && (resource.data.get('authIdentity', '') != 'role-v1'
+          || (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['email','role','roles','roleEmailRequired'])
+            && request.resource.data.get('lastRole', resource.data.role) == resource.data.role))
         && validRoleEmailChange()
         && request.resource.data.role == resource.data.role
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['displayName']) || validName(request.resource.data))

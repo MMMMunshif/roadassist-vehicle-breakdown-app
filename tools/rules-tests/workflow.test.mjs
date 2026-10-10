@@ -795,3 +795,16 @@ test('new role requires server confirmation and clients cannot forge or clear it
   await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(),'roleEmailVerifications/driver'),{provider:{email:'driver@example.com'}}));
   await assertSucceeds(setDoc(doc(db,'providerApplications/driver'),application()));
 });
+
+test('role identities protect contact email, enrollment and identity metadata', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    await setDoc(doc(c.firestore(),'users/isolated'),{role:'driver',roles:['driver'],lastRole:'driver',
+      authIdentity:'role-v1',email:'same@example.com',displayName:'Driver Name',phone:'+94771234567',online:false});
+  });
+  const db=env.authenticatedContext('isolated',{email_verified:true,email:'internal@roles.roadassist.invalid'}).firestore();
+  const ref=doc(db,'users/isolated');
+  await assertSucceeds(updateDoc(ref,{displayName:'Updated Driver',updatedAt:serverTimestamp()}));
+  for (const change of [{email:'attacker@example.com'},{authIdentity:'legacy'},{roles:['driver','provider']},
+    {lastRole:'provider'},{roleEmailRequired:['provider']}]) await assertFails(updateDoc(ref,change));
+  await assertFails(getDoc(doc(db,'roleAuthLimits/private')));
+});

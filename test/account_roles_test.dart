@@ -105,7 +105,11 @@ void main() {
         'roles': ['provider', 'driver'],
         'roleEmailRequired': ['driver'],
       });
-      final service = AuthService(auth: TestAuth(), firestore: db);
+      final service = AuthService(
+        independentRoleAuthEnabled: false,
+        auth: TestAuth(),
+        firestore: db,
+      );
       expect(await service.isRoleEmailVerified('provider'), true);
       expect(await service.isRoleEmailVerified('driver'), false);
       db.confirmations = {
@@ -143,13 +147,18 @@ void main() {
       () async {
         final db = TestDb(first), auth = TestAuth();
         final other = first == 'driver' ? 'provider' : 'driver';
-        final result = await AuthService(auth: auth, firestore: db).register(
-          email: 'same@example.com',
-          password: 'Existing123',
-          role: other,
-          displayName: 'Replacement Name',
-          phone: '+94770000000',
-        );
+        final result =
+            await AuthService(
+              independentRoleAuthEnabled: false,
+              auth: auth,
+              firestore: db,
+            ).register(
+              email: 'same@example.com',
+              password: 'Existing123',
+              role: other,
+              displayName: 'Replacement Name',
+              phone: '+94770000000',
+            );
         expect(result.user!.uid, 'same-user');
         expect(accountRoles(db.profile), containsAll(['driver', 'provider']));
         expect(db.profile['role'], first);
@@ -165,7 +174,11 @@ void main() {
   test('wrong existing password cannot enroll another role', () async {
     final db = TestDb('driver');
     await expectLater(
-      AuthService(auth: TestAuth(), firestore: db).register(
+      AuthService(
+        independentRoleAuthEnabled: false,
+        auth: TestAuth(),
+        firestore: db,
+      ).register(
         email: 'same@example.com',
         password: 'Wrong123',
         role: 'provider',
@@ -179,7 +192,11 @@ void main() {
   test('same-role duplicate signup still reports existing account', () async {
     final db = TestDb('driver');
     await expectLater(
-      AuthService(auth: TestAuth(), firestore: db).register(
+      AuthService(
+        independentRoleAuthEnabled: false,
+        auth: TestAuth(),
+        firestore: db,
+      ).register(
         email: 'same@example.com',
         password: 'Existing123',
         role: 'driver',

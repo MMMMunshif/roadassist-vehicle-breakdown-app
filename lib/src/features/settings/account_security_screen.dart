@@ -8,6 +8,24 @@ class AccountSecurityScreen extends StatefulWidget {
 }
 
 class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
+  String? contactEmail;
+  String? accountRole;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService()
+        .getCurrentProfile()
+        .then((profile) {
+          if (mounted)
+            setState(() {
+              contactEmail = profile.data()?['email'] as String?;
+              accountRole = profile.data()?['role'] as String?;
+            });
+        })
+        .catchError((Object _) {});
+  }
+
   bool deleting = false;
   bool sendingReset = false;
 
@@ -21,7 +39,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
     });
 
     try {
-      await AuthService().sendPasswordResetEmail(email);
+      await AuthService().sendPasswordResetEmail(email, role: accountRole);
 
       if (!mounted) {
         return;
@@ -276,7 +294,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
           ),
           const SizedBox(height: 10),
           _RaSecurityAccountCard(
-            email: user.email ?? 'Email unavailable',
+            email: contactEmail ?? 'Loading email?',
             verified: user.emailVerified,
           ),
           const SizedBox(height: 12),
@@ -294,10 +312,13 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : null,
-                  onTap: user.email == null || sendingReset
+                  onTap:
+                      contactEmail == null ||
+                          accountRole == null ||
+                          sendingReset
                       ? null
                       : () {
-                          sendReset(user.email!);
+                          sendReset(contactEmail!);
                         },
                 ),
                 const Divider(height: 1, indent: 56),

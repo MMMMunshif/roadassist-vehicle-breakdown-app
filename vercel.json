@@ -11,6 +11,9 @@
     },
     "api/confirm-role-email.mjs": {
       "maxDuration": 30
+    },
+    "api/role-auth.mjs": {
+      "maxDuration": 30
     }
   }
 }

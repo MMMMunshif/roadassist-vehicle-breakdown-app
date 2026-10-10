@@ -9,14 +9,30 @@ import 'device_service.dart';
 import '../models/account_roles.dart';
 
 class AuthService {
-  AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _firestore = firestore ?? FirebaseFirestore.instance;
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    http.Client? httpClient,
+    bool? independentRoleAuthEnabled,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _firestore = firestore ?? FirebaseFirestore.instance,
+       _httpClient = httpClient,
+       _independentRoleAuth = independentRoleAuthEnabled ?? independentRoleAuth;
 
   bool verificationEmailDeliveryFailed = false;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final http.Client? _httpClient;
+  final bool _independentRoleAuth;
+
+  Future<http.Response> _post(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) =>
+      _httpClient?.post(uri, headers: headers, body: body) ??
+      http.post(uri, headers: headers, body: body);
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -32,20 +48,65 @@ class AuthService {
         'https://vehiclebreakdownapp.vercel.app/api/request-email-verification',
   );
 
-  Future<void> sendPasswordResetEmail(String email) async {
+  static const independentRoleAuth = bool.fromEnvironment(
+    'INDEPENDENT_ROLE_AUTH',
+    defaultValue: true,
+  );
+  static const _roleAuthApiUrl = String.fromEnvironment(
+    'ROLE_AUTH_API_URL',
+    defaultValue: 'https://vehiclebreakdownapp.vercel.app/api/role-auth',
+  );
+
+  Future<UserCredential> _roleAuthenticate(Map<String, dynamic> values) async {
+    final response = await _post(
+      Uri.parse(_roleAuthApiUrl),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(values),
+    ).timeout(const Duration(seconds: 35));
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw FirebaseAuthException(
+        code: data['code'] as String? ?? 'role-auth-unavailable',
+      );
+    }
+    var expired = false;
+    return _auth
+        .signInWithEmailAndPassword(
+          email: data['authEmail'] as String,
+          password: values['password'] as String,
+        )
+        .then((credential) async {
+          if (expired) {
+            await _auth.signOut();
+            throw TimeoutException('Sign-in expired. Please try again.');
+          }
+          return credential;
+        })
+        .timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            expired = true;
+            throw TimeoutException('Sign-in expired. Please try again.');
+          },
+        );
+  }
+
+  Future<void> sendPasswordResetEmail(String email, {String? role}) async {
     if (_passwordResetApiUrl.isEmpty) {
       throw FirebaseAuthException(
         code: 'password-reset-service-unconfigured',
         message: 'Password reset service is not configured for this build.',
       );
     }
-    final response = await http
-        .post(
-          Uri.parse(_passwordResetApiUrl),
-          headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email.trim(), 'website': ''}),
-        )
-        .timeout(const Duration(seconds: 35));
+    final response = await _post(
+      Uri.parse(_passwordResetApiUrl),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email.trim(),
+        'website': '',
+        if (role != null) 'role': role,
+      }),
+    ).timeout(const Duration(seconds: 35));
     final body = response.body.isEmpty
         ? const <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
@@ -63,16 +124,14 @@ class AuthService {
     final user = currentUser;
     if (user == null) throw StateError('Authentication is required.');
     final idToken = await user.getIdToken(true);
-    final response = await http
-        .post(
-          Uri.parse(_emailVerificationApiUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $idToken',
-          },
-          body: jsonEncode({if (role != null) 'role': role}),
-        )
-        .timeout(const Duration(seconds: 35));
+    final response = await _post(
+      Uri.parse(_emailVerificationApiUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({if (role != null) 'role': role}),
+    ).timeout(const Duration(seconds: 35));
     final body = response.body.isEmpty
         ? const <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
@@ -349,6 +408,25 @@ class AuthService {
     if (role != 'driver' && role != 'provider') {
       throw ArgumentError('Unsupported account role.');
     }
+    if (_independentRoleAuth) {
+      try {
+        final credential = await _roleAuthenticate({
+          'action': 'login',
+          'email': email.trim(),
+          'password': password,
+          'role': role,
+        });
+        final profile = await getCurrentProfile();
+        if (!profile.exists || profile.data()?['role'] != role) {
+          throw FirebaseAuthException(code: 'wrong-role');
+        }
+        if (await isRoleEmailVerified(role)) _startBackgroundSetup(role);
+        return credential;
+      } catch (_) {
+        await _auth.signOut();
+        rethrow;
+      }
+    }
     try {
       var expired = false;
       final login = _auth.signInWithEmailAndPassword(
@@ -430,6 +508,22 @@ class AuthService {
   }) async {
     if (role != 'driver' && role != 'provider') {
       throw ArgumentError('Unsupported account role.');
+    }
+    if (_independentRoleAuth) {
+      final credential = await _roleAuthenticate({
+        'action': 'register',
+        'email': email.trim(),
+        'password': password,
+        'role': role,
+        'displayName': displayName.trim(),
+        'phone': phone.trim(),
+      });
+      try {
+        await sendVerificationEmail(role: role);
+      } catch (_) {
+        verificationEmailDeliveryFailed = true;
+      }
+      return credential;
     }
     UserCredential credential;
     try {
