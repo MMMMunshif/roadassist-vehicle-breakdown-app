@@ -83,10 +83,14 @@ class _DriverShellState extends State<DriverShell> {
         }
       },
       child: RaDriverScaffold(
+        extendBody: true,
         backgroundColor: dark
             ? const Color(0xFF07131E)
             : const Color(0xFFF4F8FC),
-        body: IndexedStack(index: index, children: pages),
+        body: SafeArea(
+          top: false,
+          child: IndexedStack(index: index, children: pages),
+        ),
         bottomNavigationBar: _DriverBottomNavigation(
           selectedIndex: index,
           chatInbox: chatInbox,
@@ -115,109 +119,35 @@ class _DriverBottomNavigation extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final dark = theme.brightness == Brightness.dark;
-
-    return Material(
-      color: Colors.transparent,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 7, 12, 9),
-          child: Container(
-            decoration: BoxDecoration(
-              color: dark ? const Color(0xFF0D2237) : Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: dark
-                    ? Colors.white.withValues(alpha: .075)
-                    : const Color(0xFFDCE8F2),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: dark ? .24 : .07),
-                  blurRadius: 22,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              height: 80,
-              child: NavigationBarTheme(
-                data: NavigationBarThemeData(
-                  height: 80,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  indicatorColor: colors.primary.withValues(
-                    alpha: dark ? .18 : .10,
-                  ),
-                  labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                    final selected = states.contains(WidgetState.selected);
-
-                    return TextStyle(
-                      fontSize: 13,
-                      height: 1.1,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: selected
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
-                    );
-                  }),
-                  iconTheme: WidgetStateProperty.resolveWith((states) {
-                    final selected = states.contains(WidgetState.selected);
-
-                    return IconThemeData(
-                      size: 22,
-                      color: selected
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
-                    );
-                  }),
-                ),
-                child: NavigationBar(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: onSelected,
-                  destinations: [
-                    const NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home_rounded),
-                      label: 'Home',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.receipt_long_outlined),
-                      selectedIcon: Icon(Icons.receipt_long_rounded),
-                      label: 'Requests',
-                    ),
-                    NavigationDestination(
-                      icon: _DriverMessagesIcon(
-                        controller: chatInbox,
-                        selected: false,
-                      ),
-                      selectedIcon: _DriverMessagesIcon(
-                        controller: chatInbox,
-                        selected: true,
-                      ),
-                      label: 'Messages',
-                    ),
-                    const NavigationDestination(
-                      icon: Icon(Icons.person_outline_rounded),
-                      selectedIcon: Icon(Icons.person_rounded),
-                      label: 'Profile',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => RaFloatingNavigation(
+    selectedIndex: selectedIndex,
+    onSelected: onSelected,
+    destinations: [
+      const NavigationDestination(
+        icon: Icon(Icons.home_outlined),
+        selectedIcon: Icon(Icons.home_rounded),
+        label: 'Home',
       ),
-    );
-  }
+      const NavigationDestination(
+        icon: Icon(Icons.receipt_long_outlined),
+        selectedIcon: Icon(Icons.receipt_long_rounded),
+        label: 'Requests',
+      ),
+      NavigationDestination(
+        icon: _DriverMessagesIcon(controller: chatInbox, selected: false),
+        selectedIcon: _DriverMessagesIcon(
+          controller: chatInbox,
+          selected: true,
+        ),
+        label: 'Messages',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline_rounded),
+        selectedIcon: Icon(Icons.person_rounded),
+        label: 'Profile',
+      ),
+    ],
+  );
 }
 
 // ============================================================
@@ -268,6 +198,167 @@ class _DriverMessagesBadge extends StatelessWidget {
         selected
             ? Icons.chat_bubble_rounded
             : Icons.chat_bubble_outline_rounded,
+      ),
+    );
+  }
+}
+
+/// Floating member navigation shared by driver and provider shells.
+class RaFloatingNavigation extends StatelessWidget {
+  const RaFloatingNavigation({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.destinations,
+  });
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final List<NavigationDestination> destinations;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final colors = Theme.of(context).colorScheme;
+    const blue = Color(0xFF007AFF);
+    final scale = MediaQuery.textScalerOf(context).scale(11) / 11;
+    final height = 76.0 + (scale.clamp(1.0, 2.0) - 1) * 18;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: Colors.transparent),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? .28 : .10),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(32),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: dark
+                        ? [
+                            const Color(0xFF173852).withValues(alpha: .76),
+                            const Color(0xFF0B2238).withValues(alpha: .62),
+                          ]
+                        : [
+                            Colors.white.withValues(alpha: .82),
+                            const Color(0xFFE8F4FF).withValues(alpha: .64),
+                          ],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: dark ? .20 : .72),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(7),
+                  child: SizedBox(
+                    height: height - 14,
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < destinations.length; i++)
+                          Expanded(
+                            child: Semantics(
+                              selected: i == selectedIndex,
+                              button: true,
+                              label: destinations[i].label,
+                              child: Tooltip(
+                                message:
+                                    destinations[i].tooltip ??
+                                    destinations[i].label,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(25),
+                                    onTap: () => onSelected(i),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: i == selectedIndex
+                                            ? blue.withValues(alpha: .90)
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(25),
+                                      ),
+                                      child: ExcludeSemantics(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            IconTheme(
+                                              data: IconThemeData(
+                                                size: 23,
+                                                color: i == selectedIndex
+                                                    ? Colors.white
+                                                    : colors.onSurfaceVariant,
+                                              ),
+                                              child: i == selectedIndex
+                                                  ? destinations[i]
+                                                            .selectedIcon ??
+                                                        destinations[i].icon
+                                                  : destinations[i].icon,
+                                            ),
+                                            const SizedBox(height: 5),
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 2,
+                                                  ),
+                                              child: Text(
+                                                destinations[i].label,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style:
+                                                    GoogleFonts.plusJakartaSans(
+                                                      fontSize:
+                                                          destinations.length ==
+                                                              5
+                                                          ? 10
+                                                          : 11,
+                                                      fontWeight:
+                                                          i == selectedIndex
+                                                          ? FontWeight.w700
+                                                          : FontWeight.w500,
+                                                      color: i == selectedIndex
+                                                          ? Colors.white
+                                                          : colors
+                                                                .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

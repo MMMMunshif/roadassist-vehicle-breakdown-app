@@ -61,12 +61,16 @@ class _ApprovedProviderShellState extends State<ApprovedProviderShell> {
         }
       },
       child: RaProviderScaffold(
+        extendBody: true,
         backgroundColor: dark
             ? const Color(0xFF07131E)
             : const Color(0xFFF5F8FC),
         body: _ProviderNavigationScope(
           onSelected: _changeTab,
-          child: IndexedStack(index: index, children: pages),
+          child: SafeArea(
+            top: false,
+            child: IndexedStack(index: index, children: pages),
+          ),
         ),
         bottomNavigationBar: _ProviderBottomNavigation(
           selectedIndex: index,
@@ -94,124 +98,49 @@ class _ProviderBottomNavigation extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final dark = theme.brightness == Brightness.dark;
-
-    return Material(
-      color: dark ? const Color(0xFF07131E) : const Color(0xFFF5F8FC),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-          child: Container(
-            decoration: BoxDecoration(
-              color: dark ? const Color(0xFF0D2237) : Colors.white,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: dark
-                    ? Colors.white.withValues(alpha: .07)
-                    : const Color(0xFFDCE7F1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: dark ? .24 : .07),
-                  blurRadius: 22,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: SizedBox(
-              height: 70,
-              child: NavigationBarTheme(
-                data: NavigationBarThemeData(
-                  height: 70,
-                  elevation: 0,
-                  backgroundColor: Colors.transparent,
-                  indicatorColor: colors.primary.withValues(
-                    alpha: dark ? .18 : .10,
-                  ),
-                  labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                    final selected = states.contains(WidgetState.selected);
-
-                    return GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      height: 1.05,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: selected
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
-                    );
-                  }),
-                  iconTheme: WidgetStateProperty.resolveWith((states) {
-                    final selected = states.contains(WidgetState.selected);
-
-                    return IconThemeData(
-                      size: 22,
-                      color: selected
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
-                    );
-                  }),
-                ),
-                child: NavigationBar(
-                  selectedIndex: selectedIndex,
-                  labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                  onDestinationSelected: onSelected,
-                  destinations: [
-                    const NavigationDestination(
-                      tooltip: 'Dashboard',
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard_rounded),
-                      label: 'Dashboard',
-                    ),
-
-                    const NavigationDestination(
-                      tooltip: 'Requests',
-                      icon: Icon(Icons.inbox_outlined),
-                      selectedIcon: Icon(Icons.inbox_rounded),
-                      label: 'Requests',
-                    ),
-
-                    const NavigationDestination(
-                      tooltip: 'Jobs',
-                      icon: Icon(Icons.work_history_outlined),
-                      selectedIcon: Icon(Icons.work_history_rounded),
-                      label: 'Jobs',
-                    ),
-
-                    NavigationDestination(
-                      tooltip: 'Messages',
-                      icon: _ProviderMessagesIcon(
-                        controller: chatInbox,
-                        selected: false,
-                      ),
-                      selectedIcon: _ProviderMessagesIcon(
-                        controller: chatInbox,
-                        selected: true,
-                      ),
-                      label: 'Messages',
-                    ),
-
-                    const NavigationDestination(
-                      tooltip: 'Profile',
-                      icon: Icon(Icons.person_outline_rounded),
-                      selectedIcon: Icon(Icons.person_rounded),
-                      label: 'Profile',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => RaFloatingNavigation(
+    selectedIndex: selectedIndex,
+    onSelected: onSelected,
+    destinations: [
+      const NavigationDestination(
+        tooltip: 'Dashboard',
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard_rounded),
+        label: 'Dashboard',
       ),
-    );
-  }
+
+      const NavigationDestination(
+        tooltip: 'Requests',
+        icon: Icon(Icons.inbox_outlined),
+        selectedIcon: Icon(Icons.inbox_rounded),
+        label: 'Requests',
+      ),
+
+      const NavigationDestination(
+        tooltip: 'Jobs',
+        icon: Icon(Icons.work_history_outlined),
+        selectedIcon: Icon(Icons.work_history_rounded),
+        label: 'Jobs',
+      ),
+
+      NavigationDestination(
+        tooltip: 'Messages',
+        icon: _ProviderMessagesIcon(controller: chatInbox, selected: false),
+        selectedIcon: _ProviderMessagesIcon(
+          controller: chatInbox,
+          selected: true,
+        ),
+        label: 'Messages',
+      ),
+
+      const NavigationDestination(
+        tooltip: 'Profile',
+        icon: Icon(Icons.person_outline_rounded),
+        selectedIcon: Icon(Icons.person_rounded),
+        label: 'Profile',
+      ),
+    ],
+  );
 }
 
 // ============================================================

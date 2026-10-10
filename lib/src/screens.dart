@@ -8,7 +8,7 @@ import 'models/service_invoice.dart';
 import 'services/invoice_pdf_service.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' show FontVariation;
+import 'dart:ui' show FontVariation, ImageFilter;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
