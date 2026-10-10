@@ -100,17 +100,23 @@ class RaProviderSection extends StatelessWidget {
   const RaProviderSection({
     super.key,
     required this.title,
+    this.icon,
     this.action,
     this.onAction,
     this.caption,
   });
   final String title;
+  final IconData? icon;
   final String? action;
   final VoidCallback? onAction;
   final String? caption;
   @override
   Widget build(BuildContext context) => Row(
     children: [
+      if (icon != null) ...[
+        Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 8),
+      ],
       Expanded(
         child: Text(
           title,

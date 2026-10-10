@@ -775,6 +775,7 @@ class _RaProviderSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RaProviderSection(
     title: title,
+    icon: icon,
     action: action,
     onAction: onAction,
     caption: title == 'Performance' ? 'Last 7 days' : null,
