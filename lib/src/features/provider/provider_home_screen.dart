@@ -401,6 +401,10 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
                     const SizedBox(height: 14),
 
+                    _RaProviderAvailabilityHint(online: online),
+
+                    const SizedBox(height: 14),
+
                     _RaProviderQuickActions(
                       onRequests: () => _openProviderRequests(context),
                       onProfile: () => _openProviderProfile(context),
@@ -535,6 +539,35 @@ class _RaProviderQuickActions extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _RaProviderAvailabilityHint extends StatelessWidget {
+  const _RaProviderAvailabilityHint({required this.online});
+
+  final bool online;
+
+  @override
+  Widget build(BuildContext context) => RaProviderCard(
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+    child: Row(
+      children: [
+        Icon(
+          online ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
+          size: 22,
+          color: online ? raSuccess : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            online
+                ? 'You are visible to nearby drivers. Keep location enabled.'
+                : 'Go online when you are ready to receive nearby requests.',
+            style: _providerText(context, size: 11.5, muted: true),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ============================================================
