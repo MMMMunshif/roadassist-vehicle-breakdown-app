@@ -137,6 +137,38 @@ test('new requests support saved vehicle snapshots without a synthetic price', a
     vehiclePhotoUrls:[],photoAnnotations:[],locationLabel:'Colombo',landmark:'',locationAccuracyMeters:null,
     latitude:6.9,longitude:79.9,serviceFee:0,dispatchFee:0,estimatedCost:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
 });
+test('driver request creation is not blocked by unchanged stale provider presence', async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    const db = c.firestore();
+    await setDoc(doc(db,'users/dual-driver'),{
+      role:'provider',roles:['provider','driver'],lastRole:'driver',
+      roleEmailRequired:['driver'],online:true,phone:'+94771234567'
+    });
+    await setDoc(doc(db,'roleEmailVerifications/dual-driver'),{
+      driver:{email:'driver@example.com'}
+    });
+  });
+
+  const db = env.authenticatedContext('dual-driver',{
+    email:'driver@example.com',email_verified:true
+  }).firestore();
+  const batch = writeBatch(db);
+  batch.set(doc(db,'requests/dual-driver-request'),{
+    driverId:'dual-driver',driverName:'Driver',driverPhone:'+94771234567',
+    providerId:null,preferredProviderId:'',preferredProviderName:'',rejectedBy:[],
+    status:'searching',workflowVersion:2,arrivalVerificationRequired:true,
+    issue:'Flat Tyre',issues:['Flat Tyre'],vehicleType:'Sedan / Hatchback',
+    modelYear:'Toyota 2011',registration:'CVF1236',description:'',notes:'',
+    priority:'normal',vehiclePhotoUrls:[],photoAnnotations:[],
+    locationLabel:'Malabe',landmark:'',locationAccuracyMeters:null,
+    latitude:6.9,longitude:79.9,serviceFee:0,dispatchFee:0,estimatedCost:0,
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+  });
+  batch.update(doc(db,'users/dual-driver'),{
+    activeRequestId:'dual-driver-request',updatedAt:serverTimestamp()
+  });
+  await assertSucceeds(batch.commit());
+});
 test('an active provider cannot clear their reservation or delete the directory entry', async () => {
   await approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1');
   await assertFails(updateDoc(doc(env.authenticatedContext('provider', {email_verified:true}).firestore(),'providerDirectory/provider'),{activeRequestId:null}));

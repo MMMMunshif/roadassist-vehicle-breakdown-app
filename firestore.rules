@@ -371,7 +371,8 @@ service cloud.firestore {
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['roles','lastRole'])
           || (validRoles(request.resource.data)
             && request.resource.data.get('roles', [resource.data.role]).hasAll(resource.data.get('roles', [resource.data.role]))))
-        && (request.resource.data.get('online', false) == false
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['online'])
+          || request.resource.data.get('online', false) == false
           || (request.auth.token.get('email_verified', false) == true && hasRole(userId, 'provider') && providerApproved(userId)));
       allow delete: if signedIn() && request.auth.uid == userId;
 
