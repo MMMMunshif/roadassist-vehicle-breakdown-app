@@ -461,7 +461,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     const _RaProviderSectionHeader(
                       icon: Icons.insights_outlined,
                       title: 'Performance',
-                      subtitle: 'Live figures from completed RoadAssist jobs.',
+                      subtitle: 'A quick view of your recent RoadAssist activity.',
                     ),
 
                     const SizedBox(height: 12),
