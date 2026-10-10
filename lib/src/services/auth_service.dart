@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 import 'device_service.dart';
@@ -64,18 +65,14 @@ class AuthService {
     defaultValue: 'https://vehiclebreakdownapp.vercel.app/api/google-role-auth',
   );
 
+  static Future<void>? _googleInitialization;
+
   Future<UserCredential> signInWithGoogle({
     required String role,
     String? displayName,
     String? phone,
     String? photoData,
   }) async {
-    if (!kIsWeb) {
-      throw FirebaseAuthException(
-        code: 'google-web-only',
-        message: 'Google login is currently available in the web app.',
-      );
-    }
     if (!_independentRoleAuth) {
       throw FirebaseAuthException(code: 'role-auth-unavailable');
     }
@@ -88,7 +85,19 @@ class AuthService {
     try {
       final provider = GoogleAuthProvider()
         ..setCustomParameters({'prompt': 'select_account'});
-      final proof = await proofAuth.signInWithPopup(provider);
+      final UserCredential proof;
+      if (kIsWeb) {
+        proof = await proofAuth.signInWithPopup(provider);
+      } else {
+        await (_googleInitialization ??= GoogleSignIn.instance.initialize());
+        final googleUser = await GoogleSignIn.instance.authenticate();
+        final idToken = googleUser.authentication.idToken;
+        if (idToken == null)
+          throw FirebaseAuthException(code: 'invalid-credential');
+        proof = await proofAuth.signInWithCredential(
+          GoogleAuthProvider.credential(idToken: idToken),
+        );
+      }
       final token = await proof.user!.getIdToken(true);
       final response = await _post(
         Uri.parse(_googleRoleAuthApiUrl),

@@ -1,5 +1,25 @@
 part of '../screens.dart';
 
+String _workflowError(Object error, String fallback) {
+  if (error is TimeoutException) {
+    return 'The server took too long. Refresh and check the current status before retrying.';
+  }
+  if (error is StateError) return error.message.toString();
+  if (error is ArgumentError) return error.message?.toString() ?? fallback;
+  if (error is FirebaseException) {
+    return switch (error.code) {
+      'permission-denied' =>
+        'This action is not allowed for your current account or request status. Refresh and try again.',
+      'unauthenticated' => 'Your session expired. Please sign in again.',
+      'unavailable' || 'deadline-exceeded' =>
+        'Cannot reach the server. Check your connection and try again.',
+      'not-found' => 'This record no longer exists. Refresh the screen.',
+      _ => fallback,
+    };
+  }
+  return fallback;
+}
+
 String requestIssueLabel(Map<String, dynamic> data) {
   final issues = (data['issues'] as List<dynamic>? ?? const [])
       .whereType<String>()
@@ -87,7 +107,7 @@ String? validateSriLankaPhone(String? value) {
 String? validateEmailAddress(String? value) {
   final email = value?.trim() ?? '';
   return email.length <= 254 &&
-      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(email)
+          RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(email)
       ? null
       : 'Enter a valid email address';
 }

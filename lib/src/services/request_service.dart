@@ -502,6 +502,7 @@ class RequestService {
       if (preferredProviderId.isNotEmpty && preferredProviderId != _userId) {
         throw StateError('This request was sent to another provider.');
       }
+      if ((data?['rejectedBy'] as List? ?? const []).contains(_userId)) return;
       final updates = <String, dynamic>{
         'rejectedBy': FieldValue.arrayUnion([_userId]),
         'updatedAt': FieldValue.serverTimestamp(),

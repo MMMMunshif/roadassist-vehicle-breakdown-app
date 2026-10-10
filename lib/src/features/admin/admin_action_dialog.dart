@@ -68,6 +68,10 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
       return confirmationMode ? 'Enter the required ID' : 'Enter a reason';
     }
 
+    if (!confirmationMode && (text.length < 10 || text.length > 500)) {
+      return 'Enter a reason of 10-500 characters';
+    }
+
     if (confirmationMode && text != widget.expectedId) {
       return 'The ID does not match';
     }

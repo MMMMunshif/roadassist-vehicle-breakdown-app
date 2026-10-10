@@ -1099,13 +1099,6 @@ class _AuthFormState extends State<_AuthForm> {
                           ] else
                             const SizedBox(height: 18),
 
-                          OutlinedButton.icon(
-                            key: const Key('auth_google_button'),
-                            onPressed: loading ? null : authenticateGoogle,
-                            icon: const Icon(Icons.account_circle_outlined),
-                            label: const Text('Continue with Google'),
-                          ),
-                          const SizedBox(height: 12),
                           _GradientAuthButton(
                             key: const Key('auth_submit_button'),
                             accent: roleAccent,
@@ -1124,6 +1117,65 @@ class _AuthFormState extends State<_AuthForm> {
                                 : 'Sign In as Driver',
                             loading: loading,
                             onPressed: loading ? null : authenticate,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            child: Row(
+                              children: [
+                                const Expanded(child: Divider()),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    'or',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                                const Expanded(child: Divider()),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              key: const Key('auth_google_button'),
+                              onPressed: loading ? null : authenticateGoogle,
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF131314)
+                                    : Colors.white,
+                                foregroundColor:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFFE3E3E3)
+                                    : const Color(0xFF1F1F1F),
+                                minimumSize: const Size.fromHeight(56),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                side: const BorderSide(
+                                  color: Color(0xFF747775),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: Image.asset(
+                                'assets/images/google_g.png',
+                                width: 20,
+                                height: 20,
+                              ),
+                              label: const Text(
+                                'Continue with Google',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
                           ),
                         ],
                       ),
