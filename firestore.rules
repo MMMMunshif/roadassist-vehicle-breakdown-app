@@ -225,7 +225,7 @@ service cloud.firestore {
     match /accountModeration/{uid} {
       allow read: if (authenticated() && request.auth.uid == uid) || isAdmin();
       allow create, update: if isAdmin()
-        && (superAdmin() || (canReviewProviders() && hasRole(uid, 'provider')))
+        && (adminRole() == 'super_admin' || (adminRole() == 'reviewer' && hasRole(uid, 'provider')))
         && exists(/databases/$(database)/documents/users/$(uid))
         && request.resource.data.keys().hasAll(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId'])
         && request.resource.data.keys().hasOnly(['status','verification','flagged','reason','updatedBy','updatedAt','lastAuditId','verificationRevision','validUntil','verificationChecks','correctionRequest'])
@@ -239,7 +239,9 @@ service cloud.firestore {
         && (resource == null || request.resource.data.lastAuditId != resource.data.lastAuditId)
         && (uid != request.auth.uid || (request.resource.data.status == 'active' && request.resource.data.verification != 'rejected'))
         && (hasRole(uid, 'provider') || request.resource.data.verification == 'pending')
-        && (request.resource.data.verification != 'verified' || (
+        && (request.resource.data.verification != 'verified' || (resource != null
+          && request.resource.data.verification == resource.data.verification
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationRevision','validUntil','verificationChecks','correctionRequest'])) || (
           exists(/databases/$(database)/documents/providerApplications/$(uid))
           && get(/databases/$(database)/documents/providerApplications/$(uid)).data.get('applicationStatus', 'submitted') != 'withdrawn'
           && validProfessional(get(/databases/$(database)/documents/providerApplications/$(uid)).data.professionalDetails, get(/databases/$(database)/documents/providerApplications/$(uid)).data.services)
@@ -620,7 +622,58 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completionState','driverCompletedAt','completedAt','updatedAt']))
       );
 
-      allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['completionState','completionReport','pendingDiscountId'])
+      // Cancellation must not evaluate unrelated repair/quote branches.
+      allow update: if request.resource.data.status == 'cancelled' && signedIn() && (
+        // Cancellation before arrival; history and the approved price remain immutable.
+        (resource.data.providerId is string
+          && resource.data.status in ['accepted','en_route']
+          && (resource.data.providerId == request.auth.uid ||
+            (resource.data.driverId == request.auth.uid && resource.data.status == 'accepted'
+             && resource.data.acceptedAt is timestamp && request.time >= resource.data.acceptedAt + duration.value(10,'m')))
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.cancelledBy == request.auth.uid
+          && request.resource.data.cancellationType == (resource.data.providerId == request.auth.uid ? 'provider_withdrawal' : 'departure_timeout')
+          && request.resource.data.cancellationReason is string
+          && request.resource.data.cancellationReason.size() >= 10 && request.resource.data.cancellationReason.size() <= 500
+          && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
+          && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationType','cancellationReason']))
+        ||
+        // Preserve older builds while recording a validated reason in new builds.
+        (resource.data.driverId == request.auth.uid
+          && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
+          && resource.data.get('completionState','') != 'pending'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
+          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt'])
+            || (request.resource.data.cancelledBy == request.auth.uid
+              && request.resource.data.cancellationType == 'driver_cancellation'
+              && request.resource.data.cancellationReason is string
+              && request.resource.data.cancellationReason.size() >= 10 && request.resource.data.cancellationReason.size() <= 500
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationReason','cancellationType']))))
+      );
+
+      // Dismiss only this provider; preserve broadcast labels and release targeted searches.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasAny(['rejectedBy'])
+        && signedIn() && isProvider() && resource.data.driverId != request.auth.uid
+        && resource.data.status == 'searching' && request.resource.data.status == 'searching'
+        && resource.data.get('preferredProviderId','') in ['',request.auth.uid]
+        && request.resource.data.rejectedBy is list
+        && request.resource.data.rejectedBy.hasAll(resource.data.get('rejectedBy',[]))
+        && request.resource.data.rejectedBy.hasAll([request.auth.uid])
+        && request.resource.data.rejectedBy.size() == resource.data.get('rejectedBy',[]).size() + 1
+        && !resource.data.get('rejectedBy',[]).hasAny([request.auth.uid])
+        && request.resource.data.get('preferredProviderId','') == ''
+        && (resource.data.get('preferredProviderId','') == request.auth.uid
+          ? request.resource.data.get('preferredProviderName','') == ''
+          : request.resource.data.get('preferredProviderName','') == resource.data.get('preferredProviderName',''))
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'rejectedBy','preferredProviderId','preferredProviderName','fallbackStartedAt','updatedAt']);
+
+      allow update: if request.resource.data.status != 'cancelled'
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rejectedBy'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['completionState','completionReport','pendingDiscountId'])
         && signedIn() && (
         (resource.data.status == 'completed'
           && resource.data.driverId == request.auth.uid
@@ -686,34 +739,6 @@ service cloud.firestore {
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'pendingRepairId', 'lastRepairDecisionId', 'lastRepairDecision', 'repairDecisionAt', 'updatedAt',
                 'approvedRepairId', 'estimatedCost', 'serviceFee', 'dispatchFee', 'extraFee', 'providerDiagnosis']))))
-        ||
-        // Cancellation before arrival; history and the approved price remain immutable.
-        (resource.data.providerId is string
-          && resource.data.status in ['accepted','en_route']
-          && (resource.data.providerId == request.auth.uid ||
-            (resource.data.driverId == request.auth.uid && resource.data.status == 'accepted'
-             && resource.data.acceptedAt is timestamp && request.time >= resource.data.acceptedAt + duration.value(10,'m')))
-          && request.resource.data.status == 'cancelled'
-          && request.resource.data.cancelledBy == request.auth.uid
-          && request.resource.data.cancellationType == (resource.data.providerId == request.auth.uid ? 'provider_withdrawal' : 'departure_timeout')
-          && request.resource.data.cancellationReason is string
-          && request.resource.data.cancellationReason.size() >= 10 && request.resource.data.cancellationReason.size() <= 500
-          && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
-          && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationType','cancellationReason']))
-        ||
-        // Preserve older builds while recording a validated reason in new builds.
-        (resource.data.driverId == request.auth.uid
-          && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
-          && resource.data.get('completionState','') != 'pending'
-          && request.resource.data.status == 'cancelled'
-          && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
-          && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt'])
-            || (request.resource.data.cancelledBy == request.auth.uid
-              && request.resource.data.cancellationType == 'driver_cancellation'
-              && request.resource.data.cancellationReason is string
-              && request.resource.data.cancellationReason.size() >= 10 && request.resource.data.cancellationReason.size() <= 500
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt','cancelledBy','cancellationReason','cancellationType']))))
         // A driver may rate only their own completed request.
         || (resource.data.driverId == request.auth.uid
           && resource.data.status == 'completed'
@@ -791,23 +816,6 @@ service cloud.firestore {
             'serviceFee', 'dispatchFee', 'extraFee', 'estimatedCost',
             'providerDistanceKm', 'quoteNotes', 'quotedAt',
             'acceptedAt', 'updatedAt'
-          ]))
-        // A provider can dismiss an open request only for themselves.
-        || (isProvider()
-          && resource.data.status == 'searching'
-          && (!('preferredProviderId' in resource.data)
-            || resource.data.preferredProviderId == ''
-            || resource.data.preferredProviderId == request.auth.uid)
-          && request.resource.data.status == 'searching'
-          && request.resource.data.rejectedBy.hasAll(resource.data.rejectedBy)
-          && request.resource.data.rejectedBy.hasAll([request.auth.uid])
-          && (!('preferredProviderId' in request.resource.data)
-            || request.resource.data.preferredProviderId == '')
-          && (!('preferredProviderName' in request.resource.data)
-            || request.resource.data.preferredProviderName == '')
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'rejectedBy', 'preferredProviderId', 'preferredProviderName',
-            'fallbackStartedAt', 'updatedAt'
           ]))
         || (resource.data.driverId == request.auth.uid && resource.data.status == 'arrived'
           && !resource.data.get('jobStartCodeRequired',false)

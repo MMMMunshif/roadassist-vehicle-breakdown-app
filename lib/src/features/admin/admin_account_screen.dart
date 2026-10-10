@@ -53,15 +53,18 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
             ? false
             : null,
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Action failed. Check admin permission and connection.',
+            _workflowError(
+              error,
+              'Action failed. Check admin permission and connection.',
+            ),
           ),
           backgroundColor: raDanger,
         ),

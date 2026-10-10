@@ -891,11 +891,15 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
       if (mounted) {
         Navigator.maybePop(context);
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to dismiss this request.')),
+        SnackBar(
+          content: Text(
+            _workflowError(error, 'Unable to dismiss this request.'),
+          ),
+        ),
       );
     } finally {
       if (mounted) {

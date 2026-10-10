@@ -17,6 +17,9 @@
     },
     "api/google-role-auth.mjs": {
       "maxDuration": 30
+    },
+    "api/admin-delete-account.mjs": {
+      "maxDuration": 60
     }
   }
 }

@@ -380,10 +380,14 @@ class _RaProviderNotificationRequestCardState
     setState(() => busy = true);
     try {
       await RequestService().rejectRequest(widget.request.id);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to dismiss this request.')),
+          SnackBar(
+            content: Text(
+              _workflowError(error, 'Unable to dismiss this request.'),
+            ),
+          ),
         );
       }
     } finally {

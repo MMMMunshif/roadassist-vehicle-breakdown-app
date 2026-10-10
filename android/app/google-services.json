@@ -1,56 +1,84 @@
-﻿{
-    "project_info":  {
-                         "project_number":  "364238545986",
-                         "project_id":  "roadassist-lk-munshif",
-                         "storage_bucket":  "roadassist-lk-munshif.firebasestorage.app"
-                     },
-    "client":  [
-                   {
-                       "client_info":  {
-                                           "mobilesdk_app_id":  "1:364238545986:android:c3263779769400c05b39db",
-                                           "android_client_info":  {
-                                                                       "package_name":  "com.roadassist.app"
-                                                                   }
-                                       },
-                       "oauth_client":  [
-
-                                        ],
-                       "api_key":  [
-                                       {
-                                           "current_key":  "AIzaSyD1uityBs0H9rDIt934m87WgUWtDn3rqUM"
-                                       }
-                                   ],
-                       "services":  {
-                                        "appinvite_service":  {
-                                                                  "other_platform_oauth_client":  [
-
-                                                                                                  ]
-                                                              }
-                                    }
-                   },
-                   {
-                       "client_info":  {
-                                           "mobilesdk_app_id":  "1:364238545986:android:5fa043c95004ed2f5b39db",
-                                           "android_client_info":  {
-                                                                       "package_name":  "com.roadassist.admin"
-                                                                   }
-                                       },
-                       "oauth_client":  [
-
-                                        ],
-                       "api_key":  [
-                                       {
-                                           "current_key":  "AIzaSyD1uityBs0H9rDIt934m87WgUWtDn3rqUM"
-                                       }
-                                   ],
-                       "services":  {
-                                        "appinvite_service":  {
-                                                                  "other_platform_oauth_client":  [
-
-                                                                                                  ]
-                                                              }
-                                    }
-                   }
-               ],
-    "configuration_version":  "1"
+{
+  "project_info": {
+    "project_number": "364238545986",
+    "project_id": "roadassist-lk-munshif",
+    "storage_bucket": "roadassist-lk-munshif.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:364238545986:android:5fa043c95004ed2f5b39db",
+        "android_client_info": {
+          "package_name": "com.roadassist.admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "364238545986-qekmcgklbf8ls8c3621k0shricnem5nv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.roadassist.admin",
+            "certificate_hash": "718eb046177c09507d1ce2dccc70af737741cce1"
+          }
+        },
+        {
+          "client_id": "364238545986-534502ijsf9r8usr5j8ihn9nuat3gdmm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1uityBs0H9rDIt934m87WgUWtDn3rqUM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "364238545986-534502ijsf9r8usr5j8ihn9nuat3gdmm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:364238545986:android:c3263779769400c05b39db",
+        "android_client_info": {
+          "package_name": "com.roadassist.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "364238545986-u8fre1kmhpl233u84gk4n8lstc04kuo1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.roadassist.app",
+            "certificate_hash": "718eb046177c09507d1ce2dccc70af737741cce1"
+          }
+        },
+        {
+          "client_id": "364238545986-534502ijsf9r8usr5j8ihn9nuat3gdmm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1uityBs0H9rDIt934m87WgUWtDn3rqUM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "364238545986-534502ijsf9r8usr5j8ihn9nuat3gdmm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
 }

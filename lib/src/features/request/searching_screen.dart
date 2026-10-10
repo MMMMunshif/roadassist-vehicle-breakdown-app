@@ -787,12 +787,14 @@ class _SearchingScreenState extends State<SearchingScreen>
       if (!mounted) return;
 
       replace(context, const DriverShell());
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to cancel the request. Try again.'),
+        SnackBar(
+          content: Text(
+            _workflowError(error, 'Unable to cancel the request. Try again.'),
+          ),
         ),
       );
     } finally {
