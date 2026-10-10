@@ -1661,7 +1661,14 @@ class _RaProviderLoadingCard extends StatelessWidget {
           color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
         ),
       ),
-      child: const Center(child: CircularProgressIndicator()),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(strokeWidth: 2.5),
+          const SizedBox(height: 10),
+          Text('Loading live data…', style: _providerText(context, size: 11, muted: true)),
+        ],
+      ),
     );
   }
 }
