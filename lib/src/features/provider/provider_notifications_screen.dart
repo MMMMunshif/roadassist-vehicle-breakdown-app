@@ -168,11 +168,12 @@ class _ProviderNotificationsScreenState
                         _providerAvailabilityStatus(directory) != 'Online') {
                       return _page(
                         profile,
-                        const RaProviderEmptyCard(
+                        RaProviderEmptyCard(
                           icon: Icons.notifications_none_rounded,
-                          title: 'Go online to see matching requests',
-                          message:
-                              'Turn on availability from your dashboard when you are ready to help.',
+                          title: directory['online'] == true
+                              ? 'Not available for requests yet'
+                              : 'Go online to see matching requests',
+                          message: _providerAvailabilityExplanation(directory),
                         ),
                       );
                     }

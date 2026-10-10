@@ -43,6 +43,11 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     availabilityClock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) {
         setState(() {});
+        if (online &&
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed) {
+          unawaited(_publishProviderLocation(syncDirectory: false));
+        }
       }
     });
 
@@ -55,7 +60,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
           .snapshots()
           .listen(
             (snapshot) {
-              if (!mounted || savingPresence) {
+              if (!mounted) {
                 return;
               }
 
@@ -63,7 +68,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
               setState(() {
                 availability = data;
-                online = data['online'] == true;
+                if (!savingPresence) online = data['online'] == true;
               });
             },
             onError: (_) {
@@ -162,7 +167,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     return '${providerServices.first} + ${providerServices.length - 1} more';
   }
 
-  Future<void> _publishProviderLocation() async {
+  Future<void> _publishProviderLocation({bool syncDirectory = true}) async {
     if (!signedIn || publishingLocation) {
       return;
     }
@@ -172,23 +177,37 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     });
 
     try {
-      await AuthService().syncProviderDirectory();
-
-      final enabled = await Geolocator.isLocationServiceEnabled();
-
-      if (!enabled) {
-        return;
+      if (syncDirectory) {
+        await AuthService().syncProviderDirectory().timeout(
+          const Duration(seconds: 20),
+        );
       }
 
-      var permission = await Geolocator.checkPermission();
+      final enabled = await Geolocator.isLocationServiceEnabled().timeout(
+        const Duration(seconds: 10),
+      );
+
+      if (!enabled) {
+        throw StateError(
+          'Turn on location services so nearby drivers can find you.',
+        );
+      }
+
+      var permission = await Geolocator.checkPermission().timeout(
+        const Duration(seconds: 10),
+      );
 
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await Geolocator.requestPermission().timeout(
+          const Duration(seconds: 30),
+        );
       }
 
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
-        return;
+        throw StateError(
+          'Allow location access for this app so nearby drivers can find you.',
+        );
       }
 
       final position = await Geolocator.getCurrentPosition(
@@ -196,14 +215,28 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
           accuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 15),
         ),
-      );
+      ).timeout(const Duration(seconds: 20));
 
-      await AuthService().updateProviderDirectoryLocation(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
-    } catch (_) {
-      // Existing provider data remains usable if GPS is unavailable.
+      await AuthService()
+          .updateProviderDirectoryLocation(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (error) {
+      if (mounted && online && syncDirectory) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message
+                  : error is FirebaseException
+                  ? 'Provider location could not be saved (${error.code}). Check your connection and provider approval.'
+                  : 'Location could not be updated. Check location permission and connection, then pull down to retry.',
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -226,7 +259,9 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
     });
 
     try {
-      await AuthService().setProviderOnline(value);
+      await AuthService()
+          .setProviderOnline(value)
+          .timeout(const Duration(seconds: 25));
 
       if (value) {
         await _publishProviderLocation();

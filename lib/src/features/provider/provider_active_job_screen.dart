@@ -41,6 +41,103 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
     if (foreground) unawaited(publishFreshPosition());
   }
 
+  DateTime? nearDriverSince;
+
+  Future<void> navigateToDriver() async {
+    final id = widget.requestId;
+    final lat = (requestData['latitude'] as num?)?.toDouble();
+    final lng = (requestData['longitude'] as num?)?.toDouble();
+    if (id == null ||
+        lat == null ||
+        lng == null ||
+        offline ||
+        updatingStatus ||
+        requestCancelled)
+      return;
+    if (status == 0) {
+      setState(() => updatingStatus = true);
+      try {
+        await RequestService().advanceProviderStatus(id, 'en_route');
+        if (!mounted) return;
+        setState(() {
+          status = 1;
+          requestData['status'] = 'en_route';
+        });
+      } catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Unable to start travelling: $error')),
+          );
+        return;
+      } finally {
+        if (mounted) setState(() => updatingStatus = false);
+      }
+    }
+    if (!mounted) return;
+    await openMapNavigation(context, latitude: lat, longitude: lng);
+    if (mounted) unawaited(publishFreshPosition());
+  }
+
+  Future<void> checkAutomaticArrival(Position position) async {
+    if (!mounted ||
+        !foreground ||
+        offline ||
+        updatingStatus ||
+        requestCancelled ||
+        status != 1) {
+      nearDriverSince = null;
+      return;
+    }
+    final lat = (requestData['latitude'] as num?)?.toDouble();
+    final lng = (requestData['longitude'] as num?)?.toDouble();
+    final age = DateTime.now().difference(position.timestamp);
+    if (lat == null ||
+        lng == null ||
+        !position.accuracy.isFinite ||
+        position.accuracy <= 0 ||
+        position.accuracy > 30 ||
+        age.isNegative ||
+        age > const Duration(seconds: 30) ||
+        Geolocator.distanceBetween(
+              position.latitude,
+              position.longitude,
+              lat,
+              lng,
+            ) >
+            75) {
+      nearDriverSince = null;
+      return;
+    }
+    final now = DateTime.now();
+    nearDriverSince ??= now;
+    if (now.difference(nearDriverSince!) < const Duration(seconds: 10)) return;
+    final id = widget.requestId;
+    if (id == null) return;
+    setState(() => updatingStatus = true);
+    try {
+      await RequestService().advanceProviderStatus(id, 'arrived');
+      if (!mounted) return;
+      setState(() {
+        status = 2;
+        requestData['status'] = 'arrived';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You are near the driver. Job marked as Arrived.'),
+        ),
+      );
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => locationMessage =
+              'Automatic arrival could not save. You can mark Arrived manually.',
+        );
+    } finally {
+      nearDriverSince = null;
+      if (mounted) setState(() => updatingStatus = false);
+    }
+  }
+
   Future<void> publishFreshPosition() async {
     final id = widget.requestId;
     if (!mounted ||
@@ -65,6 +162,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
         latitude: position.latitude,
         longitude: position.longitude,
       );
+      await checkAutomaticArrival(position);
       if (mounted)
         setState(() {
           currentProviderPosition = LatLng(
@@ -297,6 +395,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                     }),
               );
 
+              unawaited(checkAutomaticArrival(position));
               unawaited(refreshProviderRoute(point));
             },
             onError: (_) {
@@ -608,6 +707,30 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
     CompletionReport? report;
 
     if (status == 2) {
+      String? blocked;
+      if (requestData['jobStartCodeRequired'] == true &&
+          requestData['jobStartCodeVerifiedAt'] == null) {
+        blocked = 'Verify the driver job-start code before completing work.';
+      } else if (requestData['arrivalVerificationRequired'] == true &&
+          requestData['arrivalConfirmedBy'] != requestData['driverId']) {
+        blocked =
+            'Ask the driver to confirm your arrival before completing work.';
+      } else if (serviceNotesController.text.trim().length < 10 ||
+          servicePhotos.isEmpty) {
+        blocked =
+            'Add service notes of at least 10 characters and at least one completion photo before completing the job.';
+      } else if (requestData['pendingRepairId'] != null ||
+          (requestData['approvedQuoteType'] == 'inspection' &&
+              requestData['approvedRepairId'] == null)) {
+        blocked =
+            'Wait for the driver to approve the repair quote before completing the job.';
+      }
+      if (blocked != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(blocked)));
+        return;
+      }
       report = await requestCompletionReport(context, {
         ...requestData,
         if (completionReportDraft != null)
@@ -673,7 +796,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Unable to update job status: ${error.toString().replaceFirst('Exception: ', '')}',
+            error is FirebaseException
+                ? 'Unable to update job status (${error.code}). Check your connection, arrival confirmation and saved documentation.'
+                : error is StateError
+                ? error.message
+                : 'Unable to update job status. Check arrival confirmation, completion photo and driver-approved repair quote, then retry.',
           ),
         ),
       );
@@ -957,6 +1084,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
 
                   if (hasDriverLocation)
                     _RaProviderActiveMap(
+                      onNavigate: offline || updatingStatus || requestCancelled
+                          ? null
+                          : navigateToDriver,
                       latitude: latitude,
                       longitude: longitude,
                       providerPosition: currentProviderPosition,
@@ -1015,7 +1145,10 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                     _RaProviderDocumentationCard(
                       controller: serviceNotesController,
                       photos: servicePhotos,
-                      saving: savingDocumentation,
+                      saving:
+                          savingDocumentation ||
+                          waitingForArrivalConfirmation ||
+                          completionPending,
                       onAddPhoto: addDocumentationPhoto,
                       onRemovePhoto: removeDocumentationPhoto,
                       onSave: saveDocumentation,
@@ -1068,7 +1201,8 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                   !completionPending &&
                   widget.requestId != null &&
                   (requestCancelled ||
-                      (!waitingForArrivalConfirmation && repairReady)),
+                      (!waitingForArrivalConfirmation &&
+                          (status != 2 || repairReady))),
               busy: updatingStatus,
               onTap: requestCancelled
                   ? () {
@@ -1109,6 +1243,7 @@ class _RaProviderActiveStatusCard extends StatelessWidget {
 
 class _RaProviderActiveMap extends StatelessWidget {
   const _RaProviderActiveMap({
+    required this.onNavigate,
     required this.latitude,
     required this.longitude,
     required this.providerPosition,
@@ -1117,6 +1252,7 @@ class _RaProviderActiveMap extends StatelessWidget {
     required this.location,
   });
 
+  final VoidCallback? onNavigate;
   final double latitude;
   final double longitude;
 
@@ -1190,13 +1326,7 @@ class _RaProviderActiveMap extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () {
-              openMapNavigation(
-                context,
-                latitude: latitude,
-                longitude: longitude,
-              );
-            },
+            onPressed: onNavigate,
             icon: const Icon(Icons.navigation_outlined),
             label: const Text('Navigate to Driver'),
           ),
