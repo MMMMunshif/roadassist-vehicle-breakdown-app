@@ -1627,7 +1627,10 @@ class _RaProviderServiceTile extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     child: Row(
       children: [
-        Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+        Tooltip(
+          message: label,
+          child: Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
