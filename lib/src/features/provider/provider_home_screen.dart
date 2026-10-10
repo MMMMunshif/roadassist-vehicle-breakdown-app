@@ -34,6 +34,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
   bool openRequestsInitialized = false;
 
+  String get greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -381,6 +388,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     const SizedBox(height: 16),
 
                     _RaProviderHero(
+                      greeting: greeting,
                       online: online,
                       savingPresence: savingPresence,
                       publishingLocation: publishingLocation,
@@ -501,6 +509,7 @@ class _RaProviderTopHeader extends StatelessWidget {
 
 class _RaProviderHero extends StatelessWidget {
   const _RaProviderHero({
+    required this.greeting,
     required this.online,
     required this.savingPresence,
     required this.publishingLocation,
@@ -508,6 +517,7 @@ class _RaProviderHero extends StatelessWidget {
     required this.availabilityLabel,
     required this.onOnlineChanged,
   });
+  final String greeting;
   final bool online, savingPresence, publishingLocation;
   final String speciality, availabilityLabel;
   final ValueChanged<bool> onOnlineChanged;
@@ -539,7 +549,7 @@ class _RaProviderHero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Good morning, $displayName',
+            '$greeting, $displayName',
             style: _providerText(context, muted: true),
           ),
           const SizedBox(height: 4),
