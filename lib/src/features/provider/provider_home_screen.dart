@@ -401,6 +401,14 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
                     const SizedBox(height: 14),
 
+                    _RaProviderQuickActions(
+                      onRequests: () => _openProviderRequests(context),
+                      onProfile: () => _openProviderProfile(context),
+                      onRefresh: _publishProviderLocation,
+                    ),
+
+                    const SizedBox(height: 14),
+
                     _RaProviderStats(services: providerServices),
 
                     const SizedBox(height: 20),
@@ -488,6 +496,45 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
             ),
     );
   }
+}
+
+class _RaProviderQuickActions extends StatelessWidget {
+  const _RaProviderQuickActions({
+    required this.onRequests,
+    required this.onProfile,
+    required this.onRefresh,
+  });
+
+  final VoidCallback onRequests;
+  final VoidCallback onProfile;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(child: _action(context, Icons.inbox_outlined, 'Requests', onRequests)),
+      const SizedBox(width: 9),
+      Expanded(child: _action(context, Icons.person_outline_rounded, 'Profile', onProfile)),
+      const SizedBox(width: 9),
+      Expanded(child: _action(context, Icons.refresh_rounded, 'Refresh', onRefresh)),
+    ],
+  );
+
+  Widget _action(BuildContext context, IconData icon, String label, VoidCallback onTap) =>
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: RaProviderCard(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Column(
+            children: [
+              Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 5),
+              Text(label, style: _providerText(context, size: 10, weight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      );
 }
 
 // ============================================================
