@@ -18,6 +18,15 @@
     "api/google-role-auth.mjs": {
       "maxDuration": 30
     },
+    "api/create-payment-order.mjs": {
+      "maxDuration": 30
+    },
+    "api/payhere-checkout.mjs": {
+      "maxDuration": 30
+    },
+    "api/payhere-notify.mjs": {
+      "maxDuration": 30
+    },
     "api/admin-delete-account.mjs": {
       "maxDuration": 60
     }

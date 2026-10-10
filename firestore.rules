@@ -1008,6 +1008,14 @@ service cloud.firestore {
         );
         allow delete: if false;
       }
+      match /payments/{paymentId} {
+        allow read: if signedIn() && (
+          get(/databases/$(database)/documents/requests/$(requestId)).data.driverId == request.auth.uid
+          || get(/databases/$(database)/documents/requests/$(requestId)).data.providerId == request.auth.uid
+        );
+        // Payment orders and gateway updates are written only by the trusted API/webhook.
+        allow create, update, delete: if false;
+      }
       match /messages/{messageId} {
         function parentRequest() {
           return get(/databases/$(database)/documents/requests/$(requestId)).data;

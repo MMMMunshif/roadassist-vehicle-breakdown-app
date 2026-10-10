@@ -13,6 +13,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   late final Stream<DocumentSnapshot<Map<String, dynamic>>> request;
 
   bool saving = false;
+  bool startingOnlinePayment = false;
   bool exporting = false;
   String? offerKey;
   Future<Map<String, dynamic>>? offerFuture;
@@ -115,6 +116,32 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           saving = false;
         });
       }
+    }
+  }
+
+  Future<void> startOnlinePayment() async {
+    if (startingOnlinePayment) return;
+    setState(() => startingOnlinePayment = true);
+    try {
+      final checkout = await PaymentService().createCheckout(widget.requestId);
+      final opened = await launchUrl(
+        Uri.parse(checkout.checkoutUrl),
+        mode: LaunchMode.platformDefault,
+      );
+      if (!opened) throw StateError('Unable to open the secure payment page.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Complete payment in the secure checkout page.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString().replaceFirst('Bad state: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => startingOnlinePayment = false);
     }
   }
 
@@ -245,7 +272,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               const _RaInvoiceSectionHeading(
                 title: 'Payment status',
                 subtitle:
-                    'RoadAssist records cash or external payment confirmation only.',
+                    'Pay securely online or record an offline payment after it is completed.',
               ),
 
               const SizedBox(height: 10),
@@ -283,6 +310,26 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                       ),
 
                       const SizedBox(height: 12),
+
+                      FilledButton.icon(
+                        onPressed: saving || startingOnlinePayment
+                            ? null
+                            : startOnlinePayment,
+                        icon: startingOnlinePayment
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.lock_outline_rounded),
+                        label: Text(
+                          startingOnlinePayment
+                              ? 'Opening secure checkout…'
+                              : 'Pay securely online',
+                        ),
+                      ),
+
+                      const SizedBox(height: 7),
 
                       OutlinedButton.icon(
                         onPressed: saving

@@ -43,6 +43,7 @@ import 'services/provider_verification_service.dart';
 import 'services/chat_inbox_controller.dart';
 import 'services/device_service.dart';
 import 'services/request_service.dart';
+import 'services/payment_service.dart';
 import 'services/job_start_service.dart';
 import 'services/request_draft_store.dart';
 import 'services/photo_upload_service.dart';
