@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { roleAddress, resolveRoleUser } from '../functions/role-identity.mjs';
 
-async function services() {
+export async function services() {
   const {cert, getApps, initializeApp} = await import('firebase-admin/app');
   const {getAuth} = await import('firebase-admin/auth');
   const {getFirestore, FieldValue} = await import('firebase-admin/firestore');
