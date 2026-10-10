@@ -57,6 +57,79 @@ class _AuthFormState extends State<_AuthForm> {
   // AUTHENTICATION
   // ============================================================
 
+  Future<void> authenticateGoogle() async {
+    if (loading) return;
+    final role = isProvider ? 'provider' : 'driver';
+    if (registerMode &&
+        (nameController.text.trim().length < 2 ||
+            !RegExp(
+              r'^\+947\d{8}$',
+            ).hasMatch(normalizeSriLankaPhone(phoneController.text)) ||
+            (!isProvider && registrationPhotoData == null))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Enter your name, valid phone number and required profile photo first. No password is needed for Google.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() => loading = true);
+    try {
+      await authService.signInWithGoogle(
+        role: role,
+        displayName: registerMode ? nameController.text.trim() : null,
+        phone: registerMode
+            ? normalizeSriLankaPhone(phoneController.text)
+            : null,
+        photoData: registerMode ? registrationPhotoData : null,
+      );
+      if (!mounted) return;
+      replace(
+        context,
+        isProvider ? const ProviderShell() : const DriverShell(),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      if ([
+        'popup-closed-by-user',
+        'cancelled-popup-request',
+        'canceled',
+      ].contains(e.code))
+        return;
+      final message = switch (e.code) {
+        'google-web-only' =>
+          'Google login is currently available in the web app.',
+        'profile-details-required' =>
+          'Choose Create Account and complete your profile, then continue with Google.',
+        'operation-not-allowed' =>
+          'Google sign-in is not enabled yet. Please use email sign-in.',
+        'user-disabled' => 'This account has been disabled. Contact support.',
+        'too-many-requests' => 'Too many attempts. Please try again later.',
+        'popup-blocked' =>
+          'Allow sign-in popups in your browser and try again.',
+        'unauthorized-domain' =>
+          'Google sign-in is not configured for this app domain yet.',
+        _ => 'Unable to sign in with Google. Please try again.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: raDanger),
+      );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to connect. Please try Google sign-in again.',
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
   Future<void> authenticate() async {
     FocusScope.of(context).unfocus();
 
@@ -1026,6 +1099,13 @@ class _AuthFormState extends State<_AuthForm> {
                           ] else
                             const SizedBox(height: 18),
 
+                          OutlinedButton.icon(
+                            key: const Key('auth_google_button'),
+                            onPressed: loading ? null : authenticateGoogle,
+                            icon: const Icon(Icons.account_circle_outlined),
+                            label: const Text('Continue with Google'),
+                          ),
+                          const SizedBox(height: 12),
                           _GradientAuthButton(
                             key: const Key('auth_submit_button'),
                             accent: roleAccent,

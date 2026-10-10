@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'device_service.dart';
@@ -56,6 +58,76 @@ class AuthService {
     'ROLE_AUTH_API_URL',
     defaultValue: 'https://vehiclebreakdownapp.vercel.app/api/role-auth',
   );
+
+  static const _googleRoleAuthApiUrl = String.fromEnvironment(
+    'GOOGLE_ROLE_AUTH_API_URL',
+    defaultValue: 'https://vehiclebreakdownapp.vercel.app/api/google-role-auth',
+  );
+
+  Future<UserCredential> signInWithGoogle({
+    required String role,
+    String? displayName,
+    String? phone,
+    String? photoData,
+  }) async {
+    if (!kIsWeb) {
+      throw FirebaseAuthException(
+        code: 'google-web-only',
+        message: 'Google login is currently available in the web app.',
+      );
+    }
+    if (!_independentRoleAuth) {
+      throw FirebaseAuthException(code: 'role-auth-unavailable');
+    }
+    // Isolate the Google proof session from the selected RoadAssist role session.
+    final app = await Firebase.initializeApp(
+      name: 'google-proof-${DateTime.now().microsecondsSinceEpoch}',
+      options: Firebase.app().options,
+    );
+    final proofAuth = FirebaseAuth.instanceFor(app: app);
+    try {
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters({'prompt': 'select_account'});
+      final proof = await proofAuth.signInWithPopup(provider);
+      final token = await proof.user!.getIdToken(true);
+      final response = await _post(
+        Uri.parse(_googleRoleAuthApiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'role': role,
+          'displayName': displayName,
+          'phone': phone,
+          'photoData': photoData,
+        }),
+      ).timeout(const Duration(seconds: 35));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode != 200) {
+        throw FirebaseAuthException(
+          code: data['code'] as String? ?? 'role-auth-unavailable',
+        );
+      }
+      final credential = await _auth.signInWithCustomToken(
+        data['customToken'] as String,
+      );
+      try {
+        final profile = await getCurrentProfile();
+        if (!profile.exists || profile.data()?['role'] != role) {
+          throw FirebaseAuthException(code: 'wrong-role');
+        }
+        _startBackgroundSetup(role);
+        return credential;
+      } catch (_) {
+        await _auth.signOut();
+        rethrow;
+      }
+    } finally {
+      await proofAuth.signOut();
+      await app.delete();
+    }
+  }
 
   Future<UserCredential> _roleAuthenticate(Map<String, dynamic> values) async {
     final response = await _post(
