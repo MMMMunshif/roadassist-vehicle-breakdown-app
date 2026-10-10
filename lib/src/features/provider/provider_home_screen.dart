@@ -1376,9 +1376,8 @@ class _RaProviderPerformanceMetric extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(label, style: _providerText(context, size: 12, muted: true)),
-        ],
+      ],
       ),
-    ),
   );
 }
 
