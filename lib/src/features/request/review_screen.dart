@@ -145,6 +145,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
       submitting = true;
     });
     try {
+      if (!await AuthService().refreshEmailVerification(role: 'driver')) {
+        throw StateError(
+          'Verify the email address for your driver role, then sign in again.',
+        );
+      }
+
       final connections = await Connectivity().checkConnectivity();
 
       if (connections.every((result) => result == ConnectivityResult.none)) {
@@ -217,7 +223,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           : error is StateError
           ? error.message
           : error is FirebaseException && error.code == 'permission-denied'
-          ? 'Firebase rules blocked this request. Deploy the latest firestore.rules, then try again.'
+          ? 'Firestore denied this request. Sign out, then sign in again with your verified driver account.'
           : error is FirebaseException
           ? 'Request failed (${error.code}). Please check your connection and try again.'
           : 'Unable to create the request: $error';
