@@ -162,7 +162,11 @@ class _AuthFormState extends State<_AuthForm> {
           'Network unavailable. Check your internet connection.',
         'operation-not-allowed' =>
           'Email sign-in is not enabled for this Firebase project.',
-        'wrong-role' => error.message ?? 'This account has a different role.',
+        'wrong-role' =>
+          error.message ?? 'Sign in to the selected account role.',
+        'role-auth-unavailable' =>
+          'Account service is temporarily unavailable. Please try again.',
+        'invalid-argument' => 'Check your account details and password.',
         _ => error.message ?? 'Authentication failed. Please try again.',
       };
 
@@ -354,7 +358,7 @@ class _AuthFormState extends State<_AuthForm> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Reset password',
+                            'Reset ${widget.isProvider ? 'provider' : 'driver'} password',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 20,
                               height: 1.15,
@@ -437,7 +441,10 @@ class _AuthFormState extends State<_AuthForm> {
     }
 
     try {
-      await authService.sendPasswordResetEmail(email);
+      await authService.sendPasswordResetEmail(
+        email,
+        role: widget.isProvider ? 'provider' : 'driver',
+      );
 
       if (!mounted) return;
 
@@ -566,16 +573,17 @@ class _AuthFormState extends State<_AuthForm> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
-                      child: Text(
-                        widget.isProvider ? 'Profile photo' : 'Driver photo',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: colors.onSurface,
-                        ),
+                    Text(
+                      widget.isProvider ? 'Profile photo' : 'Driver photo',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colors.onSurface,
                       ),
                     ),
 

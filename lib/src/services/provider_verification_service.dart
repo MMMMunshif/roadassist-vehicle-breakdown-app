@@ -2,10 +2,15 @@ import '../models/provider_document_correction.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/account_roles.dart';
+import 'auth_service.dart';
 
 class ProviderVerificationService {
   final db = FirebaseFirestore.instance;
   Future<void> continueAsDriver() async {
+    if (AuthService.independentRoleAuth) {
+      await AuthService().signOut();
+      return;
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || !user.emailVerified)
       throw StateError('Verify your email first.');

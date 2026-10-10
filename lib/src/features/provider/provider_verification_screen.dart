@@ -1137,7 +1137,9 @@ class _ProviderVerificationScreenState
                         if (context.mounted)
                           Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(
-                              builder: (_) => const DriverShell(),
+                              builder: (_) => AuthService.independentRoleAuth
+                                  ? const LoginScreen(isProvider: false)
+                                  : const DriverShell(),
                             ),
                             (_) => false,
                           );

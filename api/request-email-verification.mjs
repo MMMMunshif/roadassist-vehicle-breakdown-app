@@ -1,3 +1,4 @@
+import { contactEmail } from '../functions/role-identity.mjs';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import nodemailer from 'nodemailer';
@@ -72,6 +73,20 @@ export default async function handler(request, response) {
     const db = getFirestore();
     const profile = (await db.doc(`users/${user.uid}`).get()).data();
     if (!profile) return response.status(403).json({ok:false,message:'Account profile unavailable.'});
+    if (profile.authIdentity === 'role-v1') {
+      if (role && role !== profile.role) return response.status(403).json({ok:false,message:'Sign in to this role first.'});
+      contactEmail(user, profile); // Validate server-owned recipient mapping.
+      if (!user.emailVerified) {
+        const limiter = db.doc(`roleEmailSendLimits/${user.uid}_native`);
+        const allowed = await db.runTransaction(async tx => {
+          const last = await tx.get(limiter);
+          if (Date.now() - (last.data()?.issuedAtMs ?? 0) < 60000) return false;
+          tx.set(limiter, {issuedAtMs:Date.now()});
+          return true;
+        });
+        if (!allowed) return response.status(429).json({ok:false,message:'Wait one minute before requesting another email.'});
+      }
+    }
     const roleRequired = role && (profile.roleEmailRequired ?? []).includes(role);
     if (roleRequired && ![profile.role, ...(profile.roles ?? [])].includes(role)) {
       return response.status(403).json({ok:false,message:'Register this role first.'});
@@ -111,8 +126,8 @@ export default async function handler(request, response) {
     const displayName = user.displayName?.trim() || 'RoadAssist user';
     const delivery = await transporter.sendMail({
       from: `RoadAssist <${gmailUser}>`,
-      to: user.email,
-      subject: 'Verify your RoadAssist email',
+      to: contactEmail(user, profile),
+      subject: `Verify your RoadAssist ${profile.authIdentity === 'role-v1' ? profile.role + ' ' : ''}email`,
       text: `Hello ${displayName},\n\nVerify your RoadAssist email using this secure link:\n${verificationLink}\n\nIf you did not create this account, ignore this email.`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#18324a">

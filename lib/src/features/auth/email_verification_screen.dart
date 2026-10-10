@@ -11,6 +11,20 @@ class EmailVerificationScreen extends StatefulWidget {
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
+  String? contactEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService()
+        .getCurrentProfile()
+        .then((profile) {
+          if (mounted)
+            setState(() => contactEmail = profile.data()?['email'] as String?);
+        })
+        .catchError((Object _) {});
+  }
+
   bool checking = false;
   bool sending = false;
 
@@ -124,8 +138,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final email =
-        FirebaseAuth.instance.currentUser?.email ?? 'your email address';
+    final email = contactEmail ?? 'your email address';
 
     return PopScope(
       canPop: false,

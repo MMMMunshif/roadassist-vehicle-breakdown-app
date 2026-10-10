@@ -70,6 +70,7 @@ void main() {
       final auth = TestAuth();
       await expectLater(
         AuthService(
+          independentRoleAuthEnabled: false,
           auth: auth,
           firestore: TestStore(false),
         ).signIn(email: 'old@example.com', password: 'password', role: role),
@@ -88,6 +89,7 @@ void main() {
     final auth = TestAuth();
     await expectLater(
       AuthService(
+        independentRoleAuthEnabled: false,
         auth: auth,
         firestore: TestStore(true),
       ).signIn(email: 'old@example.com', password: 'password', role: 'driver'),

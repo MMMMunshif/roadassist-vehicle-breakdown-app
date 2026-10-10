@@ -15,6 +15,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
 
   String workingHours = '';
   String serviceRadius = '';
+  String providerEmail = '';
   String providerName = '';
   String providerPhone = '';
 
@@ -81,6 +82,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
           providerName = data['displayName'] as String? ?? providerName;
 
           providerPhone = data['phone'] as String? ?? providerPhone;
+          providerEmail = data['email'] as String? ?? providerEmail;
 
           photoData = data['photoData'] as String?;
 
@@ -653,7 +655,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen> {
                         ? 'Service Provider'
                         : providerName,
                     phone: providerPhone,
-                    email: FirebaseAuth.instance.currentUser?.email ?? '',
+                    email: providerEmail,
                     accepting: accepting,
                     avatar: _profileAvatar(providerName),
                     uploadingPhoto: uploadingPhoto,
