@@ -771,9 +771,23 @@ class _RaProviderStatCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: _providerText(context, size: 11, muted: true)),
-            Text(
-              value,
-              style: _providerText(context, size: 19, weight: FontWeight.w800),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, .15),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: _providerText(context, size: 19, weight: FontWeight.w800),
+              ),
             ),
           ],
         );
