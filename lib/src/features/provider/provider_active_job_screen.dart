@@ -1,7 +1,6 @@
 part of '../../screens.dart';
 
-class ProviderActiveJobScreen
-    extends StatefulWidget {
+class ProviderActiveJobScreen extends StatefulWidget {
   const ProviderActiveJobScreen({
     super.key,
     this.requestId,
@@ -9,27 +8,15 @@ class ProviderActiveJobScreen
   });
 
   final String? requestId;
-
-  final Map<String, dynamic>
-      requestData;
+  final Map<String, dynamic> requestData;
 
   @override
-  State<ProviderActiveJobScreen>
-      createState() =>
-          _ProviderActiveJobScreenState();
+  State<ProviderActiveJobScreen> createState() =>
+      _ProviderActiveJobScreenState();
 }
 
-class _ProviderActiveJobScreenState
-    extends State<ProviderActiveJobScreen> {
-  int status = 0;
-
-  final statuses = const [
-    'Accepted',
-    'En Route',
-    'Arrived',
-    'Completed',
-  ];
-
+class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
+    with WidgetsBindingObserver {
   static const backendStatuses = [
     'accepted',
     'en_route',
@@ -37,266 +24,415 @@ class _ProviderActiveJobScreenState
     'completed',
   ];
 
-  StreamSubscription<Position>?
-      locationSubscription;
+  static const statuses = ['Accepted', 'En Route', 'Arrived', 'Completed'];
 
-  StreamSubscription<
-          DocumentSnapshot<
-              Map<String, dynamic>>>?
-      requestSubscription;
+  int status = 0;
 
-  late Map<String, dynamic>
-      requestData;
+  late Map<String, dynamic> requestData;
 
-  bool updatingStatus = false;
-  bool requestCancelled = false;
+  StreamSubscription<Position>? locationSubscription;
+  Timer? locationHeartbeat;
+  bool foreground = true;
+  bool publishingPosition = false;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    foreground = state == AppLifecycleState.resumed;
+    if (foreground) unawaited(publishFreshPosition());
+  }
+
+  DateTime? nearDriverSince;
+
+  Future<void> navigateToDriver() async {
+    final id = widget.requestId;
+    final lat = (requestData['latitude'] as num?)?.toDouble();
+    final lng = (requestData['longitude'] as num?)?.toDouble();
+    if (id == null ||
+        lat == null ||
+        lng == null ||
+        offline ||
+        updatingStatus ||
+        requestCancelled)
+      return;
+    if (status == 0) {
+      setState(() => updatingStatus = true);
+      try {
+        await RequestService().advanceProviderStatus(id, 'en_route');
+        if (!mounted) return;
+        setState(() {
+          status = 1;
+          requestData['status'] = 'en_route';
+        });
+      } catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Unable to start travelling: $error')),
+          );
+        return;
+      } finally {
+        if (mounted) setState(() => updatingStatus = false);
+      }
+    }
+    if (!mounted) return;
+    await openMapNavigation(context, latitude: lat, longitude: lng);
+    if (mounted) unawaited(publishFreshPosition());
+  }
+
+  Future<void> checkAutomaticArrival(Position position) async {
+    if (!mounted ||
+        !foreground ||
+        offline ||
+        updatingStatus ||
+        requestCancelled ||
+        status != 1) {
+      nearDriverSince = null;
+      return;
+    }
+    final lat = (requestData['latitude'] as num?)?.toDouble();
+    final lng = (requestData['longitude'] as num?)?.toDouble();
+    final age = DateTime.now().difference(position.timestamp);
+    if (lat == null ||
+        lng == null ||
+        !position.accuracy.isFinite ||
+        position.accuracy <= 0 ||
+        position.accuracy > 30 ||
+        age.isNegative ||
+        age > const Duration(seconds: 30) ||
+        Geolocator.distanceBetween(
+              position.latitude,
+              position.longitude,
+              lat,
+              lng,
+            ) >
+            75) {
+      nearDriverSince = null;
+      return;
+    }
+    final now = DateTime.now();
+    nearDriverSince ??= now;
+    if (now.difference(nearDriverSince!) < const Duration(seconds: 10)) return;
+    final id = widget.requestId;
+    if (id == null) return;
+    setState(() => updatingStatus = true);
+    try {
+      await RequestService().advanceProviderStatus(id, 'arrived');
+      if (!mounted) return;
+      setState(() {
+        status = 2;
+        requestData['status'] = 'arrived';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You are near the driver. Job marked as Arrived.'),
+        ),
+      );
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => locationMessage =
+              'Automatic arrival could not save. You can mark Arrived manually.',
+        );
+    } finally {
+      nearDriverSince = null;
+      if (mounted) setState(() => updatingStatus = false);
+    }
+  }
+
+  Future<void> publishFreshPosition() async {
+    final id = widget.requestId;
+    if (!mounted ||
+        !foreground ||
+        offline ||
+        publishingPosition ||
+        id == null ||
+        requestCancelled ||
+        status >= 3)
+      return;
+    publishingPosition = true;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      if (!mounted || !foreground || requestCancelled || status >= 3) return;
+      await RequestService().updateProviderLocation(
+        id,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      await checkAutomaticArrival(position);
+      if (mounted)
+        setState(() {
+          currentProviderPosition = LatLng(
+            position.latitude,
+            position.longitude,
+          );
+          locationMessage = null;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          locationMessage =
+              'Live location could not refresh. Check GPS and connection.';
+        });
+    } finally {
+      publishingPosition = false;
+    }
+  }
+
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  requestSubscription;
+
+  final serviceNotesController = TextEditingController();
+
+  List<String> servicePhotos = [];
+
+  LatLng? currentProviderPosition;
+  RoadRoute? roadRoute;
 
   String? locationMessage;
 
-  LatLng? currentProviderPosition;
-
-  RoadRoute? roadRoute;
-
   int routeRequestVersion = 0;
 
-  final serviceNotesController =
-      TextEditingController();
+  Map<String, dynamic>? completionReportDraft;
+  bool updatingStatus = false;
+  bool offline = false;
+  DateTime? lastSynced;
+  StreamSubscription<List<ConnectivityResult>>? connectionSubscription;
 
-  List<String> servicePhotos =
-      <String>[];
+  void onConnection(List<ConnectivityResult> results) {
+    if (mounted)
+      setState(() {
+        offline =
+            results.isEmpty ||
+            results.every((r) => r == ConnectivityResult.none);
+      });
+  }
 
-  bool savingDocumentation =
-      false;
+  bool savingDocumentation = false;
+  bool requestCancelled = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (widget.requestId != null) {
+      unawaited(Connectivity().checkConnectivity().then(onConnection));
+      connectionSubscription = Connectivity().onConnectivityChanged.listen(
+        onConnection,
+      );
+    }
 
-    requestData =
-        Map<String, dynamic>.from(
-      widget.requestData,
-    );
+    requestData = Map<String, dynamic>.from(widget.requestData);
 
-    status =
-        backendStatuses.indexOf(
-      requestData['status']
-              as String? ??
-          'accepted',
+    status = backendStatuses.indexOf(
+      requestData['status'] as String? ?? 'accepted',
     );
 
     if (status < 0) {
       status = 0;
     }
 
-    requestCancelled =
-        requestData['status'] ==
-            'cancelled';
+    requestCancelled = requestData['status'] == 'cancelled';
 
-    serviceNotesController.text =
-        requestData['serviceNotes']
-                as String? ??
-            '';
+    serviceNotesController.text = requestData['serviceNotes'] as String? ?? '';
 
     servicePhotos =
-        (requestData[
-                        'servicePhotoData']
-                    as List<dynamic>? ??
-                const [])
+        (requestData['servicePhotoData'] as List<dynamic>? ?? const [])
             .whereType<String>()
             .toList();
 
-    if (widget.requestId != null) {
-      requestSubscription =
-          RequestService()
-              .watchRequest(
-                widget.requestId!,
-              )
-              .listen(
-        (snapshot) {
-          final data =
-              snapshot.data();
+    final requestId = widget.requestId;
 
-          if (!mounted ||
-              data == null) {
-            return;
-          }
+    if (requestId != null) {
+      requestSubscription = RequestService()
+          .watchRequest(requestId)
+          .listen(
+            _handleRequestUpdate,
+            onError: (_) {
+              if (!mounted) return;
 
-          final nextStatus =
-              backendStatuses
-                  .indexOf(
-            data['status']
-                    as String? ??
-                '',
+              setState(() {
+                locationMessage = 'Unable to receive live request updates.';
+              });
+            },
           );
 
-          setState(() {
-            requestData = data;
-
-            requestCancelled =
-                data['status'] ==
-                    'cancelled';
-
-            if (nextStatus >= 0) {
-              status =
-                  nextStatus;
-            }
-
-            servicePhotos =
-                (data['servicePhotoData']
-                            as List<
-                                dynamic>? ??
-                        const [])
-                    .whereType<
-                        String>()
-                    .toList();
-          });
-        },
-        onError: (_) {
-          if (!mounted) return;
-
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Unable to receive live request updates.',
-              ),
-            ),
-          );
-        },
-      );
+      unawaited(startLocationSharing());
     }
-
-    startLocationSharing();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    locationHeartbeat?.cancel();
+    connectionSubscription?.cancel();
     locationSubscription?.cancel();
+
     requestSubscription?.cancel();
-    serviceNotesController
-        .dispose();
+
+    serviceNotesController.dispose();
 
     super.dispose();
   }
 
-  Future<void> startLocationSharing() async {
-    if (widget.requestId ==
-        null) {
+  void _handleRequestUpdate(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data();
+
+    if (!mounted || data == null) {
       return;
     }
 
-    var permission =
-        await Geolocator
-            .checkPermission();
+    final nextStatus = backendStatuses.indexOf(data['status'] as String? ?? '');
 
-    if (permission ==
-        LocationPermission.denied) {
-      permission =
-          await Geolocator
-              .requestPermission();
-    }
+    setState(() {
+      requestData = data;
+      if (!snapshot.metadata.isFromCache) lastSynced = DateTime.now();
 
-    if (permission ==
-            LocationPermission
-                .denied ||
-        permission ==
-            LocationPermission
-                .deniedForever) {
-      if (mounted) {
-        setState(() {
-          locationMessage =
-              'Location permission is required to share your live position.';
-        });
+      requestCancelled = data['status'] == 'cancelled';
+
+      if (nextStatus >= 0) {
+        status = nextStatus;
       }
+
+      servicePhotos = (data['servicePhotoData'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList();
+
+      final notes = data['serviceNotes'] as String? ?? '';
+
+      if (!serviceNotesController.text.trim().isNotEmpty) {
+        serviceNotesController.text = notes;
+      }
+    });
+    if (requestCancelled || status >= 3) {
+      locationSubscription?.cancel();
+      locationHeartbeat?.cancel();
+    }
+  }
+
+  Future<void> startLocationSharing() async {
+    final requestId = widget.requestId;
+
+    if (requestId == null || requestCancelled || status >= 3) {
       return;
     }
 
-    locationSubscription =
-        Geolocator
-            .getPositionStream(
-      locationSettings:
-          const LocationSettings(
-        accuracy:
-            LocationAccuracy.high,
-        distanceFilter: 25,
-      ),
-    ).listen(
-      (position) {
-        final point = LatLng(
-          position.latitude,
-          position.longitude,
-        );
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
 
-        if (mounted) {
-          setState(() {
-            currentProviderPosition =
-                point;
-
-            locationMessage = null;
-          });
-        }
-
-        unawaited(
-          refreshProviderRoute(
-            point,
-          ),
-        );
-
-        RequestService()
-            .updateProviderLocation(
-          widget.requestId!,
-          latitude:
-              position.latitude,
-          longitude:
-              position.longitude,
-        );
-      },
-      onError: (_) {
+      if (!enabled) {
         if (!mounted) return;
 
         setState(() {
           locationMessage =
-              'Live location sharing stopped.';
+              'Turn on location services to share your live position.';
         });
-      },
-    );
+
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+
+        setState(() {
+          locationMessage =
+              'Location permission is required for live provider tracking.';
+        });
+
+        return;
+      }
+
+      await locationSubscription?.cancel();
+      locationHeartbeat?.cancel();
+      locationHeartbeat = Timer.periodic(const Duration(seconds: 45), (_) {
+        unawaited(publishFreshPosition());
+      });
+      unawaited(publishFreshPosition());
+
+      locationSubscription =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 25,
+            ),
+          ).listen(
+            (position) {
+              final point = LatLng(position.latitude, position.longitude);
+
+              if (mounted) {
+                setState(() {
+                  currentProviderPosition = point;
+
+                  locationMessage = null;
+                });
+              }
+
+              if (!foreground || offline || requestCancelled || status >= 3)
+                return;
+              unawaited(
+                RequestService()
+                    .updateProviderLocation(
+                      requestId,
+                      latitude: position.latitude,
+                      longitude: position.longitude,
+                    )
+                    .catchError((_) {
+                      if (mounted)
+                        setState(() {
+                          locationMessage =
+                              'Live position could not be shared. Check your connection.';
+                        });
+                    }),
+              );
+
+              unawaited(checkAutomaticArrival(position));
+              unawaited(refreshProviderRoute(point));
+            },
+            onError: (_) {
+              if (!mounted) return;
+
+              setState(() {
+                locationMessage = 'Live location sharing stopped.';
+              });
+            },
+          );
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        locationMessage = 'Unable to start live location sharing.';
+      });
+    }
   }
 
-  Future<void> refreshProviderRoute(
-    LatLng origin,
-  ) async {
-    final latitude =
-        (requestData['latitude']
-                as num?)
-            ?.toDouble();
+  Future<void> refreshProviderRoute(LatLng origin) async {
+    final latitude = (requestData['latitude'] as num?)?.toDouble();
 
-    final longitude =
-        (requestData['longitude']
-                as num?)
-            ?.toDouble();
+    final longitude = (requestData['longitude'] as num?)?.toDouble();
 
-    if (latitude == null ||
-        longitude == null) {
+    if (latitude == null || longitude == null) {
       return;
     }
 
-    final version =
-        ++routeRequestVersion;
+    final version = ++routeRequestVersion;
 
     try {
-      final result =
-          await const RouteService()
-              .fetchDrivingRoute(
+      final result = await const RouteService().fetchDrivingRoute(
         origin: origin,
-        destination: LatLng(
-          latitude,
-          longitude,
-        ),
+        destination: LatLng(latitude, longitude),
       );
 
-      if (!mounted ||
-          version !=
-              routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
@@ -304,29 +440,29 @@ class _ProviderActiveJobScreenState
         roadRoute = result;
       });
     } catch (_) {
-      if (!mounted ||
-          version !=
-              routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
       setState(() {
-        locationMessage =
-            'Road route ETA is unavailable.';
+        locationMessage = 'Road route and ETA are temporarily unavailable.';
       });
     }
   }
 
   Future<void> withdraw() async {
-    final reason =
-        await _adminReason(
+    final requestId = widget.requestId;
+
+    if (requestId == null || updatingStatus) {
+      return;
+    }
+
+    final reason = await _adminReason(
       context,
       'Why can you no longer attend this job?',
     );
 
-    if (reason == null ||
-        !mounted ||
-        widget.requestId == null) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -335,28 +471,17 @@ class _ProviderActiveJobScreenState
     });
 
     try {
-      await RequestService()
-          .withdrawProvider(
-        widget.requestId!,
-        reason,
-      );
+      await RequestService().withdrawProvider(requestId, reason);
 
-      if (mounted) {
-        replace(
-          context,
-          const ProviderShell(),
-        );
-      }
+      if (!mounted) return;
+
+      replace(context, const ProviderShell());
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content:
-              Text('$error'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -366,41 +491,36 @@ class _ProviderActiveJobScreenState
     }
   }
 
-  Future<void>
-      addDocumentationPhoto() async {
-    if (servicePhotos.length >=
-            3 ||
-        widget.requestId == null) {
+  Future<void> addDocumentationPhoto() async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
       return;
     }
 
-    final navigator =
-        Navigator.of(context);
+    final requestId = widget.requestId;
 
-    final source =
-        await showModalBottomSheet<
-            ImageSource>(
+    if (requestId == null || savingDocumentation || servicePhotos.length >= 3) {
+      return;
+    }
+
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      showDragHandle: true,
+      useSafeArea: true,
       builder: (sheetContext) {
         return const SafeArea(
           child: Wrap(
             children: [
               _PhotoSourceTile(
-                icon: Icons
-                    .camera_alt_outlined,
-                label:
-                    'Take a photo',
-                source:
-                    ImageSource.camera,
+                icon: Icons.camera_alt_outlined,
+                label: 'Take a photo',
+                source: ImageSource.camera,
               ),
               _PhotoSourceTile(
-                icon: Icons
-                    .photo_library_outlined,
-                label:
-                    'Choose from gallery',
-                source:
-                    ImageSource.gallery,
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                source: ImageSource.gallery,
               ),
             ],
           ),
@@ -408,450 +528,219 @@ class _ProviderActiveJobScreenState
       },
     );
 
-    if (source == null ||
-        !mounted) {
+    if (source == null || !mounted) {
       return;
     }
 
-    final photo =
-        source ==
-                ImageSource.camera
-            ? await navigator
-                .push<XFile>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const CameraCaptureScreen(),
-                ),
-              )
-            : await ImagePicker()
-                .pickImage(
-                source:
-                    ImageSource.gallery,
-                imageQuality: 70,
-                maxWidth: 1200,
-              );
+    final navigator = Navigator.of(context);
 
-    if (photo == null ||
-        !mounted) {
+    final photo = source == ImageSource.camera
+        ? await navigator.push<XFile>(
+            MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+          )
+        : await ImagePicker().pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 70,
+            maxWidth: 1200,
+          );
+
+    if (photo == null || !mounted) {
       return;
     }
 
     setState(() {
-      savingDocumentation =
-          true;
+      savingDocumentation = true;
     });
 
     try {
-      final encoded =
-          await PhotoUploadService()
-              .prepareVehiclePhoto(
-        photo,
+      final encoded = await PhotoUploadService().prepareVehiclePhoto(photo);
+
+      final updated = [...servicePhotos, encoded];
+
+      await RequestService().updateProviderDocumentation(
+        requestId,
+        serviceNotes: serviceNotesController.text.trim(),
+        servicePhotoData: updated,
       );
 
-      final updated = [
-        ...servicePhotos,
-        encoded,
-      ];
+      if (!mounted) return;
 
-      await RequestService()
-          .updateProviderDocumentation(
-        widget.requestId!,
-        serviceNotes:
-            serviceNotesController
-                .text,
-        servicePhotoData:
-            updated,
-      );
-
-      if (mounted) {
-        setState(() {
-          servicePhotos =
-              updated;
-        });
-      }
+      setState(() {
+        servicePhotos = updated;
+      });
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to add documentation: $error',
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to add documentation: $error')),
       );
     } finally {
       if (mounted) {
         setState(() {
-          savingDocumentation =
-              false;
+          savingDocumentation = false;
         });
       }
     }
   }
 
-  Future<void>
-      saveDocumentation() async {
-    if (widget.requestId ==
-            null ||
-        savingDocumentation) {
+  Future<void> removeDocumentationPhoto(int index) async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
       return;
     }
 
-    setState(() {
-      savingDocumentation =
-          true;
-    });
+    final requestId = widget.requestId;
 
-    try {
-      await RequestService()
-          .updateProviderDocumentation(
-        widget.requestId!,
-        serviceNotes:
-            serviceNotesController
-                .text,
-        servicePhotoData:
-            servicePhotos,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Service documentation saved.',
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'Unable to save notes: $error',
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          savingDocumentation =
-              false;
-        });
-      }
-    }
-  }
-
-  Future<void>
-      removeDocumentationPhoto(
-    int index,
-  ) async {
-    if (widget.requestId ==
-            null ||
-        savingDocumentation) {
+    if (requestId == null ||
+        savingDocumentation ||
+        index < 0 ||
+        index >= servicePhotos.length) {
       return;
     }
 
-    final updated = [
-      ...servicePhotos,
-    ]..removeAt(index);
+    final previous = [...servicePhotos];
+
+    final updated = [...servicePhotos]..removeAt(index);
 
     setState(() {
       servicePhotos = updated;
+
+      savingDocumentation = true;
     });
 
     try {
-      await RequestService()
-          .updateProviderDocumentation(
-        widget.requestId!,
-        serviceNotes:
-            serviceNotesController
-                .text,
-        servicePhotoData:
-            updated,
+      await RequestService().updateProviderDocumentation(
+        requestId,
+        serviceNotes: serviceNotesController.text.trim(),
+        servicePhotoData: updated,
       );
     } catch (_) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to remove the photo.',
-          ),
-        ),
+      setState(() {
+        servicePhotos = previous;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to remove the photo.')),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          savingDocumentation = false;
+        });
+      }
     }
   }
 
-  Future<int?>
-      requestFinalCost() async {
-    final approved =
-        (requestData[
-                    'estimatedCost']
-                as num?)
-            ?.toInt() ??
-        0;
-
-    final protected =
-        requestData[
-                'workflowVersion'] ==
-            2;
-
-    final controller =
-        TextEditingController(
-      text: '$approved',
-    );
-
-    final costRoute =
-        DialogRoute<int>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (
-            context,
-            refresh,
-          ) {
-            final amount =
-                int.tryParse(
-              controller.text,
-            );
-
-            final changed =
-                protected &&
-                    amount !=
-                        approved;
-
-            return AlertDialog(
-              icon: const Icon(
-                Icons
-                    .receipt_long_outlined,
-              ),
-              title: const Text(
-                'Confirm final charge',
-              ),
-              content: Column(
-                mainAxisSize:
-                    MainAxisSize.min,
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .stretch,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets
-                            .all(
-                      RaSpace.md,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      )
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(
-                        alpha: .32,
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        14,
-                      ),
-                    ),
-                    child: Text(
-                      'Driver-approved total: Rs. $approved',
-                    ),
-                  ),
-
-                  const SizedBox(
-                    height:
-                        RaSpace.md,
-                  ),
-
-                  TextField(
-                    controller:
-                        controller,
-                    autofocus: true,
-                    keyboardType:
-                        TextInputType
-                            .number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter
-                          .digitsOnly,
-                      LengthLimitingTextInputFormatter(
-                        8,
-                      ),
-                    ],
-                    onChanged: (_) =>
-                        refresh(
-                      () {},
-                    ),
-                    decoration:
-                        const InputDecoration(
-                      labelText:
-                          'Final amount (Rs.)',
-                      prefixIcon:
-                          Icon(
-                        Icons
-                            .payments_outlined,
-                      ),
-                    ),
-                  ),
-
-                  if (changed) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
-                    const InlineMessage(
-                      icon: Icons
-                          .approval_outlined,
-                      text:
-                          'A changed price needs a reason and driver approval. An increase also needs photo evidence. The job remains open while approval is pending.',
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () =>
-                      Navigator.pop(
-                    dialogContext,
-                  ),
-                  child:
-                      const Text(
-                    'Cancel',
-                  ),
-                ),
-                FilledButton(
-                  onPressed:
-                      amount == null ||
-                              amount <
-                                  0 ||
-                              amount >
-                                  10000000
-                          ? null
-                          : () =>
-                              Navigator.pop(
-                                dialogContext,
-                                amount,
-                              ),
-                  child: Text(
-                    changed
-                        ? 'Request Approval'
-                        : 'Complete Job',
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    final value =
-        await Navigator.of(
-      context,
-      rootNavigator: true,
-    ).push(costRoute);
-
-    await costRoute.completed;
-
-    controller.dispose();
-
-    if (value == null ||
-        !mounted) {
-      return null;
+  Future<void> saveDocumentation() async {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
+      return;
     }
 
-    if (protected &&
-        value != approved) {
-      final quote =
-          await requestProviderQuote(
-        context,
-        {
-          ...requestData,
-          'repairRevision':
-              true,
-          'proposedTotal':
-              value,
-        },
+    final requestId = widget.requestId;
+
+    if (requestId == null || savingDocumentation) {
+      return;
+    }
+
+    setState(() {
+      savingDocumentation = true;
+    });
+
+    try {
+      await RequestService().updateProviderDocumentation(
+        requestId,
+        serviceNotes: serviceNotesController.text.trim(),
+        servicePhotoData: servicePhotos,
       );
 
-      if (quote == null ||
-          !mounted) {
-        return null;
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Service documentation saved.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save documentation: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          savingDocumentation = false;
+        });
       }
-
-      try {
-        await RequestService()
-            .proposeRepair(
-          widget.requestId!,
-          quote,
-        );
-
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Price change sent. Wait for driver approval, then complete the job at the approved total.',
-              ),
-            ),
-          );
-        }
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Could not send the price change. Check access, connection and whether another change is pending.',
-              ),
-            ),
-          );
-        }
-      }
-
-      return null;
     }
-
-    return value;
   }
 
   Future<void> advanceStatus() async {
-    if (updatingStatus ||
-        widget.requestId == null ||
-        requestCancelled) {
+    if (offline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reconnect before updating this job.')),
+      );
+      return;
+    }
+
+    final requestId = widget.requestId;
+
+    if (requestId == null || updatingStatus || requestCancelled) {
       return;
     }
 
     if (status == 3) {
       replace(
         context,
-        ProviderCompletedScreen(
-          requestId:
-              widget.requestId!,
-          requestData:
-              requestData,
-        ),
+        ProviderCompletedScreen(requestId: requestId, requestData: requestData),
       );
 
       return;
     }
 
     int? finalCost;
+    CompletionReport? report;
 
     if (status == 2) {
-      finalCost =
-          await requestFinalCost();
+      String? blocked;
+      if (requestData['jobStartCodeRequired'] == true &&
+          requestData['jobStartCodeVerifiedAt'] == null) {
+        blocked = 'Verify the driver job-start code before completing work.';
+      } else if (requestData['arrivalVerificationRequired'] == true &&
+          requestData['arrivalConfirmedBy'] != requestData['driverId']) {
+        blocked =
+            'Ask the driver to confirm your arrival before completing work.';
+      } else if (serviceNotesController.text.trim().length < 10 ||
+          servicePhotos.isEmpty) {
+        blocked =
+            'Add service notes of at least 10 characters and at least one completion photo before completing the job.';
+      } else if (requestData['pendingRepairId'] != null ||
+          (requestData['approvedQuoteType'] == 'inspection' &&
+              requestData['approvedRepairId'] == null)) {
+        blocked =
+            'Wait for the driver to approve the repair quote before completing the job.';
+      }
+      if (blocked != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(blocked)));
+        return;
+      }
+      report = await requestCompletionReport(context, {
+        ...requestData,
+        if (completionReportDraft != null)
+          'completionReport': completionReportDraft,
+      });
+      if (report == null || !mounted) return;
+      completionReportDraft = report.toMap();
+      finalCost = await requestFinalCost();
 
-      if (finalCost == null ||
-          !mounted) {
+      if (finalCost == null || !mounted) {
         return;
       }
     }
@@ -862,63 +751,56 @@ class _ProviderActiveJobScreenState
 
     try {
       if (status == 2) {
-        await RequestService()
-            .updateProviderDocumentation(
-          widget.requestId!,
-          serviceNotes:
-              serviceNotesController
-                  .text,
-          servicePhotoData:
-              servicePhotos,
+        await RequestService().updateProviderDocumentation(
+          requestId,
+          serviceNotes: serviceNotesController.text.trim(),
+          servicePhotoData: servicePhotos,
         );
 
-        await RequestService()
-            .completeProviderJob(
-          widget.requestId!,
+        await RequestService().completeProviderJob(
+          requestId,
           finalCost!,
+          report: report!,
         );
 
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Completion submitted. Waiting for driver confirmation.',
-              ),
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Completion submitted. Waiting for driver confirmation.',
             ),
-          );
-        }
-      } else {
-        await RequestService()
-            .advanceProviderStatus(
-          widget.requestId!,
-          backendStatuses[
-              status + 1],
+          ),
         );
 
-        try {
-          await RequestService()
-              .updateProviderDocumentation(
-            widget.requestId!,
-            serviceNotes:
-                serviceNotesController
-                    .text,
-            servicePhotoData:
-                servicePhotos,
-          );
-        } catch (_) {
-          // Optional notes must not
-          // block job progression.
-        }
+        return;
+      }
+
+      await RequestService().advanceProviderStatus(
+        requestId,
+        backendStatuses[status + 1],
+      );
+
+      try {
+        await RequestService().updateProviderDocumentation(
+          requestId,
+          serviceNotes: serviceNotesController.text.trim(),
+          servicePhotoData: servicePhotos,
+        );
+      } catch (_) {
+        // Optional notes save must not block workflow progression.
       }
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Unable to update job status: ${error.toString().replaceFirst('Exception: ', '')}',
+            error is FirebaseException
+                ? 'Unable to update job status (${error.code}). Check your connection, arrival confirmation and saved documentation.'
+                : error is StateError
+                ? error.message
+                : 'Unable to update job status. Check arrival confirmation, completion photo and driver-approved repair quote, then retry.',
           ),
         ),
       );
@@ -931,1169 +813,402 @@ class _ProviderActiveJobScreenState
     }
   }
 
-  String get _statusMessage {
+  Future<int?> requestFinalCost() async {
+    final approved = (requestData['estimatedCost'] as num?)?.toInt() ?? 0;
+
+    final protected = requestData['workflowVersion'] == 2;
+
+    final controller = TextEditingController(text: '$approved');
+
+    final value = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, refresh) {
+            final amount = int.tryParse(controller.text.trim());
+
+            final changed = protected && amount != approved;
+
+            return AlertDialog(
+              icon: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Confirm final charge'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Driver-approved total: Rs. $approved'),
+
+                  const SizedBox(height: 12),
+
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(8),
+                    ],
+                    onChanged: (_) {
+                      refresh(() {});
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Final amount (Rs.)',
+                    ),
+                  ),
+
+                  if (changed) ...[
+                    const SizedBox(height: 10),
+                    const Text(
+                      'A changed total requires driver approval before completion.',
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  child: const Text('Cancel'),
+                ),
+
+                FilledButton(
+                  onPressed: amount == null || amount < 0 || amount > 10000000
+                      ? null
+                      : () {
+                          Navigator.pop(dialogContext, amount);
+                        },
+                  child: Text(changed ? 'Request Approval' : 'Continue'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (value == null || !mounted) {
+      return null;
+    }
+
+    if (protected && value != approved) {
+      final quote = await requestProviderQuote(context, {
+        ...requestData,
+        'repairRevision': true,
+        'proposedTotal': value,
+      });
+
+      if (quote == null || !mounted) {
+        return null;
+      }
+
+      try {
+        await RequestService().proposeRepair(widget.requestId!, quote);
+
+        if (!mounted) return null;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Price revision sent. Wait for driver approval before completing the job.',
+            ),
+          ),
+        );
+      } catch (_) {
+        if (!mounted) return null;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to send the revised price.')),
+        );
+      }
+
+      return null;
+    }
+
+    return value;
+  }
+
+  String _statusTitle() {
     if (requestCancelled) {
-      return 'The driver cancelled this assistance request.';
+      return 'Job cancelled';
+    }
+
+    if (requestData['completionState'] == 'pending') {
+      return 'Waiting for driver confirmation';
     }
 
     return switch (status) {
-      0 =>
-        'Prepare for the job and start travelling when ready.',
-      1 =>
-        'Your live location is being shared while you travel.',
-      2 =>
-        'Confirm arrival requirements before beginning work.',
-      _ =>
-        'The roadside assistance workflow is complete.',
+      0 => 'Job accepted',
+      1 => 'Travelling to driver',
+      2 => 'Arrived at breakdown',
+      _ => 'Job completed',
     };
   }
 
-  bool get _canAdvance {
-    final data = requestData;
-
-    return !updatingStatus &&
-        data['completionState'] !=
-            'pending' &&
-        (status != 2 ||
-            data['arrivalVerificationRequired'] !=
-                true ||
-            data['arrivalConfirmedBy'] ==
-                data['driverId']) &&
-        widget.requestId != null &&
-        (requestCancelled ||
-            status != 2 ||
-            data['workflowVersion'] !=
-                2 ||
-            (data['pendingRepairId'] ==
-                    null &&
-                (data['approvedQuoteType'] !=
-                        'inspection' ||
-                    data['approvedRepairId'] !=
-                        null)));
-  }
-
-  String get _actionLabel {
-    final data = requestData;
-
-    if (updatingStatus) {
-      return 'Updating status…';
-    }
-
-    if (data['completionState'] ==
-        'pending') {
-      return 'Waiting for Driver Confirmation';
-    }
-
+  String _statusDescription() {
     if (requestCancelled) {
-      return 'Back to Dashboard';
+      return requestData['cancellationReason'] as String? ??
+          'This roadside assistance job is no longer active.';
     }
 
-    if (status == 3) {
-      return 'Finish Job';
+    if (requestData['completionState'] == 'pending') {
+      return 'The completion has been submitted. The driver must review and confirm the work.';
     }
 
-    return 'Mark as ${statuses[status + 1]}';
-  }
-
-  IconData get _statusIcon {
     return switch (status) {
-      0 =>
-        Icons.handshake_outlined,
+      0 => 'Review the request and start travelling when you are ready.',
       1 =>
-        Icons.navigation_outlined,
+        'Your live location is being shared with the driver while travelling.',
       2 =>
-        Icons
-            .location_on_outlined,
-      _ =>
-        Icons.task_alt_rounded,
+        'Confirm arrival, document the work and complete only after required approvals.',
+      _ => 'The roadside assistance job has been completed.',
     };
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
-
+  Widget build(BuildContext context) {
     final data = requestData;
 
-    final latitude =
-        (data['latitude'] as num?)
-            ?.toDouble();
+    final theme = Theme.of(context);
 
-    final longitude =
-        (data['longitude'] as num?)
-            ?.toDouble();
+    final colors = theme.colorScheme;
 
-    final hasDestination =
-        latitude != null &&
-            longitude != null;
+    final latitude = (data['latitude'] as num?)?.toDouble();
 
-    final driverName =
-        data['driverName']
-                as String? ??
-            'Driver';
+    final longitude = (data['longitude'] as num?)?.toDouble();
 
-    final driverPhone =
-        data['driverPhone']
-                as String? ??
-            '';
+    final hasDriverLocation = latitude != null && longitude != null;
+
+    final driverName = data['driverName'] as String? ?? 'Driver';
+
+    final driverPhone = data['driverPhone'] as String? ?? '';
+
+    final location =
+        data['locationLabel'] as String? ??
+        data['location'] as String? ??
+        'Location unavailable';
 
     final vehicle = [
-      data['vehicleType']
-              as String? ??
-          '',
-      data['modelYear']
-              as String? ??
-          '',
-      data['registration']
-              as String? ??
-          '',
-    ]
-        .where(
-          (value) =>
-              value.isNotEmpty,
-        )
-        .join(' • ');
+      data['vehicleType'] as String? ?? '',
+      data['modelYear'] as String? ?? '',
+      data['registration'] as String? ?? '',
+    ].where((value) => value.trim().isNotEmpty).join(' • ');
 
-    return Scaffold(
-      backgroundColor:
-          theme
-              .scaffoldBackgroundColor,
+    final completionPending = data['completionState'] == 'pending';
 
+    final waitingForArrivalConfirmation =
+        status == 2 &&
+        data['arrivalVerificationRequired'] == true &&
+        data['arrivalConfirmedBy'] == null;
+
+    final repairReady =
+        data['workflowVersion'] != 2 ||
+        (data['pendingRepairId'] == null &&
+            (data['approvedQuoteType'] != 'inspection' ||
+                data['approvedRepairId'] != null));
+
+    return RaProviderScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Active Assistance',
-        ),
-        actions: [
-          if (widget.requestId !=
-              null)
-            IconButton(
-              tooltip:
-                  'Job details',
-              onPressed: () =>
-                  push(
-                context,
-                ProviderRequestDetailsScreen(
-                  requestId:
-                      widget.requestId!,
-                  data: data,
+        title: Row(
+          children: [
+            const BrandMark(size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Active Assistance',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.45,
                 ),
               ),
-              icon: const Icon(
-                Icons
-                    .description_outlined,
-              ),
             ),
-          const SizedBox(
-            width: RaSpace.sm,
+          ],
+        ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: _WelcomeThemeToggle(),
           ),
         ],
       ),
-
       body: SafeArea(
         top: false,
         child: Column(
           children: [
             Expanded(
               child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior
-                        .onDrag,
-                padding:
-                    const EdgeInsets
-                        .fromLTRB(
-                  RaSpace.lg,
-                  RaSpace.md,
-                  RaSpace.lg,
-                  RaSpace.xxl,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
-                  if (widget.requestId !=
-                          null &&
-                      (data['arrivalVerificationRequired'] !=
-                              true ||
-                          data['arrivalConfirmedBy'] ==
-                              data['driverId'])) ...[
-                    RepairQuotePanel(
-                      requestId:
-                          widget
-                              .requestId!,
-                      isProvider:
-                          true,
-                    ),
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
-                  ],
-
-                  Container(
-                    padding:
-                        const EdgeInsets
-                            .all(
-                      RaSpace.xl,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      gradient:
-                          LinearGradient(
-                        begin:
-                            Alignment
-                                .topLeft,
-                        end:
-                            Alignment
-                                .bottomRight,
-                        colors:
-                            requestCancelled
-                                ? [
-                                    colors.error,
-                                    const Color(
-                                      0xFF9B2922,
-                                    ),
-                                  ]
-                                : [
-                                    colors.primary,
-                                    const Color(
-                                      0xFF007D70,
-                                    ),
-                                  ],
-                      ),
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        24,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 46,
-                              height: 46,
-                              decoration:
-                                  BoxDecoration(
-                                color: Colors
-                                    .white
-                                    .withValues(
-                                  alpha:
-                                      .14,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(
-                                  15,
-                                ),
-                              ),
-                              child:
-                                  Icon(
-                                requestCancelled
-                                    ? Icons
-                                        .close_rounded
-                                    : _statusIcon,
-                                color: Colors
-                                    .white,
-                              ),
-                            ),
-                            const SizedBox(
-                              width:
-                                  RaSpace
-                                      .md,
-                            ),
-                            Expanded(
-                              child:
-                                  Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    requestCancelled
-                                        ? 'Request Cancelled'
-                                        : statuses[status],
-                                    style: theme
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                      color:
-                                          Colors.white,
-                                      fontWeight:
-                                          FontWeight.w900,
-                                    ),
-                                  ),
-                                  const SizedBox(
-                                    height:
-                                        3,
-                                  ),
-                                  Text(
-                                    _statusMessage,
-                                    style: theme
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                      color: Colors
-                                          .white
-                                          .withValues(
-                                        alpha:
-                                            .82,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        if (!requestCancelled) ...[
-                          const SizedBox(
-                            height:
-                                RaSpace
-                                    .lg,
-                          ),
-                          Container(
-                            padding:
-                                const EdgeInsets
-                                    .all(
-                              RaSpace.sm,
-                            ),
-                            decoration:
-                                BoxDecoration(
-                              color: colors
-                                  .surface,
-                              borderRadius:
-                                  BorderRadius.circular(
-                                14,
-                              ),
-                            ),
-                            child:
-                                StatusTimeline(
-                              statuses:
-                                  statuses,
-                              current:
-                                  status,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  if (hasDestination) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
-
-                    Container(
-                      height: 280,
-                      clipBehavior:
-                          Clip.antiAlias,
-                      decoration:
-                          BoxDecoration(
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          22,
-                        ),
-                        border:
-                            Border.all(
-                          color: colors
-                              .outlineVariant
-                              .withValues(
-                            alpha:
-                                .6,
-                          ),
-                        ),
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child:
-                                MapMock(
-                              position:
-                                  LatLng(
-                                latitude,
-                                longitude,
-                              ),
-                              providerPosition:
-                                  currentProviderPosition,
-                              routePoints:
-                                  roadRoute
-                                      ?.points,
-                              showProviders:
-                                  currentProviderPosition !=
-                                      null,
-                              showRoute:
-                                  roadRoute !=
-                                      null,
-                            ),
-                          ),
-
-                          Positioned(
-                            top:
-                                RaSpace.md,
-                            left:
-                                RaSpace.md,
-                            right:
-                                RaSpace.md,
-                            child:
-                                Container(
-                              padding:
-                                  const EdgeInsets
-                                      .all(
-                                RaSpace
-                                    .md,
-                              ),
-                              decoration:
-                                  BoxDecoration(
-                                color: colors
-                                    .surface
-                                    .withValues(
-                                  alpha:
-                                      .94,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(
-                                  15,
-                                ),
-                              ),
-                              child:
-                                  Row(
-                                children: [
-                                  Icon(
-                                    currentProviderPosition ==
-                                            null
-                                        ? Icons
-                                            .location_searching_rounded
-                                        : Icons
-                                            .share_location_outlined,
-                                    color: colors
-                                        .primary,
-                                  ),
-                                  const SizedBox(
-                                    width:
-                                        RaSpace.sm,
-                                  ),
-                                  Expanded(
-                                    child:
-                                        Text(
-                                      currentProviderPosition ==
-                                              null
-                                          ? 'Finding your live location…'
-                                          : roadRoute ==
-                                                  null
-                                              ? 'Live location sharing active'
-                                              : '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                                      style: theme
-                                          .textTheme
-                                          .labelMedium
-                                          ?.copyWith(
-                                        fontWeight:
-                                            FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(
-                      height:
-                          RaSpace.sm,
-                    ),
-
-                    SizedBox(
-                      width:
-                          double.infinity,
-                      child:
-                          FilledButton.icon(
-                        onPressed: () =>
-                            openMapNavigation(
-                          context,
-                          latitude:
-                              latitude,
-                          longitude:
-                              longitude,
-                        ),
-                        icon: const Icon(
-                          Icons
-                              .navigation_outlined,
-                        ),
-                        label: const Text(
-                          'Open Navigation',
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  if (locationMessage !=
-                      null) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
-                    InlineMessage(
-                      icon: Icons
-                          .location_off_outlined,
-                      text:
-                          locationMessage!,
-                    ),
-                  ],
-
-                  const SizedBox(
-                    height:
-                        RaSpace.xxl,
-                  ),
-
-                  Text(
-                    'Customer & job',
-                    style: theme
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(
-                      fontWeight:
-                          FontWeight.w900,
-                    ),
-                  ),
-
-                  const SizedBox(
-                    height:
-                        RaSpace.md,
-                  ),
-
-                  Container(
-                    padding:
-                        const EdgeInsets
-                            .all(
-                      RaSpace.lg,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          colors.surface,
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        20,
-                      ),
-                      border:
-                          Border.all(
-                        color: colors
-                            .outlineVariant
-                            .withValues(
-                          alpha: .6,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            ProfileInitials(
-                              name:
-                                  driverName,
-                              radius: 25,
-                            ),
-                            const SizedBox(
-                              width:
-                                  RaSpace.md,
-                            ),
-                            Expanded(
-                              child:
-                                  Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    driverName,
-                                    style: theme
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.w900,
-                                    ),
-                                  ),
-                                  const SizedBox(
-                                    height:
-                                        2,
-                                  ),
-                                  Text(
-                                    requestIssueLabel(
-                                      data,
-                                    ),
-                                    style: theme
-                                        .textTheme
-                                        .bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(
-                          height:
-                              RaSpace.md,
-                        ),
-
-                        _ProviderActiveInfoRow(
-                          icon: Icons
-                              .directions_car_outlined,
-                          label:
-                              'Vehicle',
-                          value: vehicle
-                                  .isEmpty
-                              ? 'Vehicle details unavailable'
-                              : vehicle,
-                        ),
-
-                        const SizedBox(
-                          height:
-                              RaSpace.sm,
-                        ),
-
-                        _ProviderActiveInfoRow(
-                          icon: Icons
-                              .location_on_outlined,
-                          label:
-                              'Breakdown location',
-                          value:
-                              data['locationLabel']
-                                      as String? ??
-                                  'Pinned location',
-                        ),
-
-                        const SizedBox(
-                          height:
-                              RaSpace.md,
-                        ),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child:
-                                  OutlinedButton.icon(
-                                onPressed:
-                                    driverPhone
-                                            .isEmpty
-                                        ? null
-                                        : () =>
-                                            showCallPrompt(
-                                              context,
-                                              name:
-                                                  driverName,
-                                              number:
-                                                  driverPhone,
-                                            ),
-                                icon:
-                                    const Icon(
-                                  Icons
-                                      .call_outlined,
-                                ),
-                                label:
-                                    const Text(
-                                  'Call',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(
-                              width:
-                                  RaSpace.sm,
-                            ),
-                            Expanded(
-                              child:
-                                  FilledButton.icon(
-                                onPressed:
-                                    widget.requestId ==
-                                            null
-                                        ? null
-                                        : () =>
-                                            push(
-                                              context,
-                                              ChatScreen(
-                                                requestId:
-                                                    widget.requestId,
-                                                peerName:
-                                                    driverName,
-                                                peerPhone:
-                                                    driverPhone,
-                                              ),
-                                            ),
-                                icon:
-                                    _UnreadChatIcon(
-                                  requestId:
-                                      widget.requestId,
-                                  seenField:
-                                      'providerMessagesSeenAt',
-                                ),
-                                label:
-                                    const Text(
-                                  'Message',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  if (requestCancelled) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
-                    Container(
-                      padding:
-                          const EdgeInsets
-                              .all(
-                        RaSpace.md,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: colors
-                            .errorContainer
-                            .withValues(
-                          alpha: .4,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          16,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .cancel_outlined,
-                            color:
-                                colors.error,
-                          ),
-                          const SizedBox(
-                            width:
-                                RaSpace.sm,
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'The driver cancelled this assistance request.',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(
-                    height:
-                        RaSpace.xxl,
-                  ),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                          children: [
-                            Text(
-                              'Service documentation',
-                              style: theme
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(
-                                fontWeight:
-                                    FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(
-                              height:
-                                  3,
-                            ),
-                            Text(
-                              'Add notes and photos documenting the work performed.',
-                              style: theme
-                                  .textTheme
-                                  .bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        '${servicePhotos.length}/3',
-                        style: theme
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(
-                          color:
-                              colors.primary,
-                          fontWeight:
-                              FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(
-                    height:
-                        RaSpace.md,
-                  ),
-
-                  Container(
-                    padding:
-                        const EdgeInsets
-                            .all(
-                      RaSpace.lg,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color:
-                          colors.surface,
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        20,
-                      ),
-                      border:
-                          Border.all(
-                        color: colors
-                            .outlineVariant
-                            .withValues(
-                          alpha: .6,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .stretch,
-                      children: [
-                        SizedBox(
-                          height: 105,
-                          child:
-                              ListView(
-                            scrollDirection:
-                                Axis.horizontal,
-                            children: [
-                              if (servicePhotos
-                                      .length <
-                                  3)
-                                InkWell(
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    15,
-                                  ),
-                                  onTap:
-                                      savingDocumentation
-                                          ? null
-                                          : addDocumentationPhoto,
-                                  child:
-                                      Container(
-                                    width: 96,
-                                    decoration:
-                                        BoxDecoration(
-                                      color: colors
-                                          .primaryContainer
-                                          .withValues(
-                                        alpha:
-                                            .30,
-                                      ),
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                        15,
-                                      ),
-                                      border:
-                                          Border.all(
-                                        color: colors
-                                            .primary
-                                            .withValues(
-                                          alpha:
-                                              .32,
-                                        ),
-                                      ),
-                                    ),
-                                    child:
-                                        Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        savingDocumentation
-                                            ? const SizedBox.square(
-                                                dimension:
-                                                    22,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth:
-                                                      2,
-                                                ),
-                                              )
-                                            : Icon(
-                                                Icons.add_a_photo_outlined,
-                                                color:
-                                                    colors.primary,
-                                              ),
-                                        const SizedBox(
-                                          height:
-                                              6,
-                                        ),
-                                        const Text(
-                                          'Add Photo',
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                              for (var index =
-                                      0;
-                                  index <
-                                      servicePhotos
-                                          .length;
-                                  index++) ...[
-                                const SizedBox(
-                                  width:
-                                      RaSpace.sm,
-                                ),
-                                Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                        15,
-                                      ),
-                                      child:
-                                          Image.memory(
-                                        base64Decode(
-                                          servicePhotos[
-                                              index],
-                                        ),
-                                        width:
-                                            122,
-                                        height:
-                                            105,
-                                        fit: BoxFit
-                                            .cover,
-                                      ),
-                                    ),
-                                    Positioned(
-                                      top:
-                                          4,
-                                      right:
-                                          4,
-                                      child:
-                                          IconButton.filled(
-                                        style:
-                                            IconButton.styleFrom(
-                                          minimumSize:
-                                              const Size(
-                                            28,
-                                            28,
-                                          ),
-                                          padding:
-                                              EdgeInsets.zero,
-                                          backgroundColor:
-                                              Colors.black54,
-                                          foregroundColor:
-                                              Colors.white,
-                                        ),
-                                        onPressed: () =>
-                                            removeDocumentationPhoto(
-                                          index,
-                                        ),
-                                        icon:
-                                            const Icon(
-                                          Icons.close_rounded,
-                                          size:
-                                              16,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(
-                          height:
-                              RaSpace.lg,
-                        ),
-
-                        TextField(
-                          controller:
-                              serviceNotesController,
-                          enabled:
-                              data['completionState'] !=
-                                  'pending',
-                          minLines: 3,
-                          maxLines: 5,
-                          maxLength: 500,
-                          textCapitalization:
-                              TextCapitalization
-                                  .sentences,
-                          decoration:
-                              const InputDecoration(
-                            labelText:
-                                'Service notes',
-                            hintText:
-                                'Arrival notes, diagnosis, work completed or important observations...',
-                            alignLabelWithHint:
-                                true,
-                            prefixIcon:
-                                Padding(
-                              padding:
-                                  EdgeInsets.only(
-                                bottom:
-                                    65,
-                              ),
-                              child:
-                                  Icon(
-                                Icons
-                                    .note_alt_outlined,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        Align(
-                          alignment:
-                              Alignment
-                                  .centerRight,
-                          child:
-                              TextButton.icon(
-                            onPressed:
-                                savingDocumentation ||
-                                        data['completionState'] ==
-                                            'pending'
-                                    ? null
-                                    : saveDocumentation,
-                            icon: const Icon(
-                              Icons
-                                  .save_outlined,
-                            ),
-                            label: const Text(
-                              'Save Notes',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
                   if (status == 2 &&
-                      data['arrivalVerificationRequired'] ==
-                          true &&
-                      data['arrivalConfirmedBy'] ==
-                          null) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
+                      data['jobStartCodeRequired'] == true &&
+                      data['arrivalConfirmedBy'] == null &&
+                      widget.requestId != null) ...[
+                    JobStartCodePanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
                     ),
-                    Container(
-                      padding:
-                          const EdgeInsets
-                              .all(
-                        RaSpace.md,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color:
-                            raGoldPale,
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          16,
-                        ),
-                      ),
-                      child: const Row(
-                        crossAxisAlignment:
-                            CrossAxisAlignment
-                                .start,
-                        children: [
-                          Icon(
-                            Icons
-                                .hourglass_top_rounded,
-                            color:
-                                raGold,
-                          ),
-                          SizedBox(
-                            width:
-                                RaSpace.sm,
-                          ),
-                          Expanded(
-                            child: Text(
-                              'Waiting for driver arrival confirmation. Do not begin repair work until the driver confirms.',
-                            ),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 14),
+                  ],
+                  if (offline) ...[
+                    InlineMessage(
+                      icon: Icons.wifi_off_rounded,
+                      text:
+                          'Connection lost. ${lastSynced == null ? 'Showing available job details.' : 'Last synced at ${lastSynced!.hour.toString().padLeft(2, '0')}:${lastSynced!.minute.toString().padLeft(2, '0')}.'} Reconnect before updating job status or sending a bill.',
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  _RaProviderActiveStatusCard(
+                    title: _statusTitle(),
+                    description: _statusDescription(),
+                    status: status,
+                    cancelled: requestCancelled,
+                  ),
+
+                  if (widget.requestId != null &&
+                      (data['arrivalVerificationRequired'] != true ||
+                          data['arrivalConfirmedBy'] == data['driverId'])) ...[
+                    const SizedBox(height: 13),
+
+                    RepairQuotePanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
                     ),
                   ],
 
-                  if (!requestCancelled &&
-                      status < 2) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
+                  const SizedBox(height: 14),
+
+                  if (hasDriverLocation)
+                    _RaProviderActiveMap(
+                      onNavigate: offline || updatingStatus || requestCancelled
+                          ? null
+                          : navigateToDriver,
+                      latitude: latitude,
+                      longitude: longitude,
+                      providerPosition: currentProviderPosition,
+                      roadRoute: roadRoute,
+                      locationMessage: locationMessage,
+                      location: location,
+                    )
+                  else
+                    _RaProviderActiveNotice(
+                      icon: Icons.location_off_outlined,
+                      title: 'Driver coordinates unavailable',
+                      message: location,
+                      tone: colors.error,
                     ),
-                    Center(
-                      child:
-                          TextButton.icon(
-                        style:
-                            TextButton
-                                .styleFrom(
-                          foregroundColor:
-                              colors.error,
-                        ),
-                        onPressed:
-                            updatingStatus
-                                ? null
-                                : withdraw,
-                        icon: const Icon(
-                          Icons
-                              .person_off_outlined,
-                        ),
-                        label: const Text(
-                          'Cannot Attend This Job',
-                        ),
+
+                  const SizedBox(height: 14),
+
+                  _RaProviderActiveDriverCard(
+                    name: driverName,
+                    phone: driverPhone,
+                    requestId: widget.requestId,
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  _RaProviderActiveSummary(
+                    issue: requestIssueLabel(data),
+                    vehicle: vehicle,
+                    location: location,
+                    approvedTotal: (data['estimatedCost'] as num?)?.toInt(),
+                  ),
+
+                  if (waitingForArrivalConfirmation) ...[
+                    const SizedBox(height: 14),
+
+                    const _RaProviderActiveNotice(
+                      icon: Icons.person_pin_circle_outlined,
+                      title: 'Waiting for driver',
+                      message:
+                          'The driver must confirm that you have physically arrived before repair work begins.',
+                      tone: raGold,
+                    ),
+                  ],
+
+                  if (status == 2 && !requestCancelled) ...[
+                    const SizedBox(height: 24),
+
+                    const _RaProviderActiveHeading(
+                      title: 'Service documentation',
+                      subtitle:
+                          'Record notes and evidence of the work performed.',
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    _RaProviderDocumentationCard(
+                      controller: serviceNotesController,
+                      photos: servicePhotos,
+                      saving:
+                          savingDocumentation ||
+                          waitingForArrivalConfirmation ||
+                          completionPending,
+                      onAddPhoto: addDocumentationPhoto,
+                      onRemovePhoto: removeDocumentationPhoto,
+                      onSave: saveDocumentation,
+                    ),
+                  ],
+
+                  if (!requestCancelled && status < 2) ...[
+                    const SizedBox(height: 15),
+
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.error,
                       ),
+                      onPressed: updatingStatus ? null : withdraw,
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: const Text('Cannot Attend This Job'),
+                    ),
+                  ],
+
+                  if (completionPending && widget.requestId != null) ...[
+                    CompletionReviewPanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
+                    ),
+                    const SizedBox(height: 14),
+
+                    const _RaProviderActiveNotice(
+                      icon: Icons.hourglass_top_rounded,
+                      title: 'Driver confirmation pending',
+                      message:
+                          'No further status action is required until the driver reviews the submitted completion.',
+                      tone: raSuccess,
                     ),
                   ],
                 ],
               ),
             ),
 
-            _ProviderJobBottomBar(
-              label:
-                  _actionLabel,
+            _RaProviderActiveBottomBar(
+              label: requestCancelled
+                  ? 'Back to Dashboard'
+                  : completionPending
+                  ? 'Waiting for Driver Confirmation'
+                  : status == 3
+                  ? 'Finish Job'
+                  : 'Mark as ${statuses[status + 1]}',
               enabled:
-                  requestCancelled ||
-                      _canAdvance,
-              loading:
-                  updatingStatus,
-              onPressed:
-                  requestCancelled
-                      ? () =>
-                          replace(
-                            context,
-                            const ProviderShell(),
-                          )
-                      : advanceStatus,
+                  !offline &&
+                  !updatingStatus &&
+                  !completionPending &&
+                  widget.requestId != null &&
+                  (requestCancelled ||
+                      (!waitingForArrivalConfirmation &&
+                          (status != 2 || repairReady))),
+              busy: updatingStatus,
+              onTap: requestCancelled
+                  ? () {
+                      replace(context, const ProviderShell());
+                    }
+                  : advanceStatus,
             ),
           ],
         ),
@@ -2102,9 +1217,532 @@ class _ProviderActiveJobScreenState
   }
 }
 
-class _ProviderActiveInfoRow
-    extends StatelessWidget {
-  const _ProviderActiveInfoRow({
+class _RaProviderActiveStatusCard extends StatelessWidget {
+  const _RaProviderActiveStatusCard({
+    required this.title,
+    required this.description,
+    required this.status,
+    required this.cancelled,
+  });
+
+  final String title;
+  final String description;
+  final int status;
+  final bool cancelled;
+
+  @override
+  Widget build(BuildContext context) {
+    return RaProviderSummaryCard(
+      title: title,
+      message: description,
+      icon: cancelled ? Icons.cancel_outlined : Icons.route_outlined,
+      footer: cancelled ? null : RaProviderJobProgress(current: status),
+    );
+  }
+}
+
+class _RaProviderActiveMap extends StatelessWidget {
+  const _RaProviderActiveMap({
+    required this.onNavigate,
+    required this.latitude,
+    required this.longitude,
+    required this.providerPosition,
+    required this.roadRoute,
+    required this.locationMessage,
+    required this.location,
+  });
+
+  final VoidCallback? onNavigate;
+  final double latitude;
+  final double longitude;
+
+  final LatLng? providerPosition;
+  final RoadRoute? roadRoute;
+
+  final String? locationMessage;
+  final String location;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        Container(
+          height: 260,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(21),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: .45),
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: MapMock(
+                  position: LatLng(latitude, longitude),
+                  providerPosition: providerPosition,
+                  routePoints: roadRoute?.points,
+                  showProviders: providerPosition != null,
+                  showRoute: roadRoute != null && providerPosition != null,
+                ),
+              ),
+
+              if (roadRoute != null)
+                Positioned(
+                  top: 11,
+                  left: 11,
+                  right: 11,
+                  child: Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: colors.surface.withValues(alpha: .95),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.route_outlined, size: 17),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onNavigate,
+            icon: const Icon(Icons.navigation_outlined),
+            label: const Text('Navigate to Driver'),
+          ),
+        ),
+
+        if (locationMessage != null) ...[
+          const SizedBox(height: 8),
+          _RaProviderActiveNotice(
+            icon: Icons.gps_off_outlined,
+            title: 'Location update',
+            message: locationMessage!,
+            tone: raGold,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _RaProviderActiveDriverCard extends StatelessWidget {
+  const _RaProviderActiveDriverCard({
+    required this.name,
+    required this.phone,
+    required this.requestId,
+  });
+
+  final String name;
+  final String phone;
+  final String? requestId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              ProfileInitials(name: name, radius: 23),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      phone.trim().isEmpty ? 'Phone unavailable' : phone,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: phone.trim().isEmpty
+                      ? null
+                      : () {
+                          showCallPrompt(context, name: name, number: phone);
+                        },
+                  icon: const Icon(Icons.call_outlined),
+                  label: const Text('Call'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: requestId == null
+                      ? null
+                      : () {
+                          push(
+                            context,
+                            ChatScreen(
+                              requestId: requestId,
+                              peerName: name,
+                              peerPhone: phone,
+                            ),
+                          );
+                        },
+                  icon: _UnreadChatIcon(
+                    requestId: requestId,
+                    seenField: 'providerMessagesSeenAt',
+                  ),
+                  label: const Text('Message'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderActiveSummary extends StatelessWidget {
+  const _RaProviderActiveSummary({
+    required this.issue,
+    required this.vehicle,
+    required this.location,
+    required this.approvedTotal,
+  });
+
+  final String issue;
+  final String vehicle;
+  final String location;
+  final int? approvedTotal;
+
+  @override
+  Widget build(BuildContext context) {
+    return _RaProviderActiveSurface(
+      child: Column(
+        children: [
+          _RaProviderActiveInfo(
+            icon: Icons.car_repair_outlined,
+            label: 'Assistance',
+            value: issue,
+          ),
+          if (vehicle.isNotEmpty) ...[
+            const _RaProviderActiveDivider(),
+            _RaProviderActiveInfo(
+              icon: Icons.directions_car_outlined,
+              label: 'Vehicle',
+              value: vehicle,
+            ),
+          ],
+          const _RaProviderActiveDivider(),
+          _RaProviderActiveInfo(
+            icon: Icons.location_on_outlined,
+            label: 'Breakdown location',
+            value: location,
+          ),
+          const _RaProviderActiveDivider(),
+          _RaProviderActiveInfo(
+            icon: Icons.request_quote_outlined,
+            label: 'Driver-approved total',
+            value: approvedTotal == null
+                ? 'Price pending'
+                : 'Rs. $approvedTotal',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderDocumentationCard extends StatelessWidget {
+  const _RaProviderDocumentationCard({
+    required this.controller,
+    required this.photos,
+    required this.saving,
+    required this.onAddPhoto,
+    required this.onRemovePhoto,
+    required this.onSave,
+  });
+
+  final TextEditingController controller;
+  final List<String> photos;
+
+  final bool saving;
+
+  final VoidCallback onAddPhoto;
+  final ValueChanged<int> onRemovePhoto;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return _RaProviderActiveSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: controller,
+            minLines: 3,
+            maxLines: 5,
+            maxLength: 500,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Service notes',
+              hintText:
+                  'Work completed, observations or important information...',
+              alignLabelWithHint: true,
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(bottom: 52),
+                child: Icon(Icons.note_alt_outlined),
+              ),
+            ),
+          ),
+
+          if (photos.isNotEmpty) ...[
+            const SizedBox(height: 10),
+
+            SizedBox(
+              height: 94,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: photos.length,
+                separatorBuilder: (_, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(13),
+                        child: Image.memory(
+                          base64Decode(photos[index]),
+                          width: 94,
+                          height: 94,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 94,
+                              height: 94,
+                              color: colors.surfaceContainerHighest,
+                              alignment: Alignment.center,
+                              child: const Icon(Icons.broken_image_outlined),
+                            );
+                          },
+                        ),
+                      ),
+
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: IconButton.filled(
+                          onPressed: saving
+                              ? null
+                              : () {
+                                  onRemovePhoto(index);
+                                },
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(30, 30),
+                            padding: EdgeInsets.zero,
+                            backgroundColor: Colors.black54,
+                          ),
+                          icon: const Icon(Icons.close_rounded, size: 15),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 11),
+
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: saving || photos.length >= 3 ? null : onAddPhoto,
+                  icon: const Icon(Icons.add_a_photo_outlined),
+                  label: Text(
+                    photos.length >= 3 ? '3 Photos Added' : 'Add Photo',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: saving ? null : onSave,
+                  icon: saving
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderActiveHeading extends StatelessWidget {
+  const _RaProviderActiveHeading({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.3,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subtitle,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            height: 1.4,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaProviderActiveNotice extends StatelessWidget {
+  const _RaProviderActiveNotice({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.tone,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: .075),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: tone.withValues(alpha: .18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: tone, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  message,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaProviderActiveSurface extends StatelessWidget {
+  const _RaProviderActiveSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: RaProviderCard(child: child),
+    );
+  }
+}
+
+class _RaProviderActiveInfo extends StatelessWidget {
+  const _RaProviderActiveInfo({
     required this.icon,
     required this.label,
     required this.value,
@@ -2115,121 +1753,108 @@ class _ProviderActiveInfoRow
   final String value;
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
-    final colors =
-        theme.colorScheme;
-
-    return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: 18,
-          color:
-              colors.primary,
-        ),
-        const SizedBox(
-          width: RaSpace.sm,
-        ),
-        Expanded(
-          child: RichText(
-            text: TextSpan(
-              style: theme
-                  .textTheme.bodySmall,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 37,
+            height: 37,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: colors.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextSpan(
-                  text: '$label: ',
-                  style:
-                      const TextStyle(
-                    fontWeight:
-                        FontWeight.w800,
+                Text(
+                  label,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
-                TextSpan(
-                  text: value,
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _ProviderJobBottomBar
-    extends StatelessWidget {
-  const _ProviderJobBottomBar({
+class _RaProviderActiveDivider extends StatelessWidget {
+  const _RaProviderActiveDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 47,
+      color: Theme.of(
+        context,
+      ).colorScheme.outlineVariant.withValues(alpha: .35),
+    );
+  }
+}
+
+class _RaProviderActiveBottomBar extends StatelessWidget {
+  const _RaProviderActiveBottomBar({
     required this.label,
     required this.enabled,
-    required this.loading,
-    required this.onPressed,
+    required this.busy,
+    required this.onTap,
   });
 
   final String label;
   final bool enabled;
-  final bool loading;
-  final VoidCallback onPressed;
+  final bool busy;
+  final VoidCallback onTap;
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        RaSpace.lg,
-        RaSpace.sm,
-        RaSpace.lg,
-        RaSpace.md,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(
-              alpha: .6,
-            ),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          width:
-              double.infinity,
-          child:
-              FilledButton.icon(
-            onPressed: enabled
-                ? onPressed
-                : null,
-            icon: loading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child:
-                        CircularProgressIndicator(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: enabled && !busy ? onTap : null,
+            icon: busy
+                ? const SizedBox.square(
+                    dimension: 17,
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color:
-                          Colors.white,
+                      color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons
-                        .arrow_forward_rounded,
-                  ),
+                : const Icon(Icons.arrow_forward_rounded),
             label: Text(label),
           ),
         ),

@@ -5,186 +5,259 @@ Future<String?> _adminReason(
   String title, {
   String? expectedId,
 }) async {
-  final controller = TextEditingController();
-  final formKey = GlobalKey<FormState>();
-
-  final result = await showDialog<String>(
+  return showDialog<String>(
     context: context,
     barrierDismissible: false,
-    builder: (dialogContext) {
-      final theme = Theme.of(dialogContext);
-      final colors = theme.colorScheme;
-
-      final destructive = expectedId != null;
-
-      return AlertDialog(
-        icon: Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: destructive
-                ? colors.errorContainer
-                : colors.primaryContainer,
-            borderRadius: BorderRadius.circular(17),
-          ),
-          child: Icon(
-            destructive
-                ? Icons.warning_amber_rounded
-                : Icons.admin_panel_settings_outlined,
-            color: destructive
-                ? colors.error
-                : colors.onPrimaryContainer,
-          ),
-        ),
-        title: Text(
-          title,
-          textAlign: TextAlign.center,
-        ),
-        content: Form(
-          key: formKey,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 430,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
-              children: [
-                if (expectedId != null) ...[
-                  Text(
-                    'This action permanently deletes the account profile. Copy the account ID below and enter it exactly to continue.',
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(
-                      color:
-                          colors.onSurfaceVariant,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: RaSpace.md),
-                  Container(
-                    padding: const EdgeInsets.all(
-                      RaSpace.md,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors
-                          .surfaceContainerHighest
-                          .withValues(alpha: .45),
-                      borderRadius:
-                          BorderRadius.circular(14),
-                    ),
-                    child: SelectableText(
-                      expectedId,
-                      style: theme
-                          .textTheme.labelLarge
-                          ?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: RaSpace.lg),
-                ] else ...[
-                  Text(
-                    'Administrative actions require a reason. The reason will be recorded in the audit history.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(
-                      color:
-                          colors.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: RaSpace.md),
-                ],
-                TextFormField(
-                  controller: controller,
-                  maxLength:
-                      expectedId == null ? 500 : 128,
-                  minLines:
-                      expectedId == null ? 3 : 1,
-                  maxLines:
-                      expectedId == null ? 6 : 1,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: expectedId == null
-                        ? 'Administrative reason'
-                        : 'Account ID',
-                    hintText: expectedId == null
-                        ? 'Explain why this action is required'
-                        : 'Paste the exact ID shown above',
-                    prefixIcon: Icon(
-                      expectedId == null
-                          ? Icons.edit_note_outlined
-                          : Icons
-                              .fingerprint_rounded,
-                    ),
-                    helperText:
-                        expectedId == null
-                        ? 'Minimum 10 characters'
-                        : null,
-                    errorMaxLines: 3,
-                  ),
-                  validator: (value) {
-                    final text =
-                        (value ?? '').trim();
-
-                    if (expectedId != null) {
-                      return text == expectedId
-                          ? null
-                          : 'Paste the exact account ID shown above.';
-                    }
-
-                    return text.length >= 10
-                        ? null
-                        : 'Enter a reason with at least 10 characters.';
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-            },
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            style: destructive
-                ? FilledButton.styleFrom(
-                    backgroundColor:
-                        colors.error,
-                    foregroundColor:
-                        colors.onError,
-                  )
-                : null,
-            onPressed: () {
-              if (formKey.currentState
-                      ?.validate() ??
-                  false) {
-                Navigator.pop(
-                  dialogContext,
-                  controller.text.trim(),
-                );
-              }
-            },
-            icon: Icon(
-              destructive
-                  ? Icons.delete_forever_outlined
-                  : Icons.check_rounded,
-            ),
-            label: Text(
-              destructive
-                  ? 'Confirm Deletion'
-                  : 'Confirm',
-            ),
-          ),
-        ],
-      );
+    builder: (context) {
+      return _AdminActionDialog(title: title, expectedId: expectedId);
     },
   );
+}
 
-  controller.dispose();
+class _AdminActionDialog extends StatefulWidget {
+  const _AdminActionDialog({required this.title, this.expectedId});
 
-  return result;
+  final String title;
+  final String? expectedId;
+
+  @override
+  State<_AdminActionDialog> createState() => _AdminActionDialogState();
+}
+
+class _AdminActionDialogState extends State<_AdminActionDialog> {
+  final controller = TextEditingController();
+
+  final formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  bool get confirmationMode => widget.expectedId != null;
+
+  String get heading {
+    if (confirmationMode) {
+      return 'Confirm Action';
+    }
+
+    return widget.title;
+  }
+
+  String get description {
+    if (confirmationMode) {
+      return 'This is a sensitive action. Enter the exact account ID shown below to continue.';
+    }
+
+    return 'Provide a clear reason. This information may be stored with the related workflow or administrative audit record.';
+  }
+
+  String get fieldLabel {
+    if (confirmationMode) {
+      return 'Enter account ID';
+    }
+
+    return 'Reason';
+  }
+
+  String? validate(String? value) {
+    final text = value?.trim() ?? '';
+
+    if (text.isEmpty) {
+      return confirmationMode ? 'Enter the required ID' : 'Enter a reason';
+    }
+
+    if (confirmationMode && text != widget.expectedId) {
+      return 'The ID does not match';
+    }
+
+    return null;
+  }
+
+  void submit() {
+    if (!(formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    Navigator.of(context).pop(controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final colors = theme.colorScheme;
+
+    final danger = confirmationMode;
+
+    final tone = danger ? colors.error : colors.primary;
+
+    return AlertDialog(
+      icon: Container(
+        width: 58,
+        height: 58,
+        decoration: BoxDecoration(
+          color: tone.withValues(alpha: .08),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Icon(
+          danger ? Icons.warning_amber_rounded : Icons.edit_note_outlined,
+          color: tone,
+          size: 28,
+        ),
+      ),
+      title: Text(
+        heading,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -.3,
+        ),
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+
+              if (confirmationMode) ...[
+                const SizedBox(height: 15),
+
+                Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: colors.error.withValues(alpha: .055),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: colors.error.withValues(alpha: .17),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'REQUIRED ID',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                          color: colors.error,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      SelectableText(
+                        widget.expectedId!,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: controller,
+                autofocus: true,
+                minLines: confirmationMode ? 1 : 3,
+                maxLines: confirmationMode ? 1 : 6,
+                maxLength: confirmationMode ? 128 : 500,
+                textCapitalization: confirmationMode
+                    ? TextCapitalization.none
+                    : TextCapitalization.sentences,
+                textInputAction: confirmationMode
+                    ? TextInputAction.done
+                    : TextInputAction.newline,
+                decoration: InputDecoration(
+                  labelText: fieldLabel,
+                  alignLabelWithHint: !confirmationMode,
+                  prefixIcon: confirmationMode
+                      ? const Icon(Icons.fingerprint_rounded)
+                      : const Padding(
+                          padding: EdgeInsets.only(bottom: 45),
+                          child: Icon(Icons.notes_outlined),
+                        ),
+                ),
+                validator: validate,
+                onFieldSubmitted: confirmationMode
+                    ? (_) {
+                        submit();
+                      }
+                    : null,
+              ),
+
+              if (!confirmationMode) ...[
+                const SizedBox(height: 4),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: colors.onSurfaceVariant,
+                    ),
+
+                    const SizedBox(width: 5),
+
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Cancel'),
+        ),
+
+        FilledButton.icon(
+          style: danger
+              ? FilledButton.styleFrom(
+                  backgroundColor: colors.error,
+                  foregroundColor: colors.onError,
+                )
+              : null,
+          onPressed: submit,
+          icon: Icon(
+            danger ? Icons.warning_amber_rounded : Icons.check_rounded,
+          ),
+          label: Text(danger ? 'Confirm' : 'Continue'),
+        ),
+      ],
+    );
+  }
 }

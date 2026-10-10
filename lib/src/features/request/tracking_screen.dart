@@ -1,51 +1,40 @@
 part of '../../screens.dart';
 
 class TrackingScreen extends StatefulWidget {
-  const TrackingScreen({
-    super.key,
-    required this.draft,
-    this.requestId,
-  });
+  const TrackingScreen({super.key, required this.draft, this.requestId});
 
   final RequestDraft draft;
   final String? requestId;
 
   @override
-  State<TrackingScreen> createState() =>
-      _TrackingScreenState();
+  State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
   int status = 0;
 
-  LatLng providerPosition =
-      MapMock.providerPoint;
+  LatLng? providerPosition;
 
-  String providerName =
-      'Service Provider';
-
+  String providerName = 'Service Provider';
   String providerPhone = '';
 
   int estimatedCost = 0;
 
   bool cancelled = false;
 
-  bool arrivalNeedsConfirmation =
-      false;
-
+  bool arrivalNeedsConfirmation = false;
+  bool jobStartCodeRequired = false;
+  DateTime? providerLocationUpdatedAt;
+  Timer? freshnessClock;
   String arrivalLocationHint = '';
 
   bool completionPending = false;
-
+  bool discountPending = false;
+  int? proposedFinalCost;
   String completionNotes = '';
-
-  List<String> completionPhotos =
-      [];
+  List<String> completionPhotos = [];
 
   String? recoveryReason;
-
-  bool hasProviderLocation = false;
-
   String? requestError;
 
   RoadRoute? roadRoute;
@@ -57,205 +46,197 @@ class _TrackingScreenState extends State<TrackingScreen> {
   bool confirmingArrival = false;
   bool confirmingCompletion = false;
   bool replacingProvider = false;
+  bool cancellingRequest = false;
 
-  final statuses = const [
-    'Accepted',
-    'En Route',
-    'Arrived',
-    'Completed',
-  ];
+  Future<void> cancelBeforeArrival() async {
+    final id = widget.requestId;
+    if (id == null || cancellingRequest || status >= 2 || cancelled) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel assistance?'),
+        content: const Text(
+          'Your provider will be notified and this job will move to cancelled history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Keep request'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Cancel request'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final reason = await _adminReason(
+      context,
+      'Reason for cancelling assistance',
+    );
+    if (reason == null || !mounted) return;
+    setState(() {
+      cancellingRequest = true;
+    });
+    try {
+      await RequestService().cancelRequest(id, reason: reason);
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to cancel: $error')));
+    } finally {
+      if (mounted)
+        setState(() {
+          cancellingRequest = false;
+        });
+    }
+  }
 
-  StreamSubscription<
-          DocumentSnapshot<
-              Map<String, dynamic>>>?
-      requestListener;
+  final statuses = const ['Accepted', 'En Route', 'Arrived', 'Completed'];
+
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? requestListener;
 
   @override
   void initState() {
     super.initState();
 
-    if (widget.requestId == null) {
-      requestError =
-          'This request is not connected to live tracking.';
+    freshnessClock = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+    final requestId = widget.requestId;
+
+    if (requestId == null) {
+      requestError = 'This request is not connected to live tracking.';
       return;
     }
 
-    requestListener =
-        RequestService()
-            .watchRequest(
-      widget.requestId!,
-    )
-            .listen(
-      (snapshot) {
-        final data =
-            snapshot.data();
+    requestListener = RequestService()
+        .watchRequest(requestId)
+        .listen(
+          _handleRequestUpdate,
+          onError: (_) {
+            if (!mounted) return;
 
-        final value =
-            data?['status']
-                as String?;
-
-        final latitude =
-            (data?['providerLatitude']
-                    as num?)
-                ?.toDouble();
-
-        final longitude =
-            (data?['providerLongitude']
-                    as num?)
-                ?.toDouble();
-
-        final updatedPosition =
-            latitude != null &&
-                    longitude != null
-                ? LatLng(
-                    latitude,
-                    longitude,
-                  )
-                : null;
-
-        final shouldRefreshRoute =
-            updatedPosition != null &&
-                (!hasProviderLocation ||
-                    Geolocator.distanceBetween(
-                          providerPosition
-                              .latitude,
-                          providerPosition
-                              .longitude,
-                          updatedPosition
-                              .latitude,
-                          updatedPosition
-                              .longitude,
-                        ) >=
-                        20);
-
-        final next =
-            switch (value) {
-          'accepted' => 0,
-          'en_route' => 1,
-          'arrived' => 2,
-          'completed' => 3,
-          _ => status,
-        };
-
-        if (!mounted) return;
-
-        setState(() {
-          status = next;
-
-          cancelled =
-              value == 'cancelled';
-
-          arrivalNeedsConfirmation =
-              data?['arrivalVerificationRequired'] ==
-                      true &&
-                  data?['arrivalConfirmedBy'] ==
-                      null;
-
-          arrivalLocationHint =
-              updatedPosition == null
-                  ? 'Provider GPS is unavailable. Confirm arrival only if you have physically met the provider.'
-                  : 'Provider GPS is informational. Confirm arrival only when the provider is physically with you.';
-
-          completionPending =
-              data?['completionState'] ==
-                  'pending';
-
-          completionNotes =
-              data?['serviceNotes']
-                      as String? ??
-                  '';
-
-          completionPhotos =
-              (data?['servicePhotoData']
-                          as List? ??
-                      [])
-                  .whereType<String>()
-                  .toList();
-
-          recoveryReason =
-              data?['cancellationReason']
-                  as String?;
-
-          requestError = null;
-
-          providerName =
-              data?['providerName']
-                      as String? ??
-                  providerName;
-
-          providerPhone =
-              data?['providerPhone']
-                      as String? ??
-                  providerPhone;
-
-          estimatedCost =
-              (data?['estimatedCost']
-                          as num?)
-                      ?.toInt() ??
-                  estimatedCost;
-
-          if (updatedPosition !=
-              null) {
-            providerPosition =
-                updatedPosition;
-
-            hasProviderLocation =
-                true;
-          }
-        });
-
-        if (shouldRefreshRoute &&
-            updatedPosition != null) {
-          unawaited(
-            refreshRoadRoute(
-              updatedPosition,
-            ),
-          );
-        }
-      },
-      onError: (_) {
-        if (!mounted) return;
-
-        setState(() {
-          requestError =
-              'Live updates are temporarily unavailable.';
-        });
-      },
-    );
+            setState(() {
+              requestError = 'Live updates are temporarily unavailable.';
+            });
+          },
+        );
   }
 
   @override
   void dispose() {
+    freshnessClock?.cancel();
     requestListener?.cancel();
     super.dispose();
   }
 
-  Future<void> refreshRoadRoute(
-    LatLng origin,
-  ) async {
-    final version =
-        ++routeRequestVersion;
+  void _handleRequestUpdate(DocumentSnapshot<Map<String, dynamic>> snapshot) {
+    final data = snapshot.data();
 
-    if (mounted) {
-      setState(() {
-        routeLoading = true;
-      });
+    if (!mounted || data == null) {
+      return;
     }
 
+    final value = data['status'] as String? ?? 'accepted';
+
+    final latitude = (data['providerLatitude'] as num?)?.toDouble();
+
+    final longitude = (data['providerLongitude'] as num?)?.toDouble();
+
+    final updatedPosition = latitude != null && longitude != null
+        ? LatLng(latitude, longitude)
+        : null;
+
+    var shouldRefreshRoute = false;
+
+    if (updatedPosition != null) {
+      final old = providerPosition;
+
+      if (old == null) {
+        shouldRefreshRoute = true;
+      } else {
+        final movement = Geolocator.distanceBetween(
+          old.latitude,
+          old.longitude,
+          updatedPosition.latitude,
+          updatedPosition.longitude,
+        );
+
+        shouldRefreshRoute = movement >= 20;
+      }
+    }
+
+    final nextStatus = switch (value) {
+      'accepted' => 0,
+      'en_route' => 1,
+      'arrived' => 2,
+      'completed' => 3,
+      _ => status,
+    };
+
+    setState(() {
+      status = nextStatus;
+      jobStartCodeRequired = data['jobStartCodeRequired'] == true;
+      providerLocationUpdatedAt =
+          (data['providerLocationUpdatedAt'] as Timestamp?)?.toDate();
+
+      cancelled = value == 'cancelled';
+
+      arrivalNeedsConfirmation =
+          data['arrivalVerificationRequired'] == true &&
+          data['arrivalConfirmedBy'] == null;
+
+      arrivalLocationHint = updatedPosition == null
+          ? 'Provider GPS is unavailable. Confirm arrival only if you have physically met the provider.'
+          : 'Provider GPS is informational. Confirm arrival only when the provider is physically with you.';
+
+      discountPending = data['pendingDiscountId'] != null;
+      proposedFinalCost = (data['finalCost'] as num?)?.toInt();
+      completionPending = data['completionState'] == 'pending';
+
+      completionNotes = data['serviceNotes'] as String? ?? '';
+
+      completionPhotos = (data['servicePhotoData'] as List? ?? const [])
+          .whereType<String>()
+          .toList();
+
+      recoveryReason = data['cancellationReason'] as String?;
+
+      providerName = data['providerName'] as String? ?? providerName;
+
+      providerPhone = data['providerPhone'] as String? ?? providerPhone;
+
+      estimatedCost = (data['estimatedCost'] as num?)?.toInt() ?? estimatedCost;
+
+      if (updatedPosition != null) {
+        providerPosition = updatedPosition;
+      }
+
+      requestError = null;
+    });
+
+    if (shouldRefreshRoute && updatedPosition != null) {
+      unawaited(refreshRoadRoute(updatedPosition));
+    }
+  }
+
+  Future<void> refreshRoadRoute(LatLng origin) async {
+    final version = ++routeRequestVersion;
+
+    setState(() {
+      routeLoading = true;
+    });
+
     try {
-      final result =
-          await const RouteService()
-              .fetchDrivingRoute(
+      final result = await const RouteService().fetchDrivingRoute(
         origin: origin,
-        destination: LatLng(
-          widget.draft.latitude,
-          widget.draft.longitude,
-        ),
+        destination: LatLng(widget.draft.latitude, widget.draft.longitude),
       );
 
-      if (!mounted ||
-          version !=
-              routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
@@ -264,35 +245,31 @@ class _TrackingScreenState extends State<TrackingScreen> {
         routeLoading = false;
       });
     } catch (_) {
-      if (!mounted ||
-          version !=
-              routeRequestVersion) {
+      if (!mounted || version != routeRequestVersion) {
         return;
       }
 
       setState(() {
         routeLoading = false;
 
-        requestError =
-            'Road route and ETA are temporarily unavailable.';
+        requestError = 'Road route and ETA are temporarily unavailable.';
       });
     }
   }
 
   Future<void> confirmArrival() async {
-    if (widget.requestId == null ||
-        confirmingArrival) {
+    final requestId = widget.requestId;
+
+    if (requestId == null || confirmingArrival) {
       return;
     }
 
-    final reason =
-        await _adminReason(
+    final reason = await _adminReason(
       context,
       'Confirm you met the provider. Explain any missing or inaccurate GPS.',
     );
 
-    if (reason == null ||
-        !mounted) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -301,46 +278,35 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
 
     try {
-      await RequestService()
-          .confirmProviderArrival(
-        widget.requestId!,
-        reason,
-      );
+      await RequestService().confirmProviderArrival(requestId, reason);
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content:
-              Text('$error'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
-          confirmingArrival =
-              false;
+          confirmingArrival = false;
         });
       }
     }
   }
 
-  Future<void>
-      replaceDelayedProvider() async {
-    if (widget.requestId == null ||
-        replacingProvider) {
+  Future<void> replaceDelayedProvider() async {
+    final requestId = widget.requestId;
+
+    if (requestId == null || replacingProvider) {
       return;
     }
 
-    final reason =
-        await _adminReason(
+    final reason = await _adminReason(
       context,
       'Reason for replacing the provider',
     );
 
-    if (reason == null ||
-        !mounted) {
+    if (reason == null || !mounted) {
       return;
     }
 
@@ -349,35 +315,26 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
 
     try {
-      await RequestService()
-          .withdrawProvider(
-        widget.requestId!,
-        reason,
-      );
+      await RequestService().withdrawProvider(requestId, reason);
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content:
-              Text('$error'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
-          replacingProvider =
-              false;
+          replacingProvider = false;
         });
       }
     }
   }
 
-  Future<void>
-      confirmCompletion() async {
-    if (widget.requestId == null ||
-        confirmingCompletion) {
+  Future<void> confirmCompletion() async {
+    final requestId = widget.requestId;
+
+    if (requestId == null || confirmingCompletion) {
       return;
     }
 
@@ -386,25 +343,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
     });
 
     try {
-      await RequestService()
-          .confirmJobCompletion(
-        widget.requestId!,
+      await RequestService().confirmJobCompletion(
+        requestId,
+        expectedFinalCost: proposedFinalCost,
       );
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content:
-              Text('$error'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     } finally {
       if (mounted) {
         setState(() {
-          confirmingCompletion =
-              false;
+          confirmingCompletion = false;
         });
       }
     }
@@ -416,14 +368,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
 
     return switch (status) {
-      0 =>
-        'Provider accepted your request',
-      1 =>
-        'Provider is on the way',
-      2 =>
-        'Provider has arrived',
-      _ =>
-        'Assistance completed',
+      0 => 'Provider accepted your request',
+      1 => 'Provider is on the way',
+      2 => 'Provider has arrived',
+      _ => 'Assistance completed',
     };
   }
 
@@ -435,14 +383,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
     }
 
     return switch (status) {
-      0 =>
-        'Your provider has accepted the job and is preparing to travel to you.',
+      0 => 'Your provider accepted the job and is preparing to travel to you.',
       1 =>
-        'Track the provider on the map while they travel to your breakdown location.',
-      2 =>
-        'Confirm arrival only after you physically meet the provider.',
-      _ =>
-        'The roadside assistance workflow has been completed.',
+        'Follow the live provider location while they travel to your breakdown point.',
+      2 => 'Confirm arrival only after you physically meet the provider.',
+      _ => 'The roadside assistance workflow has been completed.',
     };
   }
 
@@ -455,9 +400,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return 'Assistance completed';
     }
 
-    if (!hasProviderLocation) {
+    if (providerPosition == null) {
       return 'Waiting for provider location';
     }
+
+    if (!LocationFreshness.isFresh(providerLocationUpdatedAt, DateTime.now()))
+      return 'Last known provider position';
 
     if (routeLoading) {
       return 'Updating driving route';
@@ -467,263 +415,219 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return 'Calculating route';
     }
 
-    return roadRoute!.trafficAware
-        ? 'Live traffic route'
-        : 'Driving route';
+    return roadRoute!.trafficAware ? 'Live traffic route' : 'Driving route';
   }
 
-  Widget _buildMap(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context).colorScheme;
+  String money(int value) {
+    final digits = value.abs().toString();
+
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
+        buffer.write(',');
+      }
+
+      buffer.write(digits[index]);
+    }
+
+    return 'Rs. ${value < 0 ? '-' : ''}${buffer.toString()}';
+  }
+
+  Widget buildMap(BuildContext context) {
+    final theme = Theme.of(context);
+
+    final colors = theme.colorScheme;
+
+    final provider = providerPosition;
 
     return Container(
-      height: 300,
+      height: 285,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(
-          24,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .6,
-          ),
-        ),
+        borderRadius: BorderRadius.circular(23),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .48)),
       ),
       child: Stack(
         children: [
           Positioned.fill(
             child: MapMock(
-              position: LatLng(
-                widget.draft.latitude,
-                widget.draft.longitude,
-              ),
-              providerPosition:
-                  providerPosition,
-              routePoints:
-                  roadRoute?.points,
-              showProviders:
-                  hasProviderLocation,
-              showRoute:
-                  roadRoute != null,
+              position: LatLng(widget.draft.latitude, widget.draft.longitude),
+              providerPosition: provider,
+              routePoints: roadRoute?.points,
+              showProviders: provider != null,
+              showRoute: provider != null && roadRoute != null,
             ),
           ),
 
           Positioned(
-            top: RaSpace.md,
-            left: RaSpace.md,
-            right: RaSpace.md,
+            top: 11,
+            left: 11,
+            right: 11,
             child: Container(
-              padding:
-                  const EdgeInsets
-                      .all(
-                RaSpace.md,
-              ),
-              decoration:
-                  BoxDecoration(
-                color: colors.surface
-                    .withValues(
-                  alpha: .95,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surface.withValues(alpha: .96),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: .30),
                 ),
-                borderRadius:
-                    BorderRadius
-                        .circular(
-                  16,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black
-                        .withValues(
-                      alpha: .08,
-                    ),
-                    blurRadius: 16,
-                    offset:
-                        const Offset(
-                      0,
-                      5,
-                    ),
-                  ),
-                ],
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
-                    decoration:
-                        BoxDecoration(
-                      color: colors
-                          .primaryContainer,
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        12,
-                      ),
+                    width: 39,
+                    height: 39,
+                    decoration: BoxDecoration(
+                      color: colors.primary.withValues(alpha: .08),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      Icons
-                          .route_outlined,
-                      color: colors
-                          .onPrimaryContainer,
+                      Icons.route_outlined,
+                      color: colors.primary,
+                      size: 19,
                     ),
                   ),
 
-                  const SizedBox(
-                    width: RaSpace.sm,
-                  ),
+                  const SizedBox(width: 9),
 
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           routeTitle,
                           maxLines: 1,
-                          overflow:
-                              TextOverflow
-                                  .ellipsis,
-                          style: Theme.of(
-                            context,
-                          )
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                            fontWeight:
-                                FontWeight
-                                    .w900,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
 
-                        if (roadRoute !=
-                                null &&
+                        if (roadRoute != null &&
                             !cancelled &&
-                            status < 3)
+                            status < 3 &&
+                            LocationFreshness.isFresh(
+                              providerLocationUpdatedAt,
+                              DateTime.now(),
+                            )) ...[
+                          const SizedBox(height: 2),
                           Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                            style: Theme.of(
-                              context,
-                            )
-                                .textTheme
-                                .bodySmall,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
+                        ],
                       ],
                     ),
                   ),
 
                   if (routeLoading)
-                    const SizedBox(
-                      width: 19,
-                      height: 19,
-                      child:
-                          CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                  else if (requestError !=
-                      null)
-                    Icon(
-                      Icons
-                          .cloud_off_outlined,
-                      color:
-                          colors.error,
-                      size: 19,
+                    const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                 ],
               ),
             ),
           ),
+
+          if (provider == null && !cancelled && status < 3)
+            Positioned(
+              left: 11,
+              right: 11,
+              bottom: 11,
+              child: Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: colors.surface.withValues(alpha: .95),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_searching_rounded,
+                      color: colors.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'The provider has not shared a live GPS location yet.',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildProviderCard(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildProviderCard(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(
-          21,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .6,
-          ),
-        ),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              ProfileInitials(
-                name: providerName,
-                radius: 27,
-              ),
+              ProfileInitials(name: providerName, radius: 25),
 
-              const SizedBox(
-                width: RaSpace.md,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       providerName,
                       maxLines: 1,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight.w900,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 4,
-                    ),
+                    const SizedBox(height: 4),
 
                     Row(
                       children: [
                         const Icon(
-                          Icons
-                              .verified_outlined,
-                          color:
-                              raSuccess,
-                          size: 16,
+                          Icons.verified_outlined,
+                          size: 14,
+                          color: raSuccess,
                         ),
-                        const SizedBox(
-                          width: 5,
-                        ),
-                        Text(
-                          'Assigned service provider',
-                          style: theme
-                              .textTheme
-                              .bodySmall,
+
+                        const SizedBox(width: 4),
+
+                        Flexible(
+                          child: Text(
+                            'Assigned RoadAssist provider',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -733,75 +637,47 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ],
           ),
 
-          const SizedBox(
-            height: RaSpace.md,
-          ),
+          const SizedBox(height: 13),
 
           Row(
             children: [
               Expanded(
-                child:
-                    OutlinedButton.icon(
-                  onPressed:
-                      providerPhone
-                              .isEmpty
-                          ? null
-                          : () =>
-                              showCallPrompt(
-                                context,
-                                name:
-                                    providerName,
-                                number:
-                                    providerPhone,
-                              ),
-                  icon:
-                      const Icon(
-                    Icons
-                        .call_outlined,
-                  ),
-                  label:
-                      const Text(
-                    'Call',
-                  ),
+                child: OutlinedButton.icon(
+                  onPressed: providerPhone.trim().isEmpty
+                      ? null
+                      : () {
+                          showCallPrompt(
+                            context,
+                            name: providerName,
+                            number: providerPhone,
+                          );
+                        },
+                  icon: const Icon(Icons.call_outlined),
+                  label: const Text('Call'),
                 ),
               ),
 
-              const SizedBox(
-                width: RaSpace.sm,
-              ),
+              const SizedBox(width: 8),
 
               Expanded(
-                child:
-                    FilledButton.icon(
-                  onPressed:
-                      widget.requestId ==
-                              null
-                          ? null
-                          : () =>
-                              push(
-                                context,
-                                ChatScreen(
-                                  requestId:
-                                      widget
-                                          .requestId,
-                                  peerName:
-                                      providerName,
-                                  peerPhone:
-                                      providerPhone,
-                                ),
-                              ),
-                  icon:
-                      _UnreadChatIcon(
-                    requestId:
-                        widget
-                            .requestId,
-                    seenField:
-                        'driverMessagesSeenAt',
+                child: FilledButton.icon(
+                  onPressed: widget.requestId == null
+                      ? null
+                      : () {
+                          push(
+                            context,
+                            ChatScreen(
+                              requestId: widget.requestId,
+                              peerName: providerName,
+                              peerPhone: providerPhone,
+                            ),
+                          );
+                        },
+                  icon: _UnreadChatIcon(
+                    requestId: widget.requestId,
+                    seenField: 'driverMessagesSeenAt',
                   ),
-                  label:
-                      const Text(
-                    'Message',
-                  ),
+                  label: const Text('Message'),
                 ),
               ),
             ],
@@ -811,110 +687,70 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget _buildStatusCard(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildStatusCard(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
+
+    final tone = cancelled
+        ? colors.error
+        : status == 3
+        ? raSuccess
+        : colors.primary;
+
+    final icon = cancelled
+        ? Icons.close_rounded
+        : switch (status) {
+            0 => Icons.handshake_outlined,
+            1 => Icons.navigation_outlined,
+            2 => Icons.location_on_outlined,
+            _ => Icons.task_alt_rounded,
+          };
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cancelled
-            ? colors.errorContainer
-                .withValues(
-                alpha: .28,
-              )
-            : colors
-                .primaryContainer
-                .withValues(
-                alpha: .26,
-              ),
-        borderRadius:
-            BorderRadius.circular(
-          22,
-        ),
+        color: tone.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(21),
+        border: Border.all(color: tone.withValues(alpha: .17)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
-                decoration:
-                    BoxDecoration(
-                  color: cancelled
-                      ? colors
-                          .errorContainer
-                      : colors
-                          .primaryContainer,
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    15,
-                  ),
+                width: 47,
+                height: 47,
+                decoration: BoxDecoration(
+                  color: tone.withValues(alpha: .11),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-                child: Icon(
-                  cancelled
-                      ? Icons
-                          .close_rounded
-                      : status == 0
-                          ? Icons
-                              .handshake_outlined
-                          : status == 1
-                              ? Icons
-                                  .navigation_outlined
-                              : status ==
-                                      2
-                                  ? Icons
-                                      .location_on_outlined
-                                  : Icons
-                                      .task_alt_rounded,
-                  color: cancelled
-                      ? colors.error
-                      : colors
-                          .onPrimaryContainer,
-                ),
+                child: Icon(icon, color: tone),
               ),
 
-              const SizedBox(
-                width: RaSpace.md,
-              ),
+              const SizedBox(width: 11),
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       statusTitle,
-                      style: theme
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight.w900,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(
-                      height: 3,
-                    ),
+
+                    const SizedBox(height: 4),
+
                     Text(
                       statusDescription,
-                      style: theme
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
                         height: 1.4,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -924,90 +760,85 @@ class _TrackingScreenState extends State<TrackingScreen> {
           ),
 
           if (!cancelled) ...[
-            const SizedBox(
-              height: RaSpace.lg,
-            ),
+            const SizedBox(height: 17),
 
-            StatusTimeline(
-              statuses: statuses,
-              current: status,
-            ),
+            StatusTimeline(statuses: statuses, current: status),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildRequestSummary(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildRequestSummary(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
+
+    final vehicle = [
+      widget.draft.modelYear,
+      widget.draft.registration,
+    ].where((value) => value.trim().isNotEmpty).join(' • ');
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: colors
-              .outlineVariant
-              .withValues(
-            alpha: .6,
-          ),
-        ),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       child: Column(
         children: [
           _RaTrackDetail(
-            icon:
-                Icons.car_repair_outlined,
+            icon: Icons.car_repair_outlined,
             label: 'Assistance',
-            value:
-                widget.draft.issue,
+            value: widget.draft.issue,
           ),
 
           const _RaTrackDivider(),
 
+          if (vehicle.isNotEmpty) ...[
+            _RaTrackDetail(
+              icon: Icons.directions_car_outlined,
+              label: 'Vehicle',
+              value: vehicle,
+            ),
+
+            const _RaTrackDivider(),
+          ],
+
           _RaTrackDetail(
-            icon:
-                Icons.location_on_outlined,
+            icon: Icons.location_on_outlined,
             label: 'Location',
-            value:
-                widget.draft.location,
+            value: widget.draft.location,
           ),
 
-          const _RaTrackDivider(),
-
-          _RaTrackDetail(
-            icon:
-                Icons.request_quote_outlined,
-            label:
-                'Approved quote',
-            value: estimatedCost > 0
-                ? 'Rs. $estimatedCost'
-                : 'Price pending',
-          ),
-
-          if (widget.requestId !=
-              null) ...[
+          if (widget.draft.landmark.trim().isNotEmpty) ...[
             const _RaTrackDivider(),
 
             _RaTrackDetail(
-              icon:
-                  Icons.tag_rounded,
+              icon: Icons.signpost_outlined,
+              label: 'Landmark',
+              value: widget.draft.landmark,
+            ),
+          ],
+
+          const _RaTrackDivider(),
+
+          _RaTrackDetail(
+            icon: Icons.request_quote_outlined,
+            label: 'Approved quote',
+            value: estimatedCost > 0 ? money(estimatedCost) : 'Price pending',
+          ),
+
+          if (widget.requestId != null) ...[
+            const _RaTrackDivider(),
+
+            _RaTrackDetail(
+              icon: Icons.tag_rounded,
               label: 'Request ID',
-              value:
-                  widget.requestId!,
+              value: widget.requestId!,
             ),
           ],
         ],
@@ -1015,181 +846,134 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget _buildArrivalConfirmation(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildArrivalConfirmation(BuildContext context) {
+    if (jobStartCodeRequired && widget.requestId != null)
+      return JobStartCodePanel(requestId: widget.requestId!, isProvider: false);
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors
-            .tertiaryContainer
-            .withValues(
-          alpha: .38,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
+        color: raGold.withValues(alpha: .075),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: raGold.withValues(alpha: .18)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Icon(
-                Icons
-                    .person_pin_circle_outlined,
-                color: colors
-                    .onTertiaryContainer,
+              Container(
+                width: 43,
+                height: 43,
+                decoration: BoxDecoration(
+                  color: raGold.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.person_pin_circle_outlined,
+                  color: raGold,
+                ),
               ),
-              const SizedBox(
-                width: RaSpace.sm,
-              ),
+
+              const SizedBox(width: 10),
+
               Expanded(
                 child: Text(
                   'Confirm provider arrival',
-                  style: theme
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w900,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(
-            height: RaSpace.sm,
-          ),
+          const SizedBox(height: 10),
 
           Text(
             arrivalLocationHint,
-            style: theme
-                .textTheme.bodySmall
-                ?.copyWith(
-              height: 1.4,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              height: 1.45,
+              color: colors.onSurfaceVariant,
             ),
           ),
 
-          const SizedBox(
-            height: RaSpace.md,
-          ),
+          const SizedBox(height: 13),
 
           FilledButton.icon(
-            onPressed:
-                confirmingArrival
-                    ? null
-                    : confirmArrival,
+            onPressed: confirmingArrival ? null : confirmArrival,
             icon: confirmingArrival
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child:
-                        CircularProgressIndicator(
+                ? const SizedBox.square(
+                    dimension: 17,
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color:
-                          Colors.white,
+                      color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons
-                        .check_circle_outline_rounded,
-                  ),
-            label: const Text(
-              'Provider Is Here',
-            ),
+                : const Icon(Icons.check_circle_outline_rounded),
+            label: const Text('Provider Is Here'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCompletionReview(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget buildCompletionReview(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
-        border: Border.all(
-          color: raSuccess
-              .withValues(alpha: .35),
-        ),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: raSuccess.withValues(alpha: .30)),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
                 width: 44,
                 height: 44,
-                decoration:
-                    BoxDecoration(
-                  color: raSuccessPale,
-                  borderRadius:
-                      BorderRadius
-                          .circular(14),
+                decoration: BoxDecoration(
+                  color: raSuccess.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(
-                  Icons
-                      .task_alt_rounded,
-                  color:
-                      raSuccess,
-                ),
+                child: const Icon(Icons.task_alt_rounded, color: raSuccess),
               ),
-              const SizedBox(
-                width: RaSpace.md,
-              ),
+
+              const SizedBox(width: 10),
+
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Review completed work',
-                      style: theme
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                            FontWeight.w900,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(
-                      height: 2,
-                    ),
+
+                    const SizedBox(height: 3),
+
                     Text(
-                      'Confirm only after checking that the agreed work has been completed.',
-                      style: theme
-                          .textTheme
-                          .bodySmall,
+                      'Confirm only after checking the agreed service.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -1197,171 +981,125 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ],
           ),
 
-          if (completionNotes
-              .trim()
-              .isNotEmpty) ...[
-            const SizedBox(
-              height: RaSpace.md,
-            ),
+          if (completionNotes.trim().isNotEmpty) ...[
+            const SizedBox(height: 14),
+
             Text(
               'Provider notes',
-              style: theme
-                  .textTheme.labelLarge
-                  ?.copyWith(
-                fontWeight:
-                    FontWeight.w800,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(
-              height: 4,
-            ),
+
+            const SizedBox(height: 5),
+
             Text(
               completionNotes,
+              style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.45),
             ),
           ],
 
-          if (completionPhotos
-              .isNotEmpty) ...[
-            const SizedBox(
-              height: RaSpace.md,
-            ),
-            RevisionEvidencePhotos(
-              photos:
-                  completionPhotos,
-            ),
+          if (completionPhotos.isNotEmpty) ...[
+            const SizedBox(height: 14),
+
+            RevisionEvidencePhotos(photos: completionPhotos),
           ],
 
-          const SizedBox(
-            height: RaSpace.lg,
-          ),
+          const SizedBox(height: 16),
 
+          CompletionReviewPanel(requestId: widget.requestId!),
+          const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed:
-                confirmingCompletion
-                    ? null
-                    : confirmCompletion,
+            onPressed: confirmingCompletion || discountPending
+                ? null
+                : confirmCompletion,
             icon: confirmingCompletion
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child:
-                        CircularProgressIndicator(
+                ? const SizedBox.square(
+                    dimension: 17,
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color:
-                          Colors.white,
+                      color: Colors.white,
                     ),
                   )
-                : const Icon(
-                    Icons
-                        .verified_outlined,
-                  ),
-            label: const Text(
-              'Confirm Work Completed',
-            ),
+                : const Icon(Icons.verified_outlined),
+            label: const Text('Agree Final Amount & Complete'),
           ),
 
-          const SizedBox(
-            height: RaSpace.sm,
-          ),
+          const SizedBox(height: 7),
 
           TextButton.icon(
-            style:
-                TextButton.styleFrom(
-              foregroundColor:
-                  colors.error,
-            ),
-            onPressed: () => push(
-              context,
-              DisputeScreen(
-                requestId:
-                    widget.requestId!,
-              ),
-            ),
-            icon: const Icon(
-              Icons
-                  .report_problem_outlined,
-            ),
-            label: const Text(
-              'There Is a Problem',
-            ),
+            style: TextButton.styleFrom(foregroundColor: colors.error),
+            onPressed: widget.requestId == null
+                ? null
+                : () {
+                    push(context, DisputeScreen(requestId: widget.requestId!));
+                  },
+            icon: const Icon(Icons.report_problem_outlined),
+            label: const Text('There Is a Problem'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRecoveryCard(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
+  Widget buildRecoveryCard(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.lg,
-      ),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: colors.errorContainer
-            .withValues(
-          alpha: .34,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          20,
-        ),
+        color: colors.error.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: colors.error.withValues(alpha: .18)),
       ),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons
-                .person_off_outlined,
-            color: colors.error,
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: colors.error.withValues(alpha: .11),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.person_off_outlined, color: colors.error),
           ),
-          const SizedBox(
-            width: RaSpace.md,
-          ),
+
+          const SizedBox(width: 10),
+
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Provider unavailable',
-                  style: theme
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w900,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(
-                  height: 4,
-                ),
+
+                const SizedBox(height: 4),
+
                 Text(
                   recoveryReason ??
                       'The assigned provider is no longer available.',
-                  style: theme
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     height: 1.4,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(
-                  height: 4,
-                ),
+
+                const SizedBox(height: 5),
+
                 Text(
                   'Choose another provider and approve a new offer before continuing.',
-                  style: theme
-                      .textTheme
-                      .bodySmall,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -1372,150 +1110,101 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
-
+    return RaDriverScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          'Track Assistance',
+        title: RaDriverAppBarTitle(
+          'Active request',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.45,
+          ),
         ),
         actions: [
-          if (widget.requestId !=
-              null)
+          if (widget.requestId != null && status == 3)
             IconButton(
-              tooltip:
-                  'Invoice',
-              onPressed: () =>
-                  push(
-                context,
-                InvoiceScreen(
-                  requestId:
-                      widget
-                          .requestId!,
-                ),
-              ),
-              icon: const Icon(
-                Icons
-                    .receipt_long_outlined,
-              ),
+              tooltip: 'Invoice',
+              onPressed: () {
+                push(context, InvoiceScreen(requestId: widget.requestId!));
+              },
+              icon: const Icon(Icons.receipt_long_outlined),
             ),
 
           IconButton(
-            tooltip:
-                'Emergency',
-            onPressed: () =>
-                push(
-              context,
-              const EmergencyScreen(),
-            ),
-            style:
-                IconButton.styleFrom(
-              backgroundColor:
-                  colors.errorContainer
-                      .withValues(
-                alpha: .65,
-              ),
-              foregroundColor:
-                  colors.error,
-            ),
-            icon: const Icon(
-              Icons.sos_outlined,
-            ),
+            tooltip: 'Emergency',
+            style: IconButton.styleFrom(foregroundColor: colors.error),
+            onPressed: () {
+              push(context, const EmergencyScreen());
+            },
+            icon: const Icon(Icons.sos_outlined),
           ),
 
-          const SizedBox(
-            width: RaSpace.sm,
-          ),
+          const SizedBox(width: 4),
         ],
       ),
-
       body: SafeArea(
         top: false,
         child: Column(
           children: [
             Expanded(
               child: ListView(
-                padding:
-                    const EdgeInsets
-                        .fromLTRB(
-                  RaSpace.lg,
-                  RaSpace.md,
-                  RaSpace.lg,
-                  RaSpace.xxl,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
-                  if (widget.requestId !=
-                      null) ...[
-                    RepairQuotePanel(
-                      requestId:
-                          widget
-                              .requestId!,
-                    ),
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
+                  if (widget.requestId != null) ...[
+                    RepairQuotePanel(requestId: widget.requestId!),
+
+                    const SizedBox(height: 13),
                   ],
 
-                  _buildMap(
-                    context,
+                  buildMap(context),
+                  const SizedBox(height: 10),
+                  LiveLocationStatus(
+                    updatedAt: providerLocationUpdatedAt,
+                    hasPosition: providerPosition != null,
+                    distanceKm: providerPosition == null
+                        ? null
+                        : Geolocator.distanceBetween(
+                                providerPosition!.latitude,
+                                providerPosition!.longitude,
+                                widget.draft.latitude,
+                                widget.draft.longitude,
+                              ) /
+                              1000,
                   ),
 
-                  if (requestError !=
-                      null) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
+                  if (requestError != null) ...[
+                    const SizedBox(height: 11),
 
                     Container(
-                      padding:
-                          const EdgeInsets
-                              .all(
-                        RaSpace.md,
-                      ),
-                      decoration:
-                          BoxDecoration(
-                        color: colors
-                            .errorContainer
-                            .withValues(
-                          alpha: .35,
-                        ),
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          15,
-                        ),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colors.error.withValues(alpha: .07),
+                        borderRadius: BorderRadius.circular(15),
                       ),
                       child: Row(
                         children: [
                           Icon(
-                            Icons
-                                .cloud_off_outlined,
-                            color: colors
-                                .error,
-                            size: 19,
+                            Icons.cloud_off_outlined,
+                            color: colors.error,
+                            size: 18,
                           ),
-                          const SizedBox(
-                            width:
-                                RaSpace.sm,
-                          ),
+
+                          const SizedBox(width: 8),
+
                           Expanded(
                             child: Text(
                               requestError!,
-                              style: theme
-                                  .textTheme
-                                  .bodySmall,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
@@ -1523,75 +1212,58 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   ],
 
-                  const SizedBox(
-                    height:
-                        RaSpace.md,
-                  ),
+                  const SizedBox(height: 14),
 
-                  _buildProviderCard(
-                    context,
-                  ),
+                  buildProviderCard(context),
+                  if (!cancelled && status < 2 && widget.requestId != null) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: cancellingRequest ? null : cancelBeforeArrival,
+                      icon: const Icon(Icons.cancel_outlined),
+                      label: Text(
+                        cancellingRequest
+                            ? 'Cancelling...'
+                            : 'Cancel assistance',
+                      ),
+                    ),
+                  ],
 
-                  const SizedBox(
-                    height:
-                        RaSpace.xl,
-                  ),
+                  const SizedBox(height: 18),
 
-                  _buildStatusCard(
-                    context,
-                  ),
+                  buildStatusCard(context),
 
-                  const SizedBox(
-                    height:
-                        RaSpace.md,
-                  ),
+                  const SizedBox(height: 13),
 
-                  _buildRequestSummary(
-                    context,
-                  ),
+                  buildRequestSummary(context),
 
                   if (!cancelled &&
                       status == 0 &&
-                      widget.requestId !=
-                          null) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.md,
-                    ),
+                      widget.requestId != null) ...[
+                    const SizedBox(height: 13),
 
-                    TextButton.icon(
-                      onPressed:
-                          replacingProvider
-                              ? null
-                              : replaceDelayedProvider,
+                    OutlinedButton.icon(
+                      onPressed: replacingProvider
+                          ? null
+                          : replaceDelayedProvider,
                       icon: replacingProvider
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(
-                              Icons
-                                  .person_search_outlined,
-                            ),
+                          : const Icon(Icons.person_search_outlined),
                       label: const Text(
                         'Provider Has Not Departed? Replace Provider',
                       ),
                     ),
 
+                    const SizedBox(height: 5),
+
                     Text(
-                      'Replacement is intended for cases where the provider does not depart after the allowed waiting period.',
-                      textAlign:
-                          TextAlign.center,
-                      style: theme
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color: colors
-                            .onSurfaceVariant,
+                      'Use replacement only when the assigned provider has not departed after the expected waiting period.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1599,39 +1271,38 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   if (!cancelled &&
                       status == 2 &&
                       arrivalNeedsConfirmation) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
+                    const SizedBox(height: 16),
 
-                    _buildArrivalConfirmation(
-                      context,
-                    ),
+                    buildArrivalConfirmation(context),
                   ],
 
-                  if (completionPending &&
-                      widget.requestId !=
-                          null) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
+                  if (completionPending && widget.requestId != null) ...[
+                    const SizedBox(height: 16),
 
-                    _buildCompletionReview(
-                      context,
-                    ),
+                    buildCompletionReview(context),
                   ],
 
-                  if (cancelled &&
-                      recoveryReason !=
-                          null) ...[
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
+                  if (cancelled && recoveryReason != null) ...[
+                    const SizedBox(height: 16),
 
-                    _buildRecoveryCard(
-                      context,
+                    buildRecoveryCard(context),
+                  ],
+
+                  if (status == 3 && widget.requestId != null) ...[
+                    const SizedBox(height: 17),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          push(
+                            context,
+                            InvoiceScreen(requestId: widget.requestId!),
+                          );
+                        },
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        label: const Text('View / Download Invoice'),
+                      ),
                     ),
                   ],
                 ],
@@ -1639,35 +1310,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ),
 
             _RaTrackingBottomBar(
-              cancelled:
-                  cancelled,
-              completed:
-                  status == 3,
-              canFindAnother:
-                  cancelled &&
-                      recoveryReason !=
-                          null,
+              cancelled: cancelled,
+              completed: status == 3,
+              canFindAnother: cancelled && recoveryReason != null,
               onPressed: () {
-                if (cancelled &&
-                    recoveryReason !=
-                        null) {
+                if (cancelled && recoveryReason != null) {
                   replace(
                     context,
                     ReviewScreen(
-                      draft:
-                          widget.draft
-                              .copyWith(
+                      draft: widget.draft.copyWith(
                         provider: '',
-                        preferredProviderId:
-                            '',
+                        preferredProviderId: '',
                       ),
                     ),
                   );
                 } else {
-                  replace(
-                    context,
-                    const DriverShell(),
-                  );
+                  replace(context, const DriverShell());
                 }
               },
             ),
@@ -1678,8 +1336,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   }
 }
 
-class _RaTrackDetail
-    extends StatelessWidget {
+class _RaTrackDetail extends StatelessWidget {
   const _RaTrackDetail({
     required this.icon,
     required this.label,
@@ -1692,68 +1349,45 @@ class _RaTrackDetail
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Padding(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: RaSpace.sm,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 38,
             height: 38,
-            decoration:
-                BoxDecoration(
-              color: colors
-                  .surfaceContainerHighest,
-              borderRadius:
-                  BorderRadius.circular(
-                12,
-              ),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .07),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              size: 19,
-              color: colors.primary,
-            ),
+            child: Icon(icon, size: 18, color: colors.primary),
           ),
-          const SizedBox(
-            width: RaSpace.md,
-          ),
+
+          const SizedBox(width: 10),
+
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: theme
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(
-                    color: colors
-                        .onSurfaceVariant,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: colors.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(
-                  height: 2,
-                ),
+
+                const SizedBox(height: 3),
+
                 Text(
                   value,
-                  style: theme
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontWeight:
-                        FontWeight.w700,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -1765,27 +1399,22 @@ class _RaTrackDetail
   }
 }
 
-class _RaTrackDivider
-    extends StatelessWidget {
+class _RaTrackDivider extends StatelessWidget {
   const _RaTrackDivider();
 
   @override
   Widget build(BuildContext context) {
     return Divider(
       height: 1,
-      indent: 50,
-      color: Theme.of(context)
-          .colorScheme
-          .outlineVariant
-          .withValues(
-            alpha: .5,
-          ),
+      indent: 48,
+      color: Theme.of(
+        context,
+      ).colorScheme.outlineVariant.withValues(alpha: .34),
     );
   }
 }
 
-class _RaTrackingBottomBar
-    extends StatelessWidget {
+class _RaTrackingBottomBar extends StatelessWidget {
   const _RaTrackingBottomBar({
     required this.cancelled,
     required this.completed,
@@ -1796,64 +1425,42 @@ class _RaTrackingBottomBar
   final bool cancelled;
   final bool completed;
   final bool canFindAnother;
+
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
-    final enabled =
-        cancelled || completed;
+    final enabled = cancelled || completed;
 
     return Container(
-      padding:
-          const EdgeInsets.fromLTRB(
-        RaSpace.lg,
-        RaSpace.sm,
-        RaSpace.lg,
-        RaSpace.md,
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
       decoration: BoxDecoration(
         color: colors.surface,
         border: Border(
-          top: BorderSide(
-            color: colors
-                .outlineVariant
-                .withValues(
-              alpha: .6,
-            ),
-          ),
+          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
         ),
       ),
       child: SafeArea(
         top: false,
         child: SizedBox(
           width: double.infinity,
-          child:
-              FilledButton.icon(
-            onPressed:
-                enabled
-                    ? onPressed
-                    : null,
+          child: FilledButton.icon(
+            onPressed: enabled ? onPressed : null,
             icon: Icon(
               canFindAnother
-                  ? Icons
-                      .person_search_outlined
-                  : completed ||
-                          cancelled
-                      ? Icons
-                          .home_outlined
-                      : Icons
-                          .hourglass_top_rounded,
+                  ? Icons.person_search_outlined
+                  : enabled
+                  ? Icons.home_outlined
+                  : Icons.hourglass_top_rounded,
             ),
             label: Text(
               canFindAnother
                   ? 'Find Another Provider'
-                  : completed ||
-                          cancelled
-                      ? 'Back to Home'
-                      : 'Waiting for Provider Update',
+                  : enabled
+                  ? 'Back to Home'
+                  : 'Waiting for Provider Update',
             ),
           ),
         ),

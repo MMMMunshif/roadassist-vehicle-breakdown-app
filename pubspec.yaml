@@ -23,6 +23,11 @@ dependencies:
 
   url_launcher: ^6.3.2
 
+  # Branded service invoices and PDF export.
+  pdf: ^3.13.1
+  printing: ^5.15.1
+  file_saver: ^0.7.0
+
   image_picker: ^1.2.3
   image: ^4.9.2
   camera: ^0.12.0+2
@@ -61,6 +66,7 @@ flutter:
         - asset: assets/fonts/Manrope-Variable.ttf
 
   assets:
+    - assets/fonts/PlusJakartaSans-Variable.ttf
     - assets/images/
 
 flutter_launcher_icons:

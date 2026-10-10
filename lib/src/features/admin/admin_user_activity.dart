@@ -1,117 +1,163 @@
 part of '../../screens.dart';
 
 class _AdminUserActivity extends StatelessWidget {
-  const _AdminUserActivity({
-    required this.uid,
-  });
+  const _AdminUserActivity({required this.uid});
 
   final String uid;
 
+  DateTime? _requestDate(Map<String, dynamic> data) {
+    final value = data['updatedAt'] ?? data['completedAt'] ?? data['createdAt'];
+
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    return null;
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _sortedRequests(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> documents,
+  ) {
+    final result = documents.toList();
+
+    result.sort((first, second) {
+      final firstDate = _requestDate(first.data());
+
+      final secondDate = _requestDate(second.data());
+
+      if (firstDate == null && secondDate == null) {
+        return 0;
+      }
+
+      if (firstDate == null) {
+        return 1;
+      }
+
+      if (secondDate == null) {
+        return -1;
+      }
+
+      return secondDate.compareTo(firstDate);
+    });
+
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = Theme.of(context).colorScheme;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Account activity',
-          style: theme.textTheme.titleLarge
-              ?.copyWith(
-            fontWeight: FontWeight.w900,
+        Container(
+          padding: const EdgeInsets.all(17),
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: .065),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: colors.primary.withValues(alpha: .13)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.manage_history_outlined,
+                  color: colors.primary,
+                ),
+              ),
+
+              const SizedBox(width: 11),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Account activity',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Review recent RoadAssist jobs, cancellations and administrative actions associated with this account.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
 
-        const SizedBox(height: RaSpace.sm),
+        const SizedBox(height: 14),
 
-        Text(
-          'Review recent jobs, cancellations and administrative actions associated with this account.',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurfaceVariant,
-          ),
-        ),
-
-        const SizedBox(height: RaSpace.md),
-
-        for (final field in [
-          'driverId',
-          'providerId',
-        ])
+        for (final field in ['driverId', 'providerId'])
           Padding(
-            padding: const EdgeInsets.only(
-              bottom: RaSpace.sm,
-            ),
-            child: StreamBuilder<
-                QuerySnapshot<
-                    Map<String, dynamic>>>(
+            padding: const EdgeInsets.only(bottom: 9),
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('requests')
-                  .where(
-                    field,
-                    isEqualTo: uid,
-                  )
+                  .where(field, isEqualTo: uid)
                   .limit(50)
                   .snapshots(),
               builder: (context, snapshot) {
-                final label =
-                    field == 'driverId'
-                    ? 'Driver jobs'
-                    : 'Provider jobs';
+                final driver = field == 'driverId';
+
+                final label = driver ? 'Driver jobs' : 'Provider jobs';
 
                 if (snapshot.hasError) {
-                  return _AdminActivitySection(
-                    icon: Icons
-                        .route_outlined,
+                  return _RaAdminActivitySection(
+                    icon: driver
+                        ? Icons.directions_car_outlined
+                        : Icons.home_repair_service_outlined,
                     title: label,
-                    subtitle:
-                        'Could not load related jobs.',
+                    subtitle: 'Could not load related jobs.',
                     children: const [],
                   );
                 }
 
                 if (!snapshot.hasData) {
-                  return _AdminActivitySection(
-                    icon: Icons
-                        .route_outlined,
+                  return _RaAdminActivitySection(
+                    icon: driver
+                        ? Icons.directions_car_outlined
+                        : Icons.home_repair_service_outlined,
                     title: label,
-                    subtitle:
-                        'Loading job history…',
+                    subtitle: 'Loading job history…',
                     loading: true,
                     children: const [],
                   );
                 }
 
-                final docs =
-                    snapshot.data!.docs;
+                final docs = _sortedRequests(snapshot.data!.docs);
 
-                return _AdminActivitySection(
-                  icon:
-                      field == 'driverId'
-                      ? Icons
-                          .directions_car_outlined
-                      : Icons
-                          .home_repair_service_outlined,
-                  title:
-                      '$label (${docs.length})',
-                  subtitle:
-                      'Up to 50 records shown',
+                return _RaAdminActivitySection(
+                  icon: driver
+                      ? Icons.directions_car_outlined
+                      : Icons.home_repair_service_outlined,
+                  title: '$label (${docs.length})',
+                  subtitle: 'Up to 50 recent records',
                   children: [
                     if (docs.isEmpty)
-                      const Padding(
-                        padding:
-                            EdgeInsets.all(
-                          RaSpace.md,
-                        ),
-                        child: Text(
-                          'No related jobs found.',
-                        ),
+                      const _RaAdminActivityEmpty(
+                        text: 'No related jobs found.',
                       ),
+
                     for (final doc in docs)
-                      _AdminActivityJobTile(
+                      _RaAdminActivityJobTile(
                         requestId: doc.id,
                         data: doc.data(),
                       ),
@@ -122,70 +168,40 @@ class _AdminUserActivity extends StatelessWidget {
           ),
 
         Padding(
-          padding: const EdgeInsets.only(
-            bottom: RaSpace.sm,
-          ),
-          child: StreamBuilder<
-              QuerySnapshot<
-                  Map<String, dynamic>>>(
+          padding: const EdgeInsets.only(bottom: 9),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection('requests')
-                .where(
-                  'cancelledBy',
-                  isEqualTo: uid,
-                )
+                .where('cancelledBy', isEqualTo: uid)
                 .limit(50)
                 .snapshots(),
             builder: (context, snapshot) {
-              final docs =
+              final rawDocs =
                   snapshot.data?.docs ??
-                      <QueryDocumentSnapshot<
-                          Map<String, dynamic>>>[];
+                  <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-              return _AdminActivitySection(
+              final docs = _sortedRequests(rawDocs);
+
+              return _RaAdminActivitySection(
                 icon: Icons.cancel_outlined,
-                title:
-                    'Cancellations (${docs.length})',
-                subtitle:
-                    'Requests cancelled by this account',
-                loading:
-                    !snapshot.hasData &&
-                    !snapshot.hasError,
+                title: 'Cancellations (${docs.length})',
+                subtitle: 'Requests cancelled by this account',
+                loading: !snapshot.hasData && !snapshot.hasError,
                 children: [
                   if (snapshot.hasError)
-                    const Padding(
-                      padding:
-                          EdgeInsets.all(
-                        RaSpace.md,
-                      ),
-                      child: Text(
-                        'Could not load cancellation history.',
-                      ),
+                    const _RaAdminActivityEmpty(
+                      text: 'Could not load cancellation history.',
                     ),
-                  if (snapshot.hasData &&
-                      docs.isEmpty)
-                    const Padding(
-                      padding:
-                          EdgeInsets.all(
-                        RaSpace.md,
-                      ),
-                      child: Text(
-                        'No cancellations recorded.',
-                      ),
+
+                  if (snapshot.hasData && docs.isEmpty)
+                    const _RaAdminActivityEmpty(
+                      text: 'No cancellations recorded.',
                     ),
+
                   for (final doc in docs)
-                    ListTile(
-                      leading: const Icon(
-                        Icons
-                            .cancel_schedule_send_outlined,
-                      ),
-                      title: Text(
-                        '${doc.data()['cancellationType'] ?? 'Cancellation'}',
-                      ),
-                      subtitle: Text(
-                        '${doc.data()['cancellationReason'] ?? 'No reason recorded'}\nRequest: ${doc.id}',
-                      ),
-                      isThreeLine: true,
+                    _RaAdminCancellationTile(
+                      requestId: doc.id,
+                      data: doc.data(),
                     ),
                 ],
               );
@@ -193,79 +209,46 @@ class _AdminUserActivity extends StatelessWidget {
           ),
         ),
 
-        StreamBuilder<
-            QuerySnapshot<
-                Map<String, dynamic>>>(
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: FirebaseFirestore.instance
               .collection('adminAudit')
-              .where(
-                'target',
-                isEqualTo: uid,
-              )
+              .where('target', isEqualTo: uid)
               .limit(50)
               .snapshots(),
           builder: (context, snapshot) {
             final docs =
-                snapshot.data?.docs ??
-                    <QueryDocumentSnapshot<
-                        Map<String, dynamic>>>[];
+                snapshot.data?.docs.toList() ??
+                <QueryDocumentSnapshot<Map<String, dynamic>>>[];
 
-            return _AdminActivitySection(
-              icon:
-                  Icons.history_rounded,
-              title:
-                  'Audit history (${docs.length})',
-              subtitle:
-                  'Administrative actions targeting this account',
-              loading:
-                  !snapshot.hasData &&
-                  !snapshot.hasError,
+            docs.sort((first, second) {
+              final firstTime = first.data()['createdAt'];
+
+              final secondTime = second.data()['createdAt'];
+
+              if (firstTime is Timestamp && secondTime is Timestamp) {
+                return secondTime.compareTo(firstTime);
+              }
+
+              return 0;
+            });
+
+            return _RaAdminActivitySection(
+              icon: Icons.history_rounded,
+              title: 'Audit history (${docs.length})',
+              subtitle: 'Administrative actions targeting this account',
+              loading: !snapshot.hasData && !snapshot.hasError,
               children: [
                 if (snapshot.hasError)
-                  const Padding(
-                    padding:
-                        EdgeInsets.all(
-                      RaSpace.md,
-                    ),
-                    child: Text(
-                      'Could not load audit history.',
-                    ),
+                  const _RaAdminActivityEmpty(
+                    text: 'Could not load audit history.',
                   ),
-                if (snapshot.hasData &&
-                    docs.isEmpty)
-                  const Padding(
-                    padding:
-                        EdgeInsets.all(
-                      RaSpace.md,
-                    ),
-                    child: Text(
-                      'No audit entries recorded.',
-                    ),
+
+                if (snapshot.hasData && docs.isEmpty)
+                  const _RaAdminActivityEmpty(
+                    text: 'No audit entries recorded.',
                   ),
-                for (final doc in docs)
-                  ListTile(
-                    leading: const Icon(
-                      Icons
-                          .admin_panel_settings_outlined,
-                    ),
-                    title: Text(
-                      '${doc.data()['kind'] ?? 'Admin action'}',
-                    ),
-                    subtitle: Text(
-                      '${doc.data()['reason'] ?? 'No reason recorded'}\nActor: ${doc.data()['actor'] ?? 'Unknown'}',
-                    ),
-                    isThreeLine: true,
-                    trailing: const Icon(
-                      Icons
-                          .chevron_right_rounded,
-                    ),
-                    onTap: () => push(
-                      context,
-                      _AdminAuditScreen(
-                        data: doc.data(),
-                      ),
-                    ),
-                  ),
+
+                for (final doc in docs) _RaAdminAuditTile(data: doc.data()),
               ],
             );
           },
@@ -275,9 +258,8 @@ class _AdminUserActivity extends StatelessWidget {
   }
 }
 
-class _AdminActivitySection
-    extends StatelessWidget {
-  const _AdminActivitySection({
+class _RaAdminActivitySection extends StatelessWidget {
+  const _RaAdminActivitySection({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -286,116 +268,404 @@ class _AdminActivitySection
   });
 
   final IconData icon;
+
   final String title;
   final String subtitle;
+
   final List<Widget> children;
+
   final bool loading;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final colors = theme.colorScheme;
 
     return Container(
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .55),
-        ),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
+            : colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
+      child: Material(
+        color: Colors.transparent,
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 3),
+          childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .075),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, size: 19, color: colors.primary),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          children: [
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.all(18),
+                child: LinearProgressIndicator(),
+              )
+            else
+              ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RaAdminActivityJobTile extends StatelessWidget {
+  const _RaAdminActivityJobTile({required this.requestId, required this.data});
+
+  final String requestId;
+
+  final Map<String, dynamic> data;
+
+  String _statusLabel(String status) {
+    return switch (status) {
+      'en_route' => 'En route',
+      'completed' => 'Completed',
+      'cancelled' => 'Cancelled',
+      'searching' => 'Searching',
+      'accepted' => 'Accepted',
+      'arrived' => 'Arrived',
+      _ => status.replaceAll('_', ' ').trim(),
+    };
+  }
+
+  RaTone _statusTone(String status) {
+    return switch (status) {
+      'completed' => RaTone.success,
+      'cancelled' => RaTone.danger,
+      'searching' => RaTone.warning,
+      'accepted' || 'en_route' || 'arrived' => RaTone.info,
+      _ => RaTone.info,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final status = data['status']?.toString() ?? 'unknown';
+
+    final paymentConfirmed = data['providerConfirmedPayment'] == true;
+
+    final arrivalConfirmed = data['arrivalConfirmedBy'] != null;
+
+    final location =
+        data['locationLabel']?.toString() ?? data['location']?.toString() ?? '';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          push(context, AdminJobMonitorScreen(requestId: requestId));
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest.withValues(alpha: .45),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.route_outlined,
+                  size: 18,
+                  color: colors.primary,
+                ),
+              ),
+
+              const SizedBox(width: 9),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            requestIssueLabel(data),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        StatusPill(
+                          label: _statusLabel(status),
+                          tone: _statusTone(status),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      'Request $requestId',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+
+                    if (location.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        location,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 6),
+
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 5,
+                      children: [
+                        _RaAdminMiniBadge(
+                          icon: paymentConfirmed
+                              ? Icons.payments_outlined
+                              : Icons.payment_outlined,
+                          label: paymentConfirmed
+                              ? 'Payment confirmed'
+                              : 'Payment unconfirmed',
+                          tone: paymentConfirmed ? raSuccess : raGold,
+                        ),
+                        if (arrivalConfirmed)
+                          const _RaAdminMiniBadge(
+                            icon: Icons.location_on_outlined,
+                            label: 'Arrival confirmed',
+                            tone: raSuccess,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 5),
+
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RaAdminCancellationTile extends StatelessWidget {
+  const _RaAdminCancellationTile({required this.requestId, required this.data});
+
+  final String requestId;
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final type = data['cancellationType']?.toString() ?? 'Cancellation';
+
+    final reason =
+        data['cancellationReason']?.toString() ?? 'No reason recorded';
+
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
         leading: Container(
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: colors.primaryContainer,
-            borderRadius:
-                BorderRadius.circular(12),
+            color: raDanger.withValues(alpha: .07),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            size: 19,
-            color:
-                colors.onPrimaryContainer,
+          child: const Icon(
+            Icons.cancel_schedule_send_outlined,
+            color: raDanger,
+            size: 18,
           ),
         ),
         title: Text(
-          title,
-          style: theme.textTheme.titleSmall
-              ?.copyWith(
-            fontWeight: FontWeight.w900,
+          type,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
         ),
         subtitle: Text(
-          subtitle,
-          style: theme.textTheme.bodySmall,
+          '$reason\nRequest $requestId',
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            height: 1.4,
+            color: colors.onSurfaceVariant,
+          ),
         ),
+        isThreeLine: true,
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () {
+          push(context, AdminJobMonitorScreen(requestId: requestId));
+        },
+      ),
+    );
+  }
+}
+
+class _RaAdminAuditTile extends StatelessWidget {
+  const _RaAdminAuditTile({required this.data});
+
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final kind = data['kind']?.toString() ?? 'Admin action';
+
+    final reason = data['reason']?.toString() ?? 'No reason recorded';
+
+    final actor = data['actor']?.toString() ?? 'Unknown';
+
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: .07),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.admin_panel_settings_outlined,
+            color: colors.primary,
+            size: 18,
+          ),
+        ),
+        title: Text(
+          kind,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(
+          '$reason\nActor: $actor',
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            height: 1.4,
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        isThreeLine: true,
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () {
+          push(context, _AdminAuditScreen(data: data));
+        },
+      ),
+    );
+  }
+}
+
+class _RaAdminMiniBadge extends StatelessWidget {
+  const _RaAdminMiniBadge({
+    required this.icon,
+    required this.label,
+    required this.tone,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.all(
-                RaSpace.lg,
-              ),
-              child:
-                  LinearProgressIndicator(),
-            )
-          else
-            ...children,
+          Icon(icon, size: 12, color: tone),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: tone,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _AdminActivityJobTile
-    extends StatelessWidget {
-  const _AdminActivityJobTile({
-    required this.requestId,
-    required this.data,
-  });
+class _RaAdminActivityEmpty extends StatelessWidget {
+  const _RaAdminActivityEmpty({required this.text});
 
-  final String requestId;
-  final Map<String, dynamic> data;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final status =
-        data['status']?.toString() ??
-            'unknown';
+    final colors = Theme.of(context).colorScheme;
 
-    final paymentConfirmed =
-        data['providerConfirmedPayment'] ==
-            true;
-
-    final arrivalConfirmed =
-        data['arrivalConfirmedBy'] != null;
-
-    return ListTile(
-      leading: const Icon(
-        Icons.route_outlined,
-      ),
-      title: Text(
-        '${data['service'] ?? requestId}',
-      ),
-      subtitle: Text(
-        '$status • Payment ${paymentConfirmed ? 'confirmed' : 'unconfirmed'}'
-        '${arrivalConfirmed ? '\nArrival: ${data['arrivalConfirmationMethod']} at ${data['arrivalConfirmedAt']} - ${data['arrivalConfirmationReason']}' : ''}',
-      ),
-      isThreeLine:
-          arrivalConfirmed,
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-      ),
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              _AdminComplaintScreen(
-            requestId: requestId,
-          ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 12,
+          color: colors.onSurfaceVariant,
         ),
       ),
     );

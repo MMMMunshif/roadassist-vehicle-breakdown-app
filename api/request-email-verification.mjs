@@ -1,6 +1,9 @@
+import { contactEmail } from '../functions/role-identity.mjs';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import nodemailer from 'nodemailer';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { randomBytes, createHash } from 'node:crypto';
 
 function requireEnvironment(name) {
   const value = process.env[name];
@@ -55,7 +58,7 @@ export default async function handler(request, response) {
 
   try {
     const auth = firebaseAuth();
-    const decoded = await auth.verifyIdToken(idToken);
+    const decoded = await auth.verifyIdToken(idToken, true);
     const user = await auth.getUser(decoded.uid);
     if (!user.email) {
       return response.status(400).json({
@@ -63,11 +66,55 @@ export default async function handler(request, response) {
         message: 'This account does not have an email address.',
       });
     }
-    if (user.emailVerified) return response.status(200).json({ ok: true });
-
-    const verificationLink = await auth.generateEmailVerificationLink(
-      user.email,
-    );
+    const role = request.body?.role;
+    if (role != null && !['driver', 'provider'].includes(role)) {
+      return response.status(400).json({ok:false, message:'Invalid account role.'});
+    }
+    const db = getFirestore();
+    const profile = (await db.doc(`users/${user.uid}`).get()).data();
+    if (!profile) return response.status(403).json({ok:false,message:'Account profile unavailable.'});
+    if (profile.authIdentity === 'role-v1') {
+      if (role && role !== profile.role) return response.status(403).json({ok:false,message:'Sign in to this role first.'});
+      contactEmail(user, profile); // Validate server-owned recipient mapping.
+      if (!user.emailVerified) {
+        const limiter = db.doc(`roleEmailSendLimits/${user.uid}_native`);
+        const allowed = await db.runTransaction(async tx => {
+          const last = await tx.get(limiter);
+          if (Date.now() - (last.data()?.issuedAtMs ?? 0) < 60000) return false;
+          tx.set(limiter, {issuedAtMs:Date.now()});
+          return true;
+        });
+        if (!allowed) return response.status(429).json({ok:false,message:'Wait one minute before requesting another email.'});
+      }
+    }
+    const roleRequired = role && (profile.roleEmailRequired ?? []).includes(role);
+    if (roleRequired && ![profile.role, ...(profile.roles ?? [])].includes(role)) {
+      return response.status(403).json({ok:false,message:'Register this role first.'});
+    }
+    if (user.emailVerified && !roleRequired) return response.status(200).json({ ok: true });
+    // First verify the Firebase identity, then independently confirm a new role.
+    let verificationLink;
+    if (!user.emailVerified) {
+      verificationLink = await auth.generateEmailVerificationLink(user.email);
+    } else {
+      const token = randomBytes(32).toString('hex');
+      const digest = createHash('sha256').update(token).digest('hex');
+      const limiter = db.doc(`roleEmailSendLimits/${user.uid}_${role}`);
+      const issued = await db.runTransaction(async tx => {
+        const last = await tx.get(limiter);
+        if (Date.now() - (last.data()?.issuedAtMs ?? 0) < 60000) return false;
+        tx.set(limiter, {issuedAtMs:Date.now()});
+        tx.set(db.doc(`roleEmailChallenges/${digest}`), {
+          uid:user.uid, role, email:user.email.toLowerCase(),
+          expiresAtMs:Date.now()+30*60*1000, used:false,
+          createdAt:FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+      if (!issued) return response.status(429).json({ok:false,message:'Wait one minute before requesting another email.'});
+      const origin = process.env.ROLE_EMAIL_PUBLIC_ORIGIN || 'https://vehiclebreakdownapp.vercel.app';
+      verificationLink = `${origin}/api/confirm-role-email?token=${token}`;
+    }
     const gmailUser = requireEnvironment('GMAIL_USER');
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -79,8 +126,8 @@ export default async function handler(request, response) {
     const displayName = user.displayName?.trim() || 'RoadAssist user';
     const delivery = await transporter.sendMail({
       from: `RoadAssist <${gmailUser}>`,
-      to: user.email,
-      subject: 'Verify your RoadAssist email',
+      to: contactEmail(user, profile),
+      subject: `Verify your RoadAssist ${profile.authIdentity === 'role-v1' ? profile.role + ' ' : ''}email`,
       text: `Hello ${displayName},\n\nVerify your RoadAssist email using this secure link:\n${verificationLink}\n\nIf you did not create this account, ignore this email.`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#18324a">
@@ -93,11 +140,7 @@ export default async function handler(request, response) {
           <p style="font-size:13px;color:#60758a">If you did not create this account, ignore this email.</p>
         </div>`,
     });
-    console.info('Verification email accepted by SMTP', {
-      accepted: delivery.accepted,
-      rejected: delivery.rejected,
-      messageId: delivery.messageId,
-    });
+    console.info('Verification email accepted by SMTP');
     if (!delivery.accepted?.length) {
       throw new Error('SMTP did not accept the verification recipient.');
     }

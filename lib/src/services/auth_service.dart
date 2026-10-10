@@ -3,17 +3,38 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'device_service.dart';
+import '../models/account_roles.dart';
 
 class AuthService {
-  AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _firestore = firestore ?? FirebaseFirestore.instance;
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    http.Client? httpClient,
+    bool? independentRoleAuthEnabled,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _firestore = firestore ?? FirebaseFirestore.instance,
+       _httpClient = httpClient,
+       _independentRoleAuth = independentRoleAuthEnabled ?? independentRoleAuth;
+
+  bool verificationEmailDeliveryFailed = false;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final http.Client? _httpClient;
+  final bool _independentRoleAuth;
+
+  Future<http.Response> _post(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) =>
+      _httpClient?.post(uri, headers: headers, body: body) ??
+      http.post(uri, headers: headers, body: body);
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -29,20 +50,135 @@ class AuthService {
         'https://vehiclebreakdownapp.vercel.app/api/request-email-verification',
   );
 
-  Future<void> sendPasswordResetEmail(String email) async {
+  static const independentRoleAuth = bool.fromEnvironment(
+    'INDEPENDENT_ROLE_AUTH',
+    defaultValue: true,
+  );
+  static const _roleAuthApiUrl = String.fromEnvironment(
+    'ROLE_AUTH_API_URL',
+    defaultValue: 'https://vehiclebreakdownapp.vercel.app/api/role-auth',
+  );
+
+  static const _googleRoleAuthApiUrl = String.fromEnvironment(
+    'GOOGLE_ROLE_AUTH_API_URL',
+    defaultValue: 'https://vehiclebreakdownapp.vercel.app/api/google-role-auth',
+  );
+
+  Future<UserCredential> signInWithGoogle({
+    required String role,
+    String? displayName,
+    String? phone,
+    String? photoData,
+  }) async {
+    if (!kIsWeb) {
+      throw FirebaseAuthException(
+        code: 'google-web-only',
+        message: 'Google login is currently available in the web app.',
+      );
+    }
+    if (!_independentRoleAuth) {
+      throw FirebaseAuthException(code: 'role-auth-unavailable');
+    }
+    // Isolate the Google proof session from the selected RoadAssist role session.
+    final app = await Firebase.initializeApp(
+      name: 'google-proof-${DateTime.now().microsecondsSinceEpoch}',
+      options: Firebase.app().options,
+    );
+    final proofAuth = FirebaseAuth.instanceFor(app: app);
+    try {
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters({'prompt': 'select_account'});
+      final proof = await proofAuth.signInWithPopup(provider);
+      final token = await proof.user!.getIdToken(true);
+      final response = await _post(
+        Uri.parse(_googleRoleAuthApiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'role': role,
+          'displayName': displayName,
+          'phone': phone,
+          'photoData': photoData,
+        }),
+      ).timeout(const Duration(seconds: 35));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode != 200) {
+        throw FirebaseAuthException(
+          code: data['code'] as String? ?? 'role-auth-unavailable',
+        );
+      }
+      final credential = await _auth.signInWithCustomToken(
+        data['customToken'] as String,
+      );
+      try {
+        final profile = await getCurrentProfile();
+        if (!profile.exists || profile.data()?['role'] != role) {
+          throw FirebaseAuthException(code: 'wrong-role');
+        }
+        _startBackgroundSetup(role);
+        return credential;
+      } catch (_) {
+        await _auth.signOut();
+        rethrow;
+      }
+    } finally {
+      await proofAuth.signOut();
+      await app.delete();
+    }
+  }
+
+  Future<UserCredential> _roleAuthenticate(Map<String, dynamic> values) async {
+    final response = await _post(
+      Uri.parse(_roleAuthApiUrl),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(values),
+    ).timeout(const Duration(seconds: 35));
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw FirebaseAuthException(
+        code: data['code'] as String? ?? 'role-auth-unavailable',
+      );
+    }
+    var expired = false;
+    return _auth
+        .signInWithEmailAndPassword(
+          email: data['authEmail'] as String,
+          password: values['password'] as String,
+        )
+        .then((credential) async {
+          if (expired) {
+            await _auth.signOut();
+            throw TimeoutException('Sign-in expired. Please try again.');
+          }
+          return credential;
+        })
+        .timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            expired = true;
+            throw TimeoutException('Sign-in expired. Please try again.');
+          },
+        );
+  }
+
+  Future<void> sendPasswordResetEmail(String email, {String? role}) async {
     if (_passwordResetApiUrl.isEmpty) {
       throw FirebaseAuthException(
         code: 'password-reset-service-unconfigured',
         message: 'Password reset service is not configured for this build.',
       );
     }
-    final response = await http
-        .post(
-          Uri.parse(_passwordResetApiUrl),
-          headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({'email': email.trim(), 'website': ''}),
-        )
-        .timeout(const Duration(seconds: 35));
+    final response = await _post(
+      Uri.parse(_passwordResetApiUrl),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email.trim(),
+        'website': '',
+        if (role != null) 'role': role,
+      }),
+    ).timeout(const Duration(seconds: 35));
     final body = response.body.isEmpty
         ? const <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
@@ -56,20 +192,18 @@ class AuthService {
     }
   }
 
-  Future<void> sendVerificationEmail() async {
+  Future<void> sendVerificationEmail({String? role}) async {
     final user = currentUser;
     if (user == null) throw StateError('Authentication is required.');
     final idToken = await user.getIdToken(true);
-    final response = await http
-        .post(
-          Uri.parse(_emailVerificationApiUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $idToken',
-          },
-          body: '{}',
-        )
-        .timeout(const Duration(seconds: 35));
+    final response = await _post(
+      Uri.parse(_emailVerificationApiUrl),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({if (role != null) 'role': role}),
+    ).timeout(const Duration(seconds: 35));
     final body = response.body.isEmpty
         ? const <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
@@ -82,11 +216,39 @@ class AuthService {
     }
   }
 
-  Future<bool> refreshEmailVerification() async {
+  Future<bool> refreshEmailVerification({String? role}) async {
     final user = currentUser;
     if (user == null) return false;
     await user.reload();
-    return _auth.currentUser?.emailVerified ?? false;
+    final refreshed = _auth.currentUser;
+    if (refreshed == null ||
+        refreshed.uid != user.uid ||
+        !refreshed.emailVerified) {
+      return false;
+    }
+    // Document submission rules read email_verified from the ID token.
+    await refreshed.getIdToken(true);
+    return role == null || await isRoleEmailVerified(role);
+  }
+
+  Future<bool> isRoleEmailVerified(String role) async {
+    final user = currentUser;
+    if (user == null || !user.emailVerified) return false;
+    final profile = await _firestore
+        .collection('users')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+    if (!profile.exists || !accountHasRole(profile.data(), role)) return false;
+    if (!((profile.data()?['roleEmailRequired'] as List?) ?? const []).contains(
+      role,
+    ))
+      return true;
+    final verified = await _firestore
+        .collection('roleEmailVerifications')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+    final record = verified.data()?[role];
+    return record is Map && record['email'] == user.email?.toLowerCase();
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchCurrentProfile() {
@@ -105,7 +267,7 @@ class AuthService {
     final user = currentUser;
     if (user == null) return;
     final profile = await getCurrentProfile();
-    final role = profile.data()?['role'] as String?;
+    final role = accountLastRole(profile.data());
     if (role == null) return;
     _startBackgroundSetup(role);
   }
@@ -121,7 +283,7 @@ class AuthService {
     if (user == null) return;
     final profile = await _firestore.collection('users').doc(user.uid).get();
     final data = profile.data();
-    if (data?['role'] != 'provider') return;
+    if (!accountHasRole(data, 'provider')) return;
     final approval =
         (await _firestore.collection('accountModeration').doc(user.uid).get())
             .data();
@@ -140,14 +302,52 @@ class AuthService {
                 .get())
             .data();
     if (application == null ||
+        application['applicationStatus'] == 'withdrawn' ||
         application['revision'] != approval?['verificationRevision'])
       return;
     final professional = application['professionalDetails'] as Map?;
     if (professional == null) return;
+    final savedRadius = (data?['serviceRadius'] as String? ?? '').trim();
+    final radius = savedRadius.isNotEmpty
+        ? savedRadius
+        : '${professional['radiusKm'] ?? 15} km from current location';
+    final savedHours = data?['workingHours'] as String? ?? '';
+    final schedule = switch (savedHours) {
+      '24 hours, 7 days a week' => <String, dynamic>{
+        'available24Hours': true,
+        'scheduleConfigured': false,
+        'workStartMinute': 0,
+        'workEndMinute': 0,
+      },
+      'Daily, 08:00 AM - 08:00 PM' => <String, dynamic>{
+        'available24Hours': false,
+        'scheduleConfigured': true,
+        'workStartMinute': 480,
+        'workEndMinute': 1200,
+      },
+      'Mon - Fri, 08:00 AM - 06:00 PM' => <String, dynamic>{
+        'available24Hours': false,
+        'scheduleConfigured': true,
+        'workStartMinute': 480,
+        'workEndMinute': 1080,
+      },
+      _ => <String, dynamic>{
+        'available24Hours': professional['available24Hours'] == true,
+        'scheduleConfigured':
+            (professional['startTime'] as String? ?? '').isNotEmpty &&
+            (professional['endTime'] as String? ?? '').isNotEmpty,
+        'workStartMinute': _workMinute(professional['startTime']),
+        'workEndMinute': _workMinute(professional['endTime']),
+      },
+    };
     await updateCurrentProfile({
       'services': application['services'],
-      'serviceRadius':
-          professional['radiusKm'].toString() + ' km from current location',
+      'additionalServiceNames': (application['customServices'] as List? ?? [])
+          .whereType<Map>()
+          .map((item) => item['name'])
+          .whereType<String>()
+          .toList(),
+      'serviceRadius': radius,
     });
     final jobs = await _firestore
         .collection('requests')
@@ -178,14 +378,8 @@ class AuthService {
       'vehicleTypes': application['vehicleTypes'],
       'verified': true,
       'verificationExpiresAt': approval!['validUntil'],
-      'available24Hours': professional['available24Hours'] == true,
-      'scheduleConfigured':
-          (professional['startTime'] as String? ?? '').isNotEmpty &&
-          (professional['endTime'] as String? ?? '').isNotEmpty,
-      'workStartMinute': _workMinute(professional['startTime']),
-      'workEndMinute': _workMinute(professional['endTime']),
-      'serviceRadius':
-          professional['radiusKm'].toString() + ' km from current location',
+      ...schedule,
+      'serviceRadius': radius,
       'completedJobs': completed.length,
       'averageRating': ratings.isEmpty
           ? 0.0
@@ -283,23 +477,98 @@ class AuthService {
     required String password,
     required String role,
   }) async {
-    final credential = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    final profile = await _firestore
-        .collection('users')
-        .doc(credential.user!.uid)
-        .get();
-    if (!profile.exists || profile.data()?['role'] != role) {
-      await _auth.signOut();
-      throw FirebaseAuthException(
-        code: 'wrong-role',
-        message: 'This account is not registered as a $role.',
-      );
+    if (role != 'driver' && role != 'provider') {
+      throw ArgumentError('Unsupported account role.');
     }
-    _startBackgroundSetup(role);
-    return credential;
+    if (_independentRoleAuth) {
+      try {
+        final credential = await _roleAuthenticate({
+          'action': 'login',
+          'email': email.trim(),
+          'password': password,
+          'role': role,
+        });
+        final profile = await getCurrentProfile();
+        if (!profile.exists || profile.data()?['role'] != role) {
+          throw FirebaseAuthException(code: 'wrong-role');
+        }
+        if (await isRoleEmailVerified(role)) _startBackgroundSetup(role);
+        return credential;
+      } catch (_) {
+        await _auth.signOut();
+        rethrow;
+      }
+    }
+    try {
+      var expired = false;
+      final login = _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      // Dart timeouts do not cancel Firebase operations. Clean up a late
+      // successful login as well, so it cannot restore an invalid session.
+      final credential = await login
+          .then((value) async {
+            if (expired) {
+              await _auth.signOut();
+              throw TimeoutException('Sign-in expired. Please try again.');
+            }
+            return value;
+          })
+          .timeout(
+            const Duration(seconds: 20),
+            onTimeout: () {
+              expired = true;
+              throw TimeoutException('Sign-in expired. Please try again.');
+            },
+          );
+      final user = credential.user;
+      if (user == null) {
+        throw FirebaseAuthException(code: 'session-unavailable');
+      }
+      // Never accept a cached profile after an account has been deleted.
+      final profile = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 15));
+      if (!profile.exists || accountRoles(profile.data()).isEmpty) {
+        throw FirebaseAuthException(
+          code: 'account-not-found',
+          message:
+              'This account no longer exists. Please create a new account.',
+        );
+      }
+      final roles = {...accountRoles(profile.data()), role}.toList();
+      await updateCurrentProfile({
+        'roles': roles,
+        'roleEmailRequired': {
+          ...((profile.data()?['roleEmailRequired'] as List?) ?? const [])
+              .whereType<String>(),
+          if (role != profile.data()?['role']) role,
+        }.toList(),
+        'lastRole': role,
+        'online': false,
+      }).timeout(const Duration(seconds: 10));
+      if (accountHasRole(profile.data(), 'provider')) {
+        unawaited(syncProviderDirectory().catchError((_) {}));
+      }
+      if (role != profile.data()?['role'] &&
+          !((profile.data()?['roleEmailRequired'] as List?) ?? const [])
+              .contains(role)) {
+        try {
+          await sendVerificationEmail(role: role);
+        } catch (_) {
+          verificationEmailDeliveryFailed = true;
+        }
+      }
+      if (await isRoleEmailVerified(role)) _startBackgroundSetup(role);
+      return credential;
+    } catch (_) {
+      // A Firebase login alone is insufficient: the app profile must be valid.
+      await _auth.signOut();
+      rethrow;
+    }
   }
 
   Future<UserCredential> register({
@@ -309,23 +578,89 @@ class AuthService {
     required String displayName,
     required String phone,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
+    if (role != 'driver' && role != 'provider') {
+      throw ArgumentError('Unsupported account role.');
+    }
+    if (_independentRoleAuth) {
+      final credential = await _roleAuthenticate({
+        'action': 'register',
+        'email': email.trim(),
+        'password': password,
+        'role': role,
+        'displayName': displayName.trim(),
+        'phone': phone.trim(),
+      });
+      try {
+        await sendVerificationEmail(role: role);
+      } catch (_) {
+        verificationEmailDeliveryFailed = true;
+      }
+      return credential;
+    }
+    UserCredential credential;
+    try {
+      credential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'email-already-in-use') rethrow;
+      // Reuse the existing account only after authenticating its password.
+      credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final profile = await _firestore
+          .collection('users')
+          .doc(credential.user!.uid)
+          .get();
+      if (!profile.exists || accountRoles(profile.data()).isEmpty) {
+        await _auth.signOut();
+        throw FirebaseAuthException(
+          code: 'wrong-role',
+          message: 'This account has no RoadAssist profile.',
+        );
+      }
+      if (accountHasRole(profile.data(), role)) {
+        await _auth.signOut();
+        rethrow;
+      }
+      await updateCurrentProfile({
+        'roles': {...accountRoles(profile.data()), role}.toList(),
+        'roleEmailRequired': {
+          ...((profile.data()?['roleEmailRequired'] as List?) ?? const [])
+              .whereType<String>(),
+          role,
+        }.toList(),
+        'lastRole': role,
+        'online': false,
+      });
+      if (accountHasRole(profile.data(), 'provider')) {
+        unawaited(syncProviderDirectory().catchError((_) {}));
+      }
+      try {
+        await sendVerificationEmail(role: role);
+      } catch (_) {
+        verificationEmailDeliveryFailed = true;
+      }
+      return credential;
+    }
     await credential.user!.updateDisplayName(displayName.trim());
     await _firestore.collection('users').doc(credential.user!.uid).set({
       'email': email.trim().toLowerCase(),
       'displayName': displayName.trim(),
       'phone': phone.trim(),
       'role': role,
+      'roles': [role],
+      'lastRole': role,
       'online': false,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
     try {
-      await sendVerificationEmail();
+      await sendVerificationEmail(role: role);
     } catch (_) {
+      verificationEmailDeliveryFailed = true;
       // Account creation must remain usable when Firebase email delivery is
       // temporarily unavailable. Verification can be resent from the app.
     }
@@ -345,7 +680,9 @@ class AuthService {
 
     final profileRef = _firestore.collection('users').doc(user.uid);
     final profile = await profileRef.get();
-    final role = profile.data()?['role'] as String?;
+    final role = accountHasRole(profile.data(), 'provider')
+        ? 'provider'
+        : 'driver';
     final devices = await profileRef.collection('devices').get();
     final batch = _firestore.batch();
     for (final device in devices.docs) {
@@ -356,7 +693,13 @@ class AuthService {
     }
     batch.delete(profileRef);
     await batch.commit();
-    await user.delete();
+    try {
+      await user.delete();
+    } finally {
+      // The profile has already been removed. Do not retain a partial session
+      // even if Firebase Auth deletion fails; the login guard rejects it.
+      await _auth.signOut();
+    }
   }
 
   void _startBackgroundSetup(String role) {
@@ -383,7 +726,7 @@ class AuthService {
             .collection('users')
             .doc(user.uid)
             .get();
-        if (profile.data()?['role'] == 'provider') {
+        if (accountHasRole(profile.data(), 'provider')) {
           await setProviderOnline(false);
         }
       } catch (_) {

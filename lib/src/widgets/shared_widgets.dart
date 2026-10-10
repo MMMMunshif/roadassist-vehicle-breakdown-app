@@ -1,7 +1,35 @@
 part of '../screens.dart';
 
-class _NearbyProvidersPreview extends StatelessWidget {
+class _NearbyProvidersPreview extends StatefulWidget {
   const _NearbyProvidersPreview();
+
+  @override
+  State<_NearbyProvidersPreview> createState() =>
+      _NearbyProvidersPreviewState();
+}
+
+class _NearbyProvidersPreviewState extends State<_NearbyProvidersPreview> {
+  Stream<DocumentSnapshot<Map<String, dynamic>>>? profile;
+  Stream<QuerySnapshot<Map<String, dynamic>>>? providers;
+  Timer? clock;
+
+  @override
+  void initState() {
+    super.initState();
+    if (signedIn) {
+      profile = AuthService().watchCurrentProfile();
+      providers = AuthService().watchOnlineProviders();
+      clock = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    clock?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,36 +39,91 @@ class _NearbyProvidersPreview extends StatelessWidget {
         text: 'Sign in to see available providers near you.',
       );
     }
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: AuthService().watchOnlineProviders(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const InlineMessage(
-            icon: Icons.cloud_off_outlined,
-            text: 'Unable to load online providers.',
-          );
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: profile,
+      builder: (context, driverSnapshot) {
+        final driver = driverSnapshot.data?.data();
+        final latitude = (driver?['currentLatitude'] as num?)?.toDouble();
+        final longitude = (driver?['currentLongitude'] as num?)?.toDouble();
+        final hasLocation = latitude != null && longitude != null;
+        double? distance(Map<String, dynamic> data) {
+          final lat = (data['latitude'] as num?)?.toDouble();
+          final lon = (data['longitude'] as num?)?.toDouble();
+          if (!hasLocation || lat == null || lon == null) return null;
+          return Geolocator.distanceBetween(latitude, longitude, lat, lon) /
+              1000;
         }
-        if (!snapshot.hasData) return const LinearProgressIndicator();
-        final providers = snapshot.data!.docs.take(2).toList();
-        if (providers.isEmpty) {
-          return const InlineMessage(
-            icon: Icons.person_search_outlined,
-            text: 'No service providers are online right now.',
-          );
-        }
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var index = 0; index < providers.length; index++) ...[
-              if (index > 0) const SizedBox(width: RaSpace.sm),
-              Expanded(
-                child: _OnlineProviderPreviewCard(
-                  data: providers[index].data(),
-                ),
-              ),
-            ],
-            if (providers.length == 1) const Spacer(),
-          ],
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: providers,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const InlineMessage(
+                icon: Icons.cloud_off_outlined,
+                text: 'Unable to load online providers. Check your connection.',
+              );
+            }
+            if (!snapshot.hasData) return const LinearProgressIndicator();
+            final nearby =
+                snapshot.data!.docs.where((doc) {
+                  final data = doc.data();
+                  if (!_providerHasCurrentVerification(data) ||
+                      _providerAvailabilityStatus(data) != 'Online')
+                    return false;
+                  final km = distance(data);
+                  if (!hasLocation) return false;
+                  if (km == null) return false;
+                  final radius =
+                      double.tryParse(
+                        RegExp(r'\d+(?:\.\d+)?')
+                                .firstMatch(
+                                  data['serviceRadius'] as String? ?? '',
+                                )
+                                ?.group(0) ??
+                            '',
+                      ) ??
+                      15;
+                  return km <= radius;
+                }).toList()..sort(
+                  (a, b) => (distance(a.data()) ?? double.infinity).compareTo(
+                    distance(b.data()) ?? double.infinity,
+                  ),
+                );
+            if (!hasLocation) {
+              return const InlineMessage(
+                icon: Icons.location_on_outlined,
+                text:
+                    'Update your current location to find providers near you.',
+              );
+            }
+            if (nearby.isEmpty) {
+              return const InlineMessage(
+                icon: Icons.person_search_outlined,
+                text:
+                    'No available providers nearby. Providers appear automatically when they come online.',
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!hasLocation) ...[
+                  const InlineMessage(
+                    icon: Icons.location_on_outlined,
+                    text:
+                        'Update your current location to find providers near you. Showing available online providers.',
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                ],
+                for (final doc in nearby.take(3)) ...[
+                  _OnlineProviderPreviewCard(
+                    data: doc.data(),
+                    distanceKm: distance(doc.data()),
+                  ),
+                  const SizedBox(height: RaSpace.sm),
+                ],
+              ],
+            );
+          },
         );
       },
     );
@@ -95,8 +178,9 @@ class _DriverQuickAction extends StatelessWidget {
 }
 
 class _OnlineProviderPreviewCard extends StatelessWidget {
-  const _OnlineProviderPreviewCard({required this.data});
+  const _OnlineProviderPreviewCard({required this.data, this.distanceKm});
   final Map<String, dynamic> data;
+  final double? distanceKm;
 
   @override
   Widget build(BuildContext context) {
@@ -111,10 +195,12 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: RaSpace.md,
+                runSpacing: RaSpace.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   ProfileInitials(name: name, radius: 24),
-                  const Spacer(),
                   const StatusPill(label: 'Online', tone: RaTone.success),
                 ],
               ),
@@ -127,7 +213,9 @@ class _OnlineProviderPreviewCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Available for roadside requests',
+                distanceKm == null
+                    ? 'Available for roadside requests'
+                    : '${distanceKm!.toStringAsFixed(1)} km away • Available for requests',
                 style: RaText.caption,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -815,8 +903,7 @@ class _ProviderRequestBadge extends StatelessWidget {
             label: Text(count > 9 ? '9+' : '$count'),
             child: IconButton(
               tooltip: 'New requests',
-              onPressed: () =>
-                  push(context, const ProviderNotificationsScreen()),
+              onPressed: () => _openProviderRequests(context),
               icon: const Icon(Icons.notifications_none_rounded),
             ),
           );

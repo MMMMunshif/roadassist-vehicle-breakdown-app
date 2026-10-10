@@ -52,17 +52,25 @@ class _SplashScreenState extends State<SplashScreen>
 
         final profileData = profile.data();
 
-        final role = profileData?['role'] as String?;
+        final role = accountLastRole(profileData);
 
         if (role == 'provider') {
-          destination = const ProviderShell();
+          destination =
+              enforceEmailVerification &&
+                  !await AuthService().isRoleEmailVerified(role!)
+              ? const EmailVerificationScreen(role: 'provider')
+              : const ProviderShell();
         } else if (role == 'driver') {
-          destination = const DriverShell();
+          destination =
+              enforceEmailVerification &&
+                  !await AuthService().isRoleEmailVerified(role!)
+              ? const EmailVerificationScreen(role: 'driver')
+              : const DriverShell();
         } else {
           await FirebaseAuth.instance.signOut();
         }
 
-        if (role == 'provider' || role == 'driver') {
+        if ((role == 'provider' || role == 'driver') && user.emailVerified) {
           unawaited(DeviceService().registerCurrentDevice());
         }
       }
@@ -292,7 +300,7 @@ class _SplashScreenState extends State<SplashScreen>
                                     const SizedBox(width: 8),
                                     Flexible(
                                       child: Text(
-                                        'Roadside assistance • Sri Lanka',
+                                        'Roadside assistance â€¢ Sri Lanka',
                                         textAlign: TextAlign.center,
                                         style: type(
                                           10,

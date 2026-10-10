@@ -33,6 +33,40 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
+    'submission identity survives resume, is owner-scoped, and clears with draft',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final first = RequestDraftStore(
+        preferences: preferences,
+        ownerId: 'driver-a',
+      );
+      await first.save(sampleDraft());
+      await first.setSubmissionId('stable-request-id');
+      await first.setPendingSubmission(true);
+      final resumed = RequestDraftStore(
+        preferences: preferences,
+        ownerId: 'driver-a',
+      );
+      expect(await resumed.submissionId(), 'stable-request-id');
+      expect(await resumed.hasPendingSubmission(), isTrue);
+      expect(
+        await RequestDraftStore(
+          preferences: preferences,
+          ownerId: 'driver-b',
+        ).submissionId(),
+        isNull,
+      );
+      await resumed.save(sampleDraft().copyWith(notes: 'Edited draft'));
+      expect(await resumed.submissionId(), 'stable-request-id');
+      await resumed.clear();
+      expect(await resumed.submissionId(), isNull);
+      expect(await resumed.hasPendingSubmission(), isFalse);
+      expect(await resumed.load(), isNull);
+    },
+  );
+
+  test(
     'multiple issues preserve the driver report without inventing prices',
     () {
       final draft = sampleDraft();

@@ -1,60 +1,63 @@
 part of '../../screens.dart';
 
 class AccountAccessGate extends StatelessWidget {
-  const AccountAccessGate({
-    super.key,
-    required this.child,
-  });
+  const AccountAccessGate({super.key, required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      initialData: FirebaseAuth.instance.currentUser,
-      builder: (context, auth) {
-        final user = auth.data;
+    // Keep the Navigator mounted while access checks run. Replacing it with
+    // a loading screen discards the sign-in route and restarts the splash.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        child,
+        StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          initialData: FirebaseAuth.instance.currentUser,
+          builder: (context, auth) {
+            final user = auth.data;
 
-        if (user == null) {
-          return child;
-        }
-
-        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('accountModeration')
-              .doc(user.uid)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return child;
+            if (user == null) {
+              return const SizedBox.shrink();
             }
 
-            if (!snapshot.hasData) {
-              return const _AccountAccessCheckingScreen();
-            }
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('accountModeration')
+                  .doc(user.uid)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const SizedBox.shrink();
+                }
 
-            final moderation = snapshot.data?.data();
+                if (!snapshot.hasData) {
+                  return const _AccountAccessCheckingScreen();
+                }
 
-            final suspended =
-                moderation?['status'] == 'suspended';
+                final moderation = snapshot.data?.data();
 
-            final rejected =
-                moderation?['verification'] == 'rejected';
+                final suspended = moderation?['status'] == 'suspended';
 
-            if (!suspended && !rejected) {
-              return child;
-            }
+                final rejected = moderation?['verification'] == 'rejected';
 
-            return _AccountAccessBlockedScreen(
-              reason:
-                  moderation?['reason'] as String? ??
+                if (!suspended && !rejected) {
+                  return const SizedBox.shrink();
+                }
+
+                return _AccountAccessBlockedScreen(
+                  reason:
+                      moderation?['reason'] as String? ??
                       'Contact project support for more information.',
-              rejected: rejected,
+                  rejected: rejected,
+                );
+              },
             );
           },
-        );
-      },
+        ),
+      ],
     );
   }
 }
@@ -67,7 +70,7 @@ class _AccountAccessCheckingScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -131,7 +134,7 @@ class _AccountAccessBlockedScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaScaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -186,17 +189,15 @@ class _AccountAccessBlockedScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(RaSpace.md),
                     decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest
-                          .withValues(alpha: .35),
+                      color: colors.surfaceContainerHighest.withValues(
+                        alpha: .35,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.support_agent_outlined,
-                          size: 20,
-                        ),
+                        Icon(Icons.support_agent_outlined, size: 20),
                         SizedBox(width: RaSpace.sm),
                         Expanded(
                           child: Text(

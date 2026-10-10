@@ -86,7 +86,8 @@ String? validateSriLankaPhone(String? value) {
 
 String? validateEmailAddress(String? value) {
   final email = value?.trim() ?? '';
-  return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(email)
+  return email.length <= 254 &&
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(email)
       ? null
       : 'Enter a valid email address';
 }

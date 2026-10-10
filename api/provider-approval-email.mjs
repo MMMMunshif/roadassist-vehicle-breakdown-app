@@ -1,3 +1,4 @@
+import { contactEmail } from '../functions/role-identity.mjs';
 import { randomUUID } from 'node:crypto';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -11,6 +12,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({message: 'POST required.'});
+  if (!/^Bearer \S+$/.test(req.headers.authorization ?? '')) return res.status(401).json({message: 'Sign in again.'});
   let receipt, attempt;
   try {
     if (!getApps().length) initializeApp({credential: cert({projectId: process.env.FIREBASE_PROJECT_ID,
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
       db.doc(`users/${uid}`).get(), auth.getUser(uid),
     ]);
     const approval = approvalDoc.data(), application = applicationDoc.data();
-    if (!applicationDoc.exists || !application?.professionalDetails || !approval?.validUntil || profileDoc.data()?.role !== 'provider' || !user.emailVerified || user.disabled ||
+    if (!applicationDoc.exists || !application?.professionalDetails || !approval?.validUntil || !(profileDoc.data()?.role === 'provider' || profileDoc.data()?.roles?.includes('provider')) || !user.emailVerified || user.disabled ||
         approval?.verification !== 'verified' || approval.status !== 'active' ||
         approval.verificationRevision !== application?.revision || approval.validUntil?.toMillis() <= Date.now()) {
       return res.status(409).json({message: 'A current verified approval is required.'});
@@ -47,7 +49,7 @@ export default async function handler(req, res) {
     });
     if (!claimed) return res.status(200).json({ok: true, message: 'Already sent or delivery in progress.'});
     const transporter = nodemailer.createTransport({service: 'gmail', auth: {user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '')}});
-    const result = await transporter.sendMail({from: `RoadAssist <${process.env.GMAIL_USER}>`, to: user.email,
+    const result = await transporter.sendMail({from: `RoadAssist <${process.env.GMAIL_USER}>`, to: contactEmail(user, profileDoc.data()),
       subject: 'Your RoadAssist provider verification is complete',
       text: `Hello,\n\nYour provider documents have been reviewed and your RoadAssist provider account is approved until ${approval.validUntil.toDate().toISOString().slice(0,10)}.\n\nSign in to RoadAssist to open your provider dashboard. Driver approval is required before additional work or charges. Keep your documents and contact details current.\n\nRoadAssist team`});
     if (!result.accepted?.length) throw new Error('Recipient not accepted');
@@ -60,6 +62,7 @@ export default async function handler(req, res) {
         if (data?.attempt === attempt && data.status !== 'sent') tx.update(receipt, {status: 'failed', failedAt: FieldValue.serverTimestamp()});
       }).catch(() => {});
     }
+    if (error?.code?.startsWith('auth/')) return res.status(401).json({message: 'Sign in again.'});
     console.error('Provider approval email failed', error?.code ?? 'delivery-error');
     return res.status(500).json({message: 'Approval email unavailable. Your saved approval has not been changed.'});
   }

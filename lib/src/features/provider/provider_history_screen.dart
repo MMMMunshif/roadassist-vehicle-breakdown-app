@@ -1,705 +1,458 @@
 part of '../../screens.dart';
 
-class ProviderHistoryScreen
-    extends StatefulWidget {
-  const ProviderHistoryScreen({
-    super.key,
-  });
+class ProviderHistoryScreen extends StatefulWidget {
+  const ProviderHistoryScreen({super.key});
 
   @override
-  State<ProviderHistoryScreen>
-      createState() =>
-          _ProviderHistoryScreenState();
+  State<ProviderHistoryScreen> createState() => _ProviderHistoryScreenState();
 }
 
-class _ProviderHistoryScreenState
-    extends State<ProviderHistoryScreen> {
+class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
   int filter = 0;
 
-  String _date(
-    Map<String, dynamic> data,
-  ) {
-    final created =
-        (data['createdAt']
-                as Timestamp?)
-            ?.toDate()
-            .toLocal();
+  static const filters = <String>['All', 'Completed', 'Cancelled'];
 
-    if (created == null) {
-      return 'Date unavailable';
-    }
-
-    return '${created.day.toString().padLeft(2, '0')}/${created.month.toString().padLeft(2, '0')}/${created.year} • ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
+  bool _matchesFilter(String status) {
+    return switch (filter) {
+      1 => status == 'completed',
+      2 => status == 'cancelled',
+      _ => status == 'completed' || status == 'cancelled',
+    };
   }
 
-  Widget _filterChip(
-    String label,
-    int value,
-  ) {
-    return ChoiceChip(
-      label: Text(label),
-      selected:
-          filter == value,
-      onSelected: (_) {
-        setState(() {
-          filter = value;
-        });
-      },
-    );
+  String _money(int value) {
+    final negative = value < 0;
+    final digits = value.abs().toString();
+
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
+        buffer.write(',');
+      }
+
+      buffer.write(digits[index]);
+    }
+
+    return 'Rs. ${negative ? '-' : ''}${buffer.toString()}';
+  }
+
+  DateTime? _requestTime(Map<String, dynamic> data) {
+    final timestamp =
+        data['completedAt'] as Timestamp? ??
+        data['updatedAt'] as Timestamp? ??
+        data['createdAt'] as Timestamp?;
+
+    return timestamp?.toDate();
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
-
-    return Scaffold(
-      backgroundColor:
-          theme
-              .scaffoldBackgroundColor,
-
+    return RaProviderScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        automaticallyImplyLeading:
-            false,
-        title:
-            const Text(
-          'Job History',
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: _WelcomeThemeToggle(),
+          ),
+        ],
+        automaticallyImplyLeading: false,
+        titleSpacing: 18,
+        title: Row(
+          children: [
+            const BrandMark(size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Job history',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.45,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
+      body: !signedIn
+          ? const Padding(
+              padding: EdgeInsets.all(20),
+              child: EmptyState(
+                icon: Icons.login_outlined,
+                title: 'Sign in required',
+                message: 'Sign in as a provider to view your job history.',
+              ),
+            )
+          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: RequestService().watchProviderRequests(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: EmptyState(
+                      icon: Icons.cloud_off_outlined,
+                      title: 'Unable to load history',
+                      message: 'Check your connection and try again.',
+                    ),
+                  );
+                }
 
-      body: StreamBuilder<
-          QuerySnapshot<
-              Map<String, dynamic>>>(
-        stream: RequestService()
-            .watchProviderRequests(),
-        builder: (
-          context,
-          snapshot,
-        ) {
-          if (snapshot.hasError) {
-            return const EmptyState(
-              icon: Icons
-                  .cloud_off_outlined,
-              title:
-                  'Unable to load history',
-              message:
-                  'Check your connection and try again.',
-            );
-          }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          if (!snapshot.hasData) {
-            return const Center(
-              child:
-                  CircularProgressIndicator(),
-            );
-          }
+                final history = snapshot.data!.docs.where((request) {
+                  final status = request.data()['status'] as String? ?? '';
 
-          final all =
-              snapshot.data!.docs
-                  .where(
-            (job) {
-              final status =
-                  job.data()[
-                          'status']
-                      as String? ??
-                      '';
+                  return status == 'completed' || status == 'cancelled';
+                }).toList();
 
-              return status ==
-                      'completed' ||
-                  status ==
-                      'cancelled' ||
-                  status ==
-                      'rejected';
-            },
-          ).toList();
+                history.sort((first, second) {
+                  final firstTime = _requestTime(first.data());
 
-          all.sort(
-            (a, b) {
-              final at =
-                  (a.data()[
-                              'createdAt']
-                          as Timestamp?)
-                      ?.toDate();
+                  final secondTime = _requestTime(second.data());
 
-              final bt =
-                  (b.data()[
-                              'createdAt']
-                          as Timestamp?)
-                      ?.toDate();
+                  if (firstTime == null && secondTime == null) {
+                    return 0;
+                  }
 
-              if (at == null ||
-                  bt == null) {
-                return 0;
-              }
+                  if (firstTime == null) {
+                    return 1;
+                  }
 
-              return bt
-                  .compareTo(at);
-            },
-          );
+                  if (secondTime == null) {
+                    return -1;
+                  }
 
-          final completedCount =
-              all
-                  .where(
-                    (job) =>
-                        job.data()[
-                            'status'] ==
-                        'completed',
-                  )
-                  .length;
+                  return secondTime.compareTo(firstTime);
+                });
 
-          final cancelledCount =
-              all.length -
-                  completedCount;
+                final completed = history.where((request) {
+                  return request.data()['status'] == 'completed';
+                }).toList();
 
-          final jobs =
-              all.where(
-            (job) {
-              final status =
-                  job.data()[
-                          'status']
-                      as String? ??
-                      '';
+                final cancelled = history.where((request) {
+                  return request.data()['status'] == 'cancelled';
+                }).length;
 
-              if (filter == 1) {
-                return status ==
-                    'completed';
-              }
+                final revenue = completed.fold<int>(0, (total, request) {
+                  final data = request.data();
 
-              if (filter == 2) {
-                return status ==
-                        'cancelled' ||
-                    status ==
-                        'rejected';
-              }
+                  final amount =
+                      (data['finalCost'] as num?)?.toInt() ??
+                      (data['estimatedCost'] as num?)?.toInt() ??
+                      0;
 
-              return true;
-            },
-          ).toList();
+                  return total + amount;
+                });
 
-          return ListView(
-            padding:
-                const EdgeInsets
-                    .fromLTRB(
-              RaSpace.lg,
-              RaSpace.md,
-              RaSpace.lg,
-              RaSpace.xxxl,
-            ),
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets
-                        .all(
-                  RaSpace.xl,
-                ),
-                decoration:
-                    BoxDecoration(
-                  gradient:
-                      LinearGradient(
-                    begin:
-                        Alignment
-                            .topLeft,
-                    end:
-                        Alignment
-                            .bottomRight,
-                    colors: [
-                      colors.primary,
-                      const Color(
-                        0xFF007D70,
-                      ),
-                    ],
-                  ),
-                  borderRadius:
-                      BorderRadius
-                          .circular(
-                    24,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment
-                          .start,
+                final filtered = history.where((request) {
+                  final status = request.data()['status'] as String? ?? '';
+
+                  return _matchesFilter(status);
+                }).toList();
+
+                return ListView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
                   children: [
-                    Text(
-                      'Your service history',
-                      style: theme
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(
-                        color:
-                            Colors.white,
-                        fontWeight:
-                            FontWeight
-                                .w900,
-                      ),
+                    _ProviderHistoryHero(
+                      completed: completed.length,
+                      cancelled: cancelled,
+                      revenue: _money(revenue),
                     ),
-                    const SizedBox(
-                      height: 5,
+
+                    const SizedBox(height: 18),
+
+                    _ProviderHistoryFilters(
+                      selected: filter,
+                      labels: filters,
+                      onChanged: (value) {
+                        setState(() {
+                          filter = value;
+                        });
+                      },
                     ),
-                    Text(
-                      'Review completed, cancelled and declined provider jobs.',
-                      style: theme
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(
-                        color: Colors
-                            .white
-                            .withValues(
-                          alpha: .82,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(
-                      height:
-                          RaSpace.lg,
-                    ),
+
+                    const SizedBox(height: 22),
+
                     Row(
                       children: [
                         Expanded(
-                          child:
-                              _ProviderHistoryMetric(
-                            value:
-                                '$completedCount',
-                            label:
-                                'Completed',
+                          child: Text(
+                            filter == 0
+                                ? 'Completed & cancelled jobs'
+                                : '${filters[filter]} jobs',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.25,
+                            ),
                           ),
                         ),
-                        const SizedBox(
-                          width:
-                              RaSpace.sm,
-                        ),
-                        Expanded(
-                          child:
-                              _ProviderHistoryMetric(
-                            value:
-                                '$cancelledCount',
-                            label:
-                                'Cancelled',
-                          ),
-                        ),
-                        const SizedBox(
-                          width:
-                              RaSpace.sm,
-                        ),
-                        Expanded(
-                          child:
-                              _ProviderHistoryMetric(
-                            value:
-                                '${all.length}',
-                            label:
-                                'Total',
+                        Text(
+                          '${filtered.length}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(
-                height: RaSpace.lg,
-              ),
+                    const SizedBox(height: 11),
 
-              SingleChildScrollView(
-                scrollDirection:
-                    Axis.horizontal,
-                child: Row(
-                  children: [
-                    _filterChip(
-                      'All',
-                      0,
-                    ),
-                    const SizedBox(
-                      width:
-                          RaSpace.sm,
-                    ),
-                    _filterChip(
-                      'Completed',
-                      1,
-                    ),
-                    const SizedBox(
-                      width:
-                          RaSpace.sm,
-                    ),
-                    _filterChip(
-                      'Cancelled',
-                      2,
-                    ),
-                  ],
-                ),
-              ),
+                    if (filtered.isEmpty)
+                      EmptyState(
+                        icon: filter == 2
+                            ? Icons.cancel_outlined
+                            : Icons.history_rounded,
+                        title: filter == 0
+                            ? 'No job history yet'
+                            : 'No ${filters[filter].toLowerCase()} jobs',
+                        message: filter == 0
+                            ? 'Completed and cancelled roadside jobs will appear here.'
+                            : 'There are no jobs matching this filter.',
+                      )
+                    else
+                      for (var index = 0; index < filtered.length; index++) ...[
+                        if (index > 0) const SizedBox(height: 9),
 
-              const SizedBox(
-                height: RaSpace.lg,
-              ),
-
-              if (jobs.isEmpty)
-                EmptyState(
-                  icon: Icons
-                      .history_outlined,
-                  title: filter == 0
-                      ? 'No job history'
-                      : filter == 1
-                          ? 'No completed jobs'
-                          : 'No cancelled jobs',
-                  message:
-                      'Matching provider jobs will appear here automatically.',
-                )
-              else
-                for (var index = 0;
-                    index <
-                        jobs.length;
-                    index++) ...[
-                  Builder(
-                    builder: (
-                      context,
-                    ) {
-                      final job =
-                          jobs[index];
-
-                      final data =
-                          job.data();
-
-                      final vehicle = [
-                        data[
-                            'modelYear'],
-                        data[
-                            'registration'],
-                      ]
-                          .whereType<
-                              String>()
-                          .where(
-                            (value) =>
-                                value
-                                    .trim()
-                                    .isNotEmpty,
-                          )
-                          .join(
-                            ' - ',
-                          );
-
-                      final completed =
-                          data['status'] ==
-                              'completed';
-
-                      final statusColor =
-                          completed
-                              ? raSuccess
-                              : colors
-                                  .error;
-
-                      return Material(
-                        color: colors
-                            .surface,
-                        borderRadius:
-                            BorderRadius
-                                .circular(
-                          20,
+                        _ProviderHistoryCard(
+                          requestId: filtered[index].id,
+                          data: filtered[index].data(),
+                          money: _money,
                         ),
-                        clipBehavior:
-                            Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () =>
-                              push(
-                            context,
-                            ProviderRequestDetailsScreen(
-                              requestId:
-                                  job.id,
-                              data:
-                                  data,
-                            ),
-                          ),
-                          child:
-                              Container(
-                            padding:
-                                const EdgeInsets
-                                    .all(
-                              RaSpace
-                                  .lg,
-                            ),
-                            decoration:
-                                BoxDecoration(
-                              borderRadius:
-                                  BorderRadius
-                                      .circular(
-                                20,
-                              ),
-                              border:
-                                  Border.all(
-                                color: colors
-                                    .outlineVariant
-                                    .withValues(
-                                  alpha:
-                                      .6,
-                                ),
-                              ),
-                            ),
-                            child:
-                                Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
-                              children: [
-                                Row(
-                                  children: [
-                                    ProfileInitials(
-                                      name: data['driverName']
-                                              as String? ??
-                                          'Driver',
-                                      radius:
-                                          23,
-                                    ),
-                                    const SizedBox(
-                                      width:
-                                          RaSpace
-                                              .md,
-                                    ),
-                                    Expanded(
-                                      child:
-                                          Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            data['driverName']
-                                                    as String? ??
-                                                'Driver',
-                                            maxLines:
-                                                1,
-                                            overflow:
-                                                TextOverflow.ellipsis,
-                                            style: theme
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(
-                                              fontWeight:
-                                                  FontWeight.w900,
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                            height:
-                                                2,
-                                          ),
-                                          Text(
-                                            _date(
-                                              data,
-                                            ),
-                                            style: theme
-                                                .textTheme
-                                                .bodySmall,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Container(
-                                      padding:
-                                          const EdgeInsets.symmetric(
-                                        horizontal:
-                                            8,
-                                        vertical:
-                                            5,
-                                      ),
-                                      decoration:
-                                          BoxDecoration(
-                                        color: statusColor
-                                            .withValues(
-                                          alpha:
-                                              .09,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(
-                                          999,
-                                        ),
-                                      ),
-                                      child:
-                                          Text(
-                                        completed
-                                            ? 'COMPLETED'
-                                            : 'CANCELLED',
-                                        style: theme
-                                            .textTheme
-                                            .labelSmall
-                                            ?.copyWith(
-                                          color:
-                                              statusColor,
-                                          fontWeight:
-                                              FontWeight.w900,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                      ],
+                  ],
+                );
+              },
+            ),
+    );
+  }
+}
 
-                                const SizedBox(
-                                  height:
-                                      RaSpace
-                                          .md,
-                                ),
+class _ProviderHistoryHero extends StatelessWidget {
+  const _ProviderHistoryHero({
+    required this.completed,
+    required this.cancelled,
+    required this.revenue,
+  });
 
-                                _ProviderHistoryLine(
-                                  icon:
-                                      Icons.car_repair_outlined,
-                                  value:
-                                      requestIssueLabel(
-                                    data,
-                                  ),
-                                ),
+  final int completed;
+  final int cancelled;
+  final String revenue;
 
-                                const SizedBox(
-                                  height:
-                                      RaSpace
-                                          .sm,
-                                ),
+  @override
+  Widget build(BuildContext context) {
+    return RaProviderMetricGrid(
+      metrics: {
+        'Completed jobs': '$completed',
+        'Cancelled jobs': '$cancelled',
+        'Total revenue': revenue,
+      },
+    );
+  }
+}
 
-                                _ProviderHistoryLine(
-                                  icon:
-                                      Icons.directions_car_outlined,
-                                  value: vehicle.isEmpty
-                                      ? data['vehicleType']
-                                              as String? ??
-                                          'Vehicle'
-                                      : vehicle,
-                                ),
+class _ProviderHistoryFilters extends StatelessWidget {
+  const _ProviderHistoryFilters({
+    required this.selected,
+    required this.labels,
+    required this.onChanged,
+  });
 
-                                const SizedBox(
-                                  height:
-                                      RaSpace
-                                          .sm,
-                                ),
+  final int selected;
+  final List<String> labels;
+  final ValueChanged<int> onChanged;
 
-                                _ProviderHistoryLine(
-                                  icon:
-                                      Icons.location_on_outlined,
-                                  value:
-                                      data['locationLabel']
-                                              as String? ??
-                                          'Pinned location',
-                                ),
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
-                                const SizedBox(
-                                  height:
-                                      RaSpace
-                                          .md,
-                                ),
-
-                                Row(
-                                  children: [
-                                    if (completed)
-                                      Expanded(
-                                        child:
-                                            Text(
-                                          'Rs. ${data['finalCost'] ?? data['estimatedCost'] ?? 0}',
-                                          style: theme
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(
-                                            color:
-                                                colors.primary,
-                                            fontWeight:
-                                                FontWeight.w900,
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      const Spacer(),
-                                    Text(
-                                      'View details',
-                                      style: theme
-                                          .textTheme
-                                          .labelMedium
-                                          ?.copyWith(
-                                        color:
-                                            colors.primary,
-                                        fontWeight:
-                                            FontWeight.w800,
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons
-                                          .chevron_right_rounded,
-                                      color:
-                                          colors.primary,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: .32),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < labels.length; index++)
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: index == labels.length - 1 ? 0 : 4,
+                ),
+                child: Material(
+                  color: selected == index
+                      ? colors.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () {
+                      onChanged(index);
                     },
-                  ),
-                  if (index !=
-                      jobs.length - 1)
-                    const SizedBox(
-                      height:
-                          RaSpace.sm,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        labels[index],
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: selected == index
+                              ? colors.onPrimary
+                              : colors.onSurfaceVariant,
+                        ),
+                      ),
                     ),
-                ],
-            ],
-          );
-        },
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _ProviderHistoryMetric
-    extends StatelessWidget {
-  const _ProviderHistoryMetric({
-    required this.value,
-    required this.label,
+class _ProviderHistoryCard extends StatelessWidget {
+  const _ProviderHistoryCard({
+    required this.requestId,
+    required this.data,
+    required this.money,
   });
 
-  final String value;
-  final String label;
+  final String requestId;
+  final Map<String, dynamic> data;
+  final String Function(int) money;
+
+  String _location() {
+    return data['locationLabel'] as String? ??
+        data['location'] as String? ??
+        'Location unavailable';
+  }
+
+  String _vehicle() {
+    return [
+      data['vehicleType'] as String? ?? '',
+      data['modelYear'] as String? ?? '',
+      data['registration'] as String? ?? '',
+    ].where((value) => value.trim().isNotEmpty).join(' • ');
+  }
+
+  String _date() {
+    final timestamp =
+        data['completedAt'] as Timestamp? ??
+        data['updatedAt'] as Timestamp? ??
+        data['createdAt'] as Timestamp?;
+
+    final date = timestamp?.toDate().toLocal();
+
+    if (date == null) {
+      return 'Date unavailable';
+    }
+
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        vertical: 12,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white
-            .withValues(
-          alpha: .12,
-        ),
-        borderRadius:
-            BorderRadius.circular(
-          15,
-        ),
-      ),
+  Widget build(BuildContext context) {
+    final status = data['status'] as String? ?? 'completed';
+    final completed = status == 'completed';
+    final driver = data['driverName'] as String? ?? 'Driver';
+    final amount =
+        (data['finalCost'] as num?)?.toInt() ??
+        (data['estimatedCost'] as num?)?.toInt() ??
+        0;
+    void view() => push(
+      context,
+      ProviderRequestDetailsScreen(requestId: requestId, data: data),
+    );
+    return RaProviderCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight:
-                  FontWeight.w900,
-            ),
-          ),
-          const SizedBox(
-            height: 2,
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white
-                  .withValues(
-                alpha: .74,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ProfileInitials(name: driver, radius: 21),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      driver,
+                      style: _providerText(
+                        context,
+                        size: 16,
+                        weight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      requestIssueLabel(data),
+                      style: _providerText(context, size: 14, muted: true),
+                    ),
+                  ],
+                ),
               ),
-              fontSize: 10.5,
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              StatusPill(
+                label: completed ? 'Completed' : 'Cancelled',
+                tone: completed ? RaTone.success : RaTone.danger,
+              ),
+              Text(
+                _date(),
+                style: _providerText(context, size: 12, muted: true),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _ProviderHistoryInfo(
+            icon: Icons.location_on_outlined,
+            value: _location(),
+          ),
+          if (_vehicle().isNotEmpty)
+            _ProviderHistoryInfo(
+              icon: Icons.directions_car_outlined,
+              value: _vehicle(),
+            ),
+          if (!completed &&
+              (data['cancellationReason'] as String? ?? '').trim().isNotEmpty)
+            _ProviderHistoryInfo(
+              icon: Icons.info_outline,
+              value: data['cancellationReason'] as String,
+            ),
+          const Divider(height: 24),
+          Text(
+            amount > 0 ? money(amount) : 'Amount not recorded',
+            style: _providerText(context, size: 18, weight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: view,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+              label: const Text('View details'),
             ),
           ),
         ],
@@ -708,47 +461,39 @@ class _ProviderHistoryMetric
   }
 }
 
-class _ProviderHistoryLine
-    extends StatelessWidget {
-  const _ProviderHistoryLine({
-    required this.icon,
-    required this.value,
-  });
+class _ProviderHistoryInfo extends StatelessWidget {
+  const _ProviderHistoryInfo({required this.icon, required this.value});
 
   final IconData icon;
   final String value;
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final colors =
-        Theme.of(context)
-            .colorScheme;
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
-    return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: 17,
-          color:
-              colors.primary,
-        ),
-        const SizedBox(
-          width: RaSpace.sm,
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style:
-                Theme.of(context)
-                    .textTheme
-                    .bodySmall,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: colors.primary, size: 15),
+
+          const SizedBox(width: 7),
+
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                height: 1.35,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
