@@ -880,9 +880,62 @@ class _ProviderPresenceAvatar extends StatelessWidget {
   );
 }
 
-class _ProviderRequestBadge extends StatelessWidget {
+class _ProviderRequestBadge extends StatefulWidget {
   const _ProviderRequestBadge({required this.services});
   final List<String> services;
+
+  @override
+  State<_ProviderRequestBadge> createState() => _ProviderRequestBadgeState();
+}
+
+class _ProviderRequestBadgeState extends State<_ProviderRequestBadge> {
+  final seenStore = ProviderRequestSeenStore();
+  Set<String> seenRequests = <String>{};
+  String? loadedUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    ProviderRequestSeenStore.revision.addListener(_reloadSeenRequests);
+    _reloadSeenRequests();
+  }
+
+  @override
+  void dispose() {
+    ProviderRequestSeenStore.revision.removeListener(_reloadSeenRequests);
+    super.dispose();
+  }
+
+  Future<void> _reloadSeenRequests() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      if (mounted) setState(() => loadedUserId = null);
+      return;
+    }
+    final seen = await seenStore.load(userId);
+    if (!mounted) return;
+    setState(() {
+      loadedUserId = userId;
+      seenRequests = seen;
+    });
+  }
+
+  Future<void> _openRequests(
+    BuildContext context,
+    String userId,
+    List<String> requestIds,
+  ) async {
+    try {
+      await seenStore.markSeen(userId, requestIds);
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not mark requests as viewed: $error')),
+        );
+      }
+    }
+    if (context.mounted) _openProviderRequests(context);
+  }
 
   @override
   Widget build(BuildContext context) =>
@@ -890,20 +943,29 @@ class _ProviderRequestBadge extends StatelessWidget {
         stream: signedIn ? RequestService().watchOpenRequests() : null,
         builder: (context, snapshot) {
           final userId = FirebaseAuth.instance.currentUser?.uid;
-          final count =
-              snapshot.data?.docs.where((request) {
-                final data = request.data();
-                return userId != null &&
-                    _requestMatchesProvider(data, userId, services: services);
-              }).length ??
-              0;
+          final requests = snapshot.data?.docs.where((request) {
+            return userId != null &&
+                _requestMatchesProvider(
+                  request.data(),
+                  userId,
+                  services: widget.services,
+                );
+          }).toList();
+          final visibleIds =
+              requests?.map((request) => request.id).toList() ?? const [];
+          final count = userId == loadedUserId
+              ? visibleIds.where((id) => !seenRequests.contains(id)).length
+              : visibleIds.length;
+
           return Badge(
             isLabelVisible: count > 0,
             backgroundColor: raDanger,
             label: Text(count > 9 ? '9+' : '$count'),
             child: IconButton(
               tooltip: 'New requests',
-              onPressed: () => _openProviderRequests(context),
+              onPressed: userId == null
+                  ? () => _openProviderRequests(context)
+                  : () => _openRequests(context, userId, visibleIds),
               icon: const Icon(Icons.notifications_none_rounded),
             ),
           );

@@ -85,4 +85,15 @@ class VehicleService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   });
+
+  Future<void> permanentlyDeleteArchived(String id) => _db.runTransaction((
+    tx,
+  ) async {
+    final ref = _vehicles.doc(id);
+    final vehicle = await tx.get(ref);
+    if (!vehicle.exists || vehicle.data()?['archived'] != true) {
+      throw StateError('Only archived vehicles can be permanently deleted.');
+    }
+    tx.delete(ref);
+  });
 }

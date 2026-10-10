@@ -4,7 +4,7 @@ Implemented locally on 4 October 2026.
 
 ## Driver walkthrough
 
-1. Open Profile -> My Vehicles. Add/edit/archive vehicles and set a default. Breakdown Details automatically fills the default when starting a fresh form; Saved vehicles lets you change it. Manual entry remains supported.
+1. Open Profile -> My Vehicles. Add/edit/archive vehicles and set a default. In Archived vehicles, restore a vehicle or permanently delete it; deletion removes only the saved vehicle record and retains assistance history. These actions require the current `firestore.rules` to be deployed. Breakdown Details automatically fills the default when starting a fresh form; Saved vehicles lets you change it. Manual entry remains supported.
 2. Tap Get Help. Select provider service capabilities, or choose I don't know the problem to request a mechanic inspection. Describe symptoms and optionally add photos/voice dictation.
 3. Choose budget compatible, branded aftermarket, genuine manufacturer, or discuss-with-provider as a parts preference. This is a preference, not a compatibility guarantee or an inventory reservation.
 4. Confirm location and review nearby providers. Default to receiving offers from all suitable providers, or select a preferred provider.

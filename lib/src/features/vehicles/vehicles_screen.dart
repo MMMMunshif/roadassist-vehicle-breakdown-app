@@ -113,6 +113,45 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     await action(() => service.restore(vehicle.id));
   }
 
+  Future<void> deleteArchivedVehicle(Vehicle vehicle) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        final name = '${vehicle.make} ${vehicle.model} ${vehicle.year}'.trim();
+
+        return AlertDialog(
+          icon: Icon(Icons.delete_forever_outlined, color: colors.error),
+          title: const Text('Delete this archived vehicle?'),
+          content: Text(
+            '$name will be permanently removed from your saved vehicles. '
+            'Existing assistance history will remain unchanged.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Delete permanently'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    await action(() => service.permanentlyDeleteArchived(vehicle.id));
+  }
+
   Widget vehicleCard(
     Vehicle vehicle,
     bool isDefault, {
@@ -243,6 +282,10 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                             if (value == 'restore') {
                               await restoreVehicle(vehicle);
                             }
+
+                            if (value == 'delete') {
+                              await deleteArchivedVehicle(vehicle);
+                            }
                           },
                           itemBuilder: (_) => archived
                               ? [
@@ -252,6 +295,16 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                                       contentPadding: EdgeInsets.zero,
                                       leading: Icon(Icons.unarchive_outlined),
                                       title: Text('Restore'),
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: Icon(
+                                        Icons.delete_outline_rounded,
+                                      ),
+                                      title: Text('Delete permanently'),
                                     ),
                                   ),
                                 ]
@@ -306,6 +359,36 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       ),
                     ],
                   ),
+                  if (archived) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: busy
+                                ? null
+                                : () => restoreVehicle(vehicle),
+                            icon: const Icon(Icons.unarchive_outlined),
+                            label: const Text('Restore'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: busy
+                              ? null
+                              : () => deleteArchivedVehicle(vehicle),
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            color: colors.error,
+                          ),
+                          label: Text(
+                            'Delete',
+                            style: TextStyle(color: colors.error),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 13),
                   Divider(
                     height: 1,

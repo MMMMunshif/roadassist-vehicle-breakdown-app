@@ -403,7 +403,7 @@ service cloud.firestore {
         allow create: if ownsVehicle() && validVehicle() && request.resource.data.createdAt == request.time;
         allow update: if ownsVehicle() && validVehicle()
           && request.resource.data.createdAt == resource.data.createdAt;
-        allow delete: if false;
+        allow delete: if ownsVehicle() && resource.data.archived == true;
       }
     }
 

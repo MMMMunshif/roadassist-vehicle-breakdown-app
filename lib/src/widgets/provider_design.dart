@@ -189,6 +189,9 @@ class RaProviderIdentityCard extends StatelessWidget {
     required this.online,
     required this.status,
     required this.onChanged,
+    required this.onRefreshLocation,
+    this.locationNeedsRefresh = false,
+    this.locationMessage = '',
     this.busy = false,
   });
   final Widget avatar;
@@ -196,58 +199,85 @@ class RaProviderIdentityCard extends StatelessWidget {
   final bool online;
   final String status;
   final ValueChanged<bool> onChanged;
+  final VoidCallback onRefreshLocation;
+  final bool locationNeedsRefresh;
+  final String locationMessage;
   final bool busy;
   @override
-  Widget build(BuildContext context) => RaProviderCard(
-    child: Row(
-      children: [
-        avatar,
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                speciality,
-                style: _providerText(context, weight: FontWeight.w700),
-              ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(
-                    Icons.circle,
-                    size: 8,
-                    color: online
-                        ? const Color(0xFF0CA98B)
-                        : Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final available =
+        status == 'Online' || status == 'Busy' || locationNeedsRefresh;
+
+    return RaProviderCard(
+      child: Row(
+        children: [
+          avatar,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  speciality,
+                  style: _providerText(context, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: locationNeedsRefresh
+                          ? colors.tertiary
+                          : available
+                          ? const Color(0xFF0CA98B)
+                          : colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        status,
+                        style: _providerText(context, size: 12, muted: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                if (online && locationNeedsRefresh) ...[
+                  Text(
+                    locationMessage,
+                    style: _providerText(context, size: 12, muted: true),
                   ),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      status,
-                      style: _providerText(context, size: 12, muted: true),
+                  TextButton.icon(
+                    onPressed: busy ? null : onRefreshLocation,
+                    icon: const Icon(Icons.my_location_rounded, size: 16),
+                    label: const Text('Update location'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                online
-                    ? 'Matching requests depend on your services and availability.'
-                    : 'Go online to receive nearby requests',
-                style: _providerText(context, size: 12, muted: true),
-              ),
-            ],
+                ] else
+                  Text(
+                    online
+                        ? 'Matching requests depend on your services and availability.'
+                        : 'Go online to receive nearby requests',
+                    style: _providerText(context, size: 12, muted: true),
+                  ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 4),
-        Semantics(
-          label: 'Provider availability',
-          child: Switch(value: online, onChanged: busy ? null : onChanged),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(width: 4),
+          Semantics(
+            label: 'Provider availability',
+            child: Switch(value: online, onChanged: busy ? null : onChanged),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class RaProviderSettingRow extends StatelessWidget {

@@ -47,6 +47,7 @@ void main() {
                         online: online,
                         status: online ? 'Online' : 'Currently offline',
                         onChanged: (value) => update(() => online = value),
+                        onRefreshLocation: () {},
                       ),
                       const SizedBox(height: 16),
                       RaProviderRequestTile(
@@ -107,5 +108,38 @@ void main() {
         });
       }
     }
+
+    testWidgets('stale provider location can be refreshed from the dashboard', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var refreshed = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RaProviderIdentityCard(
+              avatar: const CircleAvatar(child: Text('H')),
+              speciality: 'General Mechanic',
+              online: true,
+              status: 'Online · location needed',
+              onChanged: (_) {},
+              onRefreshLocation: () => refreshed = true,
+              locationNeedsRefresh: true,
+              locationMessage:
+                  'Turn on phone location and allow RoadAssist location permission.',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Online · location needed'), findsOneWidget);
+      expect(find.textContaining('Turn on phone location'), findsOneWidget);
+      await tester.tap(find.text('Update location'));
+      expect(refreshed, isTrue);
+    });
   }
 }

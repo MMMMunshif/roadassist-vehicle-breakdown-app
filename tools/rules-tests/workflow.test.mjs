@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collectionGroup, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 let env;
 before(async () => {
@@ -40,10 +40,19 @@ function approval(db,id,quoteType = 'direct') {
 }
 test('driver vehicle records are owner-only', async () => {
   const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
-  await assertSucceeds(setDoc(doc(db,'users/driver/vehicles/v1'),{make:'Toyota',model:'Aqua',year:2017,
+  const ref = doc(db,'users/driver/vehicles/v1');
+  await assertSucceeds(setDoc(ref,{make:'Toyota',model:'Aqua',year:2017,
     vehicleType:'Sedan / Hatchback',registration:'CAB-1234',fuelType:'Hybrid',transmission:'Automatic',archived:false,
     createdAt:serverTimestamp(),updatedAt:serverTimestamp()}));
   await assertFails(getDoc(doc(env.authenticatedContext('other', {email_verified:true}).firestore(),'users/driver/vehicles/v1')));
+  await assertFails(deleteDoc(ref));
+  await assertSucceeds(updateDoc(ref,{archived:true,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(
+    doc(env.authenticatedContext('other',{email_verified:true}).firestore(),'users/driver/vehicles/v1')));
+  await assertSucceeds(updateDoc(ref,{archived:false,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(ref));
+  await assertSucceeds(updateDoc(ref,{archived:true,updatedAt:serverTimestamp()}));
+  await assertSucceeds(deleteDoc(ref));
 });
 test('provider can submit an itemized offer but cannot assign a new-flow job', async () => {
   const db = env.authenticatedContext('provider', {email_verified:true}).firestore();

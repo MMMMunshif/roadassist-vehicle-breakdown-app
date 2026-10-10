@@ -45,6 +45,7 @@ import 'services/device_service.dart';
 import 'services/request_service.dart';
 import 'services/job_start_service.dart';
 import 'services/request_draft_store.dart';
+import 'services/provider_request_seen_store.dart';
 import 'services/photo_upload_service.dart';
 import 'services/route_service.dart';
 

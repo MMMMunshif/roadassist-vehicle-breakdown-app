@@ -41,7 +41,7 @@ String _providerAvailabilityExplanation(Map<String, dynamic> data) {
     return 'Turn on availability from your dashboard when you are ready to help.';
   final updated = (data['locationUpdatedAt'] as Timestamp?)?.toDate();
   if (!ProviderAvailability.hasFreshLocation(updated, DateTime.now())) {
-    return 'Your online switch is on, but your live location is missing or expired. Allow browser location access, then pull down on the dashboard to refresh your location.';
+    return 'Your online switch is on, but your live location is missing or out of date. Turn on your phone location and allow RoadAssist location permission, then tap Update location.';
   }
   final status = _providerAvailabilityStatus(data);
   if (status == 'Busy')

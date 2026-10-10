@@ -266,7 +266,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
       if (value) {
         await _publishProviderLocation();
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) {
         return;
       }
@@ -276,7 +276,7 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to update availability.')),
+        SnackBar(content: Text('Unable to update availability: $error')),
       );
     } finally {
       if (mounted) {
@@ -388,7 +388,16 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                       availabilityLabel: _providerAvailabilityStatus(
                         availability,
                       ),
+                      locationNeedsRefresh:
+                          availability['online'] == true &&
+                          _providerAvailabilityStatus(availability) ==
+                              'Offline',
+                      locationMessage: _providerAvailabilityExplanation(
+                        availability,
+                      ),
                       onOnlineChanged: _setOnline,
+                      onRefreshLocation: () =>
+                          unawaited(_publishProviderLocation()),
                     ),
 
                     const SizedBox(height: 14),
@@ -506,11 +515,16 @@ class _RaProviderHero extends StatelessWidget {
     required this.publishingLocation,
     required this.speciality,
     required this.availabilityLabel,
+    required this.locationNeedsRefresh,
+    required this.locationMessage,
     required this.onOnlineChanged,
+    required this.onRefreshLocation,
   });
   final bool online, savingPresence, publishingLocation;
-  final String speciality, availabilityLabel;
+  final bool locationNeedsRefresh;
+  final String speciality, availabilityLabel, locationMessage;
   final ValueChanged<bool> onOnlineChanged;
+  final VoidCallback onRefreshLocation;
   @override
   Widget build(
     BuildContext context,
@@ -554,11 +568,16 @@ class _RaProviderHero extends StatelessWidget {
             online: online,
             busy: savingPresence,
             onChanged: onOnlineChanged,
-            status: publishingLocation && online
+            onRefreshLocation: onRefreshLocation,
+            locationNeedsRefresh: locationNeedsRefresh,
+            locationMessage: locationMessage,
+            status: !online
+                ? 'Currently offline'
+                : locationNeedsRefresh
+                ? 'Online · location needed'
+                : publishingLocation
                 ? 'Updating your location…'
-                : online
-                ? availabilityLabel
-                : 'Currently offline',
+                : availabilityLabel,
           ),
         ],
       );
