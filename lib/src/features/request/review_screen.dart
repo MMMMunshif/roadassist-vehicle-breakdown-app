@@ -210,6 +210,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 'deadline-exceeded',
                 'network-request-failed',
               ].contains(error.code);
+      final message = activeRequestExists
+          ? 'Complete or cancel your current request before creating another.'
+          : networkError
+          ? 'Connection lost. Your draft is saved. Reconnect to check submission before retrying.'
+          : error is StateError
+          ? error.message
+          : error is FirebaseException && error.code == 'permission-denied'
+          ? 'Firebase rules blocked this request. Deploy the latest firestore.rules, then try again.'
+          : error is FirebaseException
+          ? 'Request failed (${error.code}). Please check your connection and try again.'
+          : 'Unable to create the request: $error';
 
       if (networkError) {
         await RequestDraftStore().save(widget.draft);
@@ -221,13 +232,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            activeRequestExists
-                ? 'Complete or cancel your current request before creating another.'
-                : networkError
-                ? 'Connection lost. Your draft is saved. Reconnect to check submission before retrying.'
-                : 'Unable to create the request. Please try again.',
-          ),
+          content: Text(message),
           backgroundColor: Theme.of(context).colorScheme.error,
           action: activeRequestExists
               ? SnackBarAction(
