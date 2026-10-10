@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, runTransaction, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 let env;
 before(async () => {
@@ -807,4 +807,57 @@ test('role identities protect contact email, enrollment and identity metadata', 
   for (const change of [{email:'attacker@example.com'},{authIdentity:'legacy'},{roles:['driver','provider']},
     {lastRole:'provider'},{roleEmailRequired:['provider']}]) await assertFails(updateDoc(ref,change));
   await assertFails(getDoc(doc(db,'roleAuthLimits/private')));
+});
+
+
+test('driver cancels searching request using actual profile-clearing transaction', async()=>{
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'users/driver'),{activeRequestId:'r1',authIdentity:'role-v1',email:'driver@example.com',roles:['driver'],lastRole:'driver'}));
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(runTransaction(db,async tx=>{
+    const ref=doc(db,'requests/r1'),profile=doc(db,'users/driver');await tx.get(ref);await tx.get(profile);
+    tx.update(ref,{status:'cancelled',cancelledBy:'driver',cancellationType:'driver_cancellation',cancellationReason:'I no longer need assistance.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    const {deleteField}=await import('firebase/firestore');tx.update(profile,{activeRequestId:deleteField(),updatedAt:serverTimestamp()});
+  }));
+});
+test('broadcast request with offer-mode label can be dismissed without changing its targeting',async()=>{
+  await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{preferredProviderName:'Receive provider offers'}));
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{rejectedBy:['provider'],updatedAt:serverTimestamp()}));
+});
+test('dismiss cannot add other providers to rejectedBy',async()=>{
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(db,'requests/r1'),{rejectedBy:['provider','someone-else'],updatedAt:serverTimestamp()}));
+});
+async function maintenanceModeration(status){
+ const db=env.authenticatedContext('admin',{email_verified:true,admin:true}).firestore();
+ await runTransaction(db,async tx=>{
+  const ref=doc(db,'accountModeration/provider'),directory=doc(db,'providerDirectory/provider');
+  const before=(await tx.get(ref)).data();await tx.get(directory);
+  const audit=doc(db,`adminAudit/maintenance-${status}`),after={...before,status,reason:'Account access reviewed by administrator.',updatedBy:'admin',updatedAt:serverTimestamp(),lastAuditId:audit.id};
+  tx.set(ref,after);if(status==='suspended')tx.update(directory,{online:false,updatedAt:serverTimestamp()});
+  tx.set(audit,{kind:'account',target:'provider',actor:'admin',reason:after.reason,before,after,createdAt:serverTimestamp()});
+ });
+}
+test('expired provider approval can be suspended and restored without renewing verification',async()=>{
+ await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'accountModeration/provider'),{validUntil:Timestamp.fromMillis(Date.now()-1000)}));
+ await assertSucceeds(maintenanceModeration('suspended'));
+ await assertSucceeds(maintenanceModeration('active'));
+ const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+ await assertFails(updateDoc(doc(db,'providerDirectory/provider'),{online:true}));
+});
+
+for (const status of ['accepted','en_route','arrived']) test(`driver cancellation clears assigned provider and profile at ${status}`,async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{status,providerId:'provider'});
+    await updateDoc(doc(c.firestore(),'users/driver'),{activeRequestId:'r1'});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(runTransaction(db,async tx=>{
+    const ref=doc(db,'requests/r1'),profile=doc(db,'users/driver'),directory=doc(db,'providerDirectory/provider');
+    await tx.get(ref);await tx.get(profile);await tx.get(directory);
+    tx.update(ref,{status:'cancelled',cancelledBy:'driver',cancellationType:'driver_cancellation',cancellationReason:'I no longer need assistance.',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    tx.update(directory,{activeRequestId:null});
+    const {deleteField}=await import('firebase/firestore');tx.update(profile,{activeRequestId:deleteField(),updatedAt:serverTimestamp()});
+  }));
 });

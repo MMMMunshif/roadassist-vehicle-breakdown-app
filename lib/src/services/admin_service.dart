@@ -38,7 +38,11 @@ class AdminService {
     String confirmation,
   ) async {
     await requireAdmin();
-    const endpoint = String.fromEnvironment('ADMIN_ACCOUNT_DELETE_API_URL');
+    const endpoint = String.fromEnvironment(
+      'ADMIN_ACCOUNT_DELETE_API_URL',
+      defaultValue:
+          'https://vehiclebreakdownapp.vercel.app/api/admin-delete-account',
+    );
     if (endpoint.isEmpty || Uri.tryParse(endpoint)?.scheme != 'https') {
       throw StateError(
         'Deploy and configure the private account deletion endpoint first.',
@@ -60,12 +64,20 @@ class AdminService {
             'confirmation': confirmation,
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 90));
     if (response.statusCode != 200) {
-      final result = jsonDecode(response.body);
-      throw StateError(
-        result['message'] as String? ?? 'Account deletion failed.',
-      );
+      String message = response.statusCode == 401
+          ? 'Your session expired. Sign in again before deleting an account.'
+          : 'Account deletion failed. Please retry.';
+      try {
+        final result = jsonDecode(response.body);
+        if (result is Map && result['message'] is String) {
+          message = result['message'] as String;
+        }
+      } on FormatException {
+        // Hosting failures may return HTML instead of the API JSON response.
+      }
+      throw StateError(message);
     }
   }
 
@@ -253,7 +265,11 @@ class AdminService {
     final token = await _auth.currentUser!
         .getIdToken(true)
         .timeout(accessTimeout);
-    const endpoint = String.fromEnvironment('PROVIDER_APPROVAL_EMAIL_API_URL');
+    const endpoint = String.fromEnvironment(
+      'PROVIDER_APPROVAL_EMAIL_API_URL',
+      defaultValue:
+          'https://vehiclebreakdownapp.vercel.app/api/provider-approval-email',
+    );
     if (endpoint.isEmpty || Uri.tryParse(endpoint)?.scheme != 'https') {
       throw StateError(
         'Configure your deployed approval-email endpoint first.',
