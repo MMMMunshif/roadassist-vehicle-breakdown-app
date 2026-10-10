@@ -547,10 +547,12 @@ class _RaProviderAvailabilityHint extends StatelessWidget {
   final bool online;
 
   @override
-  Widget build(BuildContext context) => RaProviderCard(
-    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-    child: Row(
-      children: [
+  Widget build(BuildContext context) => Semantics(
+    label: online ? 'Provider is online' : 'Provider is offline',
+    child: RaProviderCard(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      child: Row(
+        children: [
         Icon(
           online ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
           size: 22,
@@ -567,7 +569,8 @@ class _RaProviderAvailabilityHint extends StatelessWidget {
         ),
       ],
     ),
-  );
+      ),
+    );
 }
 
 // ============================================================
@@ -1359,7 +1362,8 @@ class _RaProviderPerformanceMetric extends StatelessWidget {
         ),
         const SizedBox(height: 3),
         Text(label, style: _providerText(context, size: 12, muted: true)),
-      ],
+        ],
+      ),
     ),
   );
 }
