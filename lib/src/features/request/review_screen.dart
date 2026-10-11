@@ -195,7 +195,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
         context,
         SearchingScreen(draft: widget.draft, requestId: requestId),
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('Request creation failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
 
       final activeRequestExists = error.toString().contains(
@@ -210,6 +213,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 'deadline-exceeded',
                 'network-request-failed',
               ].contains(error.code);
+
+      final permissionError =
+          error is FirebaseException && error.code == 'permission-denied';
+      final authError =
+          error is StateError && error.message == 'Authentication is required.';
 
       if (networkError) {
         await RequestDraftStore().save(widget.draft);
@@ -226,6 +234,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ? 'Complete or cancel your current request before creating another.'
                 : networkError
                 ? 'Connection lost. Your draft is saved. Reconnect to check submission before retrying.'
+                : permissionError || authError
+                ? 'Your session or driver access has expired. Sign out, sign in again, and verify your email.'
                 : 'Unable to create the request. Please try again.',
           ),
           backgroundColor: Theme.of(context).colorScheme.error,
