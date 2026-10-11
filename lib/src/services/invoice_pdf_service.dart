@@ -231,7 +231,9 @@ class InvoicePdfService {
           ),
           pw.SizedBox(height: 6),
           text(
-            invoice.paid
+            invoice.simulated
+                ? 'SIMULATED CARD PAYMENT. Demonstration only. No money was charged or received.'
+                : invoice.paid
                 ? 'Payment receipt confirmed by the service provider${invoice.paymentMethod.isEmpty ? '.' : ' (${invoice.paymentMethod}).'}'
                 : 'Payment confirmation has not yet been recorded.',
             size: 9,
