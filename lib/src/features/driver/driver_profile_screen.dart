@@ -1043,35 +1043,38 @@ class _RaDriverProfileMenuTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 2),
-      leading: Container(
-        width: 39,
-        height: 39,
-        decoration: BoxDecoration(
-          color: colors.primary.withValues(alpha: .07),
-          borderRadius: BorderRadius.circular(12),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 2),
+        leading: Container(
+          width: 39,
+          height: 39,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: .07),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 18, color: colors.primary),
         ),
-        child: Icon(icon, size: 18, color: colors.primary),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+        title: Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-      ),
-      subtitle: Text(
-        subtitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          color: colors.onSurfaceVariant,
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            color: colors.onSurfaceVariant,
+          ),
         ),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: onTap,
       ),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: onTap,
     );
   }
 }
