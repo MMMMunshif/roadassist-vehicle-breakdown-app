@@ -1,7 +1,12 @@
 part of '../screens.dart';
 
 class QuoteOffers extends StatefulWidget {
-  const QuoteOffers({super.key, required this.requestId});
+  const QuoteOffers({
+    super.key,
+    required this.requestId,
+    this.providerView = false,
+  });
+  final bool providerView;
   final String requestId;
   @override
   State<QuoteOffers> createState() => _QuoteOffersState();
@@ -9,11 +14,14 @@ class QuoteOffers extends StatefulWidget {
 
 class _QuoteOffersState extends State<QuoteOffers> {
   bool selecting = false;
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> offers;
+  late Stream<QuerySnapshot<Map<String, dynamic>>> offers;
   @override
   void initState() {
     super.initState();
-    offers = RequestService().watchQuotes(widget.requestId);
+    offers = RequestService().watchQuotes(
+      widget.requestId,
+      ownQuoteOnly: widget.providerView,
+    );
   }
 
   Future<void> choose(String id, Map<String, dynamic> offer) async {
@@ -60,13 +68,33 @@ class _QuoteOffersState extends State<QuoteOffers> {
   ) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
     stream: offers,
     builder: (context, snapshot) {
-      if (snapshot.hasError)
-        return const Card(
+      if (snapshot.hasError) {
+        return Card(
           child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Could not load offers. Check your connection.'),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _workflowError(
+                    snapshot.error!,
+                    'Could not load offers. Please try again.',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    offers = RequestService().watchQuotes(
+                      widget.requestId,
+                      ownQuoteOnly: widget.providerView,
+                    );
+                  }),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         );
+      }
       if (!snapshot.hasData) return const LinearProgressIndicator();
       final quotes = snapshot.data!.docs.toList()
         ..sort((a, b) {
@@ -80,10 +108,17 @@ class _QuoteOffersState extends State<QuoteOffers> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Provider offers', style: RaText.headline),
+          Text(
+            widget.providerView ? 'Your quote' : 'Provider offers',
+            style: RaText.headline,
+          ),
           const SizedBox(height: 8),
           Text(
-            quotes.isEmpty
+            widget.providerView
+                ? (quotes.isEmpty
+                      ? 'You have not sent a quote yet. Use Review & Quote to send your offer.'
+                      : 'Your submitted price and included work are shown below. The driver reviews and selects offers.')
+                : quotes.isEmpty
                 ? 'Providers are reviewing your vehicle and request. No price has been agreed yet.'
                 : 'Direct service and inspection offers are grouped separately, then sorted by price. Compare what each offer includes.',
           ),
@@ -130,13 +165,15 @@ class _QuoteOffersState extends State<QuoteOffers> {
                         'Rs. ${quote.data()['total']}',
                         strong: true,
                       ),
-                      if (quote.id ==
-                          quotes
-                              .firstWhere(
-                                (q) =>
-                                    (q.data()['quoteType'] ?? 'direct') == type,
-                              )
-                              .id)
+                      if (!widget.providerView &&
+                          quote.id ==
+                              quotes
+                                  .firstWhere(
+                                    (q) =>
+                                        (q.data()['quoteType'] ?? 'direct') ==
+                                        type,
+                                  )
+                                  .id)
                         const Text('Lowest quoted price in this category'),
                       const SizedBox(height: 8),
                       const Text(
@@ -146,14 +183,15 @@ class _QuoteOffersState extends State<QuoteOffers> {
                       Text(quote.data()['notes'] as String),
                       Text(_warrantyLabel(quote.data())),
                       const SizedBox(height: 8),
-                      FilledButton(
-                        onPressed: selecting
-                            ? null
-                            : () => choose(quote.id, quote.data()),
-                        child: Text(
-                          selecting ? 'Selecting…' : 'Review & Select',
+                      if (!widget.providerView)
+                        FilledButton(
+                          onPressed: selecting
+                              ? null
+                              : () => choose(quote.id, quote.data()),
+                          child: Text(
+                            selecting ? 'Selecting…' : 'Review & Select',
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),

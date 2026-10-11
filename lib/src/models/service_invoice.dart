@@ -24,6 +24,7 @@ class ServiceInvoice {
     required this.discount,
     required this.total,
     required this.paid,
+    required this.simulated,
     required this.paymentMethod,
     required this.warranty,
     required this.breakdownNote,
@@ -108,15 +109,24 @@ class ServiceInvoice {
               data['issue'],
               data['assistanceType'],
             ], 'Roadside assistance'),
-      work: [
-        CompletionReport.description(data),
-        _first([data['serviceNotes'], data['providerDiagnosis']], ''),
-      ].where((v) => v.isNotEmpty).join('\n\n'),
+      work:
+          data['completionReport'] is Map &&
+              data['completionReport']['summary'] is String
+          ? CompletionReport.description(data)
+          : [
+              CompletionReport.description(data),
+              _first([data['serviceNotes'], data['providerDiagnosis']], ''),
+            ].where((v) => v.isNotEmpty).join('\n\n'),
       charges: List.unmodifiable(charges),
       subtotal: subtotal,
       discount: subtotal - total,
       total: total,
-      paid: data['providerConfirmedPayment'] == true,
+      paid:
+          data['providerConfirmedPayment'] == true &&
+          data['demoPayment'] == null,
+      simulated:
+          data['demoPayment'] is Map &&
+          data['demoPayment']['status'] == 'simulated',
       paymentMethod: _text(data['paymentMethod']),
       warranty: warranty,
       breakdownNote: itemized
@@ -144,9 +154,13 @@ class ServiceInvoice {
   final DateTime? issuedAt;
   final List<InvoiceCharge> charges;
   final int subtotal, discount, total;
-  final bool paid;
+  final bool paid, simulated;
   final String paymentMethod, warranty, breakdownNote;
-  String get paymentLabel => paid ? 'Paid' : 'Payment pending';
+  String get paymentLabel => simulated
+      ? 'DEMO - NO MONEY CHARGED'
+      : paid
+      ? 'Paid'
+      : 'Payment pending';
   String get dateLabel {
     final date = issuedAt;
     if (date == null) return 'Date not recorded';
@@ -168,7 +182,7 @@ class ServiceInvoice {
   }
 
   String get filename =>
-      'RoadAssist-Invoice-${requestId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf';
+      'RoadAssist-${simulated ? 'DEMO-Receipt' : 'Invoice'}-${requestId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf';
   static String money(int value) => value.toString().replaceAllMapped(
     RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
     (m) => '${m[1]},',

@@ -100,7 +100,11 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     });
 
     try {
-      await RequestService().recordPayment(widget.requestId, method);
+      if (method == 'demo_card') {
+        await RequestService().simulateCardPayment(widget.requestId);
+      } else {
+        await RequestService().recordPayment(widget.requestId, method);
+      }
     } catch (error) {
       if (!mounted) return;
 
@@ -188,6 +192,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           final providerConfirmed = data['providerConfirmedPayment'] == true;
 
           final paymentMethod = data['paymentMethod'] as String?;
+          final simulated =
+              data['demoPayment'] is Map &&
+              data['demoPayment']['status'] == 'simulated';
 
           ServiceInvoice bill;
           try {
@@ -245,68 +252,33 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               const _RaInvoiceSectionHeading(
                 title: 'Payment status',
                 subtitle:
-                    'RoadAssist records cash or external payment confirmation only.',
+                    'Cash / bank transfer confirmation, or clearly marked demo card payment.',
               ),
 
               const SizedBox(height: 10),
 
               _RaInvoicePaymentCard(
+                simulated: simulated,
                 driverReported: driverReported,
                 providerConfirmed: providerConfirmed,
                 paymentMethod: paymentMethod,
               ),
 
-              if (driver && !driverReported) ...[
-                const SizedBox(height: 11),
-
-                _RaInvoiceSurface(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Record Payment',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: providerFontSize(context, 11),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      Text(
-                        'Only record payment after money has actually been paid to the provider.',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: providerFontSize(context, 8.5),
-                          height: 1.45,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      OutlinedButton.icon(
-                        onPressed: saving
-                            ? null
-                            : () {
-                                record('cash');
-                              },
-                        icon: const Icon(Icons.payments_outlined),
-                        label: const Text('I Paid Cash'),
-                      ),
-
-                      const SizedBox(height: 7),
-
-                      OutlinedButton.icon(
-                        onPressed: saving
-                            ? null
-                            : () {
-                                record('external');
-                              },
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('I Paid Outside the App'),
-                      ),
-                    ],
-                  ),
+              if (driver && !driverReported && !simulated) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final method = await requestCheckout(
+                            context,
+                            bill.total,
+                            confirmService: false,
+                          );
+                          if (method != null && mounted) await record(method);
+                        },
+                  icon: const Icon(Icons.payments_outlined),
+                  label: const Text('Choose payment method'),
                 ),
               ],
 
@@ -471,11 +443,13 @@ class _RaInvoiceSurface extends StatelessWidget {
 
 class _RaInvoicePaymentCard extends StatelessWidget {
   const _RaInvoicePaymentCard({
+    this.simulated = false,
     required this.driverReported,
     required this.providerConfirmed,
     required this.paymentMethod,
   });
 
+  final bool simulated;
   final bool driverReported;
   final bool providerConfirmed;
   final String? paymentMethod;
@@ -489,7 +463,13 @@ class _RaInvoicePaymentCard extends StatelessWidget {
     final String title;
     final String message;
 
-    if (providerConfirmed) {
+    if (simulated) {
+      tone = colors.primary;
+      icon = Icons.science_outlined;
+      title = 'Demo payment successful';
+      message =
+          'DEMO - NO MONEY CHARGED. Simulated card payment; no funds were received.';
+    } else if (providerConfirmed) {
       tone = raSuccess;
       icon = Icons.verified_outlined;
       title = 'Payment confirmed';

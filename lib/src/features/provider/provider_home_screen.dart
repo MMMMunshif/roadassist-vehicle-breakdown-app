@@ -65,6 +65,13 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
               }
 
               final data = snapshot.data() ?? <String, dynamic>{};
+              // A local serverTimestamp is temporarily null until acknowledged.
+              // Retain only the previous confirmed time; never extend its life.
+              if (snapshot.metadata.hasPendingWrites &&
+                  data['locationUpdatedAt'] == null &&
+                  availability['locationUpdatedAt'] is Timestamp) {
+                data['locationUpdatedAt'] = availability['locationUpdatedAt'];
+              }
 
               setState(() {
                 availability = data;
@@ -427,11 +434,15 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     const SizedBox(height: 12),
 
                     if (_providerAvailabilityStatus(availability) != 'Online')
-                      const RaProviderEmptyCard(
+                      RaProviderEmptyCard(
                         icon: Icons.notifications_none_rounded,
-                        title: 'Go online to see matching requests',
-                        message:
-                            'Requests match your services and availability.',
+                        title:
+                            _providerAvailabilityStatus(availability) == 'Busy'
+                            ? 'You are working on an active job'
+                            : online
+                            ? 'Not available for new requests'
+                            : 'Go online to see matching requests',
+                        message: _providerAvailabilityExplanation(availability),
                       )
                     else
                       _RaProviderRequestPreviewList(services: providerServices),

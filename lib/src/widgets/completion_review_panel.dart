@@ -1,99 +1,80 @@
 part of '../screens.dart';
 
-Future<CompletionReport?> requestCompletionReport(
+Future<String?> requestCheckout(
   BuildContext context,
-  Map<String, dynamic> data,
-) async {
-  final saved = data['completionReport'] is Map
-      ? data['completionReport'] as Map
-      : const {};
-  final fields = ['problem', 'repairs', 'parts', 'advice'];
-  final controllers = {
-    for (final field in fields)
-      field: TextEditingController(text: saved[field] as String? ?? ''),
-  };
-  final form = GlobalKey<FormState>();
-  final result = await showDialog<CompletionReport>(
+  int amount, {
+  bool confirmService = true,
+}) {
+  String selected = 'cash';
+  return showModalBottomSheet<String>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Completed repair report'),
-      content: SizedBox(
-        width: 450,
-        child: SingleChildScrollView(
-          child: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'These details will be shown to the driver and included in the invoice.',
-                ),
-                for (final field in fields)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: TextFormField(
-                      controller: controllers[field],
-                      maxLength: 500,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        labelText: switch (field) {
-                          'problem' => 'Exact vehicle problem',
-                          'repairs' => 'Repair / work performed',
-                          'parts' => 'Parts replaced, quantity and details',
-                          _ => 'Advice / follow-up (optional)',
-                        },
-                        helperText: field == 'parts'
-                            ? 'Enter No parts replaced when applicable.'
-                            : null,
-                      ),
-                      validator: (value) {
-                        final length = (value ?? '').trim().length;
-                        if (field == 'advice') return null;
-                        if (length < (field == 'parts' ? 1 : 10)) {
-                          return field == 'parts'
-                              ? 'List parts or enter No parts replaced.'
-                              : 'Enter at least 10 characters.';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-              ],
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheetState) => SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              confirmService ? 'Confirm & Pay' : 'Payment',
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-          ),
+            const SizedBox(height: 12),
+            Text(
+              'Approved total: Rs. ${ServiceInvoice.money(amount)}',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            for (final option in const [
+              ('cash', 'Cash', Icons.payments_outlined),
+              ('external', 'Bank transfer', Icons.account_balance_outlined),
+              ('demo_card', 'Demo card', Icons.credit_card),
+            ])
+              ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                selected: selected == option.$1,
+                leading: Icon(option.$3),
+                title: Text(option.$2),
+                trailing: Icon(
+                  selected == option.$1
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                ),
+                onTap: () => setSheetState(() => selected = option.$1),
+              ),
+            const SizedBox(height: 14),
+            Text(
+              selected == 'demo_card'
+                  ? 'DEMO - NO MONEY CHARGED. This simulates a card payment for demonstration only.'
+                  : 'Pay the provider directly. Confirm only after paying; the provider will confirm receipt.',
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(sheetContext, selected),
+              icon: const Icon(Icons.check_circle_outline),
+              label: Text(
+                selected == 'demo_card'
+                    ? (confirmService
+                          ? 'Confirm service & simulate payment'
+                          : 'Simulate card payment')
+                    : (confirmService
+                          ? 'Confirm service & paid ${selected == 'cash' ? 'cash' : 'by transfer'}'
+                          : 'I paid ${selected == 'cash' ? 'cash' : 'by transfer'}'),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(sheetContext),
+              child: const Text('Cancel'),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (form.currentState!.validate()) {
-              Navigator.pop(
-                dialogContext,
-                CompletionReport(
-                  problem: controllers['problem']!.text,
-                  repairs: controllers['repairs']!.text,
-                  parts: controllers['parts']!.text,
-                  advice: controllers['advice']!.text,
-                ),
-              );
-            }
-          },
-          child: const Text('Review final amount'),
-        ),
-      ],
     ),
   );
-  // Wait for the dialog route to finish its reverse animation before disposal.
-  await Future<void>.delayed(const Duration(milliseconds: 300));
-  for (final controller in controllers.values) {
-    controller.dispose();
-  }
-  return result;
 }
 
 class CompletionReviewPanel extends StatefulWidget {
@@ -324,7 +305,7 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
             Text(
               widget.isProvider
                   ? 'The driver must agree to the final total before the job closes. Payment is confirmed separately.'
-                  : 'Completing this job confirms the work and final amount. It does not record payment. If you disagree, request a discount or report an issue.',
+                  : 'Confirm & Pay lets you confirm the service and choose cash, bank transfer or a clearly marked demo card payment. If you disagree, report an issue.',
               style: _providerText(context, size: 13, muted: true),
             ),
             if (busy) const LinearProgressIndicator(),
