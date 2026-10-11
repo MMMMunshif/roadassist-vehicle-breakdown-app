@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collectionGroup, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, collectionGroup, query, where, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 let env;
 before(async () => {
@@ -38,6 +38,13 @@ function approval(db,id,quoteType = 'direct') {
   batch.update(doc(db,'providerDirectory/provider'),{activeRequestId:id});
   return batch.commit();
 }
+test('request read access is limited to its participants', async () => {
+  const driver = env.authenticatedContext('driver', {email_verified:true}).firestore();
+  await assertSucceeds(getDoc(doc(driver,'requests/r1')));
+  await assertSucceeds(getDocs(query(collection(driver,'requests'),where('driverId','==','driver'))));
+  await assertFails(getDoc(doc(env.authenticatedContext('other',{email_verified:true}).firestore(),'requests/r1')));
+  await assertFails(getDoc(doc(driver,'requests/r2')));
+});
 test('driver vehicle records are owner-only', async () => {
   const db = env.authenticatedContext('driver', {email_verified:true}).firestore();
   const ref = doc(db,'users/driver/vehicles/v1');

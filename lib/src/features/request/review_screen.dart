@@ -51,8 +51,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
           );
       } else {
         setState(() {
-          connectionNotice =
-              'Connection restored. Review your draft and tap Submit when ready.';
+          connectionNotice = 'Connection restored. Review your draft and tap Submit when ready.';
         });
       }
     } catch (_) {
@@ -72,10 +71,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
 
-  bool get readyToSubmit =>
-      widget.draft.modelYear.trim().isNotEmpty &&
-      widget.draft.registration.trim().isNotEmpty &&
-      !widget.draft.location.startsWith('Select current GPS');
+  bool get readyToSubmit {
+    final trimmedLocation = widget.draft.location.trim();
+
+    return widget.draft.modelYear.trim().isNotEmpty &&
+        widget.draft.registration.trim().isNotEmpty &&
+        trimmedLocation.isNotEmpty &&
+        !trimmedLocation.startsWith('Select current GPS');
+  }
 
   bool get specificProvider =>
       widget.draft.preferredProviderId.trim().isNotEmpty;
@@ -575,8 +578,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
                   const _RaReviewHeading(
                     title: 'Photo evidence',
-                    subtitle:
-                        'Photos are shared with providers reviewing this request.',
+                    subtitle: 'Photos are shared with providers reviewing this request.',
                   ),
 
                   const SizedBox(height: 11),
@@ -587,8 +589,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
                   const _RaReviewHeading(
                     title: 'Pricing',
-                    subtitle:
-                        'No payment is confirmed when the request is submitted.',
+                    subtitle: 'No payment is confirmed when the request is submitted.',
                   ),
 
                   const SizedBox(height: 11),
@@ -599,8 +600,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         const _RaPricingPoint(
                           icon: Icons.request_quote_outlined,
                           title: 'Providers send offers',
-                          message:
-                              'Service, travel and any other stated charges are shown before approval.',
+                          message: 'Service, travel and any other stated charges are shown before approval.',
                         ),
 
                         const SizedBox(height: 11),
@@ -608,8 +608,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         const _RaPricingPoint(
                           icon: Icons.compare_arrows_rounded,
                           title: 'You choose before assignment',
-                          message:
-                              'Compare available offers or approve the selected provider’s offer.',
+                          message: 'Compare available offers or approve the selected provider’s offer.',
                         ),
 
                         const SizedBox(height: 11),
@@ -617,8 +616,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         const _RaPricingPoint(
                           icon: Icons.verified_user_outlined,
                           title: 'Changes need approval',
-                          message:
-                              'If repair work changes after inspection, a revised quote must be approved first.',
+                          message: 'If repair work changes after inspection, a revised quote must be approved first.',
                         ),
                       ],
                     ),
