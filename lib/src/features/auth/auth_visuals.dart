@@ -2,23 +2,44 @@ part of '../../screens.dart';
 
 class _AuthWordmark extends StatelessWidget {
   const _AuthWordmark();
+
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Semantics(
+      label: 'RoadAssist',
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          const BrandMark(size: 64),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Road',
+                    style: TextStyle(
+                      color: dark ? Colors.white : const Color(0xFF082654),
+                    ),
+                  ),
+                  const TextSpan(
+                    text: 'Assist',
+                    style: TextStyle(color: Color(0xFF169EEC)),
+                  ),
+                ],
+              ),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1,
+              ),
+            ),
+          ),
+        ],
       ),
-      child: Image.asset(
-        'assets/images/roadassist_logo.png',
-        width: 220,
-        fit: BoxFit.contain,
-        semanticLabel: 'RoadAssist',
-      ),
-    ),
-  );
+    );
+  }
 }
 
 class _AuthRoadArtwork extends StatelessWidget {
@@ -50,13 +71,8 @@ class _AuthRoadArtwork extends StatelessWidget {
             'assets/images/welcome_assistance.jpg',
             fit: BoxFit.cover,
             alignment: const Alignment(0, .15),
-            semanticLabel:
-                'Roadside technician helping a driver with a tyre',
-            errorBuilder: (
-              context,
-              error,
-              stackTrace,
-            ) {
+            semanticLabel: 'Roadside technician helping a driver with a tyre',
+            errorBuilder: (context, error, stackTrace) {
               return Container(
                 color: colors.primaryContainer,
                 alignment: Alignment.center,
@@ -91,17 +107,11 @@ class _AuthRoadArtwork extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: .34),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: .14),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: .14)),
               ),
               child: const Row(
                 children: [
-                  Icon(
-                    Icons.shield_outlined,
-                    color: Colors.white,
-                    size: 21,
-                  ),
+                  Icon(Icons.shield_outlined, color: Colors.white, size: 21),
                   SizedBox(width: RaSpace.sm),
                   Expanded(
                     child: Text(

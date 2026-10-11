@@ -11,11 +11,11 @@ void main() {
       );
       expect(find.text('FULL NAME'), findsOneWidget);
       expect(find.text('PHONE NUMBER'), findsOneWidget);
-      expect(find.text('Driver profile photo'), findsOneWidget);
+      expect(find.text('Driver photo'), findsOneWidget);
       await tester.tap(find.text('Sign In').first);
       await tester.pumpAndSettle();
       expect(find.text('FULL NAME'), findsNothing);
-      expect(find.text('Driver profile photo'), findsNothing);
+      expect(find.text('Driver photo'), findsNothing);
     },
   );
   testWidgets('provider registration preserves verification instructions', (
@@ -26,10 +26,16 @@ void main() {
     );
     expect(find.text('FULL NAME'), findsOneWidget);
     expect(find.text('Create Provider Account'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.textContaining('Provider accounts require verification'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.textContaining('continue to provider verification'),
+      find.textContaining('Provider accounts require verification'),
       findsOneWidget,
     );
-    expect(find.text('Driver profile photo'), findsNothing);
+    expect(find.text('Driver photo'), findsNothing);
   });
 }

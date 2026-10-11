@@ -27,6 +27,10 @@ export function requestAlerts(before, after) {
   if (after.lastRepairDecisionId && before.lastRepairDecisionId !== after.lastRepairDecisionId) add(after.providerId,'decision','Driver reviewed your price change',after.lastRepairDecision === 'approved' ? 'The driver approved the revised work and total.' : 'The driver rejected the proposed change. Keep the existing approved total.');
   if (!before.driverReportedPayment && after.driverReportedPayment) add(after.providerId,'payment_reported','Driver reported payment','Confirm receipt only after receiving the payment.');
   if (!before.providerConfirmedPayment && after.providerConfirmedPayment) add(after.driverId,'payment_confirmed','Payment confirmed','Your provider confirmed that payment was received.');
+  if (before.completionState !== 'pending' && after.completionState === 'pending') add(after.driverId,'completion_review','Review completed work and final bill','Check the work details and amount before confirming completion.');
+  if (!before.arrivalConfirmedBy && after.arrivalConfirmedBy) add(after.providerId,'job_started','Job start confirmed','The driver confirmed your arrival. Begin only the approved work.');
+  if (after.pendingDiscountId && before.pendingDiscountId !== after.pendingDiscountId) add(after.providerId,'discount','Driver requested a revised final amount','Review the requested discount before confirming the final bill.');
+  if (before.pendingDiscountId && !after.pendingDiscountId) add(after.driverId,'discount_decision','Provider reviewed your discount request','Open the final bill to review the agreed amount.');
   return alerts;
 }
 export function quoteChanged(before, after) {

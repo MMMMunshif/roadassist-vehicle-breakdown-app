@@ -25,17 +25,17 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     ),
     (
       'Vehicle Towing',
-      'Choose this when your vehicle cannot be driven safely and needs recovery.',
+      'For a vehicle that cannot be driven safely and needs recovery.',
       Icons.fire_truck_outlined,
     ),
     (
       'Flat Tyre',
-      'Get help with a puncture, tyre damage or fitting your spare tyre.',
+      'Puncture, tyre damage or help fitting a spare tyre.',
       Icons.tire_repair_outlined,
     ),
     (
       'Battery Jumpstart',
-      'For a dead battery, starting issue or basic battery assistance.',
+      'Dead battery, starting problem or basic battery assistance.',
       Icons.battery_charging_full_rounded,
     ),
   ];
@@ -48,13 +48,13 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
 
   Future<void> loadSavedDraft() async {
     final draft = await draftStore.load();
-    final updatedAt = await draftStore.lastUpdated();
+    final updated = await draftStore.lastUpdated();
 
     if (!mounted) return;
 
     setState(() {
       savedDraft = draft;
-      savedAt = updatedAt;
+      savedAt = updated;
       loadingDraft = false;
     });
   }
@@ -74,7 +74,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     );
   }
 
-  String formatSavedTime(DateTime? value) {
+  String savedTime(DateTime? value) {
     if (value == null) {
       return 'Saved request available';
     }
@@ -86,21 +86,31 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     return 'Saved ${value.day}/${value.month}/${value.year} at $hour:$minute';
   }
 
-  void resumeSavedRequest() {
+  void resumeSavedRequest() async {
     final draft = savedDraft;
 
     if (draft == null) return;
+    final submissionId = await draftStore.submissionId();
+    if (!mounted) return;
+    if (submissionId != null) {
+      push(context, ReviewScreen(draft: draft));
+      return;
+    }
 
     if (draft.preferredProviderId.isNotEmpty) {
       push(context, ReviewScreen(draft: draft));
-    } else if (!draft.location.startsWith('Select current GPS')) {
-      push(context, ProvidersScreen(draft: draft));
-    } else {
-      push(
-        context,
-        BreakdownDetailsScreen(issues: draft.issues, initialDraft: draft),
-      );
+      return;
     }
+
+    if (!draft.location.startsWith('Select current GPS')) {
+      push(context, ProvidersScreen(draft: draft));
+      return;
+    }
+
+    push(
+      context,
+      BreakdownDetailsScreen(issues: draft.issues, initialDraft: draft),
+    );
   }
 
   void toggle(int index) {
@@ -121,7 +131,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     push(context, BreakdownDetailsScreen(issues: issues));
   }
 
-  void startUnknownProblem() {
+  void unknownProblem() {
     push(
       context,
       BreakdownDetailsScreen(
@@ -137,667 +147,102 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
     );
   }
 
-  Widget _buildProgressHeader(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.looks_one_outlined,
-                    size: 16,
-                    color: colors.onPrimaryContainer,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'STEP 1 OF 4',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.onPrimaryContainer,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: .8,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Spacer(),
-
-            Text(
-              'Issue',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: colors.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: RaSpace.sm),
-
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: .25,
-            minHeight: 6,
-            backgroundColor: colors.surfaceContainerHighest,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIntroHero(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final dark = theme.brightness == Brightness.dark;
-
-    final start = dark ? const Color(0xFF0B4C84) : colors.primary;
-
-    final end = dark ? const Color(0xFF08675E) : const Color(0xFF007D70);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(RaSpace.xl),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [start, end],
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            top: -25,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: .06),
-              ),
-            ),
-          ),
-
-          Positioned(
-            right: 6,
-            bottom: -18,
-            child: Icon(
-              Icons.car_repair_outlined,
-              size: 115,
-              color: Colors.white.withValues(alpha: .07),
-            ),
-          ),
-
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(17),
-                ),
-                child: const Icon(
-                  Icons.add_road_outlined,
-                  color: Colors.white,
-                  size: 27,
-                ),
-              ),
-
-              const SizedBox(height: RaSpace.lg),
-
-              Text(
-                'What happened?',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 26,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 300),
-                child: Text(
-                  'Choose every issue that applies. RoadAssist will use these details to find suitable providers.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: .84),
-                    height: 1.45,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDraftCard() {
-    final draft = savedDraft!;
-
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.secondaryContainer.withValues(alpha: .38),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.secondary.withValues(alpha: .20)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(RaSpace.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: colors.secondaryContainer,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.history_rounded,
-                    color: colors.onSecondaryContainer,
-                  ),
-                ),
-
-                const SizedBox(width: RaSpace.md),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Continue saved request',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-
-                      const SizedBox(height: 3),
-
-                      Text(
-                        'You have an unfinished roadside assistance request.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-
-                IconButton(
-                  tooltip: 'Discard draft',
-                  onPressed: discardSavedDraft,
-                  icon: Icon(Icons.delete_outline_rounded, color: colors.error),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: RaSpace.md),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(RaSpace.md),
-              decoration: BoxDecoration(
-                color: colors.surface.withValues(alpha: .7),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    draft.issue,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        size: 15,
-                        color: colors.onSurfaceVariant,
-                      ),
-
-                      const SizedBox(width: 5),
-
-                      Expanded(
-                        child: Text(
-                          formatSavedTime(savedAt),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: RaSpace.md),
-
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: resumeSavedRequest,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Resume Request'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIssueCard(int index) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final item = items[index];
-
-    final isSelected = selected.contains(index);
-
-    return Semantics(
-      selected: isSelected,
-      button: true,
-      label: '${item.$1}. ${item.$2}',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colors.primaryContainer.withValues(alpha: .55)
-              : colors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? colors.primary.withValues(alpha: .65)
-                : colors.outlineVariant.withValues(alpha: .65),
-            width: isSelected ? 1.5 : 1,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: colors.primary.withValues(alpha: .08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => toggle(index),
-            child: Padding(
-              padding: const EdgeInsets.all(RaSpace.lg),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colors.primary
-                          : colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                    child: Icon(
-                      item.$3,
-                      size: 27,
-                      color: isSelected
-                          ? colors.onPrimary
-                          : colors.onPrimaryContainer,
-                    ),
-                  ),
-
-                  const SizedBox(width: RaSpace.md),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item.$1,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(width: RaSpace.sm),
-
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 160),
-                              child: Icon(
-                                isSelected
-                                    ? Icons.check_circle_rounded
-                                    : Icons.radio_button_unchecked_rounded,
-                                key: ValueKey(isSelected),
-                                color: isSelected
-                                    ? colors.primary
-                                    : colors.outline,
-                                size: 24,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 5),
-
-                        Text(
-                          item.$2,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            height: 1.4,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-
-                        const SizedBox(height: RaSpace.sm),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? colors.primary.withValues(alpha: .10)
-                                : colors.surfaceContainerHighest.withValues(
-                                    alpha: .6,
-                                  ),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.request_quote_outlined,
-                                size: 14,
-                                color: isSelected
-                                    ? colors.primary
-                                    : colors.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                'Provider quote required',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: isSelected
-                                      ? colors.primary
-                                      : colors.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUnknownProblemCard(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Material(
-      color: colors.tertiaryContainer.withValues(alpha: .36),
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: startUnknownProblem,
-        child: Container(
-          padding: const EdgeInsets.all(RaSpace.lg),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colors.tertiary.withValues(alpha: .18)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colors.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.help_outline_rounded,
-                  color: colors.onTertiaryContainer,
-                ),
-              ),
-
-              const SizedBox(width: RaSpace.md),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Not sure what is wrong?',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-
-                    const SizedBox(height: 3),
-
-                    Text(
-                      'Describe the symptoms instead. A provider can inspect the vehicle before repair work is approved.',
-                      style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: RaSpace.sm),
-
-              Icon(Icons.arrow_forward_rounded, color: colors.tertiary),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final enabled = selected.isNotEmpty;
-
-    final count = selected.length;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        RaSpace.lg,
-        RaSpace.sm,
-        RaSpace.lg,
-        RaSpace.md,
-      ),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(
-          top: BorderSide(color: colors.outlineVariant.withValues(alpha: .65)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: .035),
-            blurRadius: 18,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (enabled) ...[
-              Row(
-                children: [
-                  Icon(
-                    Icons.check_circle_outline_rounded,
-                    size: 17,
-                    color: colors.primary,
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  Expanded(
-                    child: Text(
-                      '$count ${count == 1 ? 'issue' : 'issues'} selected',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-
-                  Text(
-                    'Next: Details',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: RaSpace.sm),
-            ],
-
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: enabled ? continueRequest : null,
-                icon: const Icon(Icons.arrow_forward_rounded),
-                label: Text(
-                  enabled ? 'Continue' : 'Select an issue to continue',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final colors = theme.colorScheme;
 
-    return Scaffold(
+    return RaDriverScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-
-      appBar: AppBar(title: const Text('Request Assistance')),
-
+      appBar: AppBar(
+        title: RaDriverAppBarTitle(
+          'Request Assistance',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.45,
+          ),
+        ),
+      ),
       body: SafeArea(
         top: false,
         child: Column(
           children: [
             Expanded(
               child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(
-                  RaSpace.lg,
-                  RaSpace.sm,
-                  RaSpace.lg,
-                  RaSpace.xxl,
-                ),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
-                  _buildProgressHeader(context),
+                  const _RaAssistProgress(),
 
-                  const SizedBox(height: RaSpace.lg),
+                  const SizedBox(height: 16),
 
-                  _buildIntroHero(context),
+                  const _RaAssistHero(),
 
                   if (loadingDraft) ...[
-                    const SizedBox(height: RaSpace.lg),
-
+                    const SizedBox(height: 14),
                     Container(
-                      padding: const EdgeInsets.all(RaSpace.md),
+                      padding: const EdgeInsets.all(13),
                       decoration: BoxDecoration(
                         color: colors.surface,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(17),
                         border: Border.all(
-                          color: colors.outlineVariant.withValues(alpha: .6),
+                          color: colors.outlineVariant.withValues(alpha: .45),
                         ),
                       ),
                       child: const Row(
                         children: [
-                          SizedBox(
-                            width: 20,
-                            height: 20,
+                          SizedBox.square(
+                            dimension: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          SizedBox(width: RaSpace.md),
-                          Text('Checking for a saved request…'),
+                          SizedBox(width: 10),
+                          Expanded(child: Text('Checking saved request...')),
                         ],
                       ),
                     ),
                   ] else if (savedDraft != null) ...[
-                    const SizedBox(height: RaSpace.lg),
-                    _buildDraftCard(),
+                    const SizedBox(height: 14),
+                    _RaAssistSavedDraft(
+                      draft: savedDraft!,
+                      savedLabel: savedTime(savedAt),
+                      onResume: resumeSavedRequest,
+                      onDelete: discardSavedDraft,
+                    ),
                   ],
 
-                  const SizedBox(height: RaSpace.xl),
+                  const SizedBox(height: 18),
 
-                  const SafetyBox(),
+                  Container(
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(
+                      color: raGold.withValues(alpha: .075),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.health_and_safety_outlined,
+                          color: raGold,
+                          size: 19,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'If you are in immediate danger, move to a safe place when possible and contact emergency services first.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                  const SizedBox(height: RaSpace.xxl),
+                  const SizedBox(height: 26),
 
                   Row(
                     children: [
@@ -807,21 +252,23 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                           children: [
                             Text(
                               'Choose assistance',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.35,
                               ),
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              'You can select more than one issue.',
-                              style: theme.textTheme.bodySmall?.copyWith(
+                              'Select every issue that applies.',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
                       ),
-
                       if (selected.isNotEmpty)
                         TextButton(
                           onPressed: () {
@@ -834,43 +281,63 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: RaSpace.md),
+                  const SizedBox(height: 11),
 
-                  for (var index = 0; index < items.length; index++) ...[
-                    _buildIssueCard(index),
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final single =
+                          box.maxWidth < 310 ||
+                          MediaQuery.textScalerOf(context).scale(14) > 20;
+                      final width = single
+                          ? box.maxWidth
+                          : (box.maxWidth - 12) / 2;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          for (var index = 0; index < items.length; index++)
+                            SizedBox(
+                              width: width,
+                              child: RaDriverServiceTile(
+                                title: items[index].$1,
+                                icon: items[index].$3,
+                                selected: selected.contains(index),
+                                onTap: () => toggle(index),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
 
-                    if (index != items.length - 1)
-                      const SizedBox(height: RaSpace.sm),
-                  ],
+                  const SizedBox(height: 13),
 
-                  const SizedBox(height: RaSpace.lg),
+                  _RaAssistUnknownCard(onTap: unknownProblem),
 
-                  _buildUnknownProblemCard(context),
-
-                  const SizedBox(height: RaSpace.lg),
+                  const SizedBox(height: 15),
 
                   Container(
-                    padding: const EdgeInsets.all(RaSpace.md),
+                    padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest.withValues(
-                        alpha: .40,
-                      ),
+                      color: colors.primary.withValues(alpha: .055),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          Icons.info_outline_rounded,
-                          size: 19,
+                          Icons.request_quote_outlined,
                           color: colors.primary,
+                          size: 19,
                         ),
-                        const SizedBox(width: RaSpace.md),
+                        const SizedBox(width: 9),
                         Expanded(
                           child: Text(
-                            'Selecting a service does not confirm a price. Providers review your request and submit an offer before assignment.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              height: 1.4,
+                            'Choosing a service does not confirm a price. Providers review the request and submit offers before assignment.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              height: 1.45,
+                              color: colors.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -881,9 +348,314 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
               ),
             ),
 
-            _buildBottomBar(),
+            Container(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: colors.outlineVariant.withValues(alpha: .45),
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (selected.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 16,
+                            color: colors.primary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${selected.length} ${selected.length == 1 ? 'issue' : 'issues'} selected',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: colors.primary,
+                            ),
+                          ),
+
+                          Text(
+                            'Next: Details',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: selected.isEmpty ? null : continueRequest,
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                        label: Text(
+                          selected.isEmpty
+                              ? 'Select an Issue'
+                              : 'Continue to Details',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RaAssistProgress extends StatelessWidget {
+  const _RaAssistProgress();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
+          alignment: WrapAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'STEP 1 OF 4',
+                style: GoogleFonts.plusJakartaSans(
+                  color: colors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .8,
+                ),
+              ),
+            ),
+
+            Text(
+              'Issue',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: colors.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 7),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: .25,
+            minHeight: 5,
+            backgroundColor: colors.surfaceContainerHighest,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RaAssistHero extends StatelessWidget {
+  const _RaAssistHero();
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'What do you need help with?',
+        style: _providerText(context, size: 24, weight: FontWeight.w800),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'Select the services you need. You can add vehicle details and photos next.',
+        style: _providerText(context, size: 14, muted: true),
+      ),
+    ],
+  );
+}
+
+class _RaAssistUnknownCard extends StatelessWidget {
+  const _RaAssistUnknownCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colors.secondary.withValues(alpha: .06),
+      borderRadius: BorderRadius.circular(19),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(19),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: colors.secondary.withValues(alpha: .15)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.secondary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.help_outline_rounded,
+                  color: colors.secondary,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'I don’t know the problem',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Describe the symptoms and let a provider inspect the vehicle first.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: colors.secondary,
+                size: 19,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RaAssistSavedDraft extends StatelessWidget {
+  const _RaAssistSavedDraft({
+    required this.draft,
+    required this.savedLabel,
+    required this.onResume,
+    required this.onDelete,
+  });
+
+  final RequestDraft draft;
+  final String savedLabel;
+  final VoidCallback onResume;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.secondary.withValues(alpha: .06),
+        borderRadius: BorderRadius.circular(19),
+        border: Border.all(color: colors.secondary.withValues(alpha: .15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: colors.secondary.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(Icons.history_rounded, color: colors.secondary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Continue saved request',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      savedLabel,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Discard draft',
+                onPressed: onDelete,
+                icon: Icon(Icons.delete_outline_rounded, color: colors.error),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(11),
+            decoration: BoxDecoration(
+              color: colors.surface.withValues(alpha: .75),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              draft.issue,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: onResume,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('Resume Request'),
+          ),
+        ],
       ),
     );
   }

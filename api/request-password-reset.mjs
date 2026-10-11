@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
+import { getFirestore } from 'firebase-admin/firestore';
+import { resolveRoleUser } from '../functions/role-identity.mjs';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import nodemailer from 'nodemailer';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const attempts = new Map();
 
 function requireEnvironment(name) {
   const value = process.env[name];
@@ -27,19 +29,20 @@ function firebaseAuth() {
   return getAuth();
 }
 
-function isRateLimited(request) {
+async function isRateLimited(request, db) {
   const forwarded = request.headers['x-forwarded-for'];
-  const address = Array.isArray(forwarded)
-    ? forwarded[0]
-    : forwarded?.split(',')[0]?.trim() || request.socket?.remoteAddress || 'unknown';
-  const now = Date.now();
-  const windowMs = 15 * 60 * 1000;
-  const recent = (attempts.get(address) || []).filter(
-    (timestamp) => now - timestamp < windowMs,
-  );
-  recent.push(now);
-  attempts.set(address, recent);
-  return recent.length > 5;
+  const address = String(Array.isArray(forwarded) ? forwarded[0] : forwarded || request.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  const key = createHash('sha256').update(`reset:${address}`).digest('hex');
+  const ref = db.doc(`roleAuthLimits/${key}`);
+  return db.runTransaction(async tx => {
+    const snapshot = await tx.get(ref);
+    const now = Date.now();
+    const data = snapshot.data();
+    const count = now - (data?.start ?? 0) < 900000 ? data.count : 0;
+    if (count >= 5) return true;
+    tx.set(ref, {count:count+1, start:count ? data.start : now});
+    return false;
+  });
 }
 
 function setResponseHeaders(response) {
@@ -57,12 +60,6 @@ export default async function handler(request, response) {
   if (request.method !== 'POST') {
     return response.status(405).json({ ok: false, message: 'Method not allowed.' });
   }
-  if (isRateLimited(request)) {
-    return response.status(429).json({
-      ok: false,
-      message: 'Too many attempts. Wait 15 minutes and try again.',
-    });
-  }
 
   const email = String(request.body?.email || '').trim().toLowerCase();
   // Honeypot used by the Flutter client. Bots commonly fill hidden fields.
@@ -76,9 +73,22 @@ export default async function handler(request, response) {
 
   try {
     const auth = firebaseAuth();
+    if (await isRateLimited(request, getFirestore())) {
+      return response.status(429).json({ok:false,message:'Too many attempts. Wait 15 minutes and try again.'});
+    }
     let user;
     try {
-      user = await auth.getUserByEmail(email);
+      const role = request.body?.role;
+      if (role != null && !['driver','provider'].includes(role)) {
+        return response.status(400).json({ok:false, message:'Select driver or provider.'});
+      }
+      if (role) {
+        const account = await resolveRoleUser(auth, getFirestore(), email, role);
+        if (!account) return response.status(200).json({ok:true});
+        user = account.user;
+      } else {
+        user = await auth.getUserByEmail(email);
+      }
     } catch (error) {
       if (error?.code === 'auth/user-not-found') {
         // Keep the response generic to prevent account enumeration.
@@ -87,7 +97,7 @@ export default async function handler(request, response) {
       throw error;
     }
 
-    const resetLink = await auth.generatePasswordResetLink(email);
+    const resetLink = await auth.generatePasswordResetLink(user.email);
     const gmailUser = requireEnvironment('GMAIL_USER');
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -100,7 +110,7 @@ export default async function handler(request, response) {
     const delivery = await transporter.sendMail({
       from: `RoadAssist <${gmailUser}>`,
       to: email,
-      subject: 'Reset your RoadAssist password',
+      subject: `Reset your RoadAssist ${request.body?.role ?? 'account'} password`,
       text: `Hello ${displayName},\n\nUse this secure link to reset your RoadAssist password:\n${resetLink}\n\nIf you did not request this, you can ignore this email.`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#18324a">

@@ -40,3 +40,12 @@ test('quote timestamps alone do not resend an offer notification',()=>{
   assert.equal(quoteChanged(null,q),true);
   assert.equal(quoteChanged(q,null),false);
 });
+test('completion, job start and discount notifications are transition-only',()=>{
+  const r={driverId:'d',providerId:'p',status:'arrived'};
+  for (const [patch,uid,type] of [[{completionState:'pending'},'d','completion_review'],[{arrivalConfirmedBy:'d'},'p','job_started'],[{pendingDiscountId:'discount'},'p','discount']]) {
+    const after={...r,...patch};
+    assert.ok(requestAlerts(r,after).some(n=>n.uid===uid && n.type===type));
+    assert.equal(requestAlerts(after,after).length,0);
+  }
+  assert.ok(requestAlerts({...r,pendingDiscountId:'discount'},r).some(n=>n.uid==='d' && n.type==='discount_decision'));
+});

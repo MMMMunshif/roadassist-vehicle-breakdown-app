@@ -24,6 +24,16 @@ class RequestDraftStore {
   String get _pendingSubmissionKey =>
       'roadassist_driver_request_pending_submission_v2_$_ownerId';
 
+  String get _submissionKey => 'roadassist_request_submission_v1_$_ownerId';
+
+  Future<String?> submissionId() async =>
+      (await _prefs).getString(_submissionKey);
+  Future<void> setSubmissionId(String id) async {
+    if (!await (await _prefs).setString(_submissionKey, id)) {
+      throw StateError('Unable to save request safely. Please try again.');
+    }
+  }
+
   SharedPreferences? _preferences;
 
   Future<SharedPreferences> get _prefs async =>
@@ -61,6 +71,7 @@ class RequestDraftStore {
 
   Future<void> clear() async {
     final preferences = await _prefs;
+    await preferences.remove(_submissionKey);
     await preferences.remove(_draftKey);
     await preferences.remove(_updatedAtKey);
     await preferences.remove(_pendingSubmissionKey);

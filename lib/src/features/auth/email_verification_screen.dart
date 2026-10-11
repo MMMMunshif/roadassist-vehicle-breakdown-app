@@ -11,6 +11,20 @@ class EmailVerificationScreen extends StatefulWidget {
 }
 
 class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
+  String? contactEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService()
+        .getCurrentProfile()
+        .then((profile) {
+          if (mounted)
+            setState(() => contactEmail = profile.data()?['email'] as String?);
+        })
+        .catchError((Object _) {});
+  }
+
   bool checking = false;
   bool sending = false;
 
@@ -22,15 +36,19 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     });
 
     try {
-      final verified = await AuthService().refreshEmailVerification();
+      final verified = await AuthService().refreshEmailVerification(
+        role: widget.role,
+      );
 
       if (!mounted) return;
 
       if (!verified) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Email is not verified yet. Open the verification link and try again.',
+              FirebaseAuth.instance.currentUser?.emailVerified == true
+                  ? 'Confirm the email link for this account role. If you only verified your original account, use Resend email.'
+                  : 'Email is not verified yet. Open the verification link and try again.',
             ),
           ),
         );
@@ -69,7 +87,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     });
 
     try {
-      await AuthService().sendVerificationEmail();
+      await AuthService().sendVerificationEmail(role: widget.role);
 
       if (!mounted) return;
 
@@ -89,6 +107,15 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           backgroundColor: raDanger,
         ),
       );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to send verification email. Please try again.',
+            ),
+          ),
+        );
     } finally {
       if (mounted) {
         setState(() {
@@ -111,12 +138,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final email =
-        FirebaseAuth.instance.currentUser?.email ?? 'your email address';
+    final email = contactEmail ?? 'your email address';
 
     return PopScope(
       canPop: false,
-      child: Scaffold(
+      child: RaScaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: SafeArea(
           child: ListView(

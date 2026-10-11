@@ -10,13 +10,13 @@ void main() {
     'driver photo upload is shown for signup and hidden for sign in',
     (tester) async {
       await tester.pumpWidget(testApp(const LoginScreen(isProvider: false)));
-      expect(find.text('Driver profile photo'), findsNothing);
+      expect(find.text('Driver photo'), findsNothing);
       await tester.tap(find.text('Create Account'));
       await tester.pumpAndSettle();
-      expect(find.text('Driver profile photo'), findsOneWidget);
+      expect(find.text('Driver photo'), findsOneWidget);
       await tester.tap(find.text('Sign In').first);
       await tester.pumpAndSettle();
-      expect(find.text('Driver profile photo'), findsNothing);
+      expect(find.text('Driver photo'), findsNothing);
       expect(find.byTooltip('Add profile photo'), findsNothing);
     },
   );
@@ -86,10 +86,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Confirm Location'), findsOneWidget);
-    expect(
-      find.byType(LocationScreen),
-      findsOneWidget,
-    );
+    expect(find.byType(LocationScreen), findsOneWidget);
   });
 
   test('vehicle registration is normalised before validation', () {

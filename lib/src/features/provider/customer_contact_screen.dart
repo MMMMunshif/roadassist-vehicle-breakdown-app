@@ -15,34 +15,23 @@ class CustomerContactScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    final driver =
-        requestData['driverName'] as String? ?? 'Driver';
+    final driver = requestData['driverName'] as String? ?? 'Driver';
 
-    final phone =
-        requestData['driverPhone'] as String? ?? '';
+    final phone = requestData['driverPhone'] as String? ?? '';
 
-    final rawStatus =
-        requestData['status'] as String? ?? 'unknown';
+    final rawStatus = requestData['status'] as String? ?? 'unknown';
 
-    final status =
-        rawStatus.replaceAll('_', ' ');
+    final status = rawStatus.replaceAll('_', ' ');
 
     final vehicle = [
       requestData['modelYear'],
       requestData['registration'],
-    ]
-        .whereType<String>()
-        .where(
-          (value) => value.trim().isNotEmpty,
-        )
-        .join(' • ');
+    ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' • ');
 
-    final issue =
-        requestIssueLabel(requestData);
+    final issue = requestIssueLabel(requestData);
 
     final location =
-        requestData['locationLabel'] as String? ??
-            'Location not recorded';
+        requestData['locationLabel'] as String? ?? 'Location not recorded';
 
     final active = const [
       'accepted',
@@ -50,22 +39,26 @@ class CustomerContactScreen extends StatelessWidget {
       'arrived',
     ].contains(rawStatus);
 
-    return Scaffold(
+    return RaProviderScaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Customer Contact'),
+        title: const Row(
+          children: [
+            BrandMark(size: 26),
+            SizedBox(width: 8),
+            Expanded(child: Text('Customer Contact')),
+          ],
+        ),
         actions: [
+          const Padding(
+            padding: EdgeInsets.only(right: 4),
+            child: _WelcomeThemeToggle(),
+          ),
           Padding(
-            padding: const EdgeInsets.only(
-              right: RaSpace.md,
-            ),
+            padding: const EdgeInsets.only(right: RaSpace.md),
             child: StatusPill(
-              label: active
-                  ? 'Active Job'
-                  : status.toUpperCase(),
-              tone: active
-                  ? RaTone.success
-                  : RaTone.info,
+              label: active ? 'Active Job' : status.toUpperCase(),
+              tone: active ? RaTone.success : RaTone.info,
             ),
           ),
         ],
@@ -82,90 +75,15 @@ class CustomerContactScreen extends StatelessWidget {
                   RaSpace.xxl,
                 ),
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(
-                      RaSpace.xl,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colors.primary,
-                          const Color(0xFF007D70),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(
-                              alpha: .16,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: ProfileInitials(
-                            name: driver,
-                            radius: 31,
-                          ),
-                        ),
-
-                        const SizedBox(width: RaSpace.lg),
-
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                driver,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                phone.isEmpty
-                                    ? 'Phone number not provided'
-                                    : phone,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.white.withValues(
-                                    alpha: .80,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: RaSpace.sm),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(
-                                    alpha: .13,
-                                  ),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: const Text(
-                                  'ROADSIDE ASSISTANCE CUSTOMER',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: .6,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                  RaProviderSummaryCard(
+                    title: driver,
+                    message: phone.isEmpty
+                        ? 'Phone number not provided'
+                        : phone,
+                    icon: Icons.person_outline,
+                    status: StatusPill(
+                      label: active ? 'Active job' : status,
+                      tone: active ? RaTone.success : RaTone.neutral,
                     ),
                   ),
 
@@ -181,16 +99,12 @@ class CustomerContactScreen extends StatelessWidget {
                   const SizedBox(height: RaSpace.md),
 
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: RaSpace.lg,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: RaSpace.lg),
                     decoration: BoxDecoration(
                       color: colors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: colors.outlineVariant.withValues(
-                          alpha: .6,
-                        ),
+                        color: colors.outlineVariant.withValues(alpha: .6),
                       ),
                     ),
                     child: Column(
@@ -210,9 +124,7 @@ class CustomerContactScreen extends StatelessWidget {
                         _CustomerContactRow(
                           icon: Icons.directions_car_outlined,
                           label: 'Vehicle',
-                          value: vehicle.isEmpty
-                              ? 'Not provided'
-                              : vehicle,
+                          value: vehicle.isEmpty ? 'Not provided' : vehicle,
                         ),
                         const Divider(height: 1),
                         _CustomerContactRow(
@@ -235,18 +147,15 @@ class CustomerContactScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(RaSpace.md),
                     decoration: BoxDecoration(
-                      color: colors
-                          .surfaceContainerHighest
-                          .withValues(alpha: .35),
+                      color: colors.surfaceContainerHighest.withValues(
+                        alpha: .35,
+                      ),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          Icons.shield_outlined,
-                          size: 19,
-                        ),
+                        Icon(Icons.shield_outlined, size: 19),
                         SizedBox(width: RaSpace.sm),
                         Expanded(
                           child: Text(
@@ -271,17 +180,14 @@ class CustomerContactScreen extends StatelessWidget {
                 color: colors.surface,
                 border: Border(
                   top: BorderSide(
-                    color: colors.outlineVariant.withValues(
-                      alpha: .6,
-                    ),
+                    color: colors.outlineVariant.withValues(alpha: .6),
                   ),
                 ),
               ),
               child: SafeArea(
                 top: false,
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
                       children: [
@@ -294,9 +200,7 @@ class CustomerContactScreen extends StatelessWidget {
                                     name: driver,
                                     number: phone,
                                   ),
-                            icon: const Icon(
-                              Icons.call_outlined,
-                            ),
+                            icon: const Icon(Icons.call_outlined),
                             label: const Text('Call'),
                           ),
                         ),
@@ -314,12 +218,8 @@ class CustomerContactScreen extends StatelessWidget {
                                 peerPhone: phone,
                               ),
                             ),
-                            icon: const Icon(
-                              Icons.chat_bubble_outline_rounded,
-                            ),
-                            label: const Text(
-                              'Open Messages',
-                            ),
+                            icon: const Icon(Icons.chat_bubble_outline_rounded),
+                            label: const Text('Open Messages'),
                           ),
                         ),
                       ],
@@ -329,13 +229,8 @@ class CustomerContactScreen extends StatelessWidget {
 
                     TextButton.icon(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.arrow_back_rounded,
-                        size: 17,
-                      ),
-                      label: const Text(
-                        'Back to Job',
-                      ),
+                      icon: const Icon(Icons.arrow_back_rounded, size: 17),
+                      label: const Text('Back to Job'),
                     ),
                   ],
                 ),
@@ -365,9 +260,7 @@ class _CustomerContactRow extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: RaSpace.md,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: RaSpace.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -378,17 +271,12 @@ class _CustomerContactRow extends StatelessWidget {
               color: colors.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              size: 19,
-              color: colors.primary,
-            ),
+            child: Icon(icon, size: 19, color: colors.primary),
           ),
           const SizedBox(width: RaSpace.md),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,

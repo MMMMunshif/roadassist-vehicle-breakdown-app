@@ -34,7 +34,8 @@ async function sendTo(uid, notice, eventId, requestId) {
       const response = await getMessaging().sendEachForMulticast({
         tokens:batch.map(d=>d.data().token),notification:{title:notice.title,body:notice.body},
         data:{requestId,type:notice.type,eventId:key,recipientUid:uid},
-        android:{priority:'high',notification:{tag:key}},
+        android:{priority:'high',notification:{tag:key,channelId:'roadassist_alerts_v1',sound:'default'}},
+        apns:{payload:{aps:{sound:'default'}}},
         webpush:{headers:{TTL:'86400'},notification:{tag:key,icon:'/icons/Icon-192.png'}},
       });
       const processed = [];
@@ -87,4 +88,12 @@ export const notifyChatMessage = onDocumentCreated({document:'requests/{requestI
   const uid=messageRecipient(request,event.data.data());
   if (!uid) return;
   await sendTo(uid,{type:'chat',title:'New RoadAssist message',body:'Open RoadAssist to read your message.'},event.id,event.params.requestId);
+});
+export const notifyComplaintReview = onDocumentWritten({document:'complaintReviews/{requestId}',retry:true}, async event => {
+  if (!event.data || !event.data.after.exists) return;
+  const before=event.data.before.data(), after=event.data.after.data();
+  if (before?.lastAuditId === after.lastAuditId) return;
+  const job=(await db.doc(`requests/${event.params.requestId}`).get()).data();
+  if (!job) return;
+  for (const uid of new Set([job.driverId,job.providerId].filter(Boolean))) await sendTo(uid,{type:'complaint_review',title:'Support review updated',body:'Open your service problem report to view the support decision.'},event.id,event.params.requestId);
 });

@@ -1,16 +1,12 @@
 part of '../../screens.dart';
 
 class VehiclesScreen extends StatefulWidget {
-  const VehiclesScreen({
-    super.key,
-    this.selecting = false,
-  });
+  const VehiclesScreen({super.key, this.selecting = false});
 
   final bool selecting;
 
   @override
-  State<VehiclesScreen> createState() =>
-      _VehiclesScreenState();
+  State<VehiclesScreen> createState() => _VehiclesScreenState();
 }
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
@@ -29,9 +25,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     }
   }
 
-  Future<void> action(
-    Future<void> Function() work,
-  ) async {
+  Future<void> action(Future<void> Function() work) async {
+    if (busy) {
+      return;
+    }
+
     setState(() {
       busy = true;
     });
@@ -39,14 +37,12 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     try {
       await work();
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Could not update vehicle: $error',
-          ),
-        ),
+        SnackBar(content: Text('Could not update vehicle: $error')),
       );
     } finally {
       if (mounted) {
@@ -58,749 +54,434 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   void edit([Vehicle? vehicle]) {
-    push(
-      context,
-      VehicleEditorScreen(
-        vehicle: vehicle,
-      ),
-    );
+    push(context, VehicleEditorScreen(vehicle: vehicle));
   }
 
-  Future<void> archiveVehicle(
-    Vehicle vehicle,
-  ) async {
-    final confirmed =
-        await showDialog<bool>(
+  Future<void> archiveVehicle(Vehicle vehicle) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        final colors =
-            Theme.of(dialogContext)
-                .colorScheme;
+        final colors = Theme.of(dialogContext).colorScheme;
 
         return AlertDialog(
           icon: Container(
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: colors.errorContainer,
-              borderRadius:
-                  BorderRadius.circular(18),
+              color: colors.error.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(17),
             ),
-            child: Icon(
-              Icons
-                  .archive_outlined,
-              color: colors.error,
-            ),
+            child: Icon(Icons.archive_outlined, color: colors.error),
           ),
-          title: const Text(
-            'Archive this vehicle?',
-          ),
+          title: const Text('Archive this vehicle?'),
           content: const Text(
             'It will be removed from your saved vehicle list. Existing assistance history will remain unchanged.',
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(
-                dialogContext,
-                false,
-              ),
-              child: const Text(
-                'Keep Vehicle',
-              ),
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Keep Vehicle'),
             ),
             FilledButton(
-              style:
-                  FilledButton.styleFrom(
-                backgroundColor:
-                    colors.error,
-                foregroundColor:
-                    colors.onError,
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
               ),
-              onPressed: () =>
-                  Navigator.pop(
-                dialogContext,
-                true,
-              ),
-              child: const Text(
-                'Archive',
-              ),
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Archive'),
             ),
           ],
         );
       },
     );
 
-    if (confirmed == true &&
-        mounted) {
-      await action(
-        () => service.archive(
-          vehicle.id,
-        ),
-      );
+    if (confirmed != true || !mounted) {
+      return;
     }
+
+    await action(() => service.archive(vehicle.id));
   }
 
-  Widget _header(
-    BuildContext context,
-    int count,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget vehicleCard(Vehicle vehicle, bool isDefault) {
+    final theme = Theme.of(context);
 
-    final colors =
-        theme.colorScheme;
+    final colors = theme.colorScheme;
 
-    return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.xl,
-      ),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end:
-              Alignment.bottomRight,
-          colors: [
-            colors.primary,
-            const Color(
-              0xFF007D70,
-            ),
-          ],
-        ),
-        borderRadius:
-            BorderRadius.circular(24),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -18,
-            bottom: -24,
-            child: Icon(
-              Icons
-                  .directions_car_filled_outlined,
-              size: 130,
-              color: Colors.white
-                  .withValues(
-                alpha: .07,
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration:
-                    BoxDecoration(
-                  color: Colors.white
-                      .withValues(
-                    alpha: .14,
-                  ),
-                  borderRadius:
-                      BorderRadius.circular(
-                    17,
-                  ),
-                ),
-                child: const Icon(
-                  Icons
-                      .garage_outlined,
-                  color: Colors.white,
-                  size: 27,
-                ),
-              ),
-              const SizedBox(
-                height: RaSpace.lg,
-              ),
-              Text(
-                widget.selecting
-                    ? 'Which vehicle needs help?'
-                    : 'Your vehicles',
-                style: theme
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(
-                  color: Colors.white,
-                  fontWeight:
-                      FontWeight.w900,
-                ),
-              ),
-              const SizedBox(
-                height: 5,
-              ),
-              Text(
-                widget.selecting
-                    ? 'Select a saved vehicle to fill the request details automatically.'
-                    : count == 0
-                        ? 'Save a vehicle once and reuse its information for future roadside requests.'
-                        : '$count saved ${count == 1 ? 'vehicle' : 'vehicles'} ready for future requests.',
-                style: theme
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(
-                  color: Colors.white
-                      .withValues(
-                    alpha: .84,
-                  ),
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _vehicleCard(
-    BuildContext context,
-    Vehicle vehicle,
-    bool isDefault,
-  ) {
-    final theme =
-        Theme.of(context);
-
-    final colors =
-        theme.colorScheme;
+    final title = [
+      vehicle.make,
+      vehicle.model,
+      '${vehicle.year}',
+    ].where((value) => value.trim().isNotEmpty).join(' ');
 
     return Material(
-      color: colors.surface,
-      borderRadius:
-          BorderRadius.circular(21),
+      color: theme.brightness == Brightness.dark
+          ? const Color(0xFF0D2237)
+          : colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isDefault
+              ? colors.primary.withValues(alpha: .40)
+              : colors.outlineVariant.withValues(alpha: .45),
+          width: isDefault ? 1.4 : 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: busy
             ? null
             : () {
                 if (widget.selecting) {
-                  Navigator.pop(
-                    context,
-                    vehicle,
-                  );
+                  Navigator.pop(context, vehicle);
                 } else {
                   edit(vehicle);
                 }
               },
-        child: Container(
-          padding:
-              const EdgeInsets.all(
-            RaSpace.lg,
-          ),
-          decoration: BoxDecoration(
-            borderRadius:
-                BorderRadius.circular(
-              21,
-            ),
-            border: Border.all(
-              color: isDefault
-                  ? colors.primary
-                      .withValues(
-                      alpha: .42,
-                    )
-                  : colors
-                      .outlineVariant
-                      .withValues(
-                      alpha: .6,
-                    ),
-              width: isDefault
-                  ? 1.4
-                  : 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration:
-                        BoxDecoration(
-                      color: colors
-                          .primaryContainer,
-                      borderRadius:
-                          BorderRadius
-                              .circular(
-                        17,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Stack(
+              children: [
+                VehiclePhotoPreview(
+                  model: title,
+                  photoData: vehicle.photoData,
+                  height: 155,
+                  compact: false,
+                ),
+                if (isDefault)
+                  Positioned(
+                    left: 12,
+                    top: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'DEFAULT',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: colors.onPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: .6,
+                        ),
                       ),
                     ),
-                    child: Icon(
-                      Icons
-                          .directions_car_outlined,
-                      color: colors
-                          .onPrimaryContainer,
-                      size: 27,
-                    ),
                   ),
-
-                  const SizedBox(
-                    width: RaSpace.md,
-                  ),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Row(
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                vehicle.label,
-                                maxLines: 1,
-                                overflow:
-                                    TextOverflow
-                                        .ellipsis,
-                                style: theme
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                  fontWeight:
-                                      FontWeight
-                                          .w900,
-                                ),
+                            Text(
+                              title.isEmpty ? 'Saved vehicle' : title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                            if (isDefault)
-                              Container(
-                                padding:
-                                    const EdgeInsets
-                                        .symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration:
-                                    BoxDecoration(
-                                  color: colors
-                                      .primaryContainer,
-                                  borderRadius:
-                                      BorderRadius
-                                          .circular(
-                                    999,
-                                  ),
-                                ),
-                                child: Text(
-                                  'DEFAULT',
-                                  style: theme
-                                      .textTheme
-                                      .labelSmall
-                                      ?.copyWith(
-                                    color: colors
-                                        .onPrimaryContainer,
-                                    fontWeight:
-                                        FontWeight
-                                            .w900,
-                                    letterSpacing:
-                                        .5,
-                                  ),
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              vehicle.registration,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
                               ),
+                            ),
                           ],
                         ),
-                        const SizedBox(
-                          height: 4,
-                        ),
-                        Text(
-                          vehicle.registration,
-                          style: theme
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
-                            color: colors
-                                .onSurfaceVariant,
-                            fontWeight:
-                                FontWeight
-                                    .w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              Wrap(
-                spacing: RaSpace.sm,
-                runSpacing: RaSpace.sm,
-                children: [
-                  _VehicleMetaChip(
-                    icon: Icons
-                        .local_gas_station_outlined,
-                    label:
-                        vehicle.fuelType,
-                  ),
-                  _VehicleMetaChip(
-                    icon: Icons
-                        .settings_outlined,
-                    label:
-                        vehicle.transmission,
-                  ),
-                ],
-              ),
-
-              const SizedBox(
-                height: RaSpace.md,
-              ),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.selecting
-                          ? 'Tap to use this vehicle'
-                          : 'Tap to edit vehicle details',
-                      style: theme
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                        color: colors
-                            .onSurfaceVariant,
                       ),
-                    ),
-                  ),
+                      if (!widget.selecting)
+                        PopupMenuButton<String>(
+                          tooltip: 'Vehicle options',
+                          enabled: !busy,
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              edit(vehicle);
+                            }
 
-                  PopupMenuButton<String>(
-                    enabled: !busy,
-                    tooltip:
-                        'Vehicle options',
-                    onSelected:
-                        (value) async {
-                      if (value ==
-                          'edit') {
-                        edit(vehicle);
-                        return;
-                      }
+                            if (value == 'default') {
+                              await action(
+                                () => service.setDefault(vehicle.id),
+                              );
+                            }
 
-                      if (value ==
-                          'default') {
-                        await action(
-                          () => service
-                              .setDefault(
-                            vehicle.id,
-                          ),
-                        );
-                        return;
-                      }
-
-                      if (value ==
-                          'archive') {
-                        await archiveVehicle(
-                          vehicle,
-                        );
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: ListTile(
-                          contentPadding:
-                              EdgeInsets.zero,
-                          leading: Icon(
-                            Icons
-                                .edit_outlined,
-                          ),
-                          title: Text(
-                            'Edit',
-                          ),
-                        ),
-                      ),
-                      if (!isDefault)
-                        const PopupMenuItem(
-                          value:
-                              'default',
-                          child: ListTile(
-                            contentPadding:
-                                EdgeInsets.zero,
-                            leading: Icon(
-                              Icons
-                                  .star_outline_rounded,
+                            if (value == 'archive') {
+                              await archiveVehicle(vehicle);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: Icon(Icons.edit_outlined),
+                                title: Text('Edit'),
+                              ),
                             ),
-                            title: Text(
-                              'Set as default',
+                            if (!isDefault)
+                              const PopupMenuItem(
+                                value: 'default',
+                                child: ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(Icons.star_outline_rounded),
+                                  title: Text('Set as default'),
+                                ),
+                              ),
+                            const PopupMenuItem(
+                              value: 'archive',
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: Icon(Icons.archive_outlined),
+                                title: Text('Archive'),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      const PopupMenuItem(
-                        value: 'archive',
-                        child: ListTile(
-                          contentPadding:
-                              EdgeInsets.zero,
-                          leading: Icon(
-                            Icons
-                                .archive_outlined,
-                          ),
-                          title: Text(
-                            'Archive',
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _RaVehicleChip(
+                        icon: Icons.directions_car_outlined,
+                        text: vehicle.vehicleType,
+                      ),
+                      _RaVehicleChip(
+                        icon: Icons.local_gas_station_outlined,
+                        text: vehicle.fuelType,
+                      ),
+                      _RaVehicleChip(
+                        icon: Icons.settings_outlined,
+                        text: vehicle.transmission,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 13),
+                  Divider(
+                    height: 1,
+                    color: colors.outlineVariant.withValues(alpha: .35),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        widget.selecting
+                            ? Icons.touch_app_outlined
+                            : Icons.edit_outlined,
+                        size: 14,
+                        color: colors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          widget.selecting
+                              ? 'Tap to use this vehicle'
+                              : 'Tap to edit vehicle details',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                       ),
+                      const Icon(Icons.chevron_right_rounded, size: 18),
                     ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final theme =
-        Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor:
-          theme.scaffoldBackgroundColor,
+    if (!signedIn) {
+      return RaDriverScaffold(
+        appBar: AppBar(
+          title: RaDriverAppBarTitle(
+            widget.selecting ? 'Choose Vehicle' : 'My Vehicles',
+          ),
+        ),
+        body: const Padding(
+          padding: EdgeInsets.all(18),
+          child: EmptyState(
+            icon: Icons.login_outlined,
+            title: 'Sign in required',
+            message: 'Sign in to manage your saved vehicles.',
+          ),
+        ),
+      );
+    }
 
+    return RaDriverScaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          widget.selecting
-              ? 'Choose Vehicle'
-              : 'My Vehicles',
+        title: RaDriverAppBarTitle(
+          widget.selecting ? 'Choose Vehicle' : 'My Vehicles',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
-
-      floatingActionButton:
-          signedIn &&
-                  !widget.selecting
-              ? FloatingActionButton
-                  .extended(
-                  onPressed:
-                      busy
-                          ? null
-                          : () =>
-                              edit(),
-                  icon: const Icon(
-                    Icons
-                        .add_rounded,
-                  ),
-                  label: const Text(
-                    'Add Vehicle',
-                  ),
-                )
-              : null,
-
-      body: !signedIn
-          ? const Padding(
-              padding:
-                  EdgeInsets.all(
-                RaSpace.lg,
-              ),
-              child: EmptyState(
-                icon: Icons
-                    .login_outlined,
-                title:
-                    'Sign in required',
-                message:
-                    'Sign in as a driver to save and select your vehicles.',
-              ),
+      floatingActionButton: !widget.selecting
+          ? FloatingActionButton.extended(
+              onPressed: busy ? null : () => edit(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Vehicle'),
             )
-          : StreamBuilder<
-              DocumentSnapshot<
-                  Map<String,
-                      dynamic>>>(
-              stream: AuthService()
-                  .watchCurrentProfile(),
-              builder: (
-                context,
-                profile,
-              ) {
-                return StreamBuilder<
-                    List<Vehicle>>(
-                  stream: vehicles,
-                  builder: (
-                    context,
-                    snapshot,
-                  ) {
-                    if (snapshot
-                        .hasError) {
-                      final error =
-                          snapshot.error;
+          : null,
+      body: StreamBuilder<List<Vehicle>>(
+        stream: vehicles,
+        builder: (context, vehicleSnapshot) {
+          if (vehicleSnapshot.hasError) {
+            return const Padding(
+              padding: EdgeInsets.all(18),
+              child: EmptyState(
+                icon: Icons.cloud_off_outlined,
+                title: 'Unable to load vehicles',
+                message: 'Check your connection and try again.',
+              ),
+            );
+          }
 
-                      final permissionDenied =
-                          error is FirebaseException &&
-                              error.code ==
-                                  'permission-denied';
+          if (!vehicleSnapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-                      return EmptyState(
-                        icon: Icons
-                            .error_outline_rounded,
-                        title:
-                            'Unable to load vehicles',
-                        message:
-                            permissionDenied
-                                ? 'Vehicle access was denied for this account. Contact support if this continues.'
-                                : 'Check your connection and try again.',
-                      );
-                    }
+          final items = vehicleSnapshot.data!;
 
-                    if (!snapshot
-                        .hasData) {
-                      return const Center(
-                        child:
-                            CircularProgressIndicator(),
-                      );
-                    }
+          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: AuthService().watchCurrentProfile(),
+            builder: (context, profile) {
+              final defaultId =
+                  profile.data?.data()?['defaultVehicleId'] as String?;
 
-                    final items =
-                        snapshot.data!;
-
-                    final defaultId =
-                        profile.data
-                                ?.data()?[
-                            'defaultVehicleId']
-                            as String?;
-
-                    return ListView(
-                      padding:
-                          const EdgeInsets
-                              .fromLTRB(
-                        RaSpace.lg,
-                        RaSpace.md,
-                        RaSpace.lg,
-                        110,
-                      ),
-                      children: [
-                        if (busy) ...[
-                          const LinearProgressIndicator(
-                            minHeight: 3,
-                          ),
-                          const SizedBox(
-                            height:
-                                RaSpace
-                                    .md,
-                          ),
-                        ],
-
-                        _header(
-                          context,
-                          items.length,
-                        ),
-
-                        const SizedBox(
-                          height:
-                              RaSpace.xl,
-                        ),
-
-                        if (items
-                            .isEmpty)
-                          _VehiclesEmptyState(
-                            onAdd:
-                                () =>
-                                    edit(),
-                          )
-                        else
-                          for (var index =
-                                  0;
-                              index <
-                                  items.length;
-                              index++) ...[
-                            _vehicleCard(
-                              context,
-                              items[index],
-                              defaultId ==
-                                  items[index]
-                                      .id,
-                            ),
-                            if (index !=
-                                items.length -
-                                    1)
-                              const SizedBox(
-                                height:
-                                    RaSpace
-                                        .sm,
-                              ),
-                          ],
-
-                        if (widget
-                            .selecting) ...[
-                          const SizedBox(
-                            height:
-                                RaSpace.lg,
-                          ),
-                          OutlinedButton.icon(
-                            onPressed:
-                                busy
-                                    ? null
-                                    : () =>
-                                        Navigator.pop(
-                                      context,
-                                    ),
-                            icon: const Icon(
-                              Icons
-                                  .edit_road_outlined,
-                            ),
-                            label: const Text(
-                              'Use Another Vehicle Without Saving',
-                            ),
-                          ),
-                        ],
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
+              return ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
+                children: [
+                  _RaVehiclesHero(
+                    count: items.length,
+                    selecting: widget.selecting,
+                  ),
+                  const SizedBox(height: 19),
+                  if (busy) ...[
+                    const LinearProgressIndicator(minHeight: 3),
+                    const SizedBox(height: 12),
+                  ],
+                  if (items.isEmpty)
+                    _RaVehiclesEmpty(
+                      selecting: widget.selecting,
+                      onAdd: widget.selecting ? null : () => edit(),
+                    )
+                  else
+                    for (var index = 0; index < items.length; index++) ...[
+                      vehicleCard(items[index], defaultId == items[index].id),
+                      if (index != items.length - 1) const SizedBox(height: 10),
+                    ],
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
-class _VehicleMetaChip
-    extends StatelessWidget {
-  const _VehicleMetaChip({
-    required this.icon,
-    required this.label,
-  });
+class _RaVehiclesHero extends StatelessWidget {
+  const _RaVehiclesHero({required this.count, required this.selecting});
 
-  final IconData icon;
-  final String label;
+  final int count;
+  final bool selecting;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colors
-            .surfaceContainerHighest
-            .withValues(alpha: .65),
-        borderRadius:
-            BorderRadius.circular(999),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? const [Color(0xFF0A497F), Color(0xFF075A68)]
+              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
+        ),
+        borderRadius: BorderRadius.circular(23),
       ),
       child: Row(
-        mainAxisSize:
-            MainAxisSize.min,
         children: [
-          Icon(
-            icon,
-            size: 15,
-            color: colors
-                .onSurfaceVariant,
+          Container(
+            width: 51,
+            height: 51,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .13),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.directions_car_outlined,
+              color: Colors.white,
+              size: 27,
+            ),
           ),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  selecting ? 'Which vehicle needs help?' : 'Your vehicles',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  selecting
+                      ? 'Select a saved vehicle to fill request details automatically.'
+                      : count == 0
+                      ? 'Save a vehicle once and reuse it when requesting roadside assistance.'
+                      : '$count saved ${count == 1 ? 'vehicle' : 'vehicles'} ready for roadside requests.',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -808,93 +489,69 @@ class _VehicleMetaChip
   }
 }
 
-class _VehiclesEmptyState
-    extends StatelessWidget {
-  const _VehiclesEmptyState({
-    required this.onAdd,
-  });
+class _RaVehicleChip extends StatelessWidget {
+  const _RaVehicleChip({required this.icon, required this.text});
 
-  final VoidCallback onAdd;
+  final IconData icon;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final colors =
-        Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
 
     return Container(
-      padding:
-          const EdgeInsets.all(
-        RaSpace.xl,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius:
-            BorderRadius.circular(22),
-        border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .6),
-        ),
+        color: colors.surfaceContainerHighest.withValues(alpha: .35),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration:
-                BoxDecoration(
-              color: colors
-                  .primaryContainer,
-              borderRadius:
-                  BorderRadius.circular(
-                23,
-              ),
-            ),
-            child: Icon(
-              Icons
-                  .directions_car_outlined,
-              size: 34,
-              color: colors
-                  .onPrimaryContainer,
-            ),
-          ),
-          const SizedBox(
-            height: RaSpace.lg,
-          ),
+          Icon(icon, size: 12, color: colors.primary),
+          const SizedBox(width: 4),
           Text(
-            'No saved vehicles',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(
-              fontWeight:
-                  FontWeight.w900,
-            ),
-          ),
-          const SizedBox(
-            height: RaSpace.sm,
-          ),
-          Text(
-            'Save your vehicle details once to make future assistance requests faster.',
-            textAlign:
-                TextAlign.center,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium,
-          ),
-          const SizedBox(
-            height: RaSpace.lg,
-          ),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(
-              Icons.add_rounded,
-            ),
-            label: const Text(
-              'Add First Vehicle',
+            text,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RaVehiclesEmpty extends StatelessWidget {
+  const _RaVehiclesEmpty({required this.selecting, required this.onAdd});
+
+  final bool selecting;
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        EmptyState(
+          icon: Icons.directions_car_outlined,
+          title: 'No saved vehicles',
+          message: selecting
+              ? 'Add a vehicle from your profile before selecting one for this request.'
+              : 'Add your first vehicle so RoadAssist can reuse its details during future requests.',
+        ),
+        if (onAdd != null) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add First Vehicle'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

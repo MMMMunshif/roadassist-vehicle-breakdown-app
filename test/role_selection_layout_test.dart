@@ -1,0 +1,43 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:road_assist/src/app.dart';
+import 'package:road_assist/src/screens.dart';
+
+void main() {
+  for (final brightness in Brightness.values) {
+    for (final width in [320.0, 430.0]) {
+      final pages = <String, Widget>{'role selection': const RoleSelectionScreen()};
+      for (final entry in pages.entries) {
+        testWidgets(
+          '${entry.key} fits $width with large text in ${brightness.name}',
+          (tester) async {
+            tester.view.physicalSize = Size(width, 800);
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: buildRoadAssistTheme(brightness),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(1.5)),
+                  child: child!,
+                ),
+                home: entry.value,
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            await tester.drag(
+              find.byType(Scrollable).first,
+              const Offset(0, -650),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+}
