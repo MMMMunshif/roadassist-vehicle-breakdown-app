@@ -322,10 +322,23 @@ class _ProviderCompletedContent extends StatelessWidget {
             const SizedBox(height: 10),
 
             _ProviderCompletedPayment(
+              simulated:
+                  data['demoPayment'] is Map &&
+                  data['demoPayment']['status'] == 'simulated',
               driverReported: driverReportedPayment,
               confirmed: providerConfirmedPayment,
               method: paymentMethod,
             ),
+
+            if (driverReportedPayment &&
+                !providerConfirmedPayment &&
+                paymentMethod != null) ...[
+              const SizedBox(height: 12),
+              _ReceivePaymentButton(
+                requestId: requestId,
+                method: paymentMethod,
+              ),
+            ],
 
             if (warrantyDays > 0) ...[
               const SizedBox(height: 24),
@@ -651,11 +664,13 @@ class _ProviderCompletedTotal extends StatelessWidget {
 
 class _ProviderCompletedPayment extends StatelessWidget {
   const _ProviderCompletedPayment({
+    this.simulated = false,
     required this.driverReported,
     required this.confirmed,
     required this.method,
   });
 
+  final bool simulated;
   final bool driverReported;
   final bool confirmed;
   final String? method;
@@ -669,7 +684,12 @@ class _ProviderCompletedPayment extends StatelessWidget {
     late final String title;
     late final String message;
 
-    if (confirmed) {
+    if (simulated) {
+      tone = Theme.of(context).colorScheme.primary;
+      icon = Icons.science_outlined;
+      title = 'Demo card payment';
+      message = 'DEMO - NO MONEY CHARGED. No funds were received.';
+    } else if (confirmed) {
       tone = raSuccess;
 
       icon = Icons.verified_outlined;
@@ -926,4 +946,49 @@ class _ProviderCompletedContactCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ReceivePaymentButton extends StatefulWidget {
+  const _ReceivePaymentButton({required this.requestId, required this.method});
+  final String requestId, method;
+  @override
+  State<_ReceivePaymentButton> createState() => _ReceivePaymentButtonState();
+}
+
+class _ReceivePaymentButtonState extends State<_ReceivePaymentButton> {
+  bool busy = false;
+  @override
+  Widget build(BuildContext context) => FilledButton.icon(
+    onPressed: busy
+        ? null
+        : () async {
+            setState(() => busy = true);
+            try {
+              await RequestService().recordPayment(
+                widget.requestId,
+                widget.method,
+              );
+            } catch (error) {
+              if (context.mounted)
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      _workflowError(
+                        error,
+                        'Unable to confirm payment. Try again.',
+                      ),
+                    ),
+                  ),
+                );
+            } finally {
+              if (mounted) setState(() => busy = false);
+            }
+          },
+    icon: const Icon(Icons.check_circle_outline),
+    label: Text(
+      busy
+          ? 'Confirming...'
+          : 'Confirm ${widget.method == 'cash' ? 'cash' : 'bank transfer'} received',
+    ),
+  );
 }
