@@ -456,11 +456,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     if (_providerAvailabilityStatus(availability) != 'Online')
                       RaProviderEmptyCard(
                         icon: Icons.notifications_none_rounded,
-<<<<<<< HEAD
-                        title: 'Your request inbox is paused',
-                        message:
-                            'Go online to receive requests matching your services and availability.',
-=======
                         title:
                             _providerAvailabilityStatus(availability) == 'Busy'
                             ? 'You are working on an active job'
@@ -468,7 +463,6 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                             ? 'Not available for new requests'
                             : 'Go online to see matching requests',
                         message: _providerAvailabilityExplanation(availability),
->>>>>>> 9ea77613c117264008dd1c687fcc37c2a1a9fb9a
                       )
                     else
                       _RaProviderRequestPreviewList(services: providerServices),
@@ -478,7 +472,8 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                     const _RaProviderSectionHeader(
                       icon: Icons.insights_outlined,
                       title: 'Performance',
-                      subtitle: 'A quick view of your recent RoadAssist activity.',
+                      subtitle:
+                          'A quick view of your recent RoadAssist activity.',
                     ),
 
                     const SizedBox(height: 12),
@@ -533,29 +528,47 @@ class _RaProviderQuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Expanded(child: _action(context, Icons.inbox_outlined, 'Requests', onRequests)),
+      Expanded(
+        child: _action(context, Icons.inbox_outlined, 'Requests', onRequests),
+      ),
       const SizedBox(width: 9),
-      Expanded(child: _action(context, Icons.person_outline_rounded, 'Profile', onProfile)),
+      Expanded(
+        child: _action(
+          context,
+          Icons.person_outline_rounded,
+          'Profile',
+          onProfile,
+        ),
+      ),
       const SizedBox(width: 9),
-      Expanded(child: _action(context, Icons.refresh_rounded, 'Refresh', onRefresh)),
+      Expanded(
+        child: _action(context, Icons.refresh_rounded, 'Refresh', onRefresh),
+      ),
     ],
   );
 
-  Widget _action(BuildContext context, IconData icon, String label, VoidCallback onTap) =>
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: RaProviderCard(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Column(
-            children: [
-              Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(height: 5),
-              Text(label, style: _providerText(context, size: 10, weight: FontWeight.w700)),
-            ],
+  Widget _action(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(16),
+    child: RaProviderCard(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: Column(
+        children: [
+          Icon(icon, size: 21, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            style: _providerText(context, size: 10, weight: FontWeight.w700),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 class _RaProviderAvailabilityHint extends StatelessWidget {
@@ -570,24 +583,26 @@ class _RaProviderAvailabilityHint extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
       child: Row(
         children: [
-        Icon(
-          online ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
-          size: 22,
-          color: online ? raSuccess : Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            online
-                ? 'You are visible to nearby drivers. Keep location enabled.'
-                : 'Go online when you are ready to receive nearby requests.',
-            style: _providerText(context, size: 11.5, muted: true),
+          Icon(
+            online ? Icons.radar_rounded : Icons.pause_circle_outline_rounded,
+            size: 22,
+            color: online
+                ? raSuccess
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-        ),
-      ],
-    ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              online
+                  ? 'You are visible to nearby drivers. Keep location enabled.'
+                  : 'Go online when you are ready to receive nearby requests.',
+              style: _providerText(context, size: 11.5, muted: true),
+            ),
+          ),
+        ],
       ),
-    );
+    ),
+  );
 }
 
 // ============================================================
@@ -803,7 +818,11 @@ class _RaProviderStatCard extends StatelessWidget {
               child: Text(
                 value,
                 key: ValueKey(value),
-                style: _providerText(context, size: 19, weight: FontWeight.w800),
+                style: _providerText(
+                  context,
+                  size: 19,
+                  weight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -1394,7 +1413,7 @@ class _RaProviderPerformanceMetric extends StatelessWidget {
         const SizedBox(height: 3),
         Text(label, style: _providerText(context, size: 12, muted: true)),
       ],
-      ),
+    ),
   );
 }
 
@@ -1645,7 +1664,11 @@ class _RaProviderServiceTile extends StatelessWidget {
       children: [
         Tooltip(
           message: label,
-          child: Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+          child: Icon(
+            icon,
+            size: 19,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -1682,7 +1705,10 @@ class _RaProviderLoadingCard extends StatelessWidget {
         children: [
           const CircularProgressIndicator(strokeWidth: 2.5),
           const SizedBox(height: 10),
-          Text('Loading live data…', style: _providerText(context, size: 11, muted: true)),
+          Text(
+            'Loading live data…',
+            style: _providerText(context, size: 11, muted: true),
+          ),
         ],
       ),
     );
