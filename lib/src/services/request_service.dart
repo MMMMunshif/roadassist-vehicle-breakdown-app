@@ -1,8 +1,12 @@
 import 'job_start_service.dart';
+
 import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
+
 import '../models/completion_report.dart';
 import '../models/provider_availability.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,13 +42,29 @@ class RequestService {
     }
   }
 
+  Future<T> _withRequestStep<T>(
+    String step,
+    Future<T> Function() action,
+  ) async {
+    try {
+      return await action();
+    } on FirebaseException catch (error) {
+      throw FirebaseException(
+        plugin: error.plugin,
+        code: error.code,
+        message: step,
+      );
+    }
+  }
+
   Future<String?> findSubmittedRequest(String id) async {
-    final matches = await _requests
-        .where('driverId', isEqualTo: _userId)
-        .where(FieldPath.documentId, isEqualTo: id)
+    final submitted = await _requests
+        .doc(id)
         .get(const GetOptions(source: Source.server))
         .timeout(const Duration(seconds: 12));
-    return matches.docs.isEmpty ? null : matches.docs.first.id;
+    return submitted.exists && submitted.data()?['driverId'] == _userId
+        ? submitted.id
+        : null;
   }
 
   Future<String> createRequest(
@@ -53,16 +73,13 @@ class RequestService {
   }) async {
     await _requireConnection();
     final document = _requests.doc(submissionId);
-    if (submissionId != null &&
-        await findSubmittedRequest(submissionId) != null)
-      return submissionId;
-
-    final settings =
-        (await _firestore
-                .collection('appSettings')
-                .doc('operations')
-                .get(const GetOptions(source: Source.server)))
-            .data();
+    final settings = (await _withRequestStep(
+      'Loading roadside-assistance settings failed.',
+      () => _firestore
+          .collection('appSettings')
+          .doc('operations')
+          .get(const GetOptions(source: Source.server)),
+    )).data();
     if (settings?['maintenance'] == true)
       throw StateError(
         'New assistance requests are temporarily paused. ${settings?['notice'] ?? ''}',
@@ -73,85 +90,72 @@ class RequestService {
       throw StateError(
         'One selected service is currently unavailable. Choose another service.',
       );
-    final driverRequests = await _requests
-        .where('driverId', isEqualTo: _userId)
-        .get(const GetOptions(source: Source.server));
-    if (driverRequests.docs.any((request) => request.id == document.id))
-      return document.id;
-    final hasActiveRequest = driverRequests.docs.any((request) {
-      return const [
-        'searching',
-        'accepted',
-        'en_route',
-        'arrived',
-      ].contains(request.data()['status']);
-    });
-    if (hasActiveRequest) {
-      throw StateError('Complete or cancel your active request first.');
-    }
     final profileReference = _firestore.collection('users').doc(_userId);
-    await _firestore.runTransaction((transaction) async {
-      final profile = await transaction.get(profileReference);
-      final activeRequestId = profile.data()?['activeRequestId'] as String?;
-      if (activeRequestId != null && activeRequestId.isNotEmpty) {
-        final activeRequest = await transaction.get(
-          _requests.doc(activeRequestId),
-        );
-        if (activeRequestId == document.id && activeRequest.exists) return;
-        if (activeRequest.exists &&
-            const [
-              'searching',
-              'accepted',
-              'en_route',
-              'arrived',
-            ].contains(activeRequest.data()?['status'])) {
-          throw StateError('Complete or cancel your active request first.');
+    await _withRequestStep(
+      'Creating the request or updating your driver profile failed.',
+      () => _firestore.runTransaction((transaction) async {
+        final profile = await transaction.get(profileReference);
+        final activeRequestId = profile.data()?['activeRequestId'] as String?;
+        if (activeRequestId != null && activeRequestId.isNotEmpty) {
+          final activeRequest = await transaction.get(
+            _requests.doc(activeRequestId),
+          );
+          if (activeRequestId == document.id && activeRequest.exists) return;
+          if (activeRequest.exists &&
+              const [
+                'searching',
+                'accepted',
+                'en_route',
+                'arrived',
+              ].contains(activeRequest.data()?['status'])) {
+            throw StateError('Complete or cancel your active request first.');
+          }
         }
-      }
-      transaction.set(document, {
-        'driverId': _userId,
-        'driverName': _auth.currentUser?.displayName ?? 'Driver',
-        'driverPhone': profile.data()?['phone'] ?? '',
-        'providerId': null,
-        'preferredProviderId': draft.preferredProviderId,
-        'preferredProviderName': draft.provider,
-        'rejectedBy': <String>[],
-        'status': 'searching',
-        'workflowVersion': 2,
-        'arrivalVerificationRequired': true,
-        if (JobStartService.enabled) 'jobStartCodeRequired': true,
-        'issue': draft.primaryIssue,
-        'issues': draft.issues,
-        'vehicleType': draft.vehicleType,
-        if (draft.vehicleId != null) 'vehicleId': draft.vehicleId,
-        if (draft.vehicleSnapshot != null)
-          'vehicleSnapshot': draft.vehicleSnapshot,
-        'modelYear': draft.modelYear,
-        'registration': draft.registration,
-        'description': draft.description,
-        'notes': draft.notes,
-        'priority': draft.priority,
-        'partsPreference': draft.partsPreference,
-        'vehiclePhotoUrls': draft.vehiclePhotoUrls,
-        'photoAnnotations': draft.photoAnnotations
-            .map((annotation) => annotation.toJson())
-            .toList(),
-        'locationLabel': draft.location,
-        'landmark': draft.landmark,
-        'locationAccuracyMeters': draft.locationAccuracyMeters,
-        'latitude': draft.latitude,
-        'longitude': draft.longitude,
-        'serviceFee': 0,
-        'dispatchFee': 0,
-        'estimatedCost': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      transaction.set(profileReference, {
-        'activeRequestId': document.id,
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-    });
+        transaction.set(document, {
+          'driverId': _userId,
+          'driverName': _auth.currentUser?.displayName ?? 'Driver',
+          'driverPhone': profile.data()?['phone'] ?? '',
+          'providerId': null,
+          'preferredProviderId': draft.preferredProviderId,
+          'preferredProviderName': draft.provider,
+          'rejectedBy': <String>[],
+          'status': 'searching',
+          'workflowVersion': 2,
+          'arrivalVerificationRequired': true,
+          if (JobStartService.enabled) 'jobStartCodeRequired': true,
+          'issue': draft.primaryIssue,
+          'issues': draft.issues,
+          'vehicleType': draft.vehicleType,
+          if (draft.vehicleId != null) 'vehicleId': draft.vehicleId,
+          if (draft.vehicleSnapshot != null)
+            'vehicleSnapshot': draft.vehicleSnapshot,
+          'modelYear': draft.modelYear,
+          'registration': draft.registration,
+          'description': draft.description,
+          'notes': draft.notes,
+          'priority': draft.priority,
+          'partsPreference': draft.partsPreference,
+          'vehiclePhotoUrls': draft.vehiclePhotoUrls,
+          'photoAnnotations': draft.photoAnnotations
+              .map((annotation) => annotation.toJson())
+              .toList(),
+          'locationLabel': draft.location,
+          'landmark': draft.landmark,
+          'locationAccuracyMeters': draft.locationAccuracyMeters,
+          'latitude': draft.latitude,
+          'longitude': draft.longitude,
+          'serviceFee': 0,
+          'dispatchFee': 0,
+          'estimatedCost': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        transaction.set(profileReference, {
+          'activeRequestId': document.id,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }),
+    );
     return document.id;
   }
 

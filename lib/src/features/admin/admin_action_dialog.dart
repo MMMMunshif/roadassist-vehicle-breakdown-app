@@ -94,6 +94,7 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
     final tone = danger ? colors.error : colors.primary;
 
     return AlertDialog(
+      scrollable: true,
       icon: Container(
         width: 58,
         height: 58,
