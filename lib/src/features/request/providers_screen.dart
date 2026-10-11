@@ -339,37 +339,50 @@ class _ProvidersScreenState
     final colors =
         theme.colorScheme;
 
+    final locationConfirmed =
+        !widget.draft.location.startsWith(
+          'Select current GPS',
+        );
+
     return Container(
       padding:
           const EdgeInsets.all(
-        RaSpace.md,
+        RaSpace.lg,
       ),
       decoration: BoxDecoration(
-        color: colors
-            .primaryContainer
-            .withValues(alpha: .28),
+        color: locationConfirmed
+            ? colors.primaryContainer.withValues(alpha: .28)
+            : colors.errorContainer.withValues(alpha: .45),
         borderRadius:
-            BorderRadius.circular(18),
+            BorderRadius.circular(20),
+        border: Border.all(
+          color: locationConfirmed
+              ? colors.primary.withValues(alpha: .12)
+              : colors.error.withValues(alpha: .35),
+        ),
       ),
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 46,
+            height: 46,
             decoration:
                 BoxDecoration(
-              color: colors
-                  .primaryContainer,
+              color: locationConfirmed
+                  ? colors.primaryContainer
+                  : colors.errorContainer,
               borderRadius:
                   BorderRadius.circular(
-                13,
+                15,
               ),
             ),
             child: Icon(
-              Icons
-                  .location_on_outlined,
-              color: colors
-                  .onPrimaryContainer,
+              locationConfirmed
+                  ? Icons.location_on_outlined
+                  : Icons.location_searching_rounded,
+              color: locationConfirmed
+                  ? colors.onPrimaryContainer
+                  : colors.onErrorContainer,
             ),
           ),
 
@@ -383,17 +396,21 @@ class _ProvidersScreenState
                   CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Breakdown location',
+                  locationConfirmed
+                      ? 'Breakdown location'
+                      : 'Location not confirmed',
                   style: theme
                       .textTheme
                       .labelSmall
                       ?.copyWith(
-                    color: colors
-                        .onSurfaceVariant,
+                    color: locationConfirmed
+                        ? colors.onSurfaceVariant
+                        : colors.error,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(
-                  height: 2,
+                  height: 3,
                 ),
                 Text(
                   widget.draft.location,
@@ -402,12 +419,21 @@ class _ProvidersScreenState
                       TextOverflow.ellipsis,
                   style: theme
                       .textTheme
-                      .labelLarge
+                      .bodyMedium
                       ?.copyWith(
                     fontWeight:
                         FontWeight.w800,
                   ),
                 ),
+                if (!locationConfirmed) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'Confirm your location before submitting the request.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.error,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -423,21 +449,86 @@ class _ProvidersScreenState
         Theme.of(context).colorScheme;
 
     return Container(
-      height: 205,
-      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(RaSpace.sm),
       decoration: BoxDecoration(
-        borderRadius:
-            BorderRadius.circular(22),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: colors.outlineVariant
-              .withValues(alpha: .6),
+          color: colors.outlineVariant.withValues(alpha: .65),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: .04),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: _NearbyProvidersMap(
-        providers:
-            onlineProviders,
-        draft: widget.draft,
-        selectedId: selectedId,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              RaSpace.sm,
+              RaSpace.xs,
+              RaSpace.sm,
+              RaSpace.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.map_outlined,
+                  size: 19,
+                  color: colors.primary,
+                ),
+                const SizedBox(width: RaSpace.sm),
+                Expanded(
+                  child: Text(
+                    'Providers around your location',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 190,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: _NearbyProvidersMap(
+                providers: onlineProviders,
+                draft: widget.draft,
+                selectedId: selectedId,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              RaSpace.sm,
+              RaSpace.sm,
+              RaSpace.sm,
+              RaSpace.xs,
+            ),
+            child: Wrap(
+              spacing: RaSpace.lg,
+              runSpacing: RaSpace.xs,
+              children: [
+                _RaMapLegend(
+                  color: raDanger,
+                  icon: Icons.directions_car_rounded,
+                  label: 'Breakdown',
+                ),
+                _RaMapLegend(
+                  color: colors.primary,
+                  icon: Icons.build_rounded,
+                  label: 'Available provider',
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -952,6 +1043,38 @@ class _ProvidersScreenState
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RaMapLegend extends StatelessWidget {
+  const _RaMapLegend({
+    required this.color,
+    required this.icon,
+    required this.label,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: RaSpace.xs),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
