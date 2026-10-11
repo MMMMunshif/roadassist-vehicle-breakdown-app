@@ -502,7 +502,10 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingDiscountId','finalCost','updatedAt']);
       }
 
-      allow read: if isAdmin();
+      allow read: if isAdmin() || (authenticated()
+        && !accountBlocked(request.auth.uid)
+        && (resource.data.driverId == request.auth.uid
+          || resource.data.providerId == request.auth.uid));
       allow create: if signedIn() && newRequestsAllowed(request.resource.data.issues)
         && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
         && isDriver()
