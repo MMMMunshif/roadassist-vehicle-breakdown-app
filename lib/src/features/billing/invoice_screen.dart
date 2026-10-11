@@ -135,13 +135,17 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       if (!opened) throw StateError('Unable to open the secure payment page.');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Complete payment in the secure checkout page.')),
+          const SnackBar(
+            content: Text('Complete payment in the secure checkout page.'),
+          ),
         );
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString().replaceFirst('Bad state: ', ''))),
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Bad state: ', '')),
+          ),
         );
       }
     } finally {
@@ -279,11 +283,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               const _RaInvoiceSectionHeading(
                 title: 'Payment status',
                 subtitle:
-<<<<<<< HEAD
-                    'Pay securely online or record an offline payment after it is completed.',
-=======
-                    'Cash / bank transfer confirmation, or clearly marked demo card payment.',
->>>>>>> 9ea77613c117264008dd1c687fcc37c2a1a9fb9a
+                    'Pay securely online, or record cash, bank transfer, or demo payment confirmation.',
               ),
 
               const SizedBox(height: 10),
@@ -295,7 +295,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 paymentMethod: paymentMethod,
               ),
 
-<<<<<<< HEAD
               if (driver && !driverReported) ...[
                 const SizedBox(height: 11),
 
@@ -332,7 +331,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.lock_outline_rounded),
                         label: Text(
@@ -367,23 +368,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                       ),
                     ],
                   ),
-=======
-              if (driver && !driverReported && !simulated) ...[
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          final method = await requestCheckout(
-                            context,
-                            bill.total,
-                            confirmService: false,
-                          );
-                          if (method != null && mounted) await record(method);
-                        },
-                  icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Choose payment method'),
->>>>>>> 9ea77613c117264008dd1c687fcc37c2a1a9fb9a
                 ),
               ],
 
