@@ -196,7 +196,6 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
 
   int routeRequestVersion = 0;
 
-  Map<String, dynamic>? completionReportDraft;
   bool updatingStatus = false;
   bool offline = false;
   DateTime? lastSynced;
@@ -716,9 +715,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
         blocked =
             'Ask the driver to confirm your arrival before completing work.';
       } else if (serviceNotesController.text.trim().length < 10 ||
-          servicePhotos.isEmpty) {
+          serviceNotesController.text.trim().length > 500) {
         blocked =
-            'Add service notes of at least 10 characters and at least one completion photo before completing the job.';
+            'Enter one service summary of 10-500 characters. Photos are optional.';
       } else if (requestData['pendingRepairId'] != null ||
           (requestData['approvedQuoteType'] == 'inspection' &&
               requestData['approvedRepairId'] == null)) {
@@ -731,18 +730,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
         ).showSnackBar(SnackBar(content: Text(blocked)));
         return;
       }
-      report = await requestCompletionReport(context, {
-        ...requestData,
-        if (completionReportDraft != null)
-          'completionReport': completionReportDraft,
-      });
-      if (report == null || !mounted) return;
-      completionReportDraft = report.toMap();
-      finalCost = await requestFinalCost();
-
-      if (finalCost == null || !mounted) {
-        return;
-      }
+      report = CompletionReport.summary(serviceNotesController.text.trim());
+      finalCost = (requestData['estimatedCost'] as num?)?.toInt();
+      if (finalCost == null) return;
     }
 
     setState(() {
@@ -800,7 +790,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                 ? 'Unable to update job status (${error.code}). Check your connection, arrival confirmation and saved documentation.'
                 : error is StateError
                 ? error.message
-                : 'Unable to update job status. Check arrival confirmation, completion photo and driver-approved repair quote, then retry.',
+                : 'Unable to update job status. Check arrival confirmation, service summary and driver-approved repair quote, then retry.',
           ),
         ),
       );
@@ -811,123 +801,6 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
         });
       }
     }
-  }
-
-  Future<int?> requestFinalCost() async {
-    final approved = (requestData['estimatedCost'] as num?)?.toInt() ?? 0;
-
-    final protected = requestData['workflowVersion'] == 2;
-
-    final controller = TextEditingController(text: '$approved');
-
-    final value = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, refresh) {
-            final amount = int.tryParse(controller.text.trim());
-
-            final changed = protected && amount != approved;
-
-            return AlertDialog(
-              icon: const Icon(Icons.receipt_long_outlined),
-              title: const Text('Confirm final charge'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text('Driver-approved total: Rs. $approved'),
-
-                  const SizedBox(height: 12),
-
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(8),
-                    ],
-                    onChanged: (_) {
-                      refresh(() {});
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Final amount (Rs.)',
-                    ),
-                  ),
-
-                  if (changed) ...[
-                    const SizedBox(height: 10),
-                    const Text(
-                      'A changed total requires driver approval before completion.',
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(dialogContext);
-                  },
-                  child: const Text('Cancel'),
-                ),
-
-                FilledButton(
-                  onPressed: amount == null || amount < 0 || amount > 10000000
-                      ? null
-                      : () {
-                          Navigator.pop(dialogContext, amount);
-                        },
-                  child: Text(changed ? 'Request Approval' : 'Continue'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    controller.dispose();
-
-    if (value == null || !mounted) {
-      return null;
-    }
-
-    if (protected && value != approved) {
-      final quote = await requestProviderQuote(context, {
-        ...requestData,
-        'repairRevision': true,
-        'proposedTotal': value,
-      });
-
-      if (quote == null || !mounted) {
-        return null;
-      }
-
-      try {
-        await RequestService().proposeRepair(widget.requestId!, quote);
-
-        if (!mounted) return null;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Price revision sent. Wait for driver approval before completing the job.',
-            ),
-          ),
-        );
-      } catch (_) {
-        if (!mounted) return null;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to send the revised price.')),
-        );
-      }
-
-      return null;
-    }
-
-    return value;
   }
 
   String _statusTitle() {
@@ -1135,9 +1008,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                     const SizedBox(height: 24),
 
                     const _RaProviderActiveHeading(
-                      title: 'Service documentation',
+                      title: 'Service summary',
                       subtitle:
-                          'Record notes and evidence of the work performed.',
+                          'Describe the completed work once. Photos are optional; Finish Service saves automatically.',
                     ),
 
                     const SizedBox(height: 10),
@@ -1194,6 +1067,8 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                   ? 'Waiting for Driver Confirmation'
                   : status == 3
                   ? 'Finish Job'
+                  : status == 2
+                  ? 'Finish Service'
                   : 'Mark as ${statuses[status + 1]}',
               enabled:
                   !offline &&
@@ -1530,7 +1405,7 @@ class _RaProviderDocumentationCard extends StatelessWidget {
             maxLength: 500,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
-              labelText: 'Service notes',
+              labelText: 'Service summary',
               hintText:
                   'Work completed, observations or important information...',
               alignLabelWithHint: true,

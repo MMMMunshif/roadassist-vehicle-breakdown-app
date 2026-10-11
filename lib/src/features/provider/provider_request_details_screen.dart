@@ -351,7 +351,7 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
 
           if (data['workflowVersion'] == 2) ...[
             const SizedBox(height: 12),
-            QuoteOffers(requestId: requestId),
+            QuoteOffers(requestId: requestId, providerView: true),
           ],
 
           if (active) ...[

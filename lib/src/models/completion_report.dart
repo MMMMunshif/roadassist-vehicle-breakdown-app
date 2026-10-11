@@ -5,8 +5,20 @@ class CompletionReport {
     required this.parts,
     this.advice = '',
   });
+  const CompletionReport.summary(String text)
+    : problem = '',
+      repairs = text,
+      parts = '',
+      advice = '';
+  bool get summaryOnly => problem.isEmpty && parts.isEmpty;
   final String problem, repairs, parts, advice;
   void validate() {
+    if (summaryOnly) {
+      if (repairs.trim().length < 10 || repairs.trim().length > 500) {
+        throw ArgumentError('Enter a service summary of 10-500 characters.');
+      }
+      return;
+    }
     if (problem.trim().length < 10 ||
         repairs.trim().length < 10 ||
         parts.trim().isEmpty ||
@@ -17,15 +29,19 @@ class CompletionReport {
     }
   }
 
-  Map<String, dynamic> toMap() => {
-    'problem': problem.trim(),
-    'repairs': repairs.trim(),
-    'parts': parts.trim(),
-    'advice': advice.trim(),
-  };
+  Map<String, dynamic> toMap() => summaryOnly
+      ? {'summary': repairs.trim()}
+      : {
+          'problem': problem.trim(),
+          'repairs': repairs.trim(),
+          'parts': parts.trim(),
+          'advice': advice.trim(),
+        };
   static String description(Map<String, dynamic> data) {
     final report = data['completionReport'];
     if (report is! Map) return '';
+    if (report['summary'] is String)
+      return 'Service summary: ${report['summary']}';
     return [
       if (report['problem'] is String) 'Exact problem: ${report['problem']}',
       if (report['repairs'] is String) 'Work performed: ${report['repairs']}',

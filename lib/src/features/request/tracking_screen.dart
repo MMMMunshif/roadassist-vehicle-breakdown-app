@@ -334,9 +334,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Future<void> confirmCompletion() async {
     final requestId = widget.requestId;
 
-    if (requestId == null || confirmingCompletion) {
+    if (requestId == null ||
+        confirmingCompletion ||
+        proposedFinalCost == null) {
       return;
     }
+
+    final method = await requestCheckout(context, proposedFinalCost!);
+    if (method == null || !mounted) return;
 
     setState(() {
       confirmingCompletion = true;
@@ -346,7 +351,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
       await RequestService().confirmJobCompletion(
         requestId,
         expectedFinalCost: proposedFinalCost,
+        checkoutMethod: method,
       );
+      if (mounted) push(context, InvoiceScreen(requestId: requestId));
     } catch (error) {
       if (!mounted) return;
 
@@ -1023,7 +1030,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   )
                 : const Icon(Icons.verified_outlined),
-            label: const Text('Agree Final Amount & Complete'),
+            label: const Text('Confirm & Pay'),
           ),
 
           const SizedBox(height: 7),

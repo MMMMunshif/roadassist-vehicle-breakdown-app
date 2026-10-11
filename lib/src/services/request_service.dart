@@ -318,8 +318,16 @@ class RequestService {
     });
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> watchQuotes(String id) =>
-      _requests.doc(id).collection('quotes').snapshots();
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchQuotes(
+    String id, {
+    bool ownQuoteOnly = false,
+  }) {
+    final quotes = _requests.doc(id).collection('quotes');
+    // Providers may read only their own quote document; drivers compare all offers.
+    return ownQuoteOnly
+        ? quotes.where(FieldPath.documentId, isEqualTo: _userId).snapshots()
+        : quotes.snapshots();
+  }
 
   Future<void> selectQuote(
     String id,
@@ -629,10 +637,9 @@ class RequestService {
         throw StateError(
           'The driver must confirm your arrival before work can be completed.',
         );
-      if ((data?['serviceNotes'] as String? ?? '').trim().length < 10 ||
-          (data?['servicePhotoData'] as List? ?? []).isEmpty)
+      if ((data?['serviceNotes'] as String? ?? '').trim().length < 10)
         throw StateError(
-          'Add work notes (at least 10 characters) and a completion photo first.',
+          'Add a service summary of at least 10 characters first.',
         );
       if (finalCost < 0 ||
           finalCost > (data?['estimatedCost'] as num).toInt() ||
@@ -724,7 +731,15 @@ class RequestService {
     });
   }
 
-  Future<void> confirmJobCompletion(String id, {int? expectedFinalCost}) async {
+  Future<void> confirmJobCompletion(
+    String id, {
+    int? expectedFinalCost,
+    String? checkoutMethod,
+  }) async {
+    if (checkoutMethod != null &&
+        !const ['cash', 'external', 'demo_card'].contains(checkoutMethod)) {
+      throw ArgumentError('Unsupported payment method.');
+    }
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final data = (await tx.get(ref)).data();
@@ -759,6 +774,7 @@ class RequestService {
       tx.update(ref, {
         'status': 'completed',
         'completionState': 'confirmed',
+        ..._checkoutFields(checkoutMethod, (data['finalCost'] as num).toInt()),
         'driverCompletedAt': FieldValue.serverTimestamp(),
         'completedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -861,6 +877,50 @@ class RequestService {
     });
   }
 
+  Map<String, dynamic> _checkoutFields(String? method, int amount) {
+    if (method == null) return {};
+    if (method == 'demo_card')
+      return {
+        'paymentMethod': 'demo_card',
+        'demoPayment': {
+          'status': 'simulated',
+          'amount': amount,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      };
+    return {
+      'driverReportedPayment': true,
+      'paymentMethod': method,
+      'paymentReportedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  Future<void> simulateCardPayment(String id) async {
+    await _requireConnection();
+    await _firestore.runTransaction((tx) async {
+      final ref = _requests.doc(id);
+      final data = (await tx.get(ref)).data();
+      if (data == null ||
+          data['driverId'] != _userId ||
+          data['status'] != 'completed' ||
+          data['driverReportedPayment'] == true ||
+          data['providerConfirmedPayment'] == true ||
+          data['demoPayment'] != null) {
+        throw StateError(
+          'A payment has already been recorded or this job is not ready.',
+        );
+      }
+      tx.update(ref, {
+        ..._checkoutFields(
+          'demo_card',
+          (data['finalCost'] as num?)?.toInt() ??
+              (data['estimatedCost'] as num).toInt(),
+        ),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   Future<void> recordPayment(String id, String method) async {
     if (!const ['cash', 'external'].contains(method))
       throw ArgumentError('Unsupported payment method.');
@@ -868,6 +928,10 @@ class RequestService {
     await _firestore.runTransaction((tx) async {
       final snapshot = await tx.get(ref);
       final data = snapshot.data();
+      if (data?['demoPayment'] != null)
+        throw StateError(
+          'This job has a simulated payment. No real money was charged.',
+        );
       if (data?['status'] != 'completed')
         throw StateError('Complete service before recording payment.');
       if (data?['driverId'] == _userId &&
@@ -973,6 +1037,14 @@ class RequestService {
         'providerLongitude': longitude,
         'providerLocationUpdatedAt': FieldValue.serverTimestamp(),
       });
+      // Keep directory presence fresh while the provider is on the job screen.
+      // Preserve the online switch and active-job lock.
+      tx.set(_firestore.collection('providerDirectory').doc(_userId), {
+        'latitude': latitude,
+        'longitude': longitude,
+        'locationUpdatedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     });
   }
 

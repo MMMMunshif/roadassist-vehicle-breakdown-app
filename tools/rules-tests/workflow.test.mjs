@@ -1,7 +1,8 @@
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, runTransaction, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, getDocs, collectionGroup, collection, query, where, documentId, runTransaction, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 let env;
 before(async () => {
@@ -91,6 +92,26 @@ test('approved direct-service job progresses and releases its provider', async (
   batch.update(doc(driver,'providerDirectory/provider'),{activeRequestId:null});
   await assertSucceeds(batch.commit());
 });
+test('active-job GPS heartbeat refreshes directory without changing online or busy lock', async () => {
+  await approval(env.authenticatedContext('driver', {email_verified:true}).firestore(),'r1');
+  const db = env.authenticatedContext('provider', {email_verified:true}).firestore();
+  const batch = writeBatch(db);
+  batch.update(doc(db,'requests/r1'), {
+    providerLatitude:6.9, providerLongitude:79.9,
+    providerLocationUpdatedAt:serverTimestamp(),
+  });
+  batch.set(doc(db,'providerDirectory/provider'), {
+    latitude:6.9, longitude:79.9,
+    locationUpdatedAt:serverTimestamp(), updatedAt:serverTimestamp(),
+  }, {merge:true});
+  await assertSucceeds(batch.commit());
+  const directory = (await getDoc(doc(db,'providerDirectory/provider'))).data();
+  assert.equal(directory.online, true);
+  assert.equal(directory.activeRequestId, 'r1');
+  assert.equal(directory.latitude, 6.9);
+  assert.ok(directory.locationUpdatedAt);
+});
+
 test('inspection-only job requires repair approval and revisions are immutable', async () => {
   await env.withSecurityRulesDisabled(c => updateDoc(doc(c.firestore(),'requests/r1/quotes/provider'),{quoteType:'inspection'}));
   const driver = env.authenticatedContext('driver', {email_verified:true}).firestore();
@@ -860,4 +881,53 @@ for (const status of ['accepted','en_route','arrived']) test(`driver cancellatio
     tx.update(directory,{activeRequestId:null});
     const {deleteField}=await import('firebase/firestore');tx.update(profile,{activeRequestId:deleteField(),updatedAt:serverTimestamp()});
   }));
+});
+
+async function seedCheckout() {
+  await env.withSecurityRulesDisabled(async c=>{
+    await updateDoc(doc(c.firestore(),'requests/r1'),{providerId:'provider',status:'arrived',completionState:'pending',estimatedCost:1800,finalCost:1800,serviceNotes:'Battery connection repaired and tested.',servicePhotoData:[]});
+    await updateDoc(doc(c.firestore(),'providerDirectory/provider'),{activeRequestId:'r1'});
+  });
+}
+function demoFields(amount=1800) {return {paymentMethod:'demo_card',demoPayment:{status:'simulated',amount,createdAt:serverTimestamp()}};}
+for (const method of ['cash','external','demo_card']) test(`single checkout atomically completes service with ${method}`,async()=>{
+  await seedCheckout();const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  const b=writeBatch(db);b.update(doc(db,'requests/r1'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp(),...(method==='demo_card'?demoFields():{driverReportedPayment:true,paymentMethod:method,paymentReportedAt:serverTimestamp()})});
+  b.update(doc(db,'providerDirectory/provider'),{activeRequestId:null});await assertSucceeds(b.commit());
+  const data=(await getDoc(doc(db,'requests/r1'))).data();
+  if(method==='demo_card' && (data.driverReportedPayment===true || data.providerConfirmedPayment===true))throw Error('Demo was recorded as real payment');
+});
+test('one service summary supports optional completion photos',async()=>{
+  await seedCheckout();await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{completionState:'none'}));
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertSucceeds(updateDoc(doc(db,'requests/r1'),{completionState:'pending',completionReport:{summary:'Battery connection repaired and tested.'},completionSubmittedAt:serverTimestamp(),finalCost:1800,updatedAt:serverTimestamp()}));
+});
+test('demo payment cannot forge received funds, amount, participant or repeat charges',async()=>{
+  await seedCheckout();await env.withSecurityRulesDisabled(c=>updateDoc(doc(c.firestore(),'requests/r1'),{status:'completed',completionState:'confirmed'}));
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore(),ref=doc(db,'requests/r1');
+  for(const uid of ['other','provider'])await assertFails(updateDoc(doc(env.authenticatedContext(uid,{email_verified:true}).firestore(),'requests/r1'),{...demoFields(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref,{...demoFields(1),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref,{...demoFields(),providerConfirmedPayment:true,updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{...demoFields(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref,{...demoFields(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(ref,{driverReportedPayment:true,paymentMethod:'cash',paymentReportedAt:serverTimestamp()}));
+});
+
+test('provider quote list is scoped to its document while driver can compare all offers', async()=>{
+  await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'requests/r1/quotes/another-provider'),{...offer(),providerId:'another-provider'}));
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const all=collection(provider,'requests/r1/quotes');
+  await assertFails(getDocs(all));
+  const own=await assertSucceeds(getDocs(query(all,where(documentId(),'==','provider'))));
+  if(own.size!==1 || own.docs[0].id!=='provider')throw Error('Provider did not get exactly its own quote');
+  await assertFails(getDocs(query(all,where(documentId(),'==','another-provider'))));
+  const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  const compared=await assertSucceeds(getDocs(collection(driver,'requests/r1/quotes')));
+  if(compared.size!==2)throw Error('Driver lost access to competing offers');
+});
+test('provider can load an empty own-quote query before submitting an offer',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{const {deleteDoc}=await import('firebase/firestore');await deleteDoc(doc(c.firestore(),'requests/r1/quotes/provider'));});
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  const own=await assertSucceeds(getDocs(query(collection(db,'requests/r1/quotes'),where(documentId(),'==','provider'))));
+  if(!own.empty)throw Error('Expected an empty own quote list');
 });
