@@ -19,6 +19,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   String providerPhone = '';
 
   int estimatedCost = 0;
+  bool visitBilling = false;
 
   bool cancelled = false;
 
@@ -179,6 +180,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     setState(() {
       status = nextStatus;
+      visitBilling = data['workflowVersion'] == 3;
       jobStartCodeRequired = data['jobStartCodeRequired'] == true;
       providerLocationUpdatedAt =
           (data['providerLocationUpdatedAt'] as Timestamp?)?.toDate();
@@ -264,14 +266,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return;
     }
 
-    final reason = await _adminReason(
-      context,
-      'Confirm you met the provider. Explain any missing or inaccurate GPS.',
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Provider is here'),
+        content: const Text(
+          'Confirm that you have physically met your assigned provider.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not yet'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Confirm arrival'),
+          ),
+        ],
+      ),
     );
-
-    if (reason == null || !mounted) {
-      return;
-    }
+    if (confirmed != true || !mounted) return;
+    const reason = 'Driver confirms physically meeting the assigned provider.';
 
     setState(() {
       confirmingArrival = true;
@@ -835,7 +850,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
           _RaTrackDetail(
             icon: Icons.request_quote_outlined,
-            label: 'Approved quote',
+            label: visitBilling ? 'Visit fee / current bill' : 'Approved quote',
             value: estimatedCost > 0 ? money(estimatedCost) : 'Price pending',
           ),
 
@@ -1030,7 +1045,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   )
                 : const Icon(Icons.verified_outlined),
-            label: const Text('Confirm & Pay'),
+            label: const Text('Accept Bill & Pay'),
           ),
 
           const SizedBox(height: 7),
@@ -1164,7 +1179,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
-                  if (widget.requestId != null) ...[
+                  if (widget.requestId != null && !visitBilling) ...[
                     RepairQuotePanel(requestId: widget.requestId!),
 
                     const SizedBox(height: 13),
@@ -1245,6 +1260,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                   if (!cancelled &&
                       status == 0 &&
+                      !visitBilling &&
                       widget.requestId != null) ...[
                     const SizedBox(height: 13),
 

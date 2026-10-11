@@ -19,6 +19,8 @@ class _SearchingScreenState extends State<SearchingScreen>
   late final AnimationController pulseController;
 
   String requestStatus = 'searching';
+  bool visitBilling = true;
+  String? cancellationReason;
 
   String? requestError;
 
@@ -108,7 +110,9 @@ class _SearchingScreenState extends State<SearchingScreen>
 
     final preferredProviderId = data['preferredProviderId'] as String? ?? '';
 
-    if (status == 'searching' && preferredProviderId.isNotEmpty) {
+    if (status == 'searching' &&
+        preferredProviderId.isNotEmpty &&
+        data['workflowVersion'] != 3) {
       scheduleProviderTimeout(data);
     } else {
       providerResponseTimer?.cancel();
@@ -148,6 +152,8 @@ class _SearchingScreenState extends State<SearchingScreen>
 
     setState(() {
       requestStatus = status;
+      visitBilling = data['workflowVersion'] == 3;
+      cancellationReason = data['cancellationReason'] as String?;
 
       currentLocationLabel = locationLabel;
 
@@ -832,7 +838,8 @@ class _SearchingScreenState extends State<SearchingScreen>
     }
 
     if (requestStatus == 'cancelled') {
-      return 'This roadside assistance request is no longer active.';
+      return cancellationReason ??
+          'This roadside assistance request is no longer active.';
     }
 
     if (requestStatus == 'not_submitted') {
@@ -902,14 +909,14 @@ class _SearchingScreenState extends State<SearchingScreen>
 
                   const SizedBox(height: 17),
 
-                  if (preferredSearch && activelySearching)
+                  if (preferredSearch && activelySearching && !visitBilling)
                     _RaPreferredProviderSearch(
                       providerName: editableDraft.provider,
                       expanding: expandingSearch,
                       onExpand: expandSearchNow,
                     ),
 
-                  if (preferredSearch && activelySearching)
+                  if (preferredSearch && activelySearching && !visitBilling)
                     const SizedBox(height: 13),
 
                   _RaSearchRequestCard(
@@ -964,7 +971,9 @@ class _SearchingScreenState extends State<SearchingScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Provider offers',
+                                visitBilling
+                                    ? 'Provider confirmation'
+                                    : 'Provider offers',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
@@ -975,7 +984,9 @@ class _SearchingScreenState extends State<SearchingScreen>
                               const SizedBox(height: 3),
 
                               Text(
-                                'Offers appear here as providers respond.',
+                                visitBilling
+                                    ? 'Your visit fee is fixed. No quote approval is required.'
+                                    : 'Offers appear here as providers respond.',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
                                   color: colors.onSurfaceVariant,
@@ -989,7 +1000,12 @@ class _SearchingScreenState extends State<SearchingScreen>
 
                     const SizedBox(height: 11),
 
-                    QuoteOffers(requestId: widget.requestId!),
+                    if (visitBilling)
+                      const Text(
+                        'Waiting for the selected provider to accept. Inspection and repair charges appear in the final bill after service.',
+                      )
+                    else
+                      QuoteOffers(requestId: widget.requestId!),
                   ],
 
                   const SizedBox(height: 20),

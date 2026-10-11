@@ -20,6 +20,9 @@
     },
     "api/admin-delete-account.mjs": {
       "maxDuration": 60
+    },
+    "api/visit-billing.mjs": {
+      "maxDuration": 30
     }
   }
 }

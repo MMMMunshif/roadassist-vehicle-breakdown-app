@@ -18,12 +18,12 @@ Future<String?> requestCheckout(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              confirmService ? 'Confirm & Pay' : 'Payment',
+              confirmService ? 'Accept Bill & Pay' : 'Payment',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
             Text(
-              'Approved total: Rs. ${ServiceInvoice.money(amount)}',
+              'Final total: Rs. ${ServiceInvoice.money(amount)}',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -216,7 +216,9 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Final amount agreement',
+              data['workflowVersion'] == 3
+                  ? 'Final service bill'
+                  : 'Final amount agreement',
               style: _providerText(context, size: 16, weight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
@@ -225,14 +227,38 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
               style: _providerText(context, size: 22, weight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
-            Text(
-              'Approved quote: LKR ${ServiceInvoice.money((data['estimatedCost'] as num?)?.toInt() ?? total)}',
-              style: _providerText(context, size: 13, muted: true),
-            ),
+            if (data['workflowVersion'] == 3) FinalBillBreakdown(data: data),
+            if (data['workflowVersion'] != 3)
+              Text(
+                'Approved quote: LKR ${ServiceInvoice.money((data['estimatedCost'] as num?)?.toInt() ?? total)}',
+                style: _providerText(context, size: 13, muted: true),
+              ),
             if (report.isNotEmpty) ...[
               const Divider(height: 24),
               Text(report, style: _providerText(context, size: 14)),
             ],
+            if (data['workflowVersion'] == 3 &&
+                !widget.isProvider &&
+                pending == null)
+              TextButton.icon(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        final reason = await _adminReason(
+                          context,
+                          'Explain what needs correcting in the final bill.',
+                        );
+                        if (reason == null || !mounted) return;
+                        await act(() async {
+                          await VisitBillingService().send('correct', {
+                            'requestId': widget.requestId,
+                            'reason': reason,
+                          });
+                        });
+                      },
+                icon: const Icon(Icons.edit_note),
+                label: const Text('Request bill correction'),
+              ),
             const SizedBox(height: 12),
             if (pending != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(

@@ -703,6 +703,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
     }
 
     int? finalCost;
+    Map<String, dynamic>? finalBill;
     CompletionReport? report;
 
     if (status == 2) {
@@ -731,6 +732,10 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
         return;
       }
       report = CompletionReport.summary(serviceNotesController.text.trim());
+      if (requestData['workflowVersion'] == 3) {
+        finalBill = await requestFinalBill(context, requestData);
+        if (finalBill == null || !mounted) return;
+      }
       finalCost = (requestData['estimatedCost'] as num?)?.toInt();
       if (finalCost == null) return;
     }
@@ -747,11 +752,19 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
           servicePhotoData: servicePhotos,
         );
 
-        await RequestService().completeProviderJob(
-          requestId,
-          finalCost!,
-          report: report!,
-        );
+        if (finalBill != null) {
+          await VisitBillingService().send('bill', {
+            'requestId': requestId,
+            'summary': serviceNotesController.text.trim(),
+            ...finalBill,
+          });
+        } else {
+          await RequestService().completeProviderJob(
+            requestId,
+            finalCost!,
+            report: report!,
+          );
+        }
 
         if (!mounted) return;
 
@@ -943,6 +956,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                   ),
 
                   if (widget.requestId != null &&
+                      data['workflowVersion'] != 3 &&
                       (data['arrivalVerificationRequired'] != true ||
                           data['arrivalConfirmedBy'] == data['driverId'])) ...[
                     const SizedBox(height: 13),
@@ -985,11 +999,18 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
 
                   const SizedBox(height: 14),
 
+                  if (data['billCorrectionReason'] is String)
+                    InlineMessage(
+                      icon: Icons.edit_note,
+                      text:
+                          'Bill correction requested: ${data['billCorrectionReason']}',
+                    ),
                   _RaProviderActiveSummary(
                     issue: requestIssueLabel(data),
                     vehicle: vehicle,
                     location: location,
                     approvedTotal: (data['estimatedCost'] as num?)?.toInt(),
+                    visitBilling: data['workflowVersion'] == 3,
                   ),
 
                   if (waitingForArrivalConfirmation) ...[
@@ -1068,7 +1089,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                   : status == 3
                   ? 'Finish Job'
                   : status == 2
-                  ? 'Finish Service'
+                  ? (data['workflowVersion'] == 3
+                        ? 'Prepare Final Bill'
+                        : 'Finish Service')
                   : 'Mark as ${statuses[status + 1]}',
               enabled:
                   !offline &&
@@ -1326,12 +1349,14 @@ class _RaProviderActiveSummary extends StatelessWidget {
     required this.vehicle,
     required this.location,
     required this.approvedTotal,
+    this.visitBilling = false,
   });
 
   final String issue;
   final String vehicle;
   final String location;
   final int? approvedTotal;
+  final bool visitBilling;
 
   @override
   Widget build(BuildContext context) {
@@ -1360,7 +1385,9 @@ class _RaProviderActiveSummary extends StatelessWidget {
           const _RaProviderActiveDivider(),
           _RaProviderActiveInfo(
             icon: Icons.request_quote_outlined,
-            label: 'Driver-approved total',
+            label: visitBilling
+                ? 'Visit fee / current bill'
+                : 'Driver-approved total',
             value: approvedTotal == null
                 ? 'Price pending'
                 : 'Rs. $approvedTotal',

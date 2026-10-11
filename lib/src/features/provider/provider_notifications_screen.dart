@@ -285,6 +285,10 @@ class _RaProviderOffersListState extends State<_RaProviderOffersList> {
       errors.remove(id);
     }
     for (final request in widget.requests) {
+      if (request.data()['workflowVersion'] == 3) {
+        offers[request.id] = false;
+        continue;
+      }
       if (subscriptions.containsKey(request.id)) continue;
       subscriptions[request.id] = request.reference
           .collection('quotes')

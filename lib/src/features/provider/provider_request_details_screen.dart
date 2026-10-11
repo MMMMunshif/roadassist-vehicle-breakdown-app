@@ -332,10 +332,11 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
 
           const SizedBox(height: 22),
 
-          const _RaProviderDetailHeading(
+          _RaProviderDetailHeading(
             title: 'Pricing',
-            subtitle:
-                'Only approved charges should form part of the final bill.',
+            subtitle: data['workflowVersion'] == 3
+                ? 'Visit fee is fixed. Add inspection, labour and parts to the final bill after work.'
+                : 'Only approved charges should form part of the final bill.',
           ),
 
           const SizedBox(height: 10),
@@ -347,6 +348,7 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
             estimatedCost: estimatedCost,
             finalCost: finalCost,
             money: money,
+            billingData: data['workflowVersion'] == 3 ? data : null,
           ),
 
           if (data['workflowVersion'] == 2) ...[
@@ -787,6 +789,7 @@ class _RaProviderPricingCard extends StatelessWidget {
     required this.travelFee,
     required this.extraFee,
     required this.estimatedCost,
+    this.billingData,
     required this.finalCost,
     required this.money,
   });
@@ -795,6 +798,7 @@ class _RaProviderPricingCard extends StatelessWidget {
   final int travelFee;
   final int extraFee;
   final int estimatedCost;
+  final Map<String, dynamic>? billingData;
   final int? finalCost;
 
   final String Function(int) money;
@@ -804,15 +808,21 @@ class _RaProviderPricingCard extends StatelessWidget {
     return _RaProviderDetailsSurface(
       child: Column(
         children: [
-          _RaProviderMoneyRow(label: 'Service', amount: money(serviceFee)),
-          _RaProviderMoneyRow(
-            label: 'Travel / dispatch',
-            amount: money(travelFee),
-          ),
-          _RaProviderMoneyRow(label: 'Additional', amount: money(extraFee)),
+          if (billingData != null) FinalBillBreakdown(data: billingData!),
+          if (billingData == null)
+            _RaProviderMoneyRow(label: 'Service', amount: money(serviceFee)),
+          if (billingData == null)
+            _RaProviderMoneyRow(
+              label: 'Travel / dispatch',
+              amount: money(travelFee),
+            ),
+          if (billingData == null)
+            _RaProviderMoneyRow(label: 'Additional', amount: money(extraFee)),
           const Divider(),
           _RaProviderMoneyRow(
-            label: finalCost == null ? 'Approved total' : 'Final total',
+            label: finalCost == null
+                ? (billingData == null ? 'Approved total' : 'Visit fee')
+                : 'Final total',
             amount: money(finalCost ?? estimatedCost),
             strong: true,
           ),
@@ -886,7 +896,13 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
     });
 
     try {
-      await RequestService().rejectRequest(widget.requestId);
+      if (widget.data['workflowVersion'] == 3) {
+        await VisitBillingService().send('dismiss', {
+          'requestId': widget.requestId,
+        });
+      } else {
+        await RequestService().rejectRequest(widget.requestId);
+      }
 
       if (mounted) {
         Navigator.maybePop(context);
@@ -913,6 +929,34 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
   Future<void> _quote() async {
     if (busy) return;
 
+    if (widget.data['workflowVersion'] == 3) {
+      setState(() => busy = true);
+      try {
+        await VisitBillingService().send('accept', {
+          'requestId': widget.requestId,
+        });
+        if (!mounted) return;
+        replace(
+          context,
+          ProviderActiveJobScreen(
+            requestId: widget.requestId,
+            requestData: widget.data,
+          ),
+        );
+      } catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _workflowError(error, 'Unable to accept this request.'),
+              ),
+            ),
+          );
+      } finally {
+        if (mounted) setState(() => busy = false);
+      }
+      return;
+    }
     final quote = await requestProviderQuote(context, widget.data);
 
     if (quote == null || !mounted) {
@@ -1009,7 +1053,11 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
                     ),
                   )
                 : const Icon(Icons.request_quote_outlined),
-            label: const Text('Review & Quote'),
+            label: Text(
+              widget.data['workflowVersion'] == 3
+                  ? 'Accept Request'
+                  : 'Review & Quote',
+            ),
           ),
         ),
       ],

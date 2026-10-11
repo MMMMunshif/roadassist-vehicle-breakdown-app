@@ -10,6 +10,36 @@ class ReviewScreen extends StatefulWidget {
 }
 
 class _ReviewScreenState extends State<ReviewScreen> {
+  Map<String, dynamic>? visitQuote;
+  String? visitFeeError;
+  bool loadingVisitFee = false;
+  Future<void> loadVisitFee() async {
+    if (loadingVisitFee) return;
+    setState(() {
+      loadingVisitFee = true;
+      visitFeeError = null;
+      visitQuote = null;
+    });
+    try {
+      final quote = await VisitBillingService().send('prepare', {
+        'providerId': widget.draft.preferredProviderId,
+        'latitude': widget.draft.latitude,
+        'longitude': widget.draft.longitude,
+      });
+      if (mounted) setState(() => visitQuote = quote);
+    } catch (error) {
+      if (mounted)
+        setState(
+          () => visitFeeError = _workflowError(
+            error,
+            'Unable to calculate the visit fee.',
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => loadingVisitFee = false);
+    }
+  }
+
   bool submitting = false;
   bool offline = false;
   bool checkingSubmission = false;
@@ -83,6 +113,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   @override
   void initState() {
     super.initState();
+    unawaited(loadVisitFee());
 
     unawaited(draftStore.save(widget.draft));
     unawaited(
@@ -116,6 +147,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
   Future<void> submitRequest({bool autoRetry = false}) async {
     if (submitting) return;
 
+    if (visitQuote == null ||
+        (visitQuote!['expiresAtMs'] as int) <=
+            DateTime.now().millisecondsSinceEpoch) {
+      await loadVisitFee();
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Review the refreshed visit fee, then submit.'),
+          ),
+        );
+      return;
+    }
     if (!readyToSubmit) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -180,7 +223,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
       }
       await draftStore.setPendingSubmission(true);
       final requestId = await RequestService()
-          .createRequest(widget.draft, submissionId: submissionId)
+          .createRequest(
+            widget.draft,
+            submissionId: submissionId,
+            visitQuote: visitQuote,
+          )
           .timeout(const Duration(seconds: 30));
 
       await RequestDraftStore().clear();
@@ -585,29 +632,27 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   _RaReviewSurface(
                     child: Column(
                       children: [
+                        if (loadingVisitFee) const LinearProgressIndicator(),
+                        if (visitFeeError != null) ...[
+                          Text(visitFeeError!),
+                          TextButton(
+                            onPressed: loadVisitFee,
+                            child: const Text('Retry visit fee'),
+                          ),
+                        ],
+                        if (visitQuote != null)
+                          _RaPricingPoint(
+                            icon: Icons.route_outlined,
+                            title: 'Visit fee: Rs. ${visitQuote!['visitFee']}',
+                            message:
+                                '${(visitQuote!['distanceKm'] as num).toStringAsFixed(2)} km estimated straight-line distance. First 1 km Rs. 100; each additional started km Rs. 20. This fee is fixed when you submit.',
+                          ),
+                        const SizedBox(height: 12),
                         const _RaPricingPoint(
-                          icon: Icons.request_quote_outlined,
-                          title: 'Providers send offers',
+                          icon: Icons.receipt_long_outlined,
+                          title: 'One final bill after the work',
                           message:
-                              'Service, travel and any other stated charges are shown before approval.',
-                        ),
-
-                        const SizedBox(height: 11),
-
-                        const _RaPricingPoint(
-                          icon: Icons.compare_arrows_rounded,
-                          title: 'You choose before assignment',
-                          message:
-                              'Compare available offers or approve the selected provider’s offer.',
-                        ),
-
-                        const SizedBox(height: 11),
-
-                        const _RaPricingPoint(
-                          icon: Icons.verified_user_outlined,
-                          title: 'Changes need approval',
-                          message:
-                              'If repair work changes after inspection, a revised quote must be approved first.',
+                              'Inspection, labour and any parts with reasons are added by the provider. Review the itemized bill and pay after the service.',
                         ),
                       ],
                     ),
@@ -650,7 +695,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ),
 
             _RaReviewBottomBar(
-              ready: readyToSubmit && !offline,
+              ready:
+                  readyToSubmit &&
+                  !offline &&
+                  visitQuote != null &&
+                  !loadingVisitFee,
               submitting: submitting,
               offline: offline,
               checking: checkingSubmission,

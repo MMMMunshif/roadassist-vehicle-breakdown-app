@@ -21,6 +21,37 @@ void main() {
     'completedAt': DateTime(2026, 10, 9),
     'warrantyDays': 7,
   };
+  test(
+    'Visit invoice itemizes inspection and replacement reasons and reconciles discount',
+    () {
+      final bill = ServiceInvoice.fromRequest('visit', {
+        'workflowVersion': 3,
+        'status': 'completed',
+        'dispatchFee': 120,
+        'inspectionFee': 200,
+        'serviceFee': 500,
+        'extraFee': 8000,
+        'estimatedCost': 8820,
+        'finalCost': 8720,
+        'billItems': [
+          {'label': 'Battery', 'reason': 'Failed load test', 'amount': 8000},
+        ],
+      });
+      expect(bill.charges.map((c) => c.label), [
+        'Visit fee',
+        'Inspection',
+        'Labour / repair',
+        'Battery ? Failed load test',
+      ]);
+      expect(
+        bill.charges.fold<int>(0, (sum, c) => sum + c.amount) - bill.discount,
+        bill.total,
+      );
+      expect(bill.discount, 100);
+      expect(bill.paid, false);
+      expect(bill.breakdownNote, isEmpty);
+    },
+  );
   test('Recorded charges reconcile with subtotal and discount', () {
     final bill = ServiceInvoice.fromRequest('job123', record());
     expect(

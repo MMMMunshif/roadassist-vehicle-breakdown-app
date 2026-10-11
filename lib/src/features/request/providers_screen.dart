@@ -137,6 +137,12 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
   }
 
   Future<void> reviewRequest() async {
+    if (selectedId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select an available provider first.')),
+      );
+      return;
+    }
     final selectedDraft = widget.draft.copyWith(
       provider: selectedName ?? 'Available Provider',
       preferredProviderId: selectedId,
@@ -149,13 +155,6 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
     }
 
     push(context, ReviewScreen(draft: selectedDraft));
-  }
-
-  void selectAllOffers() {
-    setState(() {
-      selectedId = null;
-      selectedName = null;
-    });
   }
 
   void resetSelectionIfMissing(
@@ -235,7 +234,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                   const SizedBox(height: 4),
 
                   Text(
-                    'Compare offers from suitable providers, or direct the request to one specific provider.',
+                    'Choose an available provider. The automatic visit fee is shown before you confirm.',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       height: 1.4,
@@ -245,9 +244,8 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
 
                   const SizedBox(height: 12),
 
-                  _RaAllProvidersCard(
-                    selected: selectedId == null,
-                    onTap: selectAllOffers,
+                  const Text(
+                    'Visit fee: Rs. 100 for the first 1 km + Rs. 20 per additional started km. Inspection is billed after the visit.',
                   ),
 
                   const SizedBox(height: 26),
@@ -493,7 +491,7 @@ class _RaProvidersHero extends StatelessWidget {
               SizedBox(
                 width: 295,
                 child: Text(
-                  'Let several suitable providers send offers, or request one provider directly.',
+                  'Choose your provider and review the distance-based visit fee.',
                   style: GoogleFonts.plusJakartaSans(
                     color: Colors.white.withValues(alpha: .80),
                     fontSize: 13,
@@ -581,125 +579,6 @@ class _RaProviderLocationSummary extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RaAllProvidersCard extends StatelessWidget {
-  const _RaAllProvidersCard({required this.selected, required this.onTap});
-
-  final bool selected;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Material(
-      color: selected
-          ? colors.primary.withValues(alpha: .07)
-          : theme.brightness == Brightness.dark
-          ? const Color(0xFF0D2237)
-          : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected
-                  ? colors.primary.withValues(alpha: .48)
-                  : colors.outlineVariant.withValues(alpha: .45),
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 47,
-                height: 47,
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.compare_arrows_rounded,
-                  color: colors.primary,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Receive provider offers',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-
-                        Icon(
-                          selected
-                              ? Icons.check_circle_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          color: selected ? colors.primary : colors.outline,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      'Suitable providers can review your request and submit offers for you to compare before selecting one.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-
-                    const SizedBox(height: 7),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: .08),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'Compare before approval',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: colors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1074,7 +953,7 @@ class _RaNoProviders extends StatelessWidget {
           const SizedBox(height: 5),
 
           Text(
-            'You can still continue with provider offers. Suitable providers can respond when your request becomes available.',
+            'Please try again when a suitable provider is online.',
             textAlign: TextAlign.center,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
@@ -1154,7 +1033,7 @@ class _RaProvidersBottomBar extends StatelessWidget {
                 Expanded(
                   child: Text(
                     selectedProvider == null
-                        ? 'Receive and compare provider offers'
+                        ? 'Select a provider to continue'
                         : 'Requesting $selectedProvider',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -1172,7 +1051,7 @@ class _RaProvidersBottomBar extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: onContinue,
+                onPressed: selectedProvider == null ? null : onContinue,
                 icon: const Icon(Icons.arrow_forward_rounded),
                 label: const Text('Review Request'),
               ),

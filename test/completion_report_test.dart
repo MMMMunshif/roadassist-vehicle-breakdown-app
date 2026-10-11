@@ -106,7 +106,7 @@ void main() {
         );
         await tester.tap(find.text('Report'));
         await tester.pumpAndSettle();
-        expect(find.text('Approved total: Rs. 1,800'), findsOneWidget);
+        expect(find.text('Final total: Rs. 1,800'), findsOneWidget);
         await tester.tap(find.text('Demo card'));
         await tester.pumpAndSettle();
         expect(find.textContaining('NO MONEY CHARGED'), findsOneWidget);
