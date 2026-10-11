@@ -54,9 +54,37 @@ void main() {
       expect(await InvoicePdfService.generate(bill), isNotEmpty);
     },
   );
+  test(
+    'One summary produces an explicitly simulated receipt without real paid status',
+    () async {
+      const summary = CompletionReport.summary(
+        'Battery connection repaired and tested.',
+      );
+      expect(summary.validate, returnsNormally);
+      expect(
+        () => const CompletionReport.summary('short').validate(),
+        throwsArgumentError,
+      );
+      final bill = ServiceInvoice.fromRequest('demo-job', {
+        'status': 'completed',
+        'finalCost': 1800,
+        'estimatedCost': 1800,
+        'completionReport': summary.toMap(),
+        'paymentMethod': 'demo_card',
+        'demoPayment': {'status': 'simulated', 'amount': 1800},
+        'providerConfirmedPayment': true,
+      });
+      expect(bill.paid, isFalse);
+      expect(bill.simulated, isTrue);
+      expect(bill.paymentLabel, contains('NO MONEY CHARGED'));
+      expect(bill.filename, contains('DEMO-Receipt'));
+      expect(bill.work, contains(summary.repairs));
+      expect(await InvoicePdfService.generate(bill), isNotEmpty);
+    },
+  );
   for (final brightness in Brightness.values) {
     testWidgets(
-      'Repair report validates at narrow width in ${brightness.name}',
+      'Checkout remains usable at narrow width in ${brightness.name}',
       (tester) async {
         GoogleFonts.config.allowRuntimeFetching = false;
         tester.view.physicalSize = const Size(320, 900);
@@ -69,7 +97,7 @@ void main() {
             home: Scaffold(
               body: Builder(
                 builder: (context) => TextButton(
-                  onPressed: () => requestCompletionReport(context, {}),
+                  onPressed: () => requestCheckout(context, 1800),
                   child: const Text('Report'),
                 ),
               ),
@@ -78,9 +106,11 @@ void main() {
         );
         await tester.tap(find.text('Report'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Review final amount'));
+        expect(find.text('Approved total: Rs. 1,800'), findsOneWidget);
+        await tester.tap(find.text('Demo card'));
         await tester.pumpAndSettle();
-        expect(find.text('Enter at least 10 characters.'), findsWidgets);
+        expect(find.textContaining('NO MONEY CHARGED'), findsOneWidget);
+        expect(find.text('Confirm service & simulate payment'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tap(find.text('Cancel'));
         await tester.pumpAndSettle();

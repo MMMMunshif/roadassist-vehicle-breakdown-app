@@ -472,12 +472,35 @@ service cloud.firestore {
 
     match /requests/{requestId} {
       function validCompletionReport(report) {
-        return report is map && report.keys().hasOnly(['problem','repairs','parts','advice'])
+        return report is map && ((report.keys().hasOnly(['summary']) && report.summary is string && report.summary.size() >= 10 && report.summary.size() <= 500) || (report.keys().hasOnly(['problem','repairs','parts','advice'])
           && report.problem is string && report.problem.size() >= 10 && report.problem.size() <= 500
           && report.repairs is string && report.repairs.size() >= 10 && report.repairs.size() <= 500
           && report.parts is string && report.parts.size() > 0 && report.parts.size() <= 500
-          && report.advice is string && report.advice.size() <= 500;
+          && report.advice is string && report.advice.size() <= 500));
       }
+      function validDemoPayment() {
+        let d = request.resource.data.demoPayment;
+        return resource.data.get('demoPayment',null) == null
+          && resource.data.get('driverReportedPayment',false) != true
+          && resource.data.get('providerConfirmedPayment',false) != true
+          && d is map && d.keys().hasAll(['status','amount','createdAt']) && d.keys().hasOnly(['status','amount','createdAt'])
+          && d.status == 'simulated' && d.amount == resource.data.get('finalCost',resource.data.estimatedCost)
+          && d.createdAt == request.time && request.resource.data.paymentMethod == 'demo_card';
+      }
+      function validCheckout() {
+        let keys = request.resource.data.diff(resource.data).affectedKeys();
+        return !keys.hasAny(['driverReportedPayment','paymentMethod','paymentReportedAt','demoPayment'])
+          || (resource.data.get('demoPayment',null) == null && (
+            (keys.hasAny(['demoPayment']) && !keys.hasAny(['driverReportedPayment','paymentReportedAt']) && validDemoPayment())
+            || (!keys.hasAny(['demoPayment']) && resource.data.get('driverReportedPayment',false) != true
+              && request.resource.data.driverReportedPayment == true && request.resource.data.paymentMethod in ['cash','external']
+              && request.resource.data.paymentReportedAt == request.time)));
+      }
+      allow update: if resource.data.status == 'completed' && request.resource.data.status == 'completed'
+        && request.resource.data.diff(resource.data).affectedKeys().hasAny(['demoPayment'])
+        && signedIn() && resource.data.driverId == request.auth.uid && validDemoPayment()
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['demoPayment','paymentMethod','updatedAt']);
       function discountStart() {
         let id = request.resource.data.pendingDiscountId;
         let offer = getAfter(/databases/$(database)/documents/requests/$(requestId)/completionDiscounts/$(id)).data;
@@ -606,7 +629,7 @@ service cloud.firestore {
           && request.resource.data.completionState == 'pending'
           && request.resource.data.completionSubmittedAt == request.time && request.resource.data.updatedAt == request.time
           && resource.data.serviceNotes is string && resource.data.serviceNotes.size() >= 10
-          && resource.data.servicePhotoData is list && resource.data.servicePhotoData.size() > 0
+          && resource.data.servicePhotoData is list && resource.data.servicePhotoData.size() <= 3
           && request.resource.data.finalCost is int && request.resource.data.finalCost >= 0 && request.resource.data.finalCost <= resource.data.estimatedCost
           && resource.data.get('pendingRepairId',null) == null
           && (resource.data.get('approvedQuoteType','direct') != 'inspection' || resource.data.get('approvedRepairId',null) is string)
@@ -619,7 +642,8 @@ service cloud.firestore {
           && request.resource.data.status == 'completed' && request.resource.data.completionState == 'confirmed'
           && request.resource.data.driverCompletedAt == request.time && request.resource.data.completedAt == request.time && request.resource.data.updatedAt == request.time
           && getAfter(/databases/$(database)/documents/providerDirectory/$(resource.data.providerId)).data.activeRequestId == null
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completionState','driverCompletedAt','completedAt','updatedAt']))
+          && validCheckout()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','completionState','driverCompletedAt','completedAt','updatedAt','driverReportedPayment','paymentMethod','paymentReportedAt','demoPayment']))
       );
 
       // Cancellation must not evaluate unrelated repair/quote branches.
@@ -672,10 +696,11 @@ service cloud.firestore {
           'rejectedBy','preferredProviderId','preferredProviderName','fallbackStartedAt','updatedAt']);
 
       allow update: if request.resource.data.status != 'cancelled'
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rejectedBy'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rejectedBy','demoPayment'])
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['completionState','completionReport','pendingDiscountId'])
         && signedIn() && (
         (resource.data.status == 'completed'
+          && resource.data.get('demoPayment',null) == null
           && resource.data.driverId == request.auth.uid
           && (!('driverReportedPayment' in resource.data) || resource.data.driverReportedPayment != true)
           && request.resource.data.driverReportedPayment == true

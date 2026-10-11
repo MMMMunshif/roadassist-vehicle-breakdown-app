@@ -4,7 +4,8 @@ class ProviderAvailability {
   static bool hasFreshLocation(DateTime? updated, DateTime now) {
     if (updated == null) return false;
     final age = now.difference(updated);
-    return !age.isNegative && age < locationLifetime;
+    // Allow small differences between the device clock and Firestore time.
+    return age >= const Duration(seconds: -30) && age < locationLifetime;
   }
 
   static bool withinHours(Map<String, dynamic> data, DateTime now) {
@@ -27,10 +28,10 @@ class ProviderAvailability {
     DateTime? overrideUntil,
     DateTime? locationUpdatedAt,
   }) {
-    if (data['online'] != true || !hasFreshLocation(locationUpdatedAt, now)) {
-      return 'Offline';
-    }
+    if (data['online'] != true) return 'Offline';
+    // An assigned job stays busy while GPS refreshes or loses reception.
     if ((data['activeRequestId'] as String? ?? '').isNotEmpty) return 'Busy';
+    if (!hasFreshLocation(locationUpdatedAt, now)) return 'Offline';
     if (data['requestsPaused'] == true) return 'Paused';
     if (overrideUntil?.isAfter(now) != true && !withinHours(data, now))
       return 'Outside working hours';
