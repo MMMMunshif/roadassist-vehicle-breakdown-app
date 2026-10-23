@@ -54,10 +54,7 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Available Providers',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -135,7 +132,7 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
                   Expanded(
                     child: Text(
                       query.isEmpty ? 'Online now' : 'Search results',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
@@ -143,7 +140,7 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
                   ),
                   Text(
                     '${providers.length}',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: colors.onSurfaceVariant,
@@ -191,7 +188,7 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
                         Expanded(
                           child: Text(
                             'Need roadside assistance?',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
                             ),
@@ -202,7 +199,7 @@ class _ProviderDirectoryScreenState extends State<ProviderDirectoryScreen> {
                     const SizedBox(height: 6),
                     Text(
                       'Start a request so RoadAssist can match providers to your actual vehicle, issue and breakdown location.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -272,7 +269,7 @@ class _RaProviderDirectoryHero extends StatelessWidget {
                   count > 0
                       ? '$count verified ${count == 1 ? 'provider' : 'providers'} online'
                       : 'Provider network',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -281,7 +278,7 @@ class _RaProviderDirectoryHero extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Availability updates automatically as verified providers go online or offline.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: 12,
                     height: 1.4,
@@ -328,7 +325,8 @@ class _RaProviderDirectoryCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -375,7 +373,7 @@ class _RaProviderDirectoryCard extends StatelessWidget {
                       providerName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -383,7 +381,7 @@ class _RaProviderDirectoryCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       'Online â€¢ accepting requests',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: raSuccess,
@@ -415,7 +413,7 @@ class _RaProviderDirectoryCard extends StatelessWidget {
                     ),
                     child: Text(
                       service,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: colors.primary,
@@ -439,7 +437,7 @@ class _RaProviderDirectoryCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Service coverage: $radius',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),

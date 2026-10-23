@@ -81,7 +81,7 @@ class _AdminUserActivity extends StatelessWidget {
                   children: [
                     Text(
                       'Account activity',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -.25,
@@ -90,7 +90,7 @@ class _AdminUserActivity extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Review recent RoadAssist jobs, cancellations and administrative actions associated with this account.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.45,
                         color: colors.onSurfaceVariant,
@@ -283,7 +283,8 @@ class _RaAdminActivitySection extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -307,14 +308,14 @@ class _RaAdminActivitySection extends StatelessWidget {
           ),
           title: Text(
             title,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
           ),
           subtitle: Text(
             subtitle,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               color: colors.onSurfaceVariant,
             ),
@@ -415,7 +416,7 @@ class _RaAdminActivityJobTile extends StatelessWidget {
                             requestIssueLabel(data),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -435,7 +436,7 @@ class _RaAdminActivityJobTile extends StatelessWidget {
                       'Request $requestId',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -447,7 +448,7 @@ class _RaAdminActivityJobTile extends StatelessWidget {
                         location,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           color: colors.onSurfaceVariant,
                         ),
@@ -527,16 +528,13 @@ class _RaAdminCancellationTile extends StatelessWidget {
         ),
         title: Text(
           type,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+          style: roadAssistTextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
           '$reason\nRequest $requestId',
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -586,16 +584,13 @@ class _RaAdminAuditTile extends StatelessWidget {
         ),
         title: Text(
           kind,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+          style: roadAssistTextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
           '$reason\nActor: $actor',
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -637,7 +632,7 @@ class _RaAdminMiniBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: tone,
@@ -663,7 +658,7 @@ class _RaAdminActivityEmpty extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: GoogleFonts.plusJakartaSans(
+        style: roadAssistTextStyle(
           fontSize: 12,
           color: colors.onSurfaceVariant,
         ),

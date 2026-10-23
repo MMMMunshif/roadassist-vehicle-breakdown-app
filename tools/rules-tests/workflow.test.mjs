@@ -933,7 +933,7 @@ test('provider can load an empty own-quote query before submitting an offer',asy
 });
 
 function visitRequest(overrides={}) {
-  return {driverId:'driver',driverName:'Driver',driverPhone:'',providerId:null,preferredProviderId:'provider',preferredProviderName:'Mechanic',rejectedBy:[],status:'searching',workflowVersion:3,arrivalVerificationRequired:true,
+  return {driverId:'driver',driverName:'Driver',driverPhone:'',providerId:null,preferredProviderId:'provider',preferredProviderName:'Mechanic',rejectedBy:[],status:'searching',workflowVersion:3,workApprovalRequired:true,arrivalVerificationRequired:true,
     issue:'General Mechanic',issues:['General Mechanic'],vehicleType:'Sedan / Hatchback',modelYear:'Toyota 2020',registration:'CAB-1234',description:'',notes:'',priority:'normal',vehiclePhotoUrls:[],photoAnnotations:[],locationLabel:'Test point',landmark:'',locationAccuracyMeters:null,
     latitude:7.4,longitude:81.84,serviceFee:0,dispatchFee:120,estimatedCost:120,providerDistanceKm:1.2,visitFeeQuoteId:'fee',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),...overrides};
 }
@@ -1010,4 +1010,45 @@ test('cash checkout also supports a verified legacy provider with a driver role'
     tx.update(ref,{status:'completed',completionState:'confirmed',driverReportedPayment:true,paymentMethod:'cash',paymentReportedAt:serverTimestamp(),driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
     if(directory.data().activeRequestId==='cash-checkout')tx.update(directoryRef,{activeRequestId:null});
   }));
+});
+
+test('visit creation matches the app transaction including saved vehicle and driver lock',async()=>{
+ await seedVisitQuote();await env.withSecurityRulesDisabled(async c=>{
+ const db=c.firestore();await setDoc(doc(db,'users/driver'),{role:'driver',roles:['driver'],lastRole:'driver',authIdentity:'role-v1',online:false,email:'driver@example.com',activeRequestId:'finished'});
+ await setDoc(doc(db,'requests/finished'),{driverId:'driver',status:'completed'});
+ await setDoc(doc(db,'users/driver/vehicles/car'),{make:'Rolls-Royce',model:'Ghost',year:2022,vehicleType:'Sedan / Hatchback',registration:'CAB-3223',fuelType:'Petrol',transmission:'Automatic',photoData:''});
+ });
+ const db=env.authenticatedContext('driver',{email_verified:true,email:'driver@example.com'}).firestore();
+ // A document-ID constrained query for a missing request fails resource-based read rules.
+ await assertFails(getDocs(query(collection(db,'requests'),where('driverId','==','driver'),where(documentId(),'==','create-full'))));
+ const matches=await assertSucceeds(getDocs(query(collection(db,'requests'),where('driverId','==','driver'))));assert.equal(matches.docs.some(d=>d.id==='create-full'),false);
+ await assertSucceeds(runTransaction(db,async tx=>{
+ const profile=await tx.get(doc(db,'users/driver'));await tx.get(doc(db,'requests/'+profile.data().activeRequestId));
+ tx.set(doc(db,'requests/create-full'),visitRequest({vehicleId:'car',vehicleSnapshot:{make:'Rolls-Royce',model:'Ghost',year:2022,vehicleType:'Sedan / Hatchback',registration:'CAB-3223',fuelType:'Petrol',transmission:'Automatic',modelYear:'Rolls-Royce Ghost 2022',photoData:''}}));
+ tx.set(doc(db,'users/driver'),{activeRequestId:'create-full',updatedAt:serverTimestamp()},{merge:true});
+ }));
+});
+
+test('work approval and service-finished state are server-only and survive bill correction',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{
+ const db=c.firestore();await setDoc(doc(db,'requests/protected-work'),{...visitRequest(),providerId:'provider',status:'arrived',arrivalConfirmedBy:'driver',completionState:'revision_requested',serviceCompletedAt:Timestamp.now(),finalCost:1900});
+ });
+ const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+ const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+ for(const db of [driver,provider]) {
+  await assertFails(updateDoc(doc(db,'requests/protected-work'),{workEstimate:{status:'approved',finalCost:999999},updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'requests/protected-work'),{workApprovalRequired:false,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(db,'requests/protected-work/workEstimates/1'),{status:'approved'}));
+ }
+ await assertSucceeds(getDoc(doc(driver,'requests/protected-work/workEstimates/1')));
+ await assertFails(updateDoc(doc(driver,'requests/protected-work'),{status:'cancelled',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+
+test('directory sync cannot restore a finished visit as an active provider lock',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{
+ const db=c.firestore();await setDoc(doc(db,'requests/finished-visit'),{...visitRequest(),providerId:'provider',status:'arrived',serviceCompletedAt:Timestamp.now(),completionState:'pending'});
+ await updateDoc(doc(db,'providerDirectory/provider'),{activeRequestId:null});
+ });
+ const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+ await assertFails(updateDoc(doc(provider,'providerDirectory/provider'),{activeRequestId:'finished-visit'}));
 });

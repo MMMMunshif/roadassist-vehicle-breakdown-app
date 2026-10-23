@@ -1,5 +1,10 @@
 part of '../screens.dart';
 
+const demoPaymentsEnabled = bool.fromEnvironment(
+  'DEMO_PAYMENTS',
+  defaultValue: false,
+);
+
 Future<String?> requestCheckout(
   BuildContext context,
   int amount, {
@@ -30,7 +35,8 @@ Future<String?> requestCheckout(
             for (final option in const [
               ('cash', 'Cash', Icons.payments_outlined),
               ('external', 'Bank transfer', Icons.account_balance_outlined),
-              ('demo_card', 'Demo card', Icons.credit_card),
+              if (demoPaymentsEnabled)
+                ('demo_card', 'Demo card', Icons.credit_card),
             ])
               ListTile(
                 shape: RoundedRectangleBorder(
@@ -191,6 +197,62 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
     }
   }
 
+  Future<void> questionBill(int total) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheet) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Question this bill',
+              style: Theme.of(sheet).textTheme.titleLarge,
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: const Text('A charge needs correcting'),
+              subtitle: const Text('Send the bill back to the provider'),
+              onTap: () => Navigator.pop(sheet, 'correct'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.price_change_outlined),
+              title: const Text('Ask for a discount'),
+              onTap: () => Navigator.pop(sheet, 'discount'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.support_agent_outlined),
+              title: const Text('Report a service problem'),
+              onTap: () => Navigator.pop(sheet, 'support'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'discount') {
+      await askDiscount(total);
+      return;
+    }
+    if (choice == 'support') {
+      push(context, DisputeScreen(requestId: widget.requestId));
+      return;
+    }
+    final reason = await _adminReason(
+      context,
+      'Which charge needs correcting?',
+    );
+    if (!mounted || reason == null) return;
+    await act(() async {
+      await VisitBillingService().send('correct', {
+        'requestId': widget.requestId,
+        'reason': reason,
+      });
+    });
+  }
+
   @override
   Widget build(
     BuildContext context,
@@ -241,23 +303,9 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
                 !widget.isProvider &&
                 pending == null)
               TextButton.icon(
-                onPressed: busy
-                    ? null
-                    : () async {
-                        final reason = await _adminReason(
-                          context,
-                          'Explain what needs correcting in the final bill.',
-                        );
-                        if (reason == null || !mounted) return;
-                        await act(() async {
-                          await VisitBillingService().send('correct', {
-                            'requestId': widget.requestId,
-                            'reason': reason,
-                          });
-                        });
-                      },
-                icon: const Icon(Icons.edit_note),
-                label: const Text('Request bill correction'),
+                onPressed: busy ? null : () => questionBill(total),
+                icon: const Icon(Icons.help_outline),
+                label: const Text('Question this bill'),
               ),
             const SizedBox(height: 12),
             if (pending != null)
@@ -321,7 +369,9 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
                   );
                 },
               )
-            else if (!widget.isProvider && total > 0)
+            else if (!widget.isProvider &&
+                total > 0 &&
+                data['workflowVersion'] != 3)
               OutlinedButton.icon(
                 onPressed: busy ? null : () => askDiscount(total),
                 icon: const Icon(Icons.price_change_outlined),
@@ -331,7 +381,7 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
             Text(
               widget.isProvider
                   ? 'The driver must agree to the final total before the job closes. Payment is confirmed separately.'
-                  : 'Confirm & Pay lets you confirm the service and choose cash, bank transfer or a clearly marked demo card payment. If you disagree, report an issue.',
+                  : 'Review the charges, then pay the provider directly by cash or bank transfer. Use Question this bill if something needs attention.',
               style: _providerText(context, size: 13, muted: true),
             ),
             if (busy) const LinearProgressIndicator(),

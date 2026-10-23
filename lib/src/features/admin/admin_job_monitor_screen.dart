@@ -76,10 +76,7 @@ class _AdminJobMonitorScreenState extends State<AdminJobMonitorScreen> {
       appBar: AppBar(
         title: Text(
           'Job Monitor',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -310,10 +307,7 @@ class _AdminJobMonitorScreenState extends State<AdminJobMonitorScreen> {
                 _AdminMonitorSurface(
                   child: Text(
                     description,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      height: 1.55,
-                    ),
+                    style: roadAssistTextStyle(fontSize: 12, height: 1.55),
                   ),
                 ),
               ],
@@ -367,7 +361,8 @@ class _AdminMonitorHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         borderRadius: BorderRadius.circular(23),
       ),
@@ -399,7 +394,7 @@ class _AdminMonitorHero extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             issue,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -411,7 +406,7 @@ class _AdminMonitorHero extends StatelessWidget {
             'JOB $requestId',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -439,15 +434,12 @@ class _AdminMonitorHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             color: colors.onSurfaceVariant,
           ),
@@ -476,7 +468,8 @@ class _AdminMonitorParticipant extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -495,7 +488,7 @@ class _AdminMonitorParticipant extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                   ),
@@ -503,7 +496,7 @@ class _AdminMonitorParticipant extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   role,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -558,7 +551,8 @@ class _AdminMonitorSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: padding,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -593,7 +587,7 @@ class _AdminMonitorRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: colors.onSurfaceVariant,
               ),
@@ -604,7 +598,7 @@ class _AdminMonitorRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: strong ? 15 : 14,
                 height: 1.4,
                 fontWeight: strong ? FontWeight.w800 : FontWeight.w700,
@@ -654,7 +648,7 @@ class _AdminMonitorNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -662,7 +656,7 @@ class _AdminMonitorNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,

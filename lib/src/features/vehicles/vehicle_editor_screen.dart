@@ -192,10 +192,7 @@ class _VehicleEditorScreenState extends State<VehicleEditorScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           editing ? 'Edit Vehicle' : 'Add Vehicle',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
       ),
       body: Form(
@@ -516,7 +513,7 @@ class _RaVehicleEditorHero extends StatelessWidget {
               children: [
                 Text(
                   editing ? 'Update your vehicle' : 'Add a vehicle',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -525,7 +522,7 @@ class _RaVehicleEditorHero extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Accurate vehicle details help make roadside requests faster and clearer.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: 12,
                     height: 1.4,
@@ -555,15 +552,12 @@ class _RaVehicleEditorHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -586,7 +580,8 @@ class _RaVehicleEditorSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,

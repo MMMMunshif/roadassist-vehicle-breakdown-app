@@ -1,10 +1,15 @@
 part of '../../screens.dart';
 
 class _AuthForm extends StatefulWidget {
-  const _AuthForm({required this.isProvider, this.initialRegisterMode = false});
+  const _AuthForm({
+    required this.isProvider,
+    this.initialRegisterMode = false,
+    this.commonLogin = false,
+  });
 
   final bool isProvider;
   final bool initialRegisterMode;
+  final bool commonLogin;
 
   @override
   State<_AuthForm> createState() => _AuthFormState();
@@ -12,6 +17,52 @@ class _AuthForm extends StatefulWidget {
 
 class _AuthFormState extends State<_AuthForm> {
   late bool registerMode;
+
+  final journey = AuthJourneyController();
+  final authScroll = ScrollController();
+  void beginAuthMotion() {
+    FocusScope.of(context).unfocus();
+    journey.update(phase: AuthJourneyPhase.authenticating);
+    if (authScroll.hasClients) {
+      final reduced =
+          MediaQuery.disableAnimationsOf(context) ||
+          MediaQuery.accessibleNavigationOf(context);
+      if (reduced) {
+        authScroll.jumpTo(0);
+      } else {
+        unawaited(
+          authScroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+          ),
+        );
+      }
+    }
+  }
+
+  final passwordFocus = FocusNode();
+  final emailFocus = FocusNode();
+
+  void updateJourney() {
+    if (loading || journey.phase == AuthJourneyPhase.success) return;
+    final completed =
+        [
+          nameController.text.trim().length >= 2,
+          validateEmailAddress(emailController.text) == null,
+          passwordController.text.length >= 8,
+        ].where((x) => x).length /
+        3;
+    journey.update(
+      phase: passwordFocus.hasFocus
+          ? AuthJourneyPhase.password
+          : emailFocus.hasFocus
+          ? AuthJourneyPhase.typing
+          : AuthJourneyPhase.idle,
+      progress: registerMode ? completed : 0,
+      privacy: obscure,
+    );
+  }
 
   bool obscure = true;
   bool loading = false;
@@ -28,24 +79,34 @@ class _AuthFormState extends State<_AuthForm> {
 
   AuthService get authService => AuthService();
 
-  bool get isProvider => widget.isProvider;
+  late bool selectedProvider;
+  bool get isProvider => selectedProvider;
+  bool get commonLogin => widget.commonLogin && !registerMode;
 
   String get roleName => isProvider ? 'Provider' : 'Driver';
 
-  Color get roleAccent =>
-      isProvider ? const Color(0xFF21C6AE) : const Color(0xFF43A7FF);
+  Color get roleAccent => const Color(0xFF43A7FF);
 
-  Color get roleAccentStrong =>
-      isProvider ? const Color(0xFF079A88) : const Color(0xFF167DE4);
+  Color get roleAccentStrong => const Color(0xFF167DE4);
 
   @override
   void initState() {
     super.initState();
     registerMode = widget.initialRegisterMode;
+    selectedProvider = widget.isProvider;
+    passwordFocus.addListener(updateJourney);
+    emailFocus.addListener(updateJourney);
+    for (final field in [nameController, emailController, passwordController]) {
+      field.addListener(updateJourney);
+    }
   }
 
   @override
   void dispose() {
+    passwordFocus.dispose();
+    emailFocus.dispose();
+    journey.dispose();
+    authScroll.dispose();
     emailController.dispose();
     passwordController.dispose();
     nameController.dispose();
@@ -59,26 +120,31 @@ class _AuthFormState extends State<_AuthForm> {
 
   Future<void> authenticateGoogle() async {
     if (loading) return;
-    final role = isProvider ? 'provider' : 'driver';
+    var role = commonLogin
+        ? 'auto'
+        : isProvider
+        ? 'provider'
+        : 'driver';
     if (registerMode &&
         (nameController.text.trim().length < 2 ||
             !RegExp(
               r'^\+947\d{8}$',
-            ).hasMatch(normalizeSriLankaPhone(phoneController.text)) ||
-            (!isProvider && registrationPhotoData == null))) {
+            ).hasMatch(normalizeSriLankaPhone(phoneController.text)))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Enter your name, valid phone number and required profile photo first. No password is needed for Google.',
+            'Enter your name and valid phone number first. A photo is optional; no password is needed for Google.',
           ),
         ),
       );
       return;
     }
     setState(() => loading = true);
+    beginAuthMotion();
     try {
       await authService.signInWithGoogle(
         role: role,
+        chooseRole: chooseExistingAccount,
         displayName: registerMode ? nameController.text.trim() : null,
         phone: registerMode
             ? normalizeSriLankaPhone(phoneController.text)
@@ -86,9 +152,22 @@ class _AuthFormState extends State<_AuthForm> {
         photoData: registerMode ? registrationPhotoData : null,
       );
       if (!mounted) return;
+      final profile = await authService.getCurrentProfile();
+      role = accountLastRole(profile.data()) ?? role;
+      if (!mounted) return;
+      await journey.complete();
+      if (!mounted) return;
+      final verified =
+          !enforceEmailVerification ||
+          await authService.isRoleEmailVerified(role);
+      if (!mounted) return;
       replace(
         context,
-        isProvider ? const ProviderShell() : const DriverShell(),
+        !verified
+            ? EmailVerificationScreen(role: role)
+            : role == 'provider'
+            ? const ProviderShell()
+            : const DriverShell(),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -126,7 +205,10 @@ class _AuthFormState extends State<_AuthForm> {
           ),
         );
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+        if (journey.phase != AuthJourneyPhase.success) updateJourney();
+      }
     }
   }
 
@@ -137,24 +219,14 @@ class _AuthFormState extends State<_AuthForm> {
       return;
     }
 
-    if (registerMode && !widget.isProvider && registrationPhotoData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('A profile photo is required to continue as a driver.'),
-          backgroundColor: raDanger,
-        ),
-      );
-
-      return;
-    }
-
     setState(() {
       loading = true;
     });
+    beginAuthMotion();
 
     final service = authService;
     try {
-      final role = widget.isProvider ? 'provider' : 'driver';
+      var role = isProvider ? 'provider' : 'driver';
 
       if (registerMode) {
         await service
@@ -166,6 +238,12 @@ class _AuthFormState extends State<_AuthForm> {
               phone: normalizeSriLankaPhone(phoneController.text),
             )
             .timeout(const Duration(seconds: 45));
+      } else if (commonLogin) {
+        role = await service.signInCommon(
+          email: emailController.text,
+          password: passwordController.text,
+          chooseRole: chooseExistingAccount,
+        );
       } else {
         await service.signIn(
           email: emailController.text,
@@ -180,7 +258,7 @@ class _AuthFormState extends State<_AuthForm> {
               .updateCurrentProfile({'photoData': registrationPhotoData})
               .timeout(const Duration(seconds: 15));
         } catch (_) {
-          if (!widget.isProvider) {
+          if (!isProvider) {
             await service.signOut();
           }
 
@@ -199,8 +277,12 @@ class _AuthFormState extends State<_AuthForm> {
         );
       }
 
-      if (enforceEmailVerification &&
-          !await service.isRoleEmailVerified(role)) {
+      final verified =
+          !enforceEmailVerification || await service.isRoleEmailVerified(role);
+      if (!mounted) return;
+      await journey.complete();
+      if (!mounted) return;
+      if (!verified) {
         replace(context, EmailVerificationScreen(role: role));
         if (service.verificationEmailDeliveryFailed) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -214,11 +296,11 @@ class _AuthFormState extends State<_AuthForm> {
       } else {
         replace(
           context,
-          widget.isProvider ? const ProviderShell() : const DriverShell(),
+          role == 'provider' ? const ProviderShell() : const DriverShell(),
         );
       }
     } on FirebaseAuthException catch (error) {
-      if (!mounted) return;
+      if (!mounted || error.code == 'canceled') return;
 
       final message = switch (error.code) {
         'email-already-in-use' => 'An account already exists for this email.',
@@ -271,6 +353,7 @@ class _AuthFormState extends State<_AuthForm> {
         setState(() {
           loading = false;
         });
+        if (journey.phase != AuthJourneyPhase.success) updateJourney();
       }
     }
   }
@@ -359,7 +442,13 @@ class _AuthFormState extends State<_AuthForm> {
   // ============================================================
 
   Future<void> resetPassword() async {
-    final controller = TextEditingController(text: emailController.text.trim());
+    final resetRole = commonLogin
+        ? await pickAccountRole('Which password do you want to reset?')
+        : isProvider
+        ? 'provider'
+        : 'driver';
+    if (resetRole == null || !mounted) return;
+    var resetEmail = emailController.text.trim();
 
     final email = await showModalBottomSheet<String>(
       context: context,
@@ -375,129 +464,129 @@ class _AuthFormState extends State<_AuthForm> {
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
           ),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
-            decoration: BoxDecoration(
-              color: dark ? const Color(0xFF0B1B29) : colors.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(30),
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
+              decoration: RaPremiumDecoration(
+                context,
+                color: dark ? const Color(0xFF0B1B29) : colors.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: .45),
+                ),
               ),
-              border: Border.all(
-                color: colors.outlineVariant.withValues(alpha: .45),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colors.onSurfaceVariant.withValues(alpha: .25),
-                      borderRadius: BorderRadius.circular(999),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colors.onSurfaceVariant.withValues(alpha: .25),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            roleAccent.withValues(alpha: .24),
-                            roleAccentStrong.withValues(alpha: .14),
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              roleAccent.withValues(alpha: .24),
+                              roleAccentStrong.withValues(alpha: .14),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(17),
+                        ),
+                        child: Icon(
+                          Icons.lock_reset_rounded,
+                          color: roleAccent,
+                          size: 25,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Reset $resetRole password',
+                              style: roadAssistTextStyle(
+                                fontSize: 20,
+                                height: 1.15,
+                                fontWeight: FontWeight.w800,
+                                color: colors.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'We will send a secure reset link to your email.',
+                              style: roadAssistTextStyle(
+                                fontSize: 12.5,
+                                height: 1.45,
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(17),
                       ),
-                      child: Icon(
-                        Icons.lock_reset_rounded,
-                        color: roleAccent,
-                        size: 25,
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  _PremiumField(
+                    child: TextFormField(
+                      initialValue: resetEmail,
+                      onChanged: (value) => resetEmail = value,
+                      keyboardType: TextInputType.emailAddress,
+                      autofocus: resetEmail.isEmpty,
+                      textInputAction: TextInputAction.done,
+                      style: roadAssistTextStyle(fontWeight: FontWeight.w500),
+                      decoration: const InputDecoration(
+                        hintText: 'name@email.com',
+                        prefixIcon: Icon(Icons.alternate_email_rounded),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                       ),
+                      onFieldSubmitted: (_) {
+                        Navigator.pop(sheetContext, resetEmail.trim());
+                      },
                     ),
+                  ),
 
-                    const SizedBox(width: 14),
+                  const SizedBox(height: 18),
 
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Reset ${widget.isProvider ? 'provider' : 'driver'} password',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 20,
-                              height: 1.15,
-                              fontWeight: FontWeight.w800,
-                              color: colors.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'We will send a secure reset link to your email.',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12.5,
-                              height: 1.45,
-                              color: colors.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                _PremiumField(
-                  child: TextField(
-                    controller: controller,
-                    keyboardType: TextInputType.emailAddress,
-                    autofocus: controller.text.isEmpty,
-                    textInputAction: TextInputAction.done,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: 'name@email.com',
-                      prefixIcon: Icon(Icons.alternate_email_rounded),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                    ),
-                    onSubmitted: (_) {
-                      Navigator.pop(sheetContext, controller.text.trim());
+                  _GradientAuthButton(
+                    accent: roleAccent,
+                    accentStrong: roleAccentStrong,
+                    icon: Icons.forward_to_inbox_rounded,
+                    label: 'Send reset link',
+                    loading: false,
+                    onPressed: () {
+                      Navigator.pop(sheetContext, resetEmail.trim());
                     },
                   ),
-                ),
-
-                const SizedBox(height: 18),
-
-                _GradientAuthButton(
-                  accent: roleAccent,
-                  accentStrong: roleAccentStrong,
-                  icon: Icons.forward_to_inbox_rounded,
-                  label: 'Send reset link',
-                  loading: false,
-                  onPressed: () {
-                    Navigator.pop(sheetContext, controller.text.trim());
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
       },
     );
-
-    controller.dispose();
 
     if (email == null || email.isEmpty || !mounted) {
       return;
@@ -514,10 +603,7 @@ class _AuthFormState extends State<_AuthForm> {
     }
 
     try {
-      await authService.sendPasswordResetEmail(
-        email,
-        role: widget.isProvider ? 'provider' : 'driver',
-      );
+      await authService.sendPasswordResetEmail(email, role: resetRole);
 
       if (!mounted) return;
 
@@ -590,7 +676,7 @@ class _AuthFormState extends State<_AuthForm> {
                 child: ClipOval(
                   child: registrationPhotoData == null
                       ? Icon(
-                          widget.isProvider
+                          isProvider
                               ? Icons.engineering_rounded
                               : Icons.person_rounded,
                           color: roleAccent,
@@ -652,15 +738,15 @@ class _AuthFormState extends State<_AuthForm> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      widget.isProvider ? 'Profile photo' : 'Driver photo',
-                      style: GoogleFonts.plusJakartaSans(
+                      isProvider ? 'Profile photo' : 'Driver photo',
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: colors.onSurface,
                       ),
                     ),
 
-                    if (!widget.isProvider)
+                    if (!isProvider)
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -671,8 +757,8 @@ class _AuthFormState extends State<_AuthForm> {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          'Required',
-                          style: GoogleFonts.plusJakartaSans(
+                          'Optional',
+                          style: roadAssistTextStyle(
                             color: const Color(0xFFFFA52F),
                             fontSize: 9.5,
                             fontWeight: FontWeight.w700,
@@ -686,11 +772,11 @@ class _AuthFormState extends State<_AuthForm> {
 
                 Text(
                   registrationPhotoData == null
-                      ? widget.isProvider
+                      ? isProvider
                             ? 'Optional now. You can add one later.'
-                            : 'Add a clear photo before creating your account.'
+                            : 'Optional now. You can add one later.'
                       : 'Photo ready. Tap the camera to change it.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 11.5,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -707,7 +793,7 @@ class _AuthFormState extends State<_AuthForm> {
                     registrationPhotoData == null
                         ? 'Choose photo'
                         : 'Change photo',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       color: roleAccent,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -726,14 +812,119 @@ class _AuthFormState extends State<_AuthForm> {
   // MAIN UI
   // ============================================================
 
+  Future<String?> pickAccountRole(
+    String title, {
+    List<String> roles = const ['driver', 'provider'],
+  }) {
+    if (!mounted) return Future.value(null);
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheet) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: roadAssistTextStyle(
+                fontSize: 25,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -.8,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Separate profiles. One trusted platform.',
+              style: roadAssistTextStyle(
+                fontSize: 12,
+                color: Theme.of(sheet).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 20),
+            for (final role in roles)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(18),
+                    alignment: Alignment.centerLeft,
+                  ),
+                  onPressed: () => Navigator.pop(sheet, role),
+                  child: Row(
+                    children: [
+                      if (role == 'driver')
+                        Image.asset(
+                          'assets/images/auth_journey_car.png',
+                          width: 92,
+                          height: 48,
+                        )
+                      else
+                        const SizedBox(
+                          width: 92,
+                          height: 48,
+                          child: Icon(Icons.engineering_rounded, size: 40),
+                        ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              role == 'driver'
+                                  ? "I'm a driver"
+                                  : 'I provide help',
+                              style: roadAssistTextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              role == 'driver'
+                                  ? 'Help for every journey.'
+                                  : 'Bring your expertise to the road.',
+                              style: roadAssistTextStyle(fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> chooseExistingAccount(List<String> roles) =>
+      pickAccountRole('Choose your account', roles: roles);
+
+  Future<void> beginRegistration() async {
+    if (loading) return;
+    final role = await pickAccountRole('How will you use RoadAssist?');
+    if (role == null || !mounted) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      selectedProvider = role == 'provider';
+      registerMode = true;
+    });
+    journey.update(phase: AuthJourneyPhase.idle, progress: 0);
+    if (authScroll.hasClients) authScroll.jumpTo(0);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme = Theme.of(context), colors = theme.colorScheme;
     final dark = theme.brightness == Brightness.dark;
-
     return RaScaffold(
-      backgroundColor: dark ? const Color(0xFF06121D) : const Color(0xFFF5F9FC),
+      backgroundColor: dark ? const Color(0xFF041426) : const Color(0xFFF7FBFF),
       body: Stack(
         children: [
           Positioned.fill(
@@ -741,297 +932,92 @@ class _AuthFormState extends State<_AuthForm> {
               child: _AuthBackdrop(dark: dark, accent: roleAccent),
             ),
           ),
-
           SafeArea(
             child: ListView(
+              controller: authScroll,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 34),
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
               children: [
                 _AuthTopBar(accent: roleAccent),
-
-                const SizedBox(height: 27),
-
-                _AuthHero(
-                  isProvider: widget.isProvider,
-                  registerMode: registerMode,
-                  accent: roleAccent,
-                  accentStrong: roleAccentStrong,
+                const SizedBox(height: 12),
+                AuthJourneyScene(
+                  controller: journey,
+                  registration: registerMode,
+                  provider: registerMode && isProvider,
                 ),
-
-                const SizedBox(height: 25),
-
-                _AuthModeSwitcher(
-                  registerMode: registerMode,
-                  loading: loading,
-                  accent: roleAccent,
-                  onSignIn: () {
-                    setState(() {
-                      registerMode = false;
-                    });
-                  },
-                  onRegister: () {
-                    setState(() {
-                      registerMode = true;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 17),
-
-                Container(
-                  padding: const EdgeInsets.fromLTRB(18, 19, 18, 20),
-                  decoration: BoxDecoration(
-                    color: dark
-                        ? const Color(0xE80B1A28)
-                        : Colors.white.withValues(alpha: .94),
-                    borderRadius: BorderRadius.circular(27),
-                    border: Border.all(
-                      color: dark
-                          ? Colors.white.withValues(alpha: .08)
-                          : const Color(0xFFDDE9F2),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: dark ? .20 : .06),
-                        blurRadius: 30,
-                        offset: const Offset(0, 14),
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Text(
+                  registerMode
+                      ? isProvider
+                            ? 'Bring your skills\nto the road.'
+                            : 'Your journey.\nA better beginning.'
+                      : 'Good to see you.',
+                  style: roadAssistTextStyle(
+                    fontSize: 30,
+                    height: 1.10,
+                    letterSpacing: -1.1,
+                    fontWeight: FontWeight.w800,
                   ),
-                  child: Form(
-                    key: formKey,
-                    child: AutofillGroup(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 45,
-                                height: 45,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      roleAccent.withValues(alpha: .25),
-                                      roleAccentStrong.withValues(alpha: .10),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Icon(
-                                  registerMode
-                                      ? Icons.person_add_alt_1_rounded
-                                      : Icons.login_rounded,
-                                  color: roleAccent,
-                                  size: 22,
-                                ),
-                              ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  registerMode
+                      ? isProvider
+                            ? 'Connect with drivers who need your help.'
+                            : 'Create your own space for the road ahead.'
+                      : 'Sign in and pick up where you left off.',
+                  style: roadAssistTextStyle(
+                    fontSize: 13,
+                    height: 1.58,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Divider(height: 1),
+                const SizedBox(height: 20),
+                Form(
+                  key: formKey,
+                  child: AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (registerMode) ...[
+                          _photoSection(context),
 
-                              const SizedBox(width: 13),
+                          const SizedBox(height: 21),
 
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      registerMode
-                                          ? 'Create $roleName account'
-                                          : '$roleName sign in',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 18,
-                                        height: 1.15,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -.35,
-                                        color: colors.onSurface,
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 4),
-
-                                    Text(
-                                      registerMode
-                                          ? 'A few details and you are ready to go.'
-                                          : 'Welcome back. Enter your account details.',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 11.5,
-                                        height: 1.4,
-                                        color: colors.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 22),
-
-                          if (registerMode) ...[
-                            _photoSection(context),
-
-                            const SizedBox(height: 21),
-
-                            const _PremiumFieldLabel('FULL NAME'),
-
-                            const SizedBox(height: 7),
-
-                            _PremiumField(
-                              child: TextFormField(
-                                controller: nameController,
-                                autofillHints: const [AutofillHints.name],
-                                textCapitalization: TextCapitalization.words,
-                                textInputAction: TextInputAction.next,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: 'Your full name',
-                                  prefixIcon: Icon(
-                                    Icons.person_outline_rounded,
-                                  ),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                ),
-                                validator: (value) {
-                                  final name = value?.trim() ?? '';
-
-                                  if (name.isEmpty) {
-                                    return 'Enter your full name';
-                                  }
-
-                                  if (name.length < 2) {
-                                    return 'Name is too short';
-                                  }
-                                  if (name.length > 100) {
-                                    return 'Use at most 100 characters';
-                                  }
-
-                                  return null;
-                                },
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            const _PremiumFieldLabel('PHONE NUMBER'),
-
-                            const SizedBox(height: 7),
-
-                            _PremiumField(
-                              child: TextFormField(
-                                controller: phoneController,
-                                autofillHints: const [
-                                  AutofillHints.telephoneNumber,
-                                ],
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.next,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: '+94 77 123 4567',
-                                  prefixIcon: Icon(Icons.phone_outlined),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                ),
-                                validator: validateSriLankaPhone,
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-                          ],
-
-                          const _PremiumFieldLabel('EMAIL ADDRESS'),
+                          const _PremiumFieldLabel('FULL NAME'),
 
                           const SizedBox(height: 7),
 
                           _PremiumField(
                             child: TextFormField(
-                              key: const Key('auth_email_field'),
-                              controller: emailController,
-                              autofillHints: const [AutofillHints.email],
-                              keyboardType: TextInputType.emailAddress,
+                              controller: nameController,
+                              autofillHints: const [AutofillHints.name],
+                              textCapitalization: TextCapitalization.words,
                               textInputAction: TextInputAction.next,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontWeight: FontWeight.w500,
                               ),
                               decoration: const InputDecoration(
-                                hintText: 'name@email.com',
-                                prefixIcon: Icon(Icons.alternate_email_rounded),
+                                hintText: 'Your full name',
+                                prefixIcon: Icon(Icons.person_outline_rounded),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 focusedBorder: InputBorder.none,
-                              ),
-                              validator: validateEmailAddress,
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          const _PremiumFieldLabel('PASSWORD'),
-
-                          const SizedBox(height: 7),
-
-                          _PremiumField(
-                            child: TextFormField(
-                              key: const Key('auth_password_field'),
-                              controller: passwordController,
-                              obscureText: obscure,
-                              autofillHints: [
-                                registerMode
-                                    ? AutofillHints.newPassword
-                                    : AutofillHints.password,
-                              ],
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) {
-                                if (!loading) {
-                                  authenticate();
-                                }
-                              },
-                              style: GoogleFonts.plusJakartaSans(
-                                fontWeight: FontWeight.w500,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Enter your password',
-                                prefixIcon: const Icon(
-                                  Icons.lock_outline_rounded,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                suffixIcon: IconButton(
-                                  tooltip: obscure
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () {
-                                    setState(() {
-                                      obscure = !obscure;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    obscure
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
-                                ),
                               ),
                               validator: (value) {
-                                final password = value ?? '';
+                                final name = value?.trim() ?? '';
 
-                                if (password.length < 6) {
-                                  return 'Enter at least 6 characters';
+                                if (name.isEmpty) {
+                                  return 'Enter your full name';
                                 }
 
-                                if (registerMode && password.length < 8) {
-                                  return 'New passwords need at least 8 characters';
+                                if (name.length < 2) {
+                                  return 'Name is too short';
                                 }
-
-                                if (registerMode &&
-                                    (!RegExp(r'[A-Za-z]').hasMatch(password) ||
-                                        !RegExp(r'\d').hasMatch(password))) {
-                                  return 'Include at least one letter and one number';
+                                if (name.length > 100) {
+                                  return 'Use at most 100 characters';
                                 }
 
                                 return null;
@@ -1039,180 +1025,298 @@ class _AuthFormState extends State<_AuthForm> {
                             ),
                           ),
 
-                          if (registerMode) ...[
-                            const SizedBox(height: 8),
+                          const SizedBox(height: 16),
 
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 1),
-                                  child: Icon(
-                                    Icons.info_outline_rounded,
-                                    size: 14,
+                          const _PremiumFieldLabel('PHONE NUMBER'),
+
+                          const SizedBox(height: 7),
+
+                          _PremiumField(
+                            child: TextFormField(
+                              controller: phoneController,
+                              autofillHints: const [
+                                AutofillHints.telephoneNumber,
+                              ],
+                              keyboardType: TextInputType.phone,
+                              textInputAction: TextInputAction.next,
+                              style: roadAssistTextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: '+94 77 123 4567',
+                                prefixIcon: Icon(Icons.phone_outlined),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                              ),
+                              validator: validateSriLankaPhone,
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+                        ],
+
+                        const _PremiumFieldLabel('EMAIL ADDRESS'),
+
+                        const SizedBox(height: 7),
+
+                        _PremiumField(
+                          child: TextFormField(
+                            key: const Key('auth_email_field'),
+                            controller: emailController,
+                            focusNode: emailFocus,
+                            autofillHints: const [AutofillHints.email],
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            style: roadAssistTextStyle(
+                              fontWeight: FontWeight.w500,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: 'name@email.com',
+                              prefixIcon: Icon(Icons.alternate_email_rounded),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
+                            validator: validateEmailAddress,
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        const _PremiumFieldLabel('PASSWORD'),
+
+                        const SizedBox(height: 7),
+
+                        _PremiumField(
+                          child: TextFormField(
+                            key: const Key('auth_password_field'),
+                            controller: passwordController,
+                            focusNode: passwordFocus,
+                            obscureText: obscure,
+                            autofillHints: [
+                              registerMode
+                                  ? AutofillHints.newPassword
+                                  : AutofillHints.password,
+                            ],
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) {
+                              if (!loading) {
+                                authenticate();
+                              }
+                            },
+                            style: roadAssistTextStyle(
+                              fontWeight: FontWeight.w500,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Enter your password',
+                              prefixIcon: const Icon(
+                                Icons.lock_outline_rounded,
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              suffixIcon: IconButton(
+                                tooltip: obscure
+                                    ? 'Show password'
+                                    : 'Hide password',
+                                onPressed: () {
+                                  setState(() {
+                                    obscure = !obscure;
+                                  });
+                                  updateJourney();
+                                },
+                                icon: Icon(
+                                  obscure
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              final password = value ?? '';
+
+                              if (password.length < 6) {
+                                return 'Enter at least 6 characters';
+                              }
+
+                              if (registerMode && password.length < 8) {
+                                return 'New passwords need at least 8 characters';
+                              }
+
+                              if (registerMode &&
+                                  (!RegExp(r'[A-Za-z]').hasMatch(password) ||
+                                      !RegExp(r'\d').hasMatch(password))) {
+                                return 'Include at least one letter and one number';
+                              }
+
+                              return null;
+                            },
+                          ),
+                        ),
+
+                        if (registerMode) ...[
+                          const SizedBox(height: 8),
+
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 14,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+
+                              const SizedBox(width: 6),
+
+                              Expanded(
+                                child: Text(
+                                  'Use 8+ characters with at least one letter and one number.',
+                                  style: roadAssistTextStyle(
+                                    fontSize: 10.5,
+                                    height: 1.4,
                                     color: colors.onSurfaceVariant,
                                   ),
                                 ),
-
-                                const SizedBox(width: 6),
-
-                                Expanded(
-                                  child: Text(
-                                    'Use 8+ characters with at least one letter and one number.',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10.5,
-                                      height: 1.4,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-
-                          if (!registerMode) ...[
-                            const SizedBox(height: 6),
-
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                key: const Key('auth_forgot_password'),
-                                onPressed: loading ? null : resetPassword,
-                                style: TextButton.styleFrom(
-                                  foregroundColor: roleAccent,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 3,
-                                    vertical: 7,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Forgot password?',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
                               ),
-                            ),
-
-                            const SizedBox(height: 8),
-                          ] else
-                            const SizedBox(height: 18),
-
-                          _GradientAuthButton(
-                            key: const Key('auth_submit_button'),
-                            accent: roleAccent,
-                            accentStrong: roleAccentStrong,
-                            icon: registerMode
-                                ? Icons.arrow_forward_rounded
-                                : Icons.login_rounded,
-                            label: loading
-                                ? registerMode
-                                      ? 'Creating accountâ€¦'
-                                      : 'Signing inâ€¦'
-                                : registerMode
-                                ? 'Create $roleName Account'
-                                : widget.isProvider
-                                ? 'Continue to Provider Dashboard'
-                                : 'Sign In as Driver',
-                            loading: loading,
-                            onPressed: loading ? null : authenticate,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            child: Row(
-                              children: [
-                                const Expanded(child: Divider()),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                  ),
-                                  child: Text(
-                                    'or',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ),
-                                const Expanded(child: Divider()),
-                              ],
-                            ),
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              key: const Key('auth_google_button'),
-                              onPressed: loading ? null : authenticateGoogle,
-                              style: OutlinedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? const Color(0xFF131314)
-                                    : Colors.white,
-                                foregroundColor:
-                                    Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? const Color(0xFFE3E3E3)
-                                    : const Color(0xFF1F1F1F),
-                                minimumSize: const Size.fromHeight(56),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                side: const BorderSide(
-                                  color: Color(0xFF747775),
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              icon: Image.asset(
-                                'assets/images/google_g.png',
-                                width: 20,
-                                height: 20,
-                              ),
-                              label: const Text(
-                                'Continue with Google',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
+                            ],
                           ),
                         ],
-                      ),
+
+                        if (!registerMode) ...[
+                          const SizedBox(height: 6),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              key: const Key('auth_forgot_password'),
+                              onPressed: loading ? null : resetPassword,
+                              style: TextButton.styleFrom(
+                                foregroundColor: roleAccent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                  vertical: 7,
+                                ),
+                              ),
+                              child: Text(
+                                'Forgot password?',
+                                style: roadAssistTextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+                        ] else
+                          const SizedBox(height: 18),
+
+                        _GradientAuthButton(
+                          key: const Key('auth_submit_button'),
+                          accent: roleAccent,
+                          accentStrong: roleAccentStrong,
+                          icon: Icons.arrow_forward_rounded,
+                          label: loading
+                              ? (registerMode
+                                    ? 'Creating account...'
+                                    : 'Signing in...')
+                              : registerMode
+                              ? 'Create $roleName Account'
+                              : 'Sign in',
+                          loading: loading,
+                          onPressed: loading ? null : authenticate,
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              child: Text(
+                                'or continue with',
+                                style: roadAssistTextStyle(
+                                  fontSize: 10,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        OutlinedButton.icon(
+                          key: const Key('auth_google_button'),
+                          onPressed: loading ? null : authenticateGoogle,
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF2F7FB),
+                            foregroundColor: const Color(0xFF203342),
+                            minimumSize: const Size.fromHeight(54),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          icon: Image.asset(
+                            'assets/images/google_g.png',
+                            width: 20,
+                            height: 20,
+                          ),
+                          label: const Text('Continue with Google'),
+                        ),
+                        const SizedBox(height: 14),
+                        Center(
+                          child: TextButton(
+                            onPressed: loading
+                                ? null
+                                : registerMode
+                                ? () {
+                                    setState(() => registerMode = false);
+                                    updateJourney();
+                                  }
+                                : beginRegistration,
+                            child: Text(
+                              registerMode
+                                  ? 'Already have an account? Sign in'
+                                  : 'New here? Create account',
+                            ),
+                          ),
+                        ),
+                        if (registerMode)
+                          Center(
+                            child: TextButton(
+                              onPressed: loading ? null : beginRegistration,
+                              child: const Text('Change account type'),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 15),
-
-                _AuthSecurityNote(
-                  isProvider: widget.isProvider,
-                  accent: roleAccent,
+                const SizedBox(height: 12),
+                Text(
+                  registerMode
+                      ? isProvider
+                            ? 'Verify your email, then submit documents for admin review.'
+                            : 'Email verification is required before your first journey.'
+                      : 'Your account. Your journey. Securely connected.',
+                  textAlign: TextAlign.center,
+                  style: roadAssistTextStyle(
+                    fontSize: 10,
+                    height: 1.6,
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
-
-                if (!widget.isProvider) ...[
-                  const SizedBox(height: 11),
-
+                if (!registerMode) ...[
+                  const SizedBox(height: 16),
                   _EmergencyGuestButton(
-                    onTap: () {
-                      replace(context, const DriverShell());
-                    },
+                    onTap: () => replace(context, const DriverShell()),
                   ),
                 ],
-
-                const SizedBox(height: 24),
-
-                Center(
-                  child: Text(
-                    'RoadAssist â€¢ Sri Lanka',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: colors.onSurfaceVariant.withValues(alpha: .65),
-                      fontSize: 9.5,
-                      letterSpacing: .7,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -1221,10 +1325,6 @@ class _AuthFormState extends State<_AuthForm> {
     );
   }
 }
-
-// ============================================================
-// RESPONSIVE TOP BAR
-// ============================================================
 
 class _AuthTopBar extends StatelessWidget {
   const _AuthTopBar({required this.accent});
@@ -1288,7 +1388,7 @@ class _AuthTopBar extends StatelessWidget {
                           ],
                         ),
                         maxLines: 1,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: brandFontSize,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.6,
@@ -1347,303 +1447,6 @@ class _AuthCircleAction extends StatelessWidget {
 // HERO
 // ============================================================
 
-class _AuthHero extends StatelessWidget {
-  const _AuthHero({
-    required this.isProvider,
-    required this.registerMode,
-    required this.accent,
-    required this.accentStrong,
-  });
-
-  final bool isProvider;
-  final bool registerMode;
-  final Color accent;
-  final Color accentStrong;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    final title = registerMode
-        ? isProvider
-              ? 'Grow your roadside\nservice business.'
-              : 'Roadside help starts\nwith your account.'
-        : isProvider
-        ? 'Welcome back,\nservice professional.'
-        : 'Get back on the road\nwith confidence.';
-
-    final body = registerMode
-        ? isProvider
-              ? 'Create your provider profile, complete verification and start receiving eligible assistance requests.'
-              : 'Save your vehicles, request roadside help, compare provider quotes and follow every job live.'
-        : isProvider
-        ? 'Manage requests, quotes, active jobs, earnings and customer conversations from one place.'
-        : 'Access your vehicles, assistance requests, messages, invoices and roadside history.';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: .11),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: accent.withValues(alpha: .20)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isProvider
-                    ? Icons.engineering_rounded
-                    : Icons.directions_car_rounded,
-                size: 14,
-                color: accent,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${isProvider ? 'PROVIDER' : 'DRIVER'} ACCESS',
-                style: GoogleFonts.plusJakartaSans(
-                  color: accent,
-                  fontSize: 9,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 15),
-
-        Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 30,
-            height: 1.10,
-            letterSpacing: -1.1,
-            fontWeight: FontWeight.w800,
-            color: colors.onSurface,
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        Text(
-          body,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 13,
-            height: 1.58,
-            color: colors.onSurfaceVariant,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _AuthMiniBadge(
-              icon: Icons.verified_user_outlined,
-              text: isProvider ? 'Verified professionals' : 'Secure assistance',
-              accent: accent,
-            ),
-            _AuthMiniBadge(
-              icon: Icons.location_on_outlined,
-              text: 'Sri Lanka',
-              accent: accentStrong,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ============================================================
-// RESPONSIVE MINI BADGE
-// ============================================================
-
-class _AuthMiniBadge extends StatelessWidget {
-  const _AuthMiniBadge({
-    required this.icon,
-    required this.text,
-    required this.accent,
-  });
-
-  final IconData icon;
-  final String text;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 210),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Icon(icon, size: 13, color: accent),
-          ),
-
-          const SizedBox(width: 5),
-
-          Flexible(
-            child: Text(
-              text,
-              softWrap: true,
-              maxLines: 2,
-              overflow: TextOverflow.visible,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10.5,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// MODE SWITCH
-// ============================================================
-
-class _AuthModeSwitcher extends StatelessWidget {
-  const _AuthModeSwitcher({
-    required this.registerMode,
-    required this.loading,
-    required this.accent,
-    required this.onSignIn,
-    required this.onRegister,
-  });
-
-  final bool registerMode;
-  final bool loading;
-  final Color accent;
-
-  final VoidCallback onSignIn;
-  final VoidCallback onRegister;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: dark
-            ? Colors.white.withValues(alpha: .05)
-            : const Color(0xFFE9F1F7),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: .30)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _AuthModeButton(
-              key: const Key('auth_sign_in_tab'),
-              label: 'Sign In',
-              selected: !registerMode,
-              accent: accent,
-              onTap: loading ? null : onSignIn,
-            ),
-          ),
-
-          Expanded(
-            child: _AuthModeButton(
-              key: const Key('auth_create_account_tab'),
-              label: 'Create Account',
-              selected: registerMode,
-              accent: accent,
-              onTap: loading ? null : onRegister,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthModeButton extends StatelessWidget {
-  const _AuthModeButton({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final Color accent;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      decoration: BoxDecoration(
-        color: selected
-            ? dark
-                  ? const Color(0xFF13283A)
-                  : Colors.white
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: dark ? .15 : .05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected
-                    ? accent
-                    : Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// PREMIUM INPUT FIELD
-// ============================================================
-
 class _PremiumField extends StatelessWidget {
   const _PremiumField({required this.child});
 
@@ -1688,7 +1491,7 @@ class _PremiumFieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: GoogleFonts.plusJakartaSans(
+      style: roadAssistTextStyle(
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 9,
         letterSpacing: 1.05,
@@ -1738,7 +1541,7 @@ class _GradientAuthButton extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [accent, accentStrong],
+              colors: [const Color(0xFFA2E0FF), accent],
             ),
             borderRadius: BorderRadius.circular(17),
             boxShadow: disabled
@@ -1756,33 +1559,32 @@ class _GradientAuthButton extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   if (loading)
                     const SizedBox.square(
                       dimension: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: const Color(0xFF092940),
                       ),
-                    )
-                  else
-                    Icon(icon, size: 19, color: Colors.white),
+                    ),
+                  if (loading) const SizedBox(width: 9),
 
-                  const SizedBox(width: 9),
-
-                  Flexible(
+                  Expanded(
                     child: Text(
                       label,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white,
+                      textAlign: TextAlign.left,
+                      style: roadAssistTextStyle(
+                        color: const Color(0xFF092940),
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -.15,
                       ),
                     ),
                   ),
+                  if (!loading)
+                    Icon(icon, size: 19, color: const Color(0xFF092940)),
                 ],
               ),
             ),
@@ -1795,68 +1597,6 @@ class _GradientAuthButton extends StatelessWidget {
 
 // ============================================================
 // SECURITY / VERIFICATION NOTE
-// ============================================================
-
-class _AuthSecurityNote extends StatelessWidget {
-  const _AuthSecurityNote({required this.isProvider, required this.accent});
-
-  final bool isProvider;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: dark
-            ? Colors.white.withValues(alpha: .035)
-            : Colors.white.withValues(alpha: .68),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.outlineVariant.withValues(alpha: .34)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: .11),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(
-              isProvider ? Icons.verified_user_outlined : Icons.shield_outlined,
-              color: accent,
-              size: 18,
-            ),
-          ),
-
-          const SizedBox(width: 11),
-
-          Expanded(
-            child: Text(
-              isProvider
-                  ? 'Provider accounts require verification before roadside jobs become available.'
-                  : 'Your RoadAssist account keeps vehicles, requests, messages and assistance history together.',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 10.8,
-                height: 1.5,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================
-// EMERGENCY GUEST BUTTON
 // ============================================================
 
 class _EmergencyGuestButton extends StatelessWidget {
@@ -1895,7 +1635,7 @@ class _EmergencyGuestButton extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Need urgent help? Continue as guest',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                     color: colors.onSurface,

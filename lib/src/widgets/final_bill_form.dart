@@ -2,12 +2,13 @@ part of '../screens.dart';
 
 Future<Map<String, dynamic>?> requestFinalBill(
   BuildContext context,
-  Map<String, dynamic> data,
-) => showModalBottomSheet<Map<String, dynamic>>(
+  Map<String, dynamic> data, {
+  bool estimate = false,
+}) => showModalBottomSheet<Map<String, dynamic>>(
   context: context,
   isScrollControlled: true,
   useSafeArea: true,
-  builder: (_) => _FinalBillForm(data: data),
+  builder: (_) => _FinalBillForm(data: data, estimate: estimate),
 );
 
 class _BillItemFields {
@@ -27,7 +28,8 @@ class _BillItemFields {
 }
 
 class _FinalBillForm extends StatefulWidget {
-  const _FinalBillForm({required this.data});
+  const _FinalBillForm({required this.data, this.estimate = false});
+  final bool estimate;
   final Map<String, dynamic> data;
   @override
   State<_FinalBillForm> createState() => _FinalBillFormState();
@@ -54,6 +56,12 @@ class _FinalBillFormState extends State<_FinalBillForm> {
     }
     super.dispose();
   }
+
+  bool get needsWorkApproval =>
+      !widget.estimate &&
+      widget.data['workApprovalRequired'] == true &&
+      items.isNotEmpty &&
+      widget.data['workEstimate']?['status'] != 'approved';
 
   int get total =>
       (widget.data['dispatchFee'] as num).toInt() +
@@ -95,10 +103,19 @@ class _FinalBillFormState extends State<_FinalBillForm> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Final service bill',
+            widget.estimate
+                ? 'Agree work before starting'
+                : 'Final service bill',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 12),
+          if (widget.estimate)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Describe the proposed work in the service summary. The driver approves these amounts before parts are replaced. The final bill can be lower.',
+              ),
+            ),
           Text('Visit fee (fixed): Rs. ${widget.data['dispatchFee']}'),
           const SizedBox(height: 12),
           moneyField(inspection, 'Inspection fee'),
@@ -155,34 +172,47 @@ class _FinalBillFormState extends State<_FinalBillForm> {
           const Text(
             'The driver reviews this bill once, then accepts and pays. Explain every replacement or additional charge.',
           ),
+          if (needsWorkApproval)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                'Replacement parts need approval before you finish. Go back to work and choose Agree work & parts to send an estimate.',
+              ),
+            ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: () {
-              if (!form.currentState!.validate()) return;
-              if (total > 10000000) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('The bill exceeds the supported total.'),
-                  ),
-                );
-                return;
-              }
-              Navigator.pop(context, <String, dynamic>{
-                'inspectionFee': int.parse(inspection.text),
-                'labourFee': int.parse(labour.text),
-                'items': items
-                    .map(
-                      (i) => <String, dynamic>{
-                        'label': i.label.text.trim(),
-                        'reason': i.reason.text.trim(),
-                        'amount': int.parse(i.amount.text),
-                      },
-                    )
-                    .toList(),
-              });
-            },
+            onPressed: needsWorkApproval
+                ? null
+                : () {
+                    if (!form.currentState!.validate()) return;
+                    if (total > 10000000) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'The bill exceeds the supported total.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, <String, dynamic>{
+                      'inspectionFee': int.parse(inspection.text),
+                      'labourFee': int.parse(labour.text),
+                      'items': items
+                          .map(
+                            (i) => <String, dynamic>{
+                              'label': i.label.text.trim(),
+                              'reason': i.reason.text.trim(),
+                              'amount': int.parse(i.amount.text),
+                            },
+                          )
+                          .toList(),
+                    });
+                  },
             icon: const Icon(Icons.send_outlined),
-            label: const Text('Send Final Bill'),
+            label: Text(
+              widget.estimate ? 'Request work approval' : 'Send Final Bill',
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -197,6 +227,17 @@ class _FinalBillFormState extends State<_FinalBillForm> {
 class FinalBillBreakdown extends StatelessWidget {
   const FinalBillBreakdown({super.key, required this.data});
   final Map<String, dynamic> data;
+  int get discount {
+    final subtotal = [
+      'dispatchFee',
+      'inspectionFee',
+      'serviceFee',
+      'extraFee',
+    ].fold<int>(0, (sum, key) => sum + (data[key] as num? ?? 0).toInt());
+    final total = (data['finalCost'] as num?)?.toInt() ?? subtotal;
+    return subtotal > total ? subtotal - total : 0;
+  }
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -235,6 +276,16 @@ class FinalBillBreakdown extends StatelessWidget {
                 item['reason']?.toString() ?? '',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+            ],
+          ),
+        ),
+      if (discount > 0)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              const Expanded(child: Text('Discount agreed')),
+              Text('- Rs. ${ServiceInvoice.money(discount)}'),
             ],
           ),
         ),

@@ -73,3 +73,60 @@ test('checkout tolerates a stale empty lock and preserves another active job loc
  assert.equal((await f.call('checkout',{requestId:'job',expectedFinalCost:f.docs.get('requests/job').finalCost,checkoutMethod:'cash'})).code,200);
  assert.equal(f.docs.get('providerDirectory/provider').activeRequestId,lock);assert.equal(f.docs.get('users/provider').activeRequestId,lock);}
 });
+
+test('parts need advance approval and approved work caps each bill line',async()=>{
+ const f=fixture();await f.arrived();f.docs.get('requests/job').workApprovalRequired=true;
+ assert.equal((await f.call('bill',bill,'provider')).code,409);
+ assert.equal((await f.call('estimate',bill,'provider')).code,200);
+ assert.equal(f.docs.get('requests/job').completionState,undefined);
+ const revision=f.docs.get('requests/job').workEstimate.revision;
+ assert.equal((await f.call('bill',bill,'provider')).code,409);
+ assert.equal((await f.call('decide_estimate',{requestId:'job',revision,approve:true},'provider')).code,403);
+ assert.equal((await f.call('decide_estimate',{requestId:'job',revision:revision+1,approve:true})).code,409);
+ assert.equal((await f.call('decide_estimate',{requestId:'job',revision,approve:true})).code,200);
+ for(const changes of [{labourFee:501},{inspectionFee:201},{items:[{...bill.items[0],label:'Unapproved part'}]},{items:[bill.items[0],bill.items[0]]}]) assert.equal((await f.call('bill',{...bill,...changes},'provider')).code,409);
+ assert.equal((await f.call('bill',{...bill,labourFee:400},'provider')).code,200);
+ assert.ok(f.docs.get('requests/job').serviceCompletedAt);
+ assert.equal(f.docs.get('requests/job').status,'arrived');
+ assert.equal(f.docs.get('requests/job').driverReportedPayment,undefined);
+ assert.equal(f.docs.get('providerDirectory/provider').activeRequestId,null);
+ assert.equal(f.docs.get('users/provider').activeRequestId,null);
+ assert.equal(f.docs.get('providerDirectory/provider').online,true);
+});
+test('declined or pending work cannot authorize replacement parts',async()=>{
+ const f=fixture();await f.arrived();f.docs.get('requests/job').workApprovalRequired=true;
+ await f.call('estimate',bill,'provider');
+ assert.equal((await f.call('estimate',bill,'provider')).code,409);
+ assert.equal((await f.call('decide_estimate',{requestId:'job',revision:1,approve:false})).code,200);
+ assert.equal((await f.call('bill',bill,'provider')).code,409);
+ assert.equal((await f.call('bill',{...bill,items:[],labourFee:0},'provider')).code,200);
+});
+test('finishing an old visit never releases the provider newer job lock',async()=>{
+ const f=fixture();await f.arrived();f.docs.get('requests/job').workApprovalRequired=true;
+ f.docs.get('providerDirectory/provider').activeRequestId='newer-job';f.docs.get('users/provider').activeRequestId='newer-job';
+ assert.equal((await f.call('bill',{...bill,items:[]},'provider')).code,200);
+ assert.equal(f.docs.get('providerDirectory/provider').activeRequestId,'newer-job');
+ assert.equal(f.docs.get('users/provider').activeRequestId,'newer-job');
+});
+test('finished service corrections cannot increase an approved work budget',async()=>{
+ const f=fixture();await f.arrived();f.docs.get('requests/job').workApprovalRequired=true;
+ await f.call('estimate',bill,'provider');await f.call('decide_estimate',{requestId:'job',revision:1,approve:true});await f.call('bill',bill,'provider');
+ await f.call('correct',{requestId:'job',reason:'Please check the labour charge.'});
+ assert.equal((await f.call('estimate',bill,'provider')).code,409);
+ assert.equal((await f.call('bill',{...bill,labourFee:700},'provider')).code,409);
+ assert.equal((await f.call('bill',{...bill,labourFee:300},'provider')).code,200);
+ assert.equal(f.docs.get('requests/job').billRevision,2);
+});
+
+test('numeric datastore failures return a retryable server response',async()=>{
+ const handler=createBillingHandler({loadAdmin:async()=>{throw {code:14};}});
+ const res={setHeader(){},status(code){this.code=code;return this;},json(body){this.body=body;return this;}};
+ await handler({method:'POST',headers:{authorization:'Bearer test'},body:{action:'checkout',requestId:'job'}},res);
+ assert.equal(res.code,500);assert.match(res.body.message,/retry/);
+});
+
+test('a stale profile reference to finished service does not block another visit',async()=>{
+ const f=fixture();await f.request();f.docs.set('requests/old-visit',{status:'arrived',serviceCompletedAt:ts(Date.now()),completionState:'pending'});f.docs.get('users/provider').activeRequestId='old-visit';
+ assert.equal((await f.call('accept',{requestId:'job'},'provider')).code,200);
+ assert.equal(f.docs.get('requests/old-visit').completionState,'pending');
+});

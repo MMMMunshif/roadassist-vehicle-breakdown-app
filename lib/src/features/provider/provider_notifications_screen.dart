@@ -48,42 +48,10 @@ class _ProviderNotificationsScreenState
           ),
           const SizedBox(height: 18),
           Text(
-            'Nearby requests',
+            'New requests',
             style: _providerText(context, size: 24, weight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
-          LayoutBuilder(
-            builder: (context, constraints) => SegmentedButton<bool>(
-              showSelectedIcon: false,
-              expandedInsets: EdgeInsets.zero,
-              segments: const [
-                ButtonSegment(value: false, label: Text('Available')),
-                ButtonSegment(value: true, label: Text('Offers sent')),
-              ],
-              selected: {offersOnly},
-              onSelectionChanged: (value) =>
-                  setState(() => offersOnly = value.first),
-              style: ButtonStyle(
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                ),
-                backgroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? Theme.of(context).colorScheme.primary
-                      : _providerSurface(context),
-                ),
-                foregroundColor: WidgetStateProperty.resolveWith(
-                  (states) => states.contains(WidgetState.selected)
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurface,
-                ),
-                textStyle: WidgetStatePropertyAll(
-                  _providerText(context, size: 13, weight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
           Text(
             'Matches your services and service radius.',
             style: _providerText(context, size: 12, muted: true),
@@ -332,7 +300,7 @@ class _RaProviderOffersListState extends State<_RaProviderOffersList> {
       return const LinearProgressIndicator();
     }
     final requests = widget.requests
-        .where((request) => offers[request.id] == widget.offersOnly)
+        .where((request) => !widget.offersOnly || offers[request.id] == true)
         .toList();
     if (requests.isEmpty) {
       return RaProviderEmptyCard(
@@ -353,7 +321,7 @@ class _RaProviderOffersListState extends State<_RaProviderOffersList> {
             key: ValueKey(requests[i].id),
             request: requests[i],
             directory: widget.directory,
-            offerSent: widget.offersOnly,
+            offerSent: offers[requests[i].id] == true,
           ),
         ],
       ],
@@ -439,6 +407,7 @@ class _RaProviderNotificationRequestCardState
           'Location unavailable',
       time: time,
       distance: distance,
+      visitFee: data['dispatchFee'] is num ? data['dispatchFee'] as num : null,
       priority: isHighPriority(priority)
           ? requestPriorityLabel(priority)
           : null,

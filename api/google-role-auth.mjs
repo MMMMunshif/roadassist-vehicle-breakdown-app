@@ -11,8 +11,10 @@ export function createGoogleRoleAuthHandler({getServices=services, enabled=()=>p
     if(req.method==='OPTIONS') return res.status(204).end();
     if(req.method!=='POST') return res.status(405).json({code:'method-not-allowed'});
     if(!enabled()) return res.status(503).json({code:'role-auth-unavailable'});
-    const {role,displayName,phone,photoData}=req.body??{};
-    if(!['driver','provider'].includes(role)) return res.status(400).json({code:'invalid-argument'});
+    let {role}=req.body??{};
+    const {displayName,phone,photoData}=req.body??{};
+    const automatic=role==='auto';
+    if(!['driver','provider','auto'].includes(role)) return res.status(400).json({code:'invalid-argument'});
     const token=req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
     if(!token) return res.status(401).json({code:'invalid-credential'});
     try {
@@ -22,7 +24,7 @@ export function createGoogleRoleAuthHandler({getServices=services, enabled=()=>p
       if(proof.firebase?.sign_in_provider!=='google.com'||proof.email_verified!==true||!proof.email)
         return res.status(401).json({code:'invalid-credential'});
       const email=proof.email.trim().toLowerCase();
-      const identity=roleAddress(email,role);
+      const identity=roleAddress(email,automatic?'driver':role);
       const key=createHash('sha256').update(`google:${proof.uid}:${role}`).digest('hex');
       const allowed=await db.runTransaction(async tx=>{
         const ref=db.doc(`roleAuthLimits/${key}`), snap=await tx.get(ref), now=Date.now();
@@ -38,6 +40,18 @@ export function createGoogleRoleAuthHandler({getServices=services, enabled=()=>p
       for(const uid of principals){
         const moderation=(await db.doc(`accountModeration/${uid}`).get()).data();
         if(['suspended','disabled','deleted'].includes(moderation?.status)) return res.status(403).json({code:'user-disabled'});
+      }
+      if(automatic){
+        const roles=[];
+        for(const candidate of ['driver','provider']){
+          const found=await resolveRoleUser(auth,db,email,candidate);
+          if(!found||found.user.disabled) continue;
+          const moderation=(await db.doc(`accountModeration/${found.user.uid}`).get()).data();
+          if(!['suspended','disabled','deleted'].includes(moderation?.status)) roles.push(candidate);
+        }
+        if(!roles.length) return res.status(400).json({code:'profile-details-required'});
+        if(roles.length>1) return res.status(200).json({roles});
+        role=roles[0];
       }
       let account=await resolveRoleUser(auth,db,email,role);
       if(!account){
@@ -55,7 +69,7 @@ export function createGoogleRoleAuthHandler({getServices=services, enabled=()=>p
       if(account.user.disabled||['suspended','disabled','deleted'].includes(moderation?.status)) return res.status(403).json({code:'user-disabled'});
       // Verified Google ownership can verify the matching contact email, without changing its password/profile.
       if(!account.user.emailVerified) await auth.updateUser(account.user.uid,{emailVerified:true});
-      return res.status(200).json({customToken:await auth.createCustomToken(account.user.uid)});
+      return res.status(200).json({customToken:await auth.createCustomToken(account.user.uid),role});
     } catch(e){
       if(e.code==='auth/email-already-exists') return res.status(409).json({code:'account-conflict'});
       console.error('Google role sign-in failed',e.code??e.name);

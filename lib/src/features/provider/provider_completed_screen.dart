@@ -140,7 +140,7 @@ class _ProviderCompletedContent extends StatelessWidget {
             Expanded(
               child: Text(
                 completed ? 'Job Completed' : 'Completion Submitted',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
@@ -488,7 +488,7 @@ class _ProviderCompletedSectionHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: -.3,
@@ -497,7 +497,7 @@ class _ProviderCompletedSectionHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -560,7 +560,7 @@ class _ProviderCompletedRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -570,7 +570,7 @@ class _ProviderCompletedRow extends StatelessWidget {
 
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     fontWeight: FontWeight.w700,
@@ -635,7 +635,7 @@ class _ProviderCompletedTotal extends StatelessWidget {
               children: [
                 Text(
                   'FINAL SERVICE TOTAL',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -647,7 +647,7 @@ class _ProviderCompletedTotal extends StatelessWidget {
 
                 Text(
                   total,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
@@ -738,7 +738,7 @@ class _ProviderCompletedPayment extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -748,7 +748,7 @@ class _ProviderCompletedPayment extends StatelessWidget {
 
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -759,7 +759,7 @@ class _ProviderCompletedPayment extends StatelessWidget {
 
                 Text(
                   'RoadAssist records payment confirmation but does not process an in-app payment for this service.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -857,7 +857,8 @@ class _ProviderCompletedContactCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -878,7 +879,7 @@ class _ProviderCompletedContactCard extends StatelessWidget {
                   children: [
                     Text(
                       driverName,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -888,7 +889,7 @@ class _ProviderCompletedContactCard extends StatelessWidget {
 
                     Text(
                       'Service customer',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),

@@ -108,10 +108,7 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Notifications',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
       ),
       body: !signedIn
@@ -176,7 +173,8 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                     const SizedBox(height: 15),
 
                     Container(
-                      decoration: BoxDecoration(
+                      decoration: RaPremiumDecoration(
+                        context,
                         color: theme.brightness == Brightness.dark
                             ? const Color(0xFF0D2237)
                             : colors.surface,
@@ -196,7 +194,7 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                         Expanded(
                           child: Text(
                             'Request updates',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
@@ -204,7 +202,7 @@ class _DriverNotificationsScreenState extends State<DriverNotificationsScreen> {
                         ),
                         Text(
                           '${requests.length}',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: colors.onSurfaceVariant,
@@ -292,7 +290,7 @@ class _RaNotificationUpdatesHero extends StatelessWidget {
               children: [
                 Text(
                   'RoadAssist updates',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -303,7 +301,7 @@ class _RaNotificationUpdatesHero extends StatelessWidget {
                   count == 0
                       ? 'Important request activity will appear here.'
                       : '$count ${count == 1 ? 'request' : 'requests'} currently available in your update history.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: 12,
                     height: 1.4,
@@ -392,7 +390,8 @@ class _RaDriverNotificationCard extends StatelessWidget {
               Container(
                 width: 43,
                 height: 43,
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: tone.withValues(alpha: .08),
                   borderRadius: BorderRadius.circular(13),
                 ),
@@ -411,7 +410,7 @@ class _RaDriverNotificationCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             message,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               height: 1.35,
@@ -422,7 +421,7 @@ class _RaDriverNotificationCard extends StatelessWidget {
                           const SizedBox(width: 7),
                           Text(
                             time,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -437,7 +436,7 @@ class _RaDriverNotificationCard extends StatelessWidget {
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -451,7 +450,7 @@ class _RaDriverNotificationCard extends StatelessWidget {
                       children: [
                         Text(
                           'Open request',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: colors.primary,

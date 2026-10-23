@@ -154,7 +154,15 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
       return;
     }
 
-    push(context, ReviewScreen(draft: selectedDraft));
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .92,
+        child: ReviewScreen(draft: selectedDraft, compact: true),
+      ),
+    );
   }
 
   void resetSelectionIfMissing(
@@ -193,7 +201,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Choose Provider',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -223,7 +231,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
 
                   Text(
                     'How do you want to request help?',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -.35,
@@ -235,7 +243,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
 
                   Text(
                     'Choose an available provider. The automatic visit fee is shown before you confirm.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 13,
                       height: 1.4,
                       color: colors.onSurfaceVariant,
@@ -258,7 +266,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
                           children: [
                             Text(
                               'Available providers',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -.35,
@@ -269,7 +277,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
 
                             Text(
                               'Only verified, online and suitable providers are shown.',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -389,7 +397,7 @@ class _RaProvidersProgress extends StatelessWidget {
               ),
               child: Text(
                 'PROVIDER',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   letterSpacing: .8,
                   fontWeight: FontWeight.w700,
@@ -401,8 +409,8 @@ class _RaProvidersProgress extends StatelessWidget {
             const Spacer(),
 
             Text(
-              'Next: Review',
-              style: GoogleFonts.plusJakartaSans(
+              'STEP 3 OF 3',
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: colors.primary,
                 fontWeight: FontWeight.w700,
@@ -416,7 +424,7 @@ class _RaProvidersProgress extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
-            value: .88,
+            value: 1,
             minHeight: 5,
             backgroundColor: colors.surfaceContainerHighest,
           ),
@@ -478,7 +486,7 @@ class _RaProvidersHero extends StatelessWidget {
 
               Text(
                 'Choose how you get help',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -492,7 +500,7 @@ class _RaProvidersHero extends StatelessWidget {
                 width: 295,
                 child: Text(
                   'Choose your provider and review the distance-based visit fee.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white.withValues(alpha: .80),
                     fontSize: 13,
                     height: 1.45,
@@ -520,7 +528,8 @@ class _RaProviderLocationSummary extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -548,7 +557,7 @@ class _RaProviderLocationSummary extends StatelessWidget {
               children: [
                 Text(
                   'Provider search location',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -558,7 +567,7 @@ class _RaProviderLocationSummary extends StatelessWidget {
 
                 Text(
                   draft.location,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -569,7 +578,7 @@ class _RaProviderLocationSummary extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Landmark: ${draft.landmark}',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -635,7 +644,8 @@ class _RaProviderChoiceCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: selected
@@ -664,7 +674,7 @@ class _RaProviderChoiceCard extends StatelessWidget {
                                 name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -760,7 +770,7 @@ class _RaProviderChoiceCard extends StatelessWidget {
                         ),
                         child: Text(
                           service,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -781,7 +791,7 @@ class _RaProviderChoiceCard extends StatelessWidget {
                         ),
                         child: Text(
                           '+${services.length - 3}',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -813,7 +823,7 @@ class _RaProviderChoiceCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Provider location may be outdated. Confirm their location after connecting.',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             height: 1.4,
                             color: colors.onSurfaceVariant,
@@ -864,7 +874,7 @@ class _RaProviderBadge extends StatelessWidget {
 
           Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: tone,
@@ -895,7 +905,7 @@ class _RaProviderFact extends StatelessWidget {
 
         Text(
           value,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             color: colors.onSurfaceVariant,
           ),
@@ -916,7 +926,8 @@ class _RaNoProviders extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -944,7 +955,7 @@ class _RaNoProviders extends StatelessWidget {
           Text(
             'No matching provider online right now',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -955,7 +966,7 @@ class _RaNoProviders extends StatelessWidget {
           Text(
             'Please try again when a suitable provider is online.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.4,
               color: colors.onSurfaceVariant,
@@ -1037,7 +1048,7 @@ class _RaProvidersBottomBar extends StatelessWidget {
                         : 'Requesting $selectedProvider',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -1053,7 +1064,7 @@ class _RaProvidersBottomBar extends StatelessWidget {
               child: FilledButton.icon(
                 onPressed: selectedProvider == null ? null : onContinue,
                 icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('Review Request'),
+                label: const Text('Review visit fee'),
               ),
             ),
           ],

@@ -111,10 +111,7 @@ class _AdminAuditScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Audit Record',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
       body: ListView(
@@ -299,7 +296,8 @@ class _RaAdminAuditHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         borderRadius: BorderRadius.circular(23),
       ),
@@ -331,7 +329,7 @@ class _RaAdminAuditHero extends StatelessWidget {
                   kind,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     height: 1.2,
@@ -352,7 +350,7 @@ class _RaAdminAuditHero extends StatelessWidget {
                     Expanded(
                       child: Text(
                         createdAt,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
@@ -374,7 +372,7 @@ class _RaAdminAuditHero extends StatelessWidget {
             ),
             child: Text(
               'AUDIT',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
@@ -403,15 +401,12 @@ class _RaAdminAuditHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -434,7 +429,8 @@ class _RaAdminAuditSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -465,7 +461,7 @@ class _RaAdminAuditDetailField extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    final valueStyle = GoogleFonts.plusJakartaSans(
+    final valueStyle = roadAssistTextStyle(
       fontSize: 12,
       height: 1.4,
       fontWeight: FontWeight.w700,
@@ -483,7 +479,7 @@ class _RaAdminAuditDetailField extends StatelessWidget {
               const SizedBox(width: 7),
               Text(
                 label,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: colors.onSurfaceVariant,
@@ -548,7 +544,8 @@ class _RaAdminAuditDetailTextCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -563,7 +560,8 @@ class _RaAdminAuditDetailTextCard extends StatelessWidget {
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: tone.withValues(alpha: .07),
                   borderRadius: BorderRadius.circular(11),
                 ),
@@ -574,7 +572,7 @@ class _RaAdminAuditDetailTextCard extends StatelessWidget {
 
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
@@ -586,7 +584,7 @@ class _RaAdminAuditDetailTextCard extends StatelessWidget {
 
           SelectableText(
             value,
-            style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.55),
+            style: roadAssistTextStyle(fontSize: 12, height: 1.55),
           ),
         ],
       ),
@@ -629,7 +627,7 @@ class _RaAdminAuditNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -637,7 +635,7 @@ class _RaAdminAuditNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,

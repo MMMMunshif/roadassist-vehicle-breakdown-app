@@ -12,7 +12,9 @@ void main() {
       expect(find.text('FULL NAME'), findsOneWidget);
       expect(find.text('PHONE NUMBER'), findsOneWidget);
       expect(find.text('Driver photo'), findsOneWidget);
-      await tester.tap(find.text('Sign In').first);
+      await tester.ensureVisible(find.text('Already have an account? Sign in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Already have an account? Sign in'));
       await tester.pumpAndSettle();
       expect(find.text('FULL NAME'), findsNothing);
       expect(find.text('Driver photo'), findsNothing);
@@ -27,13 +29,13 @@ void main() {
     expect(find.text('FULL NAME'), findsOneWidget);
     expect(find.text('Create Provider Account'), findsWidgets);
     await tester.scrollUntilVisible(
-      find.textContaining('Provider accounts require verification'),
+      find.textContaining('submit documents for admin review'),
       250,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('Provider accounts require verification'),
+      find.textContaining('submit documents for admin review'),
       findsOneWidget,
     );
     expect(find.text('Driver photo'), findsNothing);

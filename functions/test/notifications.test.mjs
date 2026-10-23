@@ -49,3 +49,15 @@ test('completion, job start and discount notifications are transition-only',()=>
   }
   assert.ok(requestAlerts({...r,pendingDiscountId:'discount'},r).some(n=>n.uid==='d' && n.type==='discount_decision'));
 });
+
+test('visit acceptance notifies the driver instead of describing a selected quote',()=>{
+ const alerts=requestAlerts({status:'searching'},{status:'accepted',workflowVersion:3,driverId:'d',providerId:'p'});
+ assert.ok(alerts.some(a=>a.uid==='d'&&a.type==='provider_accepted'));
+ assert.equal(alerts.some(a=>a.type==='selected'),false);
+});
+test('work approval and bill correction notifications target the right participant',()=>{
+ const base={driverId:'d',providerId:'p',status:'arrived'};
+ assert.ok(requestAlerts(base,{...base,workEstimate:{status:'pending',revision:1}}).some(a=>a.uid==='d'&&a.type==='work_approval'));
+ assert.ok(requestAlerts({...base,workEstimate:{status:'pending',revision:1}},{...base,workEstimate:{status:'approved',revision:1}}).some(a=>a.uid==='p'&&a.type==='work_decision'));
+ assert.ok(requestAlerts({...base,completionState:'pending'},{...base,completionState:'revision_requested'}).some(a=>a.uid==='p'&&a.type==='bill_correction'));
+});

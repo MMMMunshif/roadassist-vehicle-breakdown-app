@@ -1,3 +1,6 @@
+import 'widgets/splash_rescue_scene.dart';
+import 'widgets/premium_style.dart';
+import 'widgets/auth_journey_scene.dart';
 import 'models/admin_audit_presentation.dart';
 import 'services/admin_identity_service.dart';
 import 'models/admin_earnings_report.dart';
@@ -8,8 +11,7 @@ import 'models/service_invoice.dart';
 import 'services/invoice_pdf_service.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' show FontVariation, ImageFilter;
-import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui' show ImageFilter;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:camera/camera.dart';
@@ -74,6 +76,7 @@ part 'widgets/complaint_progress_panel.dart';
 part 'widgets/completion_review_panel.dart';
 part 'widgets/final_bill_form.dart';
 part 'widgets/provider_earnings_panel.dart';
+part 'widgets/provider_daily_summary.dart';
 part 'features/auth/splash_screen.dart';
 part 'features/auth/legacy_welcome_screen.dart';
 part 'features/auth/welcome_screen.dart';
@@ -182,3 +185,5 @@ part 'features/chat/chat_inbox_screen.dart';
 part 'features/auth/auth_visuals.dart';
 
 part 'features/auth/role_email_gate.dart';
+
+part 'widgets/workflow_actions.dart';

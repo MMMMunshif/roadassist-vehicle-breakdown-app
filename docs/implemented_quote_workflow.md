@@ -1,5 +1,7 @@
 # Saved vehicles and driver-approved offers
 
+> This document describes legacy quote workflows. New requests follow the [simplified workflow](premium_workflow.md); existing quote jobs remain supported.
+
 Implemented locally on 4 October 2026.
 
 ## Driver walkthrough

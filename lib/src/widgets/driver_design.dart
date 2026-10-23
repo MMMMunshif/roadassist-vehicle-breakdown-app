@@ -116,7 +116,7 @@ class RaDriverServiceTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(icon, color: colors.primary, size: 26),
+                    RaPremiumServiceIcon(icon: icon, color: colors.primary, size: 34),
                     const Spacer(),
                     if (selected)
                       Icon(

@@ -1,7 +1,8 @@
+import 'widgets/premium_style.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui' as ui;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -63,6 +64,53 @@ class RaRadius {
 // TYPE SCALE â€” one place for every recurring text role so
 // screens stop inventing their own TextStyle each time.
 // ============================================================
+/// Bundled typography: no network fetch or runtime font-family swap.
+TextStyle roadAssistTextStyle({
+  TextStyle? textStyle,
+  Color? color,
+  Color? backgroundColor,
+  double? fontSize,
+  FontWeight? fontWeight,
+  FontStyle? fontStyle,
+  double? letterSpacing,
+  double? wordSpacing,
+  TextBaseline? textBaseline,
+  double? height,
+  Locale? locale,
+  ui.Paint? foreground,
+  ui.Paint? background,
+  List<ui.Shadow>? shadows,
+  List<ui.FontFeature>? fontFeatures,
+  List<ui.FontVariation>? fontVariations,
+  TextDecoration? decoration,
+  Color? decorationColor,
+  TextDecorationStyle? decorationStyle,
+  double? decorationThickness,
+}) => (textStyle ?? const TextStyle()).copyWith(
+  fontFamily: 'PlusJakartaSans',
+  color: color,
+  backgroundColor: backgroundColor,
+  fontSize: fontSize,
+  fontWeight: fontWeight,
+  fontStyle: fontStyle,
+  letterSpacing: letterSpacing,
+  wordSpacing: wordSpacing,
+  textBaseline: textBaseline,
+  height: height,
+  locale: locale,
+  foreground: foreground,
+  background: background,
+  shadows: shadows,
+  fontFeatures: fontFeatures,
+  fontVariations: fontVariations,
+  decoration: decoration,
+  decorationColor: decorationColor,
+  decorationStyle: decorationStyle,
+  decorationThickness: decorationThickness,
+);
+TextTheme roadAssistTextTheme([TextTheme? theme]) =>
+    (theme ?? ThemeData.light().textTheme).apply(fontFamily: 'PlusJakartaSans');
+
 class RaText {
   static const eyebrow = TextStyle(
     fontSize: 11,

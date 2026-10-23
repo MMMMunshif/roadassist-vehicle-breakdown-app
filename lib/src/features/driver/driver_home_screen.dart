@@ -12,6 +12,7 @@ class DriverHomeScreen extends StatefulWidget {
 }
 
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
+  final selectedHomeServices = <String>{};
   String locationLabel = 'Location not set';
 
   bool updatingLocation = false;
@@ -20,6 +21,29 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   locationProfileSubscription;
+
+  Future<void> startAssistance() async {
+    final store = RequestDraftStore();
+    final draft = await store.load();
+    final submitted = await store.submissionId();
+    if (!mounted) return;
+    if (draft != null && submitted != null) {
+      push(context, ReviewScreen(draft: draft));
+      return;
+    }
+    final selectedDraft = draft != null && selectedHomeServices.isNotEmpty
+        ? draft.copyWith(issues: selectedHomeServices.toList())
+        : draft;
+    push(
+      context,
+      BreakdownDetailsScreen(
+        issues: selectedHomeServices.isNotEmpty
+            ? selectedHomeServices.toList()
+            : selectedDraft?.issues ?? const [],
+        initialDraft: selectedDraft,
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -197,7 +221,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           child: Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: dark ? const Color(0xFF0C1B29) : colors.surface,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
@@ -235,7 +260,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         children: [
                           Text(
                             'Set your location',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: colors.onSurface,
@@ -244,7 +269,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           const SizedBox(height: 3),
                           Text(
                             'Enter a street, city or nearby landmark.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 13,
                               height: 1.4,
                               color: colors.onSurfaceVariant,
@@ -311,7 +336,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
         return Container(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: dark ? const Color(0xFF0C1B29) : colors.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -335,7 +361,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'Update location',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: colors.onSurface,
@@ -349,7 +375,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'RoadAssist uses this to show relevant nearby providers.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -432,7 +458,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               ),
               const SizedBox(height: 5),
               Text(
-                'Wherever you go,\nwe are here.',
+                'How can we help?',
                 style: _providerText(
                   context,
                   size: 26,
@@ -521,66 +547,114 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // HERO
   // ===========================================================================
 
-  Widget _buildAssistanceHero(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(22),
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFF0062DB), Color(0xFF009AF5)],
-      ),
-    ),
-    child: Column(
+  Widget _buildAssistanceHero(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    const services = [
+      ('General Mechanic', 'Mechanic', Icons.car_repair_outlined),
+      ('Flat Tyre', 'Flat tyre', Icons.tire_repair_outlined),
+      ('Battery Jumpstart', 'Battery', Icons.battery_charging_full_rounded),
+      ('Vehicle Towing', 'Towing', Icons.fire_truck_outlined),
+    ];
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.car_repair_outlined,
-              color: Colors.white,
-              size: 30,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Need roadside help?',
-                    style: _providerText(
-                      context,
-                      size: 20,
-                      weight: FontWeight.w700,
-                    ).copyWith(color: Colors.white),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Find nearby assistance and compare provider quotes.',
-                    style: _providerText(
-                      context,
-                      size: 14,
-                    ).copyWith(color: Colors.white.withValues(alpha: .88)),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        Text(
+          'Select a service',
+          style: _providerText(context, size: 18, weight: FontWeight.w800),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, box) {
+            final columns =
+                box.maxWidth < 300 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 21
+                ? 1
+                : 2;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final item in services)
+                  SizedBox(
+                    width: (box.maxWidth - (columns - 1) * 10) / columns,
+                    child: Semantics(
+                      button: true,
+                      selected: selectedHomeServices.contains(item.$1),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(19),
+                        clipBehavior: Clip.antiAlias,
+                        child: Ink(
+                          decoration: RaPremiumDecoration(
+                            context,
+                            color: _providerSurface(context),
+                            borderRadius: BorderRadius.circular(19),
+                            border: Border.all(
+                              color: selectedHomeServices.contains(item.$1)
+                                  ? colors.primary
+                                  : RaPremiumPalette.edge(context),
+                              width: selectedHomeServices.contains(item.$1)
+                                  ? 1.6
+                                  : 1,
+                            ),
+                          ),
+                          child: InkWell(
+                            onTap: () => setState(() {
+                              if (!selectedHomeServices.add(item.$1))
+                                selectedHomeServices.remove(item.$1);
+                            }),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  RaPremiumServiceIcon(
+                                    icon: item.$3,
+                                    size: 44,
+                                    color: colors.primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      item.$2,
+                                      style: _providerText(
+                                        context,
+                                        size: 14,
+                                        weight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  if (selectedHomeServices.contains(item.$1))
+                                    Icon(
+                                      Icons.check_circle_rounded,
+                                      size: 17,
+                                      color: colors.primary,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 16),
         FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF0062DB),
-          ),
-          onPressed: () => push(context, const AssistanceTypeScreen()),
+          onPressed: startAssistance,
           icon: const Icon(Icons.arrow_forward_rounded),
           label: const Text('Request Assistance'),
         ),
+        const SizedBox(height: 9),
+        Text(
+          'Review the visit fee before you request. Final bill after the service.',
+          style: _providerText(context, size: 13, muted: true),
+        ),
       ],
-    ),
-  );
+    );
+  }
 
   Widget _buildSavedVehicleCard(String? defaultId) {
     final theme = Theme.of(context);
@@ -607,132 +681,77 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         final loading = signedIn && !snapshot.hasError && !snapshot.hasData;
 
         return _DriverHomeSurface(
-          onTap: () {
-            push(context, const VehiclesScreen());
-          },
+          onTap: () => push(context, const VehiclesScreen()),
           padding: const EdgeInsets.all(16),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 82,
-                height: 70,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest.withValues(alpha: .55),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: selected == null
-                    ? Icon(
-                        Icons.directions_car_outlined,
-                        size: 36,
-                        color: colors.primary,
-                      )
-                    : VehiclePhotoPreview(
-                        model: selected.label,
-                        photoData: selected.photoData,
-                        height: 70,
-                        compact: true,
-                      ),
-              ),
-
-              const SizedBox(width: 14),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'YOUR VEHICLE',
-                            style: GoogleFonts.plusJakartaSans(
-                              color: colors.onSurfaceVariant,
-                              fontSize: 12,
-                              letterSpacing: 1,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-
-                        if (selected != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withValues(alpha: .09),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              'Default',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: colors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    Text(
-                      selected == null
-                          ? loading
-                                ? 'Loading vehicle…'
-                                : snapshot.hasError
-                                ? 'Vehicles unavailable'
-                                : 'Add a vehicle'
-                          : '${selected.make} ${selected.model}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: colors.onSurface,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      selected == null
-                          ? 'Manage saved vehicles'
-                          : '${selected.year}  •  ${selected.fuelType}  •  ${selected.transmission}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'YOUR VEHICLE',
+                      style: roadAssistTextStyle(
                         color: colors.onSurfaceVariant,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-
-                    if (selected != null &&
-                        selected.registration.trim().isNotEmpty) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        selected.registration,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: colors.primary,
-                          fontSize: 13,
-                          letterSpacing: .35,
-                          fontWeight: FontWeight.w700,
-                        ),
+                  ),
+                  if (selected != null)
+                    Text(
+                      'Default',
+                      style: roadAssistTextStyle(
+                        color: colors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ],
-                  ],
+                    ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              if (selected != null) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: VehiclePhotoPreview(
+                    model: selected.label,
+                    photoData: selected.photoData,
+                    height: 138,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ] else
+                const SizedBox(height: 12),
+              Text(
+                selected == null
+                    ? loading
+                          ? 'Loading vehicle...'
+                          : snapshot.hasError
+                          ? 'Vehicles unavailable'
+                          : 'Add a vehicle'
+                    : '${selected.make} ${selected.model}',
+                style: roadAssistTextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface,
                 ),
               ),
-
-              const SizedBox(width: 7),
-
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colors.onSurfaceVariant,
-                size: 20,
+              const SizedBox(height: 5),
+              Text(
+                selected == null
+                    ? 'Manage saved vehicles'
+                    : '${selected.registration} / ${selected.year} / ${selected.fuelType}',
+                style: roadAssistTextStyle(
+                  fontSize: 13,
+                  color: colors.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -927,7 +946,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     ].indexOf(status);
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: dark ? const Color(0xFF0D2237) : Colors.white,
         borderRadius: BorderRadius.circular(23),
         border: Border.all(
@@ -985,7 +1005,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         provider,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: colors.onSurface,
@@ -998,7 +1018,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         issue,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 13,
                           height: 1.4,
                           color: colors.onSurfaceVariant,
@@ -1113,7 +1133,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               children: [
                 Text(
                   'No active assistance',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurface,
@@ -1124,7 +1144,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
                 Text(
                   'Everything looks clear. Start a request whenever you need roadside help.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -1139,7 +1159,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           IconButton(
             tooltip: 'Request assistance',
             onPressed: () {
-              push(context, const AssistanceTypeScreen());
+              unawaited(startAssistance());
             },
             icon: const Icon(Icons.arrow_forward_rounded),
           ),
@@ -1271,14 +1291,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         children: [
           const ServiceNotice(),
           _buildHeader(context),
-          _buildAssistanceHero(context),
-          const SizedBox(height: 14),
           StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
             stream: signedIn ? AuthService().watchCurrentProfile() : null,
             builder: (context, snapshot) => _buildSavedVehicleCard(
               snapshot.data?.data()?['defaultVehicleId'] as String?,
             ),
           ),
+          const SizedBox(height: 22),
+          _buildAssistanceHero(context),
           const SizedBox(height: 24),
           _DriverHomeSectionHeader(
             title: 'Active assistance',
@@ -1302,7 +1322,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             title: 'Quick Help',
             subtitle: 'Start with the issue you are facing',
             action: 'View all',
-            onAction: () => push(context, const AssistanceTypeScreen()),
+            onAction: () => unawaited(startAssistance()),
           ),
           const SizedBox(height: 10),
           _buildQuickHelp(context),
@@ -1349,7 +1369,8 @@ class _DriverHomeSurface extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Ink(
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: dark
@@ -1394,7 +1415,7 @@ class _DriverHomeSectionHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 18,
                   letterSpacing: -.35,
                   fontWeight: FontWeight.w800,
@@ -1408,7 +1429,7 @@ class _DriverHomeSectionHeader extends StatelessWidget {
                   subtitle!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -1430,7 +1451,7 @@ class _DriverHomeSectionHeader extends StatelessWidget {
             ),
             child: Text(
               action!,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -1481,7 +1502,8 @@ class _DriverQuickHelpCard extends StatelessWidget {
         onTap: onTap,
         child: Ink(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             borderRadius: BorderRadius.circular(19),
             border: Border.all(
               color: dark
@@ -1511,7 +1533,7 @@ class _DriverQuickHelpCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: colors.onSurface,
@@ -1524,7 +1546,7 @@ class _DriverQuickHelpCard extends StatelessWidget {
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -1599,7 +1621,7 @@ class _DriverHomeQuickAction extends StatelessWidget {
                 child: Text(
                   label,
                   maxLines: 1,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: colors.onSurface,
@@ -1679,7 +1701,7 @@ class _DriverHomeSheetAction extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: colors.onSurface,
@@ -1690,7 +1712,7 @@ class _DriverHomeSheetAction extends StatelessWidget {
 
                     Text(
                       subtitle,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -1752,7 +1774,8 @@ class _DriverEmergencyActionCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             borderRadius: BorderRadius.circular(19),
             border: Border.all(
               color: raDanger.withValues(alpha: dark ? .19 : .13),
@@ -1780,7 +1803,7 @@ class _DriverEmergencyActionCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: colors.onSurface,
@@ -1791,7 +1814,7 @@ class _DriverEmergencyActionCard extends StatelessWidget {
 
                     Text(
                       number,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: raDanger,
@@ -1844,7 +1867,7 @@ class _DriverHomeMessageCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurface,
@@ -1855,7 +1878,7 @@ class _DriverHomeMessageCard extends StatelessWidget {
 
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -1892,7 +1915,8 @@ class _DriverHomeLoadingCard extends StatelessWidget {
           Container(
             width: 43,
             height: 43,
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: colors.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(14),
             ),

@@ -187,10 +187,7 @@ class _ProviderMessageBadge extends StatelessWidget {
       textColor: Colors.white,
       label: Text(
         unread > 99 ? '99+' : '$unread',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        style: roadAssistTextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       child: Icon(
         selected

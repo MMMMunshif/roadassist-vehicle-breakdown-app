@@ -52,30 +52,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Future<void> cancelBeforeArrival() async {
     final id = widget.requestId;
     if (id == null || cancellingRequest || status >= 2 || cancelled) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel assistance?'),
-        content: const Text(
-          'Your provider will be notified and this job will move to cancelled history.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep request'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel request'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    final reason = await _adminReason(
-      context,
-      'Reason for cancelling assistance',
-    );
+    final reason = await requestCancellationReason(context);
     if (reason == null || !mounted) return;
     setState(() {
       cancellingRequest = true;
@@ -392,7 +369,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
     return switch (status) {
       0 => 'Provider accepted your request',
       1 => 'Provider is on the way',
-      2 => 'Provider has arrived',
+      2 =>
+        completionPending
+            ? 'Your bill is ready'
+            : arrivalNeedsConfirmation
+            ? 'Provider has arrived'
+            : 'Service in progress',
       _ => 'Assistance completed',
     };
   }
@@ -408,7 +390,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
       0 => 'Your provider accepted the job and is preparing to travel to you.',
       1 =>
         'Follow the live provider location while they travel to your breakdown point.',
-      2 => 'Confirm arrival only after you physically meet the provider.',
+      2 =>
+        completionPending
+            ? 'Review the final charges and choose how to pay.'
+            : arrivalNeedsConfirmation
+            ? 'Confirm arrival only after you physically meet the provider.'
+            : 'Your provider is helping you. Any replacement parts need your approval first.',
       _ => 'The roadside assistance workflow has been completed.',
     };
   }
@@ -521,7 +508,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           routeTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -537,7 +524,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           const SizedBox(height: 2),
                           Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -579,7 +566,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     Expanded(
                       child: Text(
                         'The provider has not shared a live GPS location yet.',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           color: colors.onSurfaceVariant,
                         ),
@@ -601,7 +588,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -624,7 +612,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       providerName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -645,7 +633,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         Flexible(
                           child: Text(
                             'Assigned RoadAssist provider',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -759,7 +747,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   children: [
                     Text(
                       statusTitle,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
@@ -769,7 +757,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                     Text(
                       statusDescription,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -803,7 +791,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -905,7 +894,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               Expanded(
                 child: Text(
                   'Confirm provider arrival',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
@@ -918,7 +907,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
           Text(
             arrivalLocationHint,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.45,
               color: colors.onSurfaceVariant,
@@ -952,7 +941,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -971,7 +961,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   color: raSuccess.withValues(alpha: .10),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.task_alt_rounded, color: raSuccess),
+                child: const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: RaPremiumSuccessMark(size: 30, color: raSuccess),
+                ),
               ),
 
               const SizedBox(width: 10),
@@ -982,7 +975,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   children: [
                     Text(
                       'Review completed work',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -992,7 +985,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                     Text(
                       'Confirm only after checking the agreed service.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -1003,12 +996,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ],
           ),
 
-          if (completionNotes.trim().isNotEmpty) ...[
+          if (completionNotes.trim().isNotEmpty && !visitBilling) ...[
             const SizedBox(height: 14),
 
             Text(
               'Provider notes',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -1018,7 +1011,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
             Text(
               completionNotes,
-              style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.45),
+              style: roadAssistTextStyle(fontSize: 12, height: 1.45),
             ),
           ],
 
@@ -1050,16 +1043,20 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
           const SizedBox(height: 7),
 
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: colors.error),
-            onPressed: widget.requestId == null
-                ? null
-                : () {
-                    push(context, DisputeScreen(requestId: widget.requestId!));
-                  },
-            icon: const Icon(Icons.report_problem_outlined),
-            label: const Text('There Is a Problem'),
-          ),
+          if (!visitBilling)
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: colors.error),
+              onPressed: widget.requestId == null
+                  ? null
+                  : () {
+                      push(
+                        context,
+                        DisputeScreen(requestId: widget.requestId!),
+                      );
+                    },
+              icon: const Icon(Icons.report_problem_outlined),
+              label: const Text('There Is a Problem'),
+            ),
         ],
       ),
     );
@@ -1096,7 +1093,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               children: [
                 Text(
                   'Provider unavailable',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1107,7 +1104,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 Text(
                   recoveryReason ??
                       'The assigned provider is no longer available.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -1118,7 +1115,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                 Text(
                   'Choose another provider and approve a new offer before continuing.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1142,7 +1139,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Active request',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -1223,7 +1220,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           Expanded(
                             child: Text(
                               requestError!,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -1256,6 +1253,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                   const SizedBox(height: 13),
 
+                  if (visitBilling && widget.requestId != null)
+                    WorkApprovalPanel(requestId: widget.requestId!),
                   buildRequestSummary(context),
 
                   if (!cancelled &&
@@ -1284,7 +1283,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     Text(
                       'Use replacement only when the assigned provider has not departed after the expected waiting period.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -1397,7 +1396,7 @@ class _RaTrackDetail extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1407,7 +1406,7 @@ class _RaTrackDetail extends StatelessWidget {
 
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.4,
                     fontWeight: FontWeight.w600,

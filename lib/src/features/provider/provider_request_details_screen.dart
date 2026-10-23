@@ -180,7 +180,7 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
             Expanded(
               child: Text(
                 'Request Details',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
@@ -472,7 +472,7 @@ class _RaProviderDetailHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: -.3,
@@ -481,7 +481,7 @@ class _RaProviderDetailHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -510,7 +510,8 @@ class _RaProviderDriverCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -529,7 +530,7 @@ class _RaProviderDriverCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -537,7 +538,7 @@ class _RaProviderDriverCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       phone.trim().isEmpty ? 'Phone unavailable' : phone,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -639,7 +640,7 @@ class _RaProviderDetailRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -647,7 +648,7 @@ class _RaProviderDetailRow extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     height: 1.4,
                     fontWeight: FontWeight.w600,
@@ -854,7 +855,7 @@ class _RaProviderMoneyRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: strong ? colors.onSurface : colors.onSurfaceVariant,
                 fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
@@ -863,7 +864,7 @@ class _RaProviderMoneyRow extends StatelessWidget {
           ),
           Text(
             amount,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: strong ? 16 : 14,
               fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
             ),
@@ -1124,7 +1125,7 @@ class _RaProviderVehicleHistory extends StatelessWidget {
                         ),
                         title: Text(
                           requestIssueLabel(previous[index].data()),
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),

@@ -1,5 +1,7 @@
 # RoadAssist
 
+> Current simplified request, work-approval and payment flow: [Premium workflow](docs/premium_workflow.md).
+
 RoadAssist is a Flutter-based roadside assistance platform for Sri Lanka. It
 connects drivers experiencing a vehicle breakdown with nearby service
 providers and supports the complete request lifecycle in real time.
@@ -92,11 +94,18 @@ The API endpoints are located in `api/`. Copy `.env.example` and configure the
 listed values as encrypted Vercel environment variables. Never commit a
 service-account private key or Gmail application password.
 
-Deploy after configuring the environment:
+The web client and APIs are deployed together. After configuring encrypted environment variables:
 
 ```powershell
-npx vercel --prod
+flutter build web --release --no-pub --pwa-strategy=none
+python scripts/prepare-vercel-web.py
+# Use the stage path printed by the script:
+npx vercel <stage-path> --prod --skip-domain --yes
+# Verify the staged release, then promote its URL:
+npx vercel promote <deployment-url> --yes
 ```
+
+The packaging script includes `build/web` as the public site and only required API/helper modules. Deploying the repository root directly uploads APIs without the compiled frontend because `build/` is excluded. Production: https://vehiclebreakdownapp.vercel.app.
 
 ## Build an installable APK
 

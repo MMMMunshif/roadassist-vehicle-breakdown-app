@@ -167,7 +167,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       ),
                       child: Text(
                         'DEFAULT',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           color: colors.onPrimary,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -194,7 +194,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                               title.isEmpty ? 'Saved vehicle' : title,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -202,7 +202,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                             const SizedBox(height: 4),
                             Text(
                               vehicle.registration,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -299,7 +299,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                           widget.selecting
                               ? 'Tap to use this vehicle'
                               : 'Tap to edit vehicle details',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: colors.onSurfaceVariant,
@@ -345,10 +345,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           widget.selecting ? 'Choose Vehicle' : 'My Vehicles',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
       ),
       floatingActionButton: !widget.selecting
@@ -461,7 +458,7 @@ class _RaVehiclesHero extends StatelessWidget {
               children: [
                 Text(
                   selecting ? 'Which vehicle needs help?' : 'Your vehicles',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -474,7 +471,7 @@ class _RaVehiclesHero extends StatelessWidget {
                       : count == 0
                       ? 'Save a vehicle once and reuse it when requesting roadside assistance.'
                       : '$count saved ${count == 1 ? 'vehicle' : 'vehicles'} ready for roadside requests.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: 12,
                     height: 1.4,
@@ -512,7 +509,7 @@ class _RaVehicleChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),

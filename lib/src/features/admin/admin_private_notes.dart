@@ -70,7 +70,8 @@ class _AdminPrivateNotesState extends State<_AdminPrivateNotes> {
 
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -108,7 +109,7 @@ class _AdminPrivateNotesState extends State<_AdminPrivateNotes> {
                     children: [
                       Text(
                         'Private admin notes',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                         ),
@@ -118,7 +119,7 @@ class _AdminPrivateNotesState extends State<_AdminPrivateNotes> {
 
                       Text(
                         'Visible only to administrators. Saved notes are append-only and cannot be edited from this workspace.',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           height: 1.4,
                           color: colors.onSurfaceVariant,
@@ -146,7 +147,7 @@ class _AdminPrivateNotesState extends State<_AdminPrivateNotes> {
                 Expanded(
                   child: Text(
                     'Use notes for internal operational context only. Avoid unnecessary identity, medical, payment-card or other highly sensitive information.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       height: 1.4,
                       color: colors.onSurfaceVariant,
@@ -310,7 +311,7 @@ class _RaAdminPrivateNoteTile extends StatelessWidget {
               children: [
                 Text(
                   text.trim().isEmpty ? 'Empty note' : text,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.5,
                     fontWeight: FontWeight.w600,
@@ -365,7 +366,7 @@ class _RaAdminPrivateNoteMeta extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             text,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               color: colors.onSurfaceVariant,
             ),
@@ -394,7 +395,7 @@ class _RaAdminPrivateNotesEmpty extends StatelessWidget {
         Text(
           'No private notes recorded.',
           textAlign: TextAlign.center,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             color: colors.onSurfaceVariant,
           ),
@@ -438,7 +439,7 @@ class _RaAdminPrivateNotesMessage extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -446,7 +447,7 @@ class _RaAdminPrivateNotesMessage extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,

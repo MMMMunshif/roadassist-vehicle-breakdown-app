@@ -21,10 +21,7 @@ class RoleSelectionScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         title: Text(
           'Choose Account Type',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
       body: Stack(
@@ -55,7 +52,7 @@ class RoleSelectionScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 27,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.8,
@@ -79,7 +76,7 @@ class RoleSelectionScreen extends StatelessWidget {
                       'Request roadside assistance, manage your vehicles and follow your active service.',
                   highlights: const [
                     'Save and manage vehicles',
-                    'Compare provider offers',
+                    'Review the visit fee',
                     'Track roadside assistance',
                   ],
                   buttonLabel: 'Continue as Driver',
@@ -96,7 +93,7 @@ class RoleSelectionScreen extends StatelessWidget {
                   title: 'Service Provider',
                   eyebrow: 'PROFESSIONAL PORTAL',
                   description:
-                      'Receive matching roadside requests, submit quotes and manage active service jobs.',
+                      'Receive matching roadside requests, accept requests and manage active service jobs.',
                   highlights: const [
                     'Provider verification',
                     'Manage matching requests',
@@ -117,7 +114,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     const SizedBox(width: 10),
                     Text(
                       'EMERGENCY ACCESS',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                         letterSpacing: .8,
@@ -163,7 +160,7 @@ class RoleSelectionScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   'Need urgent access?',
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: roadAssistTextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -171,7 +168,7 @@ class RoleSelectionScreen extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   'Continue to limited driver emergency access without signing in.',
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: roadAssistTextStyle(
                                     fontSize: 11,
                                     height: 1.4,
                                     color: colors.onSurfaceVariant,
@@ -210,7 +207,7 @@ class RoleSelectionScreen extends StatelessWidget {
                 Text(
                   'Choose the account type that matches how you use RoadAssist.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 10.5,
                     color: colors.onSurfaceVariant,
                   ),
@@ -265,7 +262,7 @@ class _RoleSelectionHero extends StatelessWidget {
               children: [
                 Text(
                   'How will you use RoadAssist?',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: dark ? Colors.white : const Color(0xFF102E4D),
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -275,7 +272,7 @@ class _RoleSelectionHero extends StatelessWidget {
                 const SizedBox(height: 5),
                 Text(
                   'Select a driver or provider account to continue.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: dark
                         ? Colors.white.withValues(alpha: .85)
                         : const Color(0xFF34516B),
@@ -321,7 +318,8 @@ class _AuthRoleCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0B2035).withValues(alpha: .95)
             : Colors.white.withValues(alpha: .97),
@@ -362,7 +360,7 @@ class _AuthRoleCard extends StatelessWidget {
                   children: [
                     Text(
                       eyebrow,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 10,
                         letterSpacing: .65,
                         fontWeight: FontWeight.w700,
@@ -372,7 +370,7 @@ class _AuthRoleCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                       ),
@@ -387,7 +385,7 @@ class _AuthRoleCard extends StatelessWidget {
 
           Text(
             description,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.5,
               color: colors.onSurfaceVariant,
@@ -414,7 +412,7 @@ class _AuthRoleCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       item,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),

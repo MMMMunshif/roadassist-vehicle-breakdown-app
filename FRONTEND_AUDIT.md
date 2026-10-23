@@ -1,5 +1,7 @@
 # RoadAssist frontend audit
 
+> Historical prototype audit. For current implemented behavior and deployment limits, see [Premium workflow](docs/premium_workflow.md).
+
 Status: frontend prototype in progress. Backend integration is intentionally deferred.
 
 ## What is already present

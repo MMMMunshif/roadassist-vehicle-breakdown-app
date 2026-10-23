@@ -64,10 +64,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         titleSpacing: 18,
         title: RaDriverAppBarTitle(
           'Requests',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         actions: [
           IconButton(
@@ -170,7 +167,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             children: [
                               Text(
                                 'Your assistance',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -178,7 +175,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               const SizedBox(height: 3),
                               Text(
                                 'Track active roadside help and review previous requests.',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: 12,
                                   color: colors.onSurfaceVariant,
                                 ),
@@ -252,7 +249,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             Expanded(
                               child: Text(
                                 'Cancelled requests remain available for reference.',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: 12,
                                   color: colors.onSurfaceVariant,
                                 ),
@@ -463,7 +460,8 @@ class _RaHistoryCard extends StatelessWidget {
                   Container(
                     width: 43,
                     height: 43,
-                    decoration: BoxDecoration(
+                    decoration: RaPremiumDecoration(
+                      context,
                       color: colors.primary.withValues(alpha: .08),
                       borderRadius: BorderRadius.circular(13),
                     ),
@@ -484,7 +482,7 @@ class _RaHistoryCard extends StatelessWidget {
                           requestIssueLabel(data),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
@@ -504,7 +502,7 @@ class _RaHistoryCard extends StatelessWidget {
 
                   Text(
                     dateLabel(data['createdAt'] as Timestamp?),
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -545,7 +543,7 @@ class _RaHistoryCard extends StatelessWidget {
                   if (amount != null)
                     Text(
                       amount,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         color: colors.primary,
@@ -558,7 +556,7 @@ class _RaHistoryCard extends StatelessWidget {
                     _driverActiveRequestStatuses.contains(status)
                         ? 'Resume'
                         : 'View details',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: colors.primary,
@@ -601,7 +599,7 @@ class _RaHistoryLine extends StatelessWidget {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               color: colors.onSurfaceVariant,
             ),

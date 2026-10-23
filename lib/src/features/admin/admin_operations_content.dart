@@ -503,7 +503,7 @@ class _RaAdminOpsLoadedDataNotice extends StatelessWidget {
           Expanded(
             child: Text(
               '$count recent jobs loaded from a maximum of $limit. Metrics and exports below represent only these loaded records, not lifetime totals.',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 height: 1.45,
                 color: colors.onSurfaceVariant,
@@ -580,7 +580,8 @@ class _RaAdminOpsMetricCard extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minHeight: 108),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -592,7 +593,8 @@ class _RaAdminOpsMetricCard extends StatelessWidget {
           Container(
             width: 43,
             height: 43,
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: tone.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(13),
             ),
@@ -610,7 +612,7 @@ class _RaAdminOpsMetricCard extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -620,7 +622,7 @@ class _RaAdminOpsMetricCard extends StatelessWidget {
 
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.3,
                     color: colors.onSurfaceVariant,
@@ -650,7 +652,7 @@ class _RaAdminOpsSectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w800,
             letterSpacing: -.25,
@@ -661,7 +663,7 @@ class _RaAdminOpsSectionHeader extends StatelessWidget {
 
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -777,7 +779,8 @@ class _RaAdminComplaintFollowUpCard extends StatelessWidget {
               Container(
                 width: 42,
                 height: 42,
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: raDanger.withValues(alpha: .07),
                   borderRadius: BorderRadius.circular(13),
                 ),
@@ -798,7 +801,7 @@ class _RaAdminComplaintFollowUpCard extends StatelessWidget {
                       'Case $requestId',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -808,7 +811,7 @@ class _RaAdminComplaintFollowUpCard extends StatelessWidget {
 
                     Text(
                       'Priority: $priority • Due $due',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -840,7 +843,8 @@ class _RaAdminPaymentFilter extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -853,14 +857,14 @@ class _RaAdminPaymentFilter extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           title: Text(
             'Only payments needing confirmation',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
           ),
           subtitle: Text(
             'Hide completed jobs after provider receipt is confirmed.',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               color: colors.onSurfaceVariant,
             ),
@@ -969,7 +973,7 @@ class _RaAdminOpsJobCard extends StatelessWidget {
                           driver,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
@@ -981,7 +985,7 @@ class _RaAdminOpsJobCard extends StatelessWidget {
                           provider,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             color: colors.onSurfaceVariant,
                           ),
@@ -1029,7 +1033,7 @@ class _RaAdminOpsJobCard extends StatelessWidget {
                 children: [
                   Text(
                     paymentMode ? 'Open invoice' : 'Monitor job',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: colors.primary,
@@ -1077,7 +1081,7 @@ class _RaAdminOpsInfoRow extends StatelessWidget {
               text,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 height: 1.4,
                 color: colors.onSurfaceVariant,
@@ -1104,7 +1108,8 @@ class _RaAdminOpsReportCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -1117,7 +1122,8 @@ class _RaAdminOpsReportCard extends StatelessWidget {
           Container(
             width: 45,
             height: 45,
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: colors.primary.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(14),
             ),
@@ -1131,7 +1137,7 @@ class _RaAdminOpsReportCard extends StatelessWidget {
             children: [
               Text(
                 'Loaded job report',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1141,7 +1147,7 @@ class _RaAdminOpsReportCard extends StatelessWidget {
 
               Text(
                 '$jobs records will be exported as CSV.',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   color: colors.onSurfaceVariant,
                 ),
@@ -1194,7 +1200,7 @@ class _RaAdminServiceMix extends StatelessWidget {
         children: [
           Text(
             'SERVICE MIX',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
               letterSpacing: .7,
@@ -1243,7 +1249,7 @@ class _RaAdminServiceMixRow extends StatelessWidget {
             Expanded(
               child: Text(
                 service,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1252,7 +1258,7 @@ class _RaAdminServiceMixRow extends StatelessWidget {
 
             Text(
               '$value',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -1287,7 +1293,8 @@ class _RaAdminOpsSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -1339,7 +1346,7 @@ class _RaAdminOpsNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1349,7 +1356,7 @@ class _RaAdminOpsNotice extends StatelessWidget {
 
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -1395,7 +1402,7 @@ class _RaAdminOpsEmptyState extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -1406,7 +1413,7 @@ class _RaAdminOpsEmptyState extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.4,
               color: colors.onSurfaceVariant,
@@ -1620,7 +1627,7 @@ class _AdminSettingsPanelState extends State<_AdminSettingsPanel> {
                   ),
                   title: Text(
                     'Pause new assistance requests',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1629,7 +1636,7 @@ class _AdminSettingsPanelState extends State<_AdminSettingsPanel> {
                     maintenance
                         ? 'Maintenance mode is selected.'
                         : 'New assistance requests remain enabled.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -1791,7 +1798,8 @@ class _RaAdminSettingsHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         borderRadius: BorderRadius.circular(23),
       ),
@@ -1821,7 +1829,7 @@ class _RaAdminSettingsHero extends StatelessWidget {
               children: [
                 Text(
                   'App operations',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -1834,7 +1842,7 @@ class _RaAdminSettingsHero extends StatelessWidget {
                   maintenance
                       ? 'New assistance requests are configured to pause.'
                       : 'RoadAssist is configured to accept new assistance requests.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
                     height: 1.4,
@@ -1982,7 +1990,8 @@ class _RaAdminTeamHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         borderRadius: BorderRadius.circular(23),
       ),
@@ -2012,7 +2021,7 @@ class _RaAdminTeamHero extends StatelessWidget {
               children: [
                 Text(
                   'Admin team',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -2023,7 +2032,7 @@ class _RaAdminTeamHero extends StatelessWidget {
 
                 Text(
                   '$active active of $total loaded administrator access records',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 12,
                   ),
@@ -2109,7 +2118,7 @@ class _RaAdminPermissionRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -2119,7 +2128,7 @@ class _RaAdminPermissionRow extends StatelessWidget {
 
                 Text(
                   description,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -2162,7 +2171,8 @@ class _RaAdminTeamMemberCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -2174,7 +2184,8 @@ class _RaAdminTeamMemberCard extends StatelessWidget {
           Container(
             width: 43,
             height: 43,
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: (enabled ? colors.primary : colors.onSurfaceVariant)
                   .withValues(alpha: .08),
               borderRadius: BorderRadius.circular(13),
@@ -2196,7 +2207,7 @@ class _RaAdminTeamMemberCard extends StatelessWidget {
                   display,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -2206,7 +2217,7 @@ class _RaAdminTeamMemberCard extends StatelessWidget {
 
                 Text(
                   roleLabel(role),
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),

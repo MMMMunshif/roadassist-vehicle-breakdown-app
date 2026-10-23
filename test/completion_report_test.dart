@@ -107,10 +107,10 @@ void main() {
         await tester.tap(find.text('Report'));
         await tester.pumpAndSettle();
         expect(find.text('Final total: Rs. 1,800'), findsOneWidget);
-        await tester.tap(find.text('Demo card'));
+        expect(find.text('Demo card'), findsNothing);
+        await tester.tap(find.text('Bank transfer'));
         await tester.pumpAndSettle();
-        expect(find.textContaining('NO MONEY CHARGED'), findsOneWidget);
-        expect(find.text('Confirm service & simulate payment'), findsOneWidget);
+        expect(find.text('Confirm service & paid by transfer'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.tap(find.text('Cancel'));
         await tester.pumpAndSettle();

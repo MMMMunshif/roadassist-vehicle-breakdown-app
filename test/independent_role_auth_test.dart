@@ -38,7 +38,110 @@ class NativeAuth extends Fake implements FirebaseAuth {
   }
 }
 
+class CommonAuthService extends AuthService {
+  CommonAuthService(http.Client client)
+    : super(
+        auth: NativeAuth(),
+        firestore: Store(),
+        httpClient: client,
+        independentRoleAuthEnabled: true,
+      );
+  String? selected;
+  @override
+  Future<UserCredential> signIn({
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    selected = role;
+    return Credential();
+  }
+}
+
 void main() {
+  test('common login routes using validated password result', () async {
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(body['role'], 'auto');
+      expect(body['action'], 'login');
+      return http.Response(
+        '{"role":"provider","authEmail":"provider@roles.roadassist.invalid"}',
+        200,
+      );
+    });
+    final service = CommonAuthService(client);
+    final role = await service.signInCommon(
+      email: 'same@example.com',
+      password: 'Provider123',
+      chooseRole: (_) async => throw StateError('No chooser for a single role'),
+    );
+    expect(role, 'provider');
+    expect(service.selected, 'provider');
+    client.close();
+  });
+  test(
+    'common login supports ambiguous password and cancellation without signing in',
+    () async {
+      final client = MockClient(
+        (_) async => http.Response('{"roles":["driver","provider"]}', 200),
+      );
+      final service = CommonAuthService(client);
+      await expectLater(
+        service.signInCommon(
+          email: 'same@example.com',
+          password: 'Shared123',
+          chooseRole: (roles) async {
+            expect(roles, ['driver', 'provider']);
+            return null;
+          },
+        ),
+        throwsA(
+          isA<FirebaseAuthException>().having(
+            (e) => e.code,
+            'code',
+            'canceled',
+          ),
+        ),
+      );
+      expect(service.selected, isNull);
+      expect(
+        await service.signInCommon(
+          email: 'same@example.com',
+          password: 'Shared123',
+          chooseRole: (_) async => 'driver',
+        ),
+        'driver',
+      );
+      expect(service.selected, 'driver');
+      client.close();
+    },
+  );
+  test(
+    'invalid common credentials do not sign in or expose a role picker',
+    () async {
+      final client = MockClient(
+        (_) async => http.Response('{"code":"invalid-credential"}', 401),
+      );
+      final service = CommonAuthService(client);
+      await expectLater(
+        service.signInCommon(
+          email: 'same@example.com',
+          password: 'Wrong123',
+          chooseRole: (_) async => throw StateError('Must not disclose roles'),
+        ),
+        throwsA(
+          isA<FirebaseAuthException>().having(
+            (e) => e.code,
+            'code',
+            'invalid-credential',
+          ),
+        ),
+      );
+      expect(service.selected, isNull);
+      client.close();
+    },
+  );
+
   for (final role in ['driver', 'provider']) {
     test(
       'new $role uses native role password and requests its verification',

@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 import 'device_service.dart';
 import '../models/account_roles.dart';
+import '../models/provider_availability.dart';
 
 class AuthService {
   AuthService({
@@ -69,6 +70,7 @@ class AuthService {
 
   Future<UserCredential> signInWithGoogle({
     required String role,
+    Future<String?> Function(List<String>)? chooseRole,
     String? displayName,
     String? phone,
     String? photoData,
@@ -99,7 +101,7 @@ class AuthService {
         );
       }
       final token = await proof.user!.getIdToken(true);
-      final response = await _post(
+      var response = await _post(
         Uri.parse(_googleRoleAuthApiUrl),
         headers: {
           'Content-Type': 'application/json',
@@ -112,21 +114,41 @@ class AuthService {
           'photoData': photoData,
         }),
       ).timeout(const Duration(seconds: 35));
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      var data = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode != 200) {
         throw FirebaseAuthException(
           code: data['code'] as String? ?? 'role-auth-unavailable',
         );
       }
+      if (data['roles'] is List) {
+        final selected = await chooseRole?.call(
+          List<String>.from(data['roles'] as List),
+        );
+        if (selected == null) throw FirebaseAuthException(code: 'canceled');
+        response = await _post(
+          Uri.parse(_googleRoleAuthApiUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'role': selected}),
+        ).timeout(const Duration(seconds: 35));
+        data = jsonDecode(response.body) as Map<String, dynamic>;
+        if (response.statusCode != 200)
+          throw FirebaseAuthException(
+            code: data['code'] as String? ?? 'role-auth-unavailable',
+          );
+      }
+      final resolvedRole = role == 'auto' ? data['role'] as String : role;
       final credential = await _auth.signInWithCustomToken(
         data['customToken'] as String,
       );
       try {
         final profile = await getCurrentProfile();
-        if (!profile.exists || profile.data()?['role'] != role) {
+        if (!profile.exists || profile.data()?['role'] != resolvedRole) {
           throw FirebaseAuthException(code: 'wrong-role');
         }
-        _startBackgroundSetup(role);
+        _startBackgroundSetup(resolvedRole);
         return credential;
       } catch (_) {
         await _auth.signOut();
@@ -399,11 +421,7 @@ class AuthService {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
     final activeJobs = jobs.docs.where(
-      (job) => const [
-        'accepted',
-        'en_route',
-        'arrived',
-      ].contains(job.data()['status']),
+      (job) => ProviderAvailability.hasActiveService(job.data()),
     );
     if (activeJobs.isNotEmpty) {
       await _firestore.collection('providerDirectory').doc(user.uid).update({
@@ -479,6 +497,36 @@ class AuthService {
       'notificationsSeenAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  Future<String> signInCommon({
+    required String email,
+    required String password,
+    required Future<String?> Function(List<String>) chooseRole,
+  }) async {
+    if (!_independentRoleAuth)
+      throw FirebaseAuthException(code: 'role-auth-unavailable');
+    final response = await _post(
+      Uri.parse(_roleAuthApiUrl),
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'action': 'login',
+        'email': email.trim(),
+        'password': password,
+        'role': 'auto',
+      }),
+    ).timeout(const Duration(seconds: 35));
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200)
+      throw FirebaseAuthException(
+        code: data['code'] as String? ?? 'role-auth-unavailable',
+      );
+    String? role = data['role'] as String?;
+    if (data['roles'] is List)
+      role = await chooseRole(List<String>.from(data['roles'] as List));
+    if (role == null) throw FirebaseAuthException(code: 'canceled');
+    await signIn(email: email, password: password, role: role);
+    return role;
   }
 
   Future<UserCredential> signIn({

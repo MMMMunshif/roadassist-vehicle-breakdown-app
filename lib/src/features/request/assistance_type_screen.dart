@@ -157,7 +157,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Request Assistance',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -231,7 +231,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                         Expanded(
                           child: Text(
                             'If you are in immediate danger, move to a safe place when possible and contact emergency services first.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               height: 1.45,
                               color: colors.onSurfaceVariant,
@@ -252,7 +252,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                           children: [
                             Text(
                               'Choose assistance',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -.35,
@@ -261,7 +261,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                             const SizedBox(height: 3),
                             Text(
                               'Select every issue that applies.',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -333,8 +333,8 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                         const SizedBox(width: 9),
                         Expanded(
                           child: Text(
-                            'Choosing a service does not confirm a price. Providers review the request and submit offers before assignment.',
-                            style: GoogleFonts.plusJakartaSans(
+                            'Review the visit fee before requesting a provider. Inspection and repair are billed after service.',
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               height: 1.45,
                               color: colors.onSurfaceVariant,
@@ -377,7 +377,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
                           const SizedBox(width: 6),
                           Text(
                             '${selected.length} ${selected.length == 1 ? 'issue' : 'issues'} selected',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: colors.primary,
@@ -386,7 +386,7 @@ class _AssistanceTypeScreenState extends State<AssistanceTypeScreen> {
 
                           Text(
                             'Next: Details',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -440,7 +440,7 @@ class _RaAssistProgress extends StatelessWidget {
               ),
               child: Text(
                 'STEP 1 OF 4',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   color: colors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -451,7 +451,7 @@ class _RaAssistProgress extends StatelessWidget {
 
             Text(
               'Issue',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: colors.primary,
@@ -509,7 +509,8 @@ class _RaAssistUnknownCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             borderRadius: BorderRadius.circular(19),
             border: Border.all(color: colors.secondary.withValues(alpha: .15)),
           ),
@@ -534,7 +535,7 @@ class _RaAssistUnknownCard extends StatelessWidget {
                   children: [
                     Text(
                       'I don’t know the problem',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -542,7 +543,7 @@ class _RaAssistUnknownCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       'Describe the symptoms and let a provider inspect the vehicle first.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -609,7 +610,7 @@ class _RaAssistSavedDraft extends StatelessWidget {
                   children: [
                     Text(
                       'Continue saved request',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -617,7 +618,7 @@ class _RaAssistSavedDraft extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       savedLabel,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -643,7 +644,7 @@ class _RaAssistSavedDraft extends StatelessWidget {
               draft.issue,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),

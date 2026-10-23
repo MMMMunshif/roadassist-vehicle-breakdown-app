@@ -80,7 +80,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return [0, 2, 3, 4, 5, 6, 7, 8];
     }
 
-    return List.generate(tabs.length, (index) => index);
+    return [0, 1, 2, 4, 6, 3, 7, 8, 9, 5, 10];
   }
 
   String get roleLabel {
@@ -318,7 +318,7 @@ class _AdminDashboardSidebar extends StatelessWidget {
                     children: [
                       Text(
                         'RoadAssist',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.35,
@@ -326,7 +326,7 @@ class _AdminDashboardSidebar extends StatelessWidget {
                       ),
                       Text(
                         'ADMIN WORKSPACE',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           letterSpacing: .85,
@@ -354,7 +354,7 @@ class _AdminDashboardSidebar extends StatelessWidget {
                   Expanded(
                     child: Text(
                       loadingRole ? 'Checking access…' : roleLabel,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
@@ -369,18 +369,37 @@ class _AdminDashboardSidebar extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 9),
               children: [
-                for (final index in visibleTabs)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: _AdminDashboardNavItem(
-                      icon: tab == index ? selectedIcons[index] : icons[index],
-                      label: tabs[index],
-                      selected: tab == index,
-                      onTap: () {
-                        onSelected(index);
-                      },
+                for (final group in const <String, List<int>>{
+                  'Overview': [0],
+                  'People': [1, 2],
+                  'Services': [4, 6],
+                  'Support & payments': [3, 7],
+                  'Management': [8, 9, 5, 10],
+                }.entries) ...[
+                  if (group.value.any(visibleTabs.contains))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+                      child: Text(
+                        group.key.toUpperCase(),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          letterSpacing: 1,
+                        ),
+                      ),
                     ),
-                  ),
+                  for (final index in group.value.where(visibleTabs.contains))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: _AdminDashboardNavItem(
+                        icon: tab == index
+                            ? selectedIcons[index]
+                            : icons[index],
+                        label: tabs[index],
+                        selected: tab == index,
+                        onTap: () => onSelected(index),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -409,7 +428,7 @@ class _AdminDashboardSidebar extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Private access. Administrative actions are audited.',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 14,
                             height: 1.4,
                             color: colors.onSurfaceVariant,
@@ -474,7 +493,7 @@ class _AdminDashboardNavItem extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 15,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     color: selected ? colors.primary : null,
@@ -530,7 +549,7 @@ class _AdminDashboardWorkspace extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -.5,
@@ -539,7 +558,7 @@ class _AdminDashboardWorkspace extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       description,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         color: colors.onSurfaceVariant,
                       ),

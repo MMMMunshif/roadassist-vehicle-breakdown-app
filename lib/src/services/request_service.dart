@@ -40,12 +40,13 @@ class RequestService {
   }
 
   Future<String?> findSubmittedRequest(String id) async {
+    // Keep this query scoped by owner. Adding a document-ID filter makes an
+    // absent request evaluate resource-based read rules and denies first submit.
     final matches = await _requests
         .where('driverId', isEqualTo: _userId)
-        .where(FieldPath.documentId, isEqualTo: id)
         .get(const GetOptions(source: Source.server))
         .timeout(const Duration(seconds: 12));
-    return matches.docs.isEmpty ? null : matches.docs.first.id;
+    return matches.docs.any((document) => document.id == id) ? id : null;
   }
 
   Future<String> createRequest(
@@ -125,6 +126,7 @@ class RequestService {
         'rejectedBy': <String>[],
         'status': 'searching',
         'workflowVersion': 3,
+        'workApprovalRequired': true,
         'visitFeeQuoteId': visitQuote['quoteId'],
         'providerDistanceKm': visitQuote['distanceKm'],
         'arrivalVerificationRequired': true,
@@ -877,7 +879,8 @@ class RequestService {
       final status = data?['status'] as String?;
       if (status == 'completed' ||
           status == 'cancelled' ||
-          data?['completionState'] == 'pending') {
+          data?['completionState'] == 'pending' ||
+          data?['serviceCompletedAt'] != null) {
         throw StateError('This request can no longer be cancelled.');
       }
       final providerId = data?['providerId'] as String?;

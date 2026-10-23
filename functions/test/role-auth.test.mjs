@@ -80,3 +80,22 @@ test('disabled production flow never accesses account services',async()=>{
   const res={setHeader(){},status(code){this.code=code;return this;},json(){return this;}};
   await handler({method:'POST',body:{},headers:{}},res);assert.equal(res.code,503);
 });
+
+test('common login resolves only password-matching roles',async()=>{
+ const f=fixture();await f.register('driver','Driver123');await f.register('provider','Provider456');
+ const d=await f.login('auto','Driver123'),p=await f.login('auto','Provider456');
+ assert.equal(d.statusCode,200);assert.equal(d.body.role,'driver');assert.equal(p.body.role,'provider');
+ assert.equal((await f.login('auto','Wrong123')).statusCode,401);
+ assert.equal(f.users.size,2);
+});
+test('same valid password asks which existing account, never guesses',async()=>{
+ const f=fixture();await f.register('driver','Shared123');await f.register('provider','Shared123');
+ const result=await f.login('auto','Shared123');assert.equal(result.statusCode,200);
+ assert.deepEqual(result.body.roles,['driver','provider']);assert.equal(result.body.authEmail,undefined);
+});
+test('common login excludes suspended accounts and rejects auto registration',async()=>{
+ const f=fixture();await f.register('driver','Shared123');await f.register('provider','Shared123');
+ const u=f.users.get(roleAddress('same@example.com','provider'));f.docs.set(`accountModeration/${u.uid}`,{status:'suspended'});
+ assert.equal((await f.login('auto','Shared123')).body.role,'driver');
+ assert.equal((await f.register('auto','Shared123')).statusCode,400);
+});

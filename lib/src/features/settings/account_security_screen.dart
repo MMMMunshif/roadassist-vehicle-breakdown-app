@@ -111,7 +111,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                   children: [
                     Text(
                       'Your profile and saved device information will be removed. Completed service, payment, complaint or security records may remain where required.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 8.8),
                         height: 1.5,
                       ),
@@ -158,7 +158,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
                     const SizedBox(height: 10),
                     Text(
                       'This action cannot be automatically undone.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 7.7),
                         color: colors.error,
                         fontWeight: FontWeight.w700,
@@ -275,7 +275,7 @@ class _AccountSecurityScreenState extends State<AccountSecurityScreen> {
       appBar: AppBar(
         title: Text(
           'Account & Security',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 19),
             fontWeight: FontWeight.w800,
           ),
@@ -407,7 +407,7 @@ class _RaSecurityHero extends StatelessWidget {
               children: [
                 Text(
                   'Protect your account',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: providerFontSize(context, 18),
                     fontWeight: FontWeight.w800,
@@ -416,7 +416,7 @@ class _RaSecurityHero extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Manage password recovery, verification and account access.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: providerFontSize(context, 8.5),
                     height: 1.4,
@@ -451,7 +451,7 @@ class _RaSecurityHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 14.5),
             fontWeight: FontWeight.w800,
             color: tone,
@@ -460,7 +460,7 @@ class _RaSecurityHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 8.3),
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -487,7 +487,8 @@ class _RaSecuritySurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: padding,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D1D2B)
             : theme.colorScheme.surface,
@@ -517,7 +518,8 @@ class _RaSecurityAccountCard extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: tone.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(14),
             ),
@@ -537,7 +539,7 @@ class _RaSecurityAccountCard extends StatelessWidget {
                   email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10),
                     fontWeight: FontWeight.w800,
                   ),
@@ -549,7 +551,7 @@ class _RaSecurityAccountCard extends StatelessWidget {
                       : enforceEmailVerification
                       ? 'Email verification required'
                       : 'Verification unavailable',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 7.8),
                     fontWeight: FontWeight.w700,
                     color: tone,
@@ -599,7 +601,7 @@ class _RaSecurityMenuTile extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 9.6),
             fontWeight: FontWeight.w700,
           ),
@@ -608,7 +610,7 @@ class _RaSecurityMenuTile extends StatelessWidget {
           subtitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 7.5),
             color: colors.onSurfaceVariant,
           ),
@@ -632,7 +634,8 @@ class _RaSecurityDangerCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: colors.error.withValues(alpha: .055),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: colors.error.withValues(alpha: .20)),
@@ -655,7 +658,7 @@ class _RaSecurityDangerCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Delete RoadAssist account',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10.5),
                     fontWeight: FontWeight.w800,
                     color: colors.error,
@@ -667,7 +670,7 @@ class _RaSecurityDangerCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'Your active profile will be removed. Some completed service, payment, complaint or security records may still be retained where required.',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: providerFontSize(context, 8.2),
               height: 1.45,
             ),

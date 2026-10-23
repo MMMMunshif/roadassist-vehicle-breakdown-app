@@ -1292,12 +1292,22 @@ class StatusTimeline extends StatelessWidget {
               children: [
                 if (index > 0)
                   Expanded(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration:
+                          MediaQuery.disableAnimationsOf(context) ||
+                              MediaQuery.accessibleNavigationOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 260),
                       height: 3,
                       color: index <= current ? raBlue : raLine,
                     ),
                   ),
-                Container(
+                AnimatedContainer(
+                  duration:
+                      MediaQuery.disableAnimationsOf(context) ||
+                          MediaQuery.accessibleNavigationOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 260),
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
@@ -1331,7 +1341,12 @@ class StatusTimeline extends StatelessWidget {
                 ),
                 if (index < statuses.length - 1)
                   Expanded(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration:
+                          MediaQuery.disableAnimationsOf(context) ||
+                              MediaQuery.accessibleNavigationOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 260),
                       height: 3,
                       color: index < current ? raBlue : raLine,
                     ),
@@ -2604,7 +2619,8 @@ class IconBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: size,
     height: size,
-    decoration: BoxDecoration(
+    decoration: RaPremiumDecoration(
+      context,
       color:
           background ??
           (Theme.of(context).brightness == Brightness.dark
@@ -2612,7 +2628,13 @@ class IconBadge extends StatelessWidget {
               : raPale),
       borderRadius: BorderRadius.circular(size * 0.3),
     ),
-    child: Icon(icon, color: color, size: iconSize ?? size * 0.5),
+    child: RaPremiumServiceIcon(
+      icon: icon,
+      color: color,
+      size:
+          iconSize ??
+          size * (RaPremiumServiceIcon.quadrant(icon) == null ? .5 : .9),
+    ),
   );
 }
 

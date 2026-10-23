@@ -679,6 +679,52 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
     }
   }
 
+  Future<void> prepareWorkEstimate() async {
+    if (updatingStatus || offline || widget.requestId == null) return;
+    if (requestData['arrivalConfirmedBy'] != requestData['driverId']) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ask the driver to confirm arrival first.'),
+        ),
+      );
+      return;
+    }
+    if (serviceNotesController.text.trim().length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Describe the proposed work in the service summary first.',
+          ),
+        ),
+      );
+      return;
+    }
+    final estimate = await requestFinalBill(context, {
+      ...requestData,
+      ...(requestData['workEstimate'] as Map? ?? {}),
+    }, estimate: true);
+    if (estimate == null || !mounted) return;
+    setState(() => updatingStatus = true);
+    try {
+      await VisitBillingService().send('estimate', {
+        'requestId': widget.requestId,
+        'summary': serviceNotesController.text.trim(),
+        ...estimate,
+      });
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _workflowError(error, 'Unable to send work estimate.'),
+            ),
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => updatingStatus = false);
+    }
+  }
+
   Future<void> advanceStatus() async {
     if (offline) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -733,7 +779,11 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
       }
       report = CompletionReport.summary(serviceNotesController.text.trim());
       if (requestData['workflowVersion'] == 3) {
-        finalBill = await requestFinalBill(context, requestData);
+        finalBill = await requestFinalBill(context, {
+          ...requestData,
+          if (requestData['workEstimate']?['status'] == 'approved')
+            ...(requestData['workEstimate'] as Map),
+        });
         if (finalBill == null || !mounted) return;
       }
       finalCost = (requestData['estimatedCost'] as num?)?.toInt();
@@ -905,7 +955,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
             Expanded(
               child: Text(
                 'Active Assistance',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
@@ -1025,11 +1075,20 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                     ),
                   ],
 
+                  if (status == 2 &&
+                      !requestCancelled &&
+                      data['workflowVersion'] == 3)
+                    WorkApprovalPanel(
+                      requestId: widget.requestId!,
+                      isProvider: true,
+                      onPrepare: prepareWorkEstimate,
+                    ),
+
                   if (status == 2 && !requestCancelled) ...[
                     const SizedBox(height: 24),
 
                     const _RaProviderActiveHeading(
-                      title: 'Service summary',
+                      title: 'Work details',
                       subtitle:
                           'Describe the completed work once. Photos are optional; Finish Service saves automatically.',
                     ),
@@ -1046,6 +1105,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                       onAddPhoto: addDocumentationPhoto,
                       onRemovePhoto: removeDocumentationPhoto,
                       onSave: saveDocumentation,
+                      showSave: data['workflowVersion'] != 3,
                     ),
                   ],
 
@@ -1061,6 +1121,18 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                       label: const Text('Cannot Attend This Job'),
                     ),
                   ],
+
+                  if (data['serviceCompletedAt'] != null &&
+                      widget.requestId != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            replace(context, const ProviderShell()),
+                        icon: const Icon(Icons.dashboard_outlined),
+                        label: const Text('Back to dashboard'),
+                      ),
+                    ),
 
                   if (completionPending && widget.requestId != null) ...[
                     CompletionReviewPanel(
@@ -1090,13 +1162,14 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                   ? 'Finish Job'
                   : status == 2
                   ? (data['workflowVersion'] == 3
-                        ? 'Prepare Final Bill'
+                        ? 'Finish service & bill'
                         : 'Finish Service')
                   : 'Mark as ${statuses[status + 1]}',
               enabled:
                   !offline &&
                   !updatingStatus &&
                   !completionPending &&
+                  data['workEstimate']?['status'] != 'pending' &&
                   widget.requestId != null &&
                   (requestCancelled ||
                       (!waitingForArrivalConfirmation &&
@@ -1205,7 +1278,7 @@ class _RaProviderActiveMap extends StatelessWidget {
                         Expanded(
                           child: Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1262,7 +1335,8 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -1281,7 +1355,7 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1289,7 +1363,7 @@ class _RaProviderActiveDriverCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       phone.trim().isEmpty ? 'Phone unavailable' : phone,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -1406,6 +1480,7 @@ class _RaProviderDocumentationCard extends StatelessWidget {
     required this.onAddPhoto,
     required this.onRemovePhoto,
     required this.onSave,
+    this.showSave = true,
   });
 
   final TextEditingController controller;
@@ -1416,6 +1491,7 @@ class _RaProviderDocumentationCard extends StatelessWidget {
   final VoidCallback onAddPhoto;
   final ValueChanged<int> onRemovePhoto;
   final VoidCallback onSave;
+  final bool showSave;
 
   @override
   Widget build(BuildContext context) {
@@ -1498,6 +1574,11 @@ class _RaProviderDocumentationCard extends StatelessWidget {
             ),
           ],
 
+          if (!showSave)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('Saved automatically when you send the final bill.'),
+            ),
           const SizedBox(height: 11),
 
           Row(
@@ -1511,22 +1592,23 @@ class _RaProviderDocumentationCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: saving ? null : onSave,
-                  icon: saving
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: const Text('Save'),
+              if (showSave) const SizedBox(width: 8),
+              if (showSave)
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: saving ? null : onSave,
+                    icon: saving
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: const Text('Save'),
+                  ),
                 ),
-              ),
             ],
           ),
         ],
@@ -1550,7 +1632,7 @@ class _RaProviderActiveHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: -.3,
@@ -1559,7 +1641,7 @@ class _RaProviderActiveHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -1606,7 +1688,7 @@ class _RaProviderActiveNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1614,7 +1696,7 @@ class _RaProviderActiveNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -1679,7 +1761,7 @@ class _RaProviderActiveInfo extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1687,7 +1769,7 @@ class _RaProviderActiveInfo extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     height: 1.4,
                     fontWeight: FontWeight.w600,

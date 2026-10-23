@@ -50,7 +50,7 @@ class EmergencyScreen extends StatelessWidget {
                         children: [
                           Text(
                             'Emergency contact',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
@@ -58,7 +58,7 @@ class EmergencyScreen extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             'Save a trusted contact for roadside situations.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -488,7 +488,7 @@ class _RaEmergencyHero extends StatelessWidget {
                   children: [
                     Text(
                       'Emergency assistance',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -497,7 +497,7 @@ class _RaEmergencyHero extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'For immediate danger, contact emergency services before continuing with RoadAssist.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         color: Colors.white70,
                         fontSize: 12,
                         height: 1.4,

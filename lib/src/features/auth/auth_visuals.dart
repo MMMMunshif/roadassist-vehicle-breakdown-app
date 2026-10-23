@@ -29,7 +29,7 @@ class _AuthWordmark extends StatelessWidget {
                   ),
                 ],
               ),
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -1,

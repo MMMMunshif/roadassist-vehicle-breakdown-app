@@ -613,7 +613,7 @@ class _AdminVerificationPanelState extends State<_AdminVerificationPanel> {
                                       },
                                 title: Text(
                                   entry.value,
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: roadAssistTextStyle(
                                     fontSize: 12,
                                     height: 1.35,
                                     fontWeight: FontWeight.w600,
@@ -744,7 +744,8 @@ class _RaAdminVerificationHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         borderRadius: BorderRadius.circular(22),
       ),
@@ -775,7 +776,7 @@ class _RaAdminVerificationHero extends StatelessWidget {
               children: [
                 Text(
                   'Provider verification',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -788,7 +789,7 @@ class _RaAdminVerificationHero extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     providerName!,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
                     ),
@@ -799,7 +800,7 @@ class _RaAdminVerificationHero extends StatelessWidget {
 
                 Text(
                   'Review private identity and service-capability evidence before making a decision.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Theme.of(
                       context,
                     ).colorScheme.primary.withValues(alpha: .72),
@@ -821,7 +822,7 @@ class _RaAdminVerificationHero extends StatelessWidget {
             ),
             child: Text(
               'REV $revision',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
@@ -853,15 +854,12 @@ class _RaAdminVerificationHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -884,7 +882,8 @@ class _RaAdminVerificationSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -934,7 +933,7 @@ class _RaAdminVerificationNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -942,7 +941,7 @@ class _RaAdminVerificationNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -980,7 +979,7 @@ class _RaAdminVerificationChecklistHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 'Reviewer checklist',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -988,7 +987,7 @@ class _RaAdminVerificationChecklistHeader extends StatelessWidget {
             ),
             Text(
               '$completed/$total',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 color: colors.primary,
@@ -1024,7 +1023,8 @@ class _RaAdminVerificationDocument extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -1050,14 +1050,14 @@ class _RaAdminVerificationDocument extends StatelessWidget {
           ),
           title: Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
           ),
           subtitle: Text(
             'Private verification evidence',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               color: colors.onSurfaceVariant,
             ),
@@ -1103,7 +1103,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurfaceVariant,
@@ -1112,7 +1112,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     fontWeight: FontWeight.w600,
@@ -1129,7 +1129,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
                 width: 175,
                 child: Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: colors.onSurfaceVariant,
@@ -1140,7 +1140,7 @@ class _RaAdminVerificationRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     fontWeight: FontWeight.w600,

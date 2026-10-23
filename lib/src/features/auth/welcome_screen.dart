@@ -4,7 +4,7 @@ class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   void _continue(BuildContext context) {
-    push(context, const RoleSelectionScreen());
+    push(context, const LoginScreen());
   }
 
   @override
@@ -95,7 +95,7 @@ class WelcomeScreen extends StatelessWidget {
                               ),
                             ],
                           ),
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 35,
                             height: 1.07,
                             letterSpacing: -1.35,
@@ -106,9 +106,9 @@ class WelcomeScreen extends StatelessWidget {
                         const SizedBox(height: 15),
 
                         Text(
-                          'Request roadside assistance, compare provider '
-                          'quotes and follow your service progress from one place.',
-                          style: GoogleFonts.plusJakartaSans(
+                          'Request roadside assistance, review visit fees '
+                          'and follow your service progress from one place.',
+                          style: roadAssistTextStyle(
                             fontSize: 14.5,
                             height: 1.58,
                             letterSpacing: -.15,
@@ -171,7 +171,13 @@ class _WelcomeHeader extends StatelessWidget {
 
     return Row(
       children: [
-        const _WelcomeBrandLogo(size: 48),
+        const Hero(
+          tag: 'opening-brand-mark',
+          child: Material(
+            color: Colors.transparent,
+            child: _WelcomeBrandLogo(size: 48),
+          ),
+        ),
 
         const SizedBox(width: 11),
 
@@ -179,28 +185,34 @@ class _WelcomeHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text.rich(
-                TextSpan(
-                  children: [
+              Hero(
+                tag: 'opening-brand-name',
+                child: Material(
+                  color: Colors.transparent,
+                  child: Text.rich(
                     TextSpan(
-                      text: 'Road',
-                      style: TextStyle(color: colors.onSurface),
+                      children: [
+                        TextSpan(
+                          text: 'Road',
+                          style: TextStyle(color: colors.onSurface),
+                        ),
+                        TextSpan(
+                          text: 'Assist',
+                          style: TextStyle(
+                            color: theme.brightness == Brightness.dark
+                                ? const Color(0xFF55B7F4)
+                                : const Color(0xFF14283F),
+                          ),
+                        ),
+                      ],
                     ),
-                    TextSpan(
-                      text: 'Assist',
-                      style: TextStyle(
-                        color: theme.brightness == Brightness.dark
-                            ? const Color(0xFF55B7F4)
-                            : const Color(0xFF14283F),
-                      ),
+                    style: roadAssistTextStyle(
+                      fontSize: 20,
+                      height: 1,
+                      letterSpacing: -.7,
+                      fontWeight: FontWeight.w800,
                     ),
-                  ],
-                ),
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 20,
-                  height: 1,
-                  letterSpacing: -.7,
-                  fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
 
@@ -208,7 +220,7 @@ class _WelcomeHeader extends StatelessWidget {
 
               Text(
                 'ON THE ROAD WITH YOU',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 7.8,
                   height: 1.2,
                   letterSpacing: 1.75,
@@ -373,7 +385,7 @@ class _WelcomeFeatureGrid extends StatelessWidget {
               iconColor: Color(0xFF64B5FF),
               iconBackground: Color(0xFF103C71),
               title: 'Compare\nQuotes',
-              description: 'Review provider offers and choose the right price.',
+              description: 'See the visit fee before requesting a provider.',
             ),
           ),
 
@@ -397,8 +409,7 @@ class _WelcomeFeatureGrid extends StatelessWidget {
               iconColor: Color(0xFFB98AFF),
               iconBackground: Color(0xFF42316A),
               title: 'Complete\nHistory',
-              description:
-                  'Keep quotes, invoices and service records together.',
+              description: 'Keep invoices and service records together.',
             ),
           ),
         ],
@@ -432,7 +443,8 @@ class _WelcomeFeatureCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 13, 11, 14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: dark ? const Color(0xFF0C2032) : colors.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
@@ -463,7 +475,7 @@ class _WelcomeFeatureCard extends StatelessWidget {
 
           Text(
             title,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12.5,
               height: 1.17,
               letterSpacing: -.25,
@@ -478,7 +490,7 @@ class _WelcomeFeatureCard extends StatelessWidget {
             description,
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 10.1,
               height: 1.42,
               letterSpacing: -.05,
@@ -537,7 +549,7 @@ class _WelcomePrimaryButton extends StatelessWidget {
                   child: Text(
                     'Get Started',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 15,
                       letterSpacing: -.2,
                       fontWeight: FontWeight.w700,
@@ -596,7 +608,7 @@ class _WelcomeSecondaryButton extends StatelessWidget {
         ),
         child: Text(
           'I Already Have an Account',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 13.5,
             letterSpacing: -.15,
             fontWeight: FontWeight.w600,
@@ -638,7 +650,7 @@ class _WelcomeFooter extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 7,
               letterSpacing: 1.28,
               fontWeight: FontWeight.w600,
@@ -669,10 +681,36 @@ class _WelcomeReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context)) {
       return child;
     }
 
+    final route = ModalRoute.of(context);
+    if (route?.settings.name == '/welcome-from-splash' &&
+        route?.animation != null) {
+      return AnimatedBuilder(
+        animation: route!.animation!,
+        child: child,
+        builder: (context, child) {
+          final start = (index * .065).clamp(0.0, .45);
+          final end = (.56 + index * .065).clamp(0.0, 1.0);
+          final v = Curves.easeOutCubic.transform(
+            ((route.animation!.value - start) / (end - start)).clamp(0.0, 1.0),
+          );
+          return IgnorePointer(
+            ignoring: v < .95,
+            child: Opacity(
+              opacity: v,
+              child: Transform.translate(
+                offset: Offset(0, (1 - v) * 14),
+                child: child,
+              ),
+            ),
+          );
+        },
+      );
+    }
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: Duration(milliseconds: 320 + index * 65),

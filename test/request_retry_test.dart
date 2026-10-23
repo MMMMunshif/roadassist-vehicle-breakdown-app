@@ -84,14 +84,18 @@ class QueryResult extends Fake implements Query<Map<String, dynamic>> {
   }
 }
 
+List<String> storedRequestIds = ['stable-id'];
+
 class Snapshot extends Fake implements QuerySnapshot<Map<String, dynamic>> {
   @override
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> get docs => [Job()];
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> get docs =>
+      storedRequestIds.map(Job.new).toList();
 }
 
 class Job extends Fake implements QueryDocumentSnapshot<Map<String, dynamic>> {
+  Job(this.id);
   @override
-  String get id => 'stable-id';
+  final String id;
 }
 
 void main() {
@@ -99,6 +103,7 @@ void main() {
   late ConnectivityPlatform original;
   setUp(() {
     original = ConnectivityPlatform.instance;
+    storedRequestIds = ['stable-id'];
   });
   tearDown(() {
     ConnectivityPlatform.instance = original;
@@ -114,6 +119,17 @@ void main() {
       'stable-id',
     );
   });
+  test(
+    'submission lookup ignores unrelated requests and finds the exact ID',
+    () async {
+      storedRequestIds = ['other-request', 'stable-id'];
+      final service = RequestService(auth: Auth(), firestore: Store());
+      expect(await service.findSubmittedRequest('stable-id'), 'stable-id');
+      expect(await service.findSubmittedRequest('missing-request'), isNull);
+      storedRequestIds = [];
+      expect(await service.findSubmittedRequest('stable-id'), isNull);
+    },
+  );
   test('offline creation is rejected before any database access', () async {
     ConnectivityPlatform.instance = Connection(true);
     final service = RequestService(auth: Auth(), firestore: Store());

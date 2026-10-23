@@ -284,15 +284,23 @@ class RaFloatingNavigation extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(25),
                                     onTap: () => onSelected(i),
                                     child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
+                                      duration:
+                                          MediaQuery.disableAnimationsOf(
+                                                context,
+                                              ) ||
+                                              MediaQuery.accessibleNavigationOf(
+                                                context,
+                                              )
+                                          ? Duration.zero
+                                          : const Duration(milliseconds: 220),
                                       margin: const EdgeInsets.symmetric(
                                         horizontal: 2,
                                       ),
                                       decoration: BoxDecoration(
                                         color: i == selectedIndex
-                                            ? blue.withValues(alpha: .90)
+                                            ? blue.withValues(
+                                                alpha: dark ? .18 : .11,
+                                              )
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(25),
                                       ),
@@ -305,7 +313,7 @@ class RaFloatingNavigation extends StatelessWidget {
                                               data: IconThemeData(
                                                 size: 23,
                                                 color: i == selectedIndex
-                                                    ? Colors.white
+                                                    ? colors.primary
                                                     : colors.onSurfaceVariant,
                                               ),
                                               child: i == selectedIndex
@@ -324,22 +332,18 @@ class RaFloatingNavigation extends StatelessWidget {
                                                 destinations[i].label,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style:
-                                                    GoogleFonts.plusJakartaSans(
-                                                      fontSize:
-                                                          destinations.length ==
-                                                              5
-                                                          ? 10
-                                                          : 11,
-                                                      fontWeight:
-                                                          i == selectedIndex
-                                                          ? FontWeight.w700
-                                                          : FontWeight.w500,
-                                                      color: i == selectedIndex
-                                                          ? Colors.white
-                                                          : colors
-                                                                .onSurfaceVariant,
-                                                    ),
+                                                style: roadAssistTextStyle(
+                                                  fontSize:
+                                                      destinations.length == 5
+                                                      ? 10
+                                                      : 11,
+                                                  fontWeight: i == selectedIndex
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w500,
+                                                  color: i == selectedIndex
+                                                      ? colors.primary
+                                                      : colors.onSurfaceVariant,
+                                                ),
                                               ),
                                             ),
                                           ],

@@ -21,7 +21,8 @@ class SupportScreen extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: dark ? const Color(0xFF0D1D2B) : colors.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -65,7 +66,7 @@ class SupportScreen extends StatelessWidget {
                       children: [
                         Text(
                           'App support',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: providerFontSize(context, 18),
                             fontWeight: FontWeight.w800,
                             color: colors.onSurface,
@@ -74,7 +75,7 @@ class SupportScreen extends StatelessWidget {
                         const SizedBox(height: 3),
                         Text(
                           'Run quick checks or copy account diagnostics.',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: providerFontSize(context, 9.5),
                             color: colors.onSurfaceVariant,
                           ),
@@ -167,7 +168,8 @@ class SupportScreen extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: dark ? const Color(0xFF0D1D2B) : colors.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -203,7 +205,7 @@ class SupportScreen extends StatelessWidget {
 
               Text(
                 'Location & tracking',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 18),
                   fontWeight: FontWeight.w800,
                   color: colors.onSurface,
@@ -214,7 +216,7 @@ class SupportScreen extends StatelessWidget {
 
               Text(
                 'RoadAssist needs accurate location access during roadside assistance so providers can locate you and navigation can work correctly.',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 10),
                   height: 1.45,
                   color: colors.onSurfaceVariant,
@@ -288,7 +290,7 @@ class SupportScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Help & Support',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 19),
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -413,7 +415,7 @@ class SupportScreen extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Never share your RoadAssist password or verification codes when requesting support.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: providerFontSize(context, 10),
                       height: 1.45,
                       color: colors.onSurfaceVariant,
@@ -489,7 +491,7 @@ class _RaSupportHero extends StatelessWidget {
 
               Text(
                 'How can we help?',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   color: Colors.white,
                   fontSize: providerFontSize(context, 20),
                   fontWeight: FontWeight.w800,
@@ -503,7 +505,7 @@ class _RaSupportHero extends StatelessWidget {
                 width: 290,
                 child: Text(
                   'Find support for your roadside request, account, location, safety and app permissions.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white.withValues(alpha: .80),
                     fontSize: providerFontSize(context, 10),
                     height: 1.45,
@@ -533,7 +535,7 @@ class _RaSupportHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 17),
             fontWeight: FontWeight.w800,
             letterSpacing: -.35,
@@ -543,7 +545,7 @@ class _RaSupportHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 10),
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -565,7 +567,8 @@ class _RaSupportMenuGroup extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D1D2B)
             : Colors.white,
@@ -627,7 +630,7 @@ class _RaSupportMenuTile extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 10.8),
             fontWeight: FontWeight.w700,
             color: colors.onSurface,
@@ -637,7 +640,7 @@ class _RaSupportMenuTile extends StatelessWidget {
           subtitle,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 8.7),
             height: 1.35,
             color: colors.onSurfaceVariant,
@@ -697,7 +700,7 @@ class _RaSupportSheetTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 10.8),
                         fontWeight: FontWeight.w700,
                       ),
@@ -707,7 +710,7 @@ class _RaSupportSheetTile extends StatelessWidget {
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 8.7),
                         color: colors.onSurfaceVariant,
                       ),

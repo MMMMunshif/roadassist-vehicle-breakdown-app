@@ -32,7 +32,7 @@ class PrivacySafetyScreen extends StatelessWidget {
               const SizedBox(height: 14),
               Text(
                 'Information visibility',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 18),
                   fontWeight: FontWeight.w800,
                 ),
@@ -42,7 +42,7 @@ class PrivacySafetyScreen extends StatelessWidget {
                 isProvider
                     ? 'Drivers can access the provider information required for an accepted job. Other users should not receive your private account information through the normal RoadAssist workflow.'
                     : 'Your assigned provider receives information required to complete the active roadside request, such as relevant vehicle, contact and request details. Never share your password or verification codes.',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 9),
                   height: 1.5,
                   color: colors.onSurfaceVariant,
@@ -83,7 +83,7 @@ class PrivacySafetyScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Privacy & Safety',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 19),
             fontWeight: FontWeight.w800,
           ),
@@ -217,7 +217,7 @@ class _RaPrivacyHero extends StatelessWidget {
               children: [
                 Text(
                   'Your information matters',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: providerFontSize(context, 18),
                     fontWeight: FontWeight.w800,
@@ -226,7 +226,7 @@ class _RaPrivacyHero extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'RoadAssist uses information needed to support roadside assistance and account security.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: providerFontSize(context, 8.5),
                     height: 1.4,
@@ -256,7 +256,7 @@ class _RaPrivacyHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 14.5),
             fontWeight: FontWeight.w800,
           ),
@@ -264,7 +264,7 @@ class _RaPrivacyHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 8.3),
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -287,7 +287,8 @@ class _RaPrivacyMenuCard extends StatelessWidget {
     final colors = theme.colorScheme;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D1D2B)
             : colors.surface,
@@ -345,7 +346,7 @@ class _RaPrivacyTile extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 9.7),
             fontWeight: FontWeight.w700,
           ),
@@ -354,7 +355,7 @@ class _RaPrivacyTile extends StatelessWidget {
           subtitle,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 7.5),
             height: 1.35,
             color: colors.onSurfaceVariant,
@@ -378,7 +379,8 @@ class _RaPrivacySafetyCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: raGold.withValues(alpha: .07),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: raGold.withValues(alpha: .20)),
@@ -406,7 +408,7 @@ class _RaPrivacySafetyCard extends StatelessWidget {
               children: [
                 Text(
                   'Stay safe first',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10),
                     fontWeight: FontWeight.w700,
                   ),
@@ -414,7 +416,7 @@ class _RaPrivacySafetyCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   'Move away from active traffic when it is safe to do so. For immediate danger, contact emergency services before continuing with RoadAssist.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 8),
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -438,7 +440,8 @@ class _RaPrivacyInfoCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: colors.surfaceContainerHighest.withValues(alpha: .28),
         borderRadius: BorderRadius.circular(15),
       ),
@@ -450,7 +453,7 @@ class _RaPrivacyInfoCard extends StatelessWidget {
           Expanded(
             child: Text(
               'Never share your RoadAssist password, verification code or authentication credentials with a driver, provider or support contact.',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 8),
                 height: 1.45,
                 color: colors.onSurfaceVariant,

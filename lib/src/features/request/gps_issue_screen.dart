@@ -38,7 +38,7 @@ class _GpsIssueScreenState extends State<GpsIssueScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Location Issue',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -59,7 +59,7 @@ class _GpsIssueScreenState extends State<GpsIssueScreen> {
 
           Text(
             'Improve your location',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
               letterSpacing: -.35,
@@ -71,7 +71,7 @@ class _GpsIssueScreenState extends State<GpsIssueScreen> {
 
           Text(
             'Try these steps before sending the roadside request.',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 13,
               color: colors.onSurfaceVariant,
             ),
@@ -163,7 +163,7 @@ class _GpsIssueScreenState extends State<GpsIssueScreen> {
                 Expanded(
                   child: Text(
                     'Confirm the pickup point before sending your request. Accurate location information helps reduce provider delays.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       height: 1.45,
                       color: colors.onSurfaceVariant,
@@ -227,7 +227,7 @@ class _RaGpsHero extends StatelessWidget {
 
               Text(
                 'Location needs attention',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -241,7 +241,7 @@ class _RaGpsHero extends StatelessWidget {
                 width: 290,
                 child: Text(
                   'RoadAssist needs a reliable pickup point so the provider can find you safely.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white.withValues(alpha: .82),
                     fontSize: 13,
                     height: 1.45,
@@ -269,7 +269,8 @@ class _RaGpsSignalPanel extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: dark ? const Color(0xFF0D2237) : Colors.white,
         borderRadius: BorderRadius.circular(21),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
@@ -328,7 +329,7 @@ class _RaGpsSignalPanel extends StatelessWidget {
 
           Text(
             retrying ? 'Checking GPS signal…' : 'Location accuracy is low',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: colors.onSurface,
@@ -342,7 +343,7 @@ class _RaGpsSignalPanel extends StatelessWidget {
                 ? 'RoadAssist is checking whether your location can be used again.'
                 : 'No pickup point will be assumed. Retry GPS or manually confirm your location before continuing.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.45,
               color: colors.onSurfaceVariant,
@@ -380,7 +381,8 @@ class _RaGpsStep extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -417,7 +419,7 @@ class _RaGpsStep extends StatelessWidget {
                   ),
                   child: Text(
                     number,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       color: colors.onPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
@@ -436,7 +438,7 @@ class _RaGpsStep extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -444,7 +446,7 @@ class _RaGpsStep extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,

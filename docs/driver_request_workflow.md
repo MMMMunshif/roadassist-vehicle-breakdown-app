@@ -1,5 +1,7 @@
 # Driver Assistance Request Workflow
 
+> Current requests use the [simplified workflow](premium_workflow.md). The preferred-provider expansion described below documents an older flow.
+
 This document describes the RoadAssist driver request workflow owned and
 demonstrated by Munshif. It maps the visible screens to the application code,
 validation rules, Firestore data and viva demonstration steps.

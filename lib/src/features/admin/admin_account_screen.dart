@@ -144,10 +144,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
       appBar: AppBar(
         title: Text(
           'Account Review',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -365,7 +362,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
                         children: [
                           Text(
                             'SERVICES',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
                               letterSpacing: .65,
@@ -379,7 +376,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
                             services.isEmpty
                                 ? 'No services recorded.'
                                 : services.join(', '),
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 15,
                               height: 1.45,
                             ),
@@ -400,7 +397,7 @@ class _AdminAccountScreenState extends State<_AdminAccountScreen> {
 
                           Text(
                             'Private provider approval should be completed using the verification application and reviewer checklist below.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 14,
                               height: 1.4,
                               color: Theme.of(
@@ -484,7 +481,8 @@ class _AdminAccountHero extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .45)),
         borderRadius: BorderRadius.circular(23),
@@ -501,7 +499,7 @@ class _AdminAccountHero extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: colors.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -512,7 +510,7 @@ class _AdminAccountHero extends StatelessWidget {
                   email.trim().isEmpty ? uid : email,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: colors.onSurfaceVariant,
                     fontSize: 14,
                   ),
@@ -551,15 +549,12 @@ class _AdminAccountHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 14,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -582,7 +577,8 @@ class _AdminAccountSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -614,7 +610,7 @@ class _AdminAccountRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 14,
                 color: colors.onSurfaceVariant,
               ),
@@ -625,7 +621,7 @@ class _AdminAccountRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
@@ -673,7 +669,7 @@ class _AdminAccountNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
@@ -681,7 +677,7 @@ class _AdminAccountNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -728,7 +724,7 @@ class _AdminAccountDangerZone extends StatelessWidget {
               Expanded(
                 child: Text(
                   'Permanent account deletion',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: colors.error,
@@ -740,7 +736,7 @@ class _AdminAccountDangerZone extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Login, profile, vehicles, device tokens and verification documents are removed. Job, payment, complaint and audit records remain. Active jobs, unconfirmed payments and unresolved complaints block deletion.',
-            style: GoogleFonts.plusJakartaSans(fontSize: 14, height: 1.45),
+            style: roadAssistTextStyle(fontSize: 14, height: 1.45),
           ),
           const SizedBox(height: 13),
           OutlinedButton.icon(

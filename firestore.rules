@@ -443,7 +443,8 @@ service cloud.firestore {
             || (request.resource.data.activeRequestId is string
               && (!('activeRequestId' in resource.data) || resource.data.activeRequestId == null)
               && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.providerId == providerId
-              && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.status in ['accepted', 'en_route', 'arrived'])
+              && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.status in ['accepted', 'en_route', 'arrived']
+              && getAfter(/databases/$(database)/documents/requests/$(request.resource.data.activeRequestId)).data.get('serviceCompletedAt',null) == null)
             || (request.resource.data.activeRequestId == null
               && resource.data.activeRequestId is string
               && getAfter(/databases/$(database)/documents/requests/$(resource.data.activeRequestId)).data.providerId == providerId
@@ -471,6 +472,10 @@ service cloud.firestore {
     }
 
     match /requests/{requestId} {
+      match /workEstimates/{revisionId} {
+        allow read: if isAdmin() || (signedIn() && (get(/databases/$(database)/documents/requests/$(requestId)).data.driverId == request.auth.uid || get(/databases/$(database)/documents/requests/$(requestId)).data.providerId == request.auth.uid));
+        allow write: if false;
+      }
       function validCompletionReport(report) {
         return report is map && ((report.keys().hasOnly(['summary']) && report.summary is string && report.summary.size() >= 10 && report.summary.size() <= 500) || (report.keys().hasOnly(['problem','repairs','parts','advice'])
           && report.problem is string && report.problem.size() >= 10 && report.problem.size() <= 500
@@ -600,7 +605,7 @@ service cloud.firestore {
         && request.resource.data.estimatedCost ==
           request.resource.data.serviceFee + request.resource.data.dispatchFee
         && (request.resource.data.get('workflowVersion',1) == 3
-          ? validVisitRequest()
+          ? ((!('workApprovalRequired' in request.resource.data) || request.resource.data.workApprovalRequired == true) && validVisitRequest())
           : (!request.resource.data.keys().hasAny(['visitFeeQuoteId','providerDistanceKm']) && (!('workflowVersion' in request.resource.data) || request.resource.data.estimatedCost == 0)))
         && request.resource.data.preferredProviderId is string
         && request.resource.data.rejectedBy is list
@@ -609,7 +614,7 @@ service cloud.firestore {
           'driverId', 'driverName', 'driverPhone', 'providerId',
           'preferredProviderId', 'preferredProviderName', 'rejectedBy',
           'status', 'issue', 'issues', 'vehicleType', 'modelYear', 'registration',
-          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'visitFeeQuoteId', 'providerDistanceKm', 'partsPreference', 'arrivalVerificationRequired', 'jobStartCodeRequired',
+          'vehicleId', 'vehicleSnapshot', 'workflowVersion', 'workApprovalRequired', 'visitFeeQuoteId', 'providerDistanceKm', 'partsPreference', 'arrivalVerificationRequired', 'jobStartCodeRequired',
           'description', 'notes', 'priority', 'vehiclePhotoUrls',
           'photoAnnotations', 'locationLabel', 'landmark',
           'locationAccuracyMeters', 'latitude', 'longitude', 'serviceFee', 'dispatchFee',
@@ -678,6 +683,7 @@ service cloud.firestore {
         (resource.data.driverId == request.auth.uid
           && resource.data.status in ['searching', 'accepted', 'en_route', 'arrived']
           && resource.data.get('completionState','') != 'pending'
+          && resource.data.get('serviceCompletedAt',null) == null
           && request.resource.data.status == 'cancelled'
           && request.resource.data.cancelledAt == request.time && request.resource.data.updatedAt == request.time
           && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','updatedAt'])
@@ -707,7 +713,7 @@ service cloud.firestore {
           'rejectedBy','preferredProviderId','preferredProviderName','fallbackStartedAt','updatedAt']);
 
       allow update: if request.resource.data.status != 'cancelled'
-        && (resource.data.get('workflowVersion',1) != 3 || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['workflowVersion','visitFeeQuoteId','providerDistanceKm','dispatchFee','inspectionFee','serviceFee','extraFee','estimatedCost','finalCost','billItems','billRevision','billCorrectionReason']))
+        && (resource.data.get('workflowVersion',1) != 3 || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['workflowVersion','visitFeeQuoteId','providerDistanceKm','dispatchFee','inspectionFee','serviceFee','extraFee','estimatedCost','finalCost','billItems','billRevision','billCorrectionReason','workApprovalRequired','workEstimate','serviceCompletedAt']))
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rejectedBy','demoPayment'])
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['completionState','completionReport','pendingDiscountId'])
         && signedIn() && (

@@ -114,7 +114,8 @@ class _ProviderGateLoading extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: dark ? const Color(0xFF0D2237) : colors.surface,
                   borderRadius: BorderRadius.circular(26),
                   border: Border.all(
@@ -143,7 +144,7 @@ class _ProviderGateLoading extends StatelessWidget {
                     Text(
                       'Checking provider access',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -.4,
@@ -155,7 +156,7 @@ class _ProviderGateLoading extends StatelessWidget {
                     Text(
                       'Confirming your account, provider application and verification status.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.5,
                         color: colors.onSurfaceVariant,
@@ -173,7 +174,7 @@ class _ProviderGateLoading extends StatelessWidget {
 
                     Text(
                       'ROADASSIST PROVIDER',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         letterSpacing: .75,
@@ -211,7 +212,8 @@ class _ProviderGateError extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: theme.brightness == Brightness.dark
                       ? const Color(0xFF0D2237)
                       : colors.surface,
@@ -242,7 +244,7 @@ class _ProviderGateError extends StatelessWidget {
                     Text(
                       'Unable to verify provider access',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -.35,
@@ -254,7 +256,7 @@ class _ProviderGateError extends StatelessWidget {
                     Text(
                       'RoadAssist could not read your current provider verification status. Check your connection and open the provider portal again.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.5,
                         color: colors.onSurfaceVariant,

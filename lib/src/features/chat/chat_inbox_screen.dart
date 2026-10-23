@@ -232,7 +232,7 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
         automaticallyImplyLeading: Navigator.of(context).canPop(),
         title: Text(
           'Messages',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 20),
             fontWeight: FontWeight.w800,
             letterSpacing: -.5,
@@ -302,7 +302,7 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
                             unreadOnly
                                 ? 'Unread conversations'
                                 : 'Conversations',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: providerFontSize(context, 17),
                               fontWeight: FontWeight.w800,
                               letterSpacing: -.35,
@@ -323,7 +323,7 @@ class _ChatInboxScreenState extends State<_ChatInboxScreen> {
                             ),
                             child: Text(
                               '${controller.unread} unread',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: providerFontSize(context, 9),
                                 fontWeight: FontWeight.w700,
                                 color: colors.primary,
@@ -434,7 +434,7 @@ class _RaInboxHero extends StatelessWidget {
                   unread > 0
                       ? '$unread unread ${unread == 1 ? 'message' : 'messages'}'
                       : 'You’re all caught up',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: providerFontSize(context, 15),
                     fontWeight: FontWeight.w800,
@@ -447,7 +447,7 @@ class _RaInboxHero extends StatelessWidget {
                   isProvider
                       ? 'Stay connected with drivers throughout each roadside job.'
                       : 'Stay connected with your provider throughout roadside assistance.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white.withValues(alpha: .78),
                     fontSize: providerFontSize(context, 10),
                     height: 1.4,
@@ -550,7 +550,7 @@ class _RaInboxFilterButton extends StatelessWidget {
 
               Text(
                 label,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 10.5),
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   color: selected ? colors.primary : colors.onSurfaceVariant,
@@ -632,7 +632,8 @@ class _RaInboxConversationCard extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             borderRadius: BorderRadius.circular(19),
             border: Border.all(
               color: unread > 0
@@ -671,7 +672,7 @@ class _RaInboxConversationCard extends StatelessWidget {
                         child: Center(
                           child: Text(
                             unread > 99 ? '99+' : '$unread',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               color: Colors.white,
                               fontSize: providerFontSize(context, 7.5),
                               fontWeight: FontWeight.w700,
@@ -696,7 +697,7 @@ class _RaInboxConversationCard extends StatelessWidget {
                             peer,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               color: colors.onSurface,
                               fontSize: providerFontSize(context, 12.5),
                               fontWeight: unread > 0
@@ -709,7 +710,7 @@ class _RaInboxConversationCard extends StatelessWidget {
                         if (sentAt.isNotEmpty)
                           Text(
                             sentAt,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               color: colors.onSurfaceVariant,
                               fontSize: providerFontSize(context, 8.5),
                               fontWeight: unread > 0
@@ -736,7 +737,7 @@ class _RaInboxConversationCard extends StatelessWidget {
                             issue,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               color: colors.onSurfaceVariant,
                               fontSize: providerFontSize(context, 9),
                             ),
@@ -751,7 +752,7 @@ class _RaInboxConversationCard extends StatelessWidget {
                       preview,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 10.5),
                         height: 1.35,
                         color: unread > 0
@@ -810,7 +811,7 @@ class _RaInboxError extends StatelessWidget {
           Expanded(
             child: Text(
               'Some conversations could not be loaded. Check your connection.',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 10),
                 height: 1.4,
                 color: colors.onSurfaceVariant,

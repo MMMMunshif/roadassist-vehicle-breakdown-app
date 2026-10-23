@@ -54,11 +54,11 @@ void main() {
           home: const SplashScreen(),
         ),
       );
-      expect(find.text('Roadside support,\nwhen it matters.'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
       await tester.pump(const Duration(milliseconds: 800));
       expect(find.byType(SplashScreen), findsOneWidget);
       expect(find.byType(WelcomeScreen), findsNothing);
-      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pump(const Duration(milliseconds: 3500));
       await tester.pumpAndSettle();
       expect(find.byType(WelcomeScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -66,27 +66,38 @@ void main() {
   );
   for (final brightness in Brightness.values) {
     for (final reduced in [false, true]) {
-      testWidgets('splash fits narrow large text in ${brightness.name}, reduced motion $reduced', (tester) async {
-        tester.view.physicalSize = const Size(280, 650);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(MaterialApp(
-          theme: buildRoadAssistTheme(brightness),
-          builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(2), disableAnimations: reduced),
-            child: child!,
-          ),
-          home: const SplashScreen(),
-        ));
-        await tester.pump(const Duration(milliseconds: 1600));
-        expect(find.byType(SplashScreen), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        await tester.pump(const Duration(milliseconds: 1700));
-        await tester.pumpAndSettle();
-        expect(find.byType(WelcomeScreen), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      });
+      testWidgets(
+        'splash fits narrow large text in ${brightness.name}, reduced motion $reduced',
+        (tester) async {
+          tester.view.physicalSize = const Size(280, 650);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: buildRoadAssistTheme(brightness),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(2),
+                  disableAnimations: reduced,
+                ),
+                child: child!,
+              ),
+              home: const SplashScreen(),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 1600));
+          expect(
+            find.byType(reduced ? WelcomeScreen : SplashScreen),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pump(const Duration(milliseconds: 2700));
+          await tester.pumpAndSettle();
+          expect(find.byType(WelcomeScreen), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
 }
