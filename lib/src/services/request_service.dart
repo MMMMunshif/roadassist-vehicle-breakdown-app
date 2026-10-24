@@ -202,7 +202,7 @@ class RequestService {
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchRequest(String id) =>
-      _requests.doc(id).snapshots();
+      _requests.doc(id).snapshots(includeMetadataChanges: true);
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchOpenRequests() => _requests
       .where('status', isEqualTo: 'searching')

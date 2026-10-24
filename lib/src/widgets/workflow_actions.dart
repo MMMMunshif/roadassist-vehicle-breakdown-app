@@ -57,6 +57,12 @@ class _CancellationSheetState extends State<_CancellationSheet> {
               : 'Your provider will be notified. This request stays in your history.',
         ),
         const SizedBox(height: 12),
+        const InlineMessage(
+          icon: Icons.receipt_long_outlined,
+          text:
+              'No cancellation fee is added by this action. Payments already made are not automatically refunded.',
+        ),
+        const SizedBox(height: 12),
         for (final reason in const [
           'Assistance is no longer needed',
           'The provider is taking too long',

@@ -1,3 +1,4 @@
+import {guestActor,assertGuest,assertGuestRequest,guestActions} from '../functions/guest-policy.mjs';
 import {BillingError,visitFee,distanceKm,finalBill,assertVisitQuote} from '../functions/visit-billing-policy.mjs';
 export function createBillingHandler({loadAdmin = defaultAdmin} = {}) {
   return async function handler(req,res) {
@@ -15,12 +16,21 @@ export function createBillingHandler({loadAdmin = defaultAdmin} = {}) {
     try {
       const {auth,db,FieldValue,Timestamp} = await loadAdmin();
       const actor = await auth.verifyIdToken(req.headers.authorization.substring(7),true);
-      if (!actor.email_verified) throw new BillingError('Verify your email first.',403);
+      const phoneVerified = guestActor(actor);
+      if (!actor.email_verified && !phoneVerified) throw new BillingError('Verify your email first.',403);
       const result = await db.runTransaction(async tx => {
         const profileRef=db.doc(`users/${actor.uid}`), moderationRef=db.doc(`accountModeration/${actor.uid}`);
         const [profileSnap,moderationSnap,roleEmailSnap] = await Promise.all([tx.get(profileRef),tx.get(moderationRef),tx.get(db.doc(`roleEmailVerifications/${actor.uid}`))]);
         const profile=profileSnap.data(), moderation=moderationSnap.data(), role=['prepare','correct','checkout','decide_estimate'].includes(input.action)?'driver':'provider', now=Date.now();
-        if (!profile || ![profile.role,...(profile.roles??[])].includes(role) || ['suspended','deleted','disabled'].includes(moderation?.status) || moderation?.verification==='rejected') throw new BillingError('Account access is unavailable.',403);
+        const guest = phoneVerified && profile?.accountType === 'guest';
+        if (!actor.email_verified && !guest) throw new BillingError('Verify your email first.',403);
+        let guestSession;
+        if (guest) {
+          guestSession=(await tx.get(db.doc(`guestSessions/${actor.uid}`))).data();
+          assertGuest(actor,profile,guestSession,moderation);
+          if (process.env.GUEST_REQUESTS_ENABLED!=='true' || !guestActions.has(input.action) || input.checkoutMethod && input.checkoutMethod!=='cash') throw new BillingError('This action is unavailable for guest access.',403);
+        }
+        if (!profile || (!guest && ![profile.role,...(profile.roles??[])].includes(role)) || ['suspended','deleted','disabled'].includes(moderation?.status) || moderation?.verification==='rejected') throw new BillingError('Account access is unavailable.',403);
         if ((profile.roleEmailRequired??[]).includes(role) && roleEmailSnap.data()?.[role]?.email!==actor.email?.toLowerCase()) throw new BillingError('Verify your email for this role first.',403);
         const stamp=()=>FieldValue.serverTimestamp();
         if (input.action==='prepare') {
@@ -38,6 +48,7 @@ export function createBillingHandler({loadAdmin = defaultAdmin} = {}) {
           return {quoteId:quoteRef.id,visitFee:quote.visitFee,distanceKm:km,expiresAtMs:now+15*60*1000};
         }
         const jobRef=db.doc(`requests/${input.requestId}`), jobSnap=await tx.get(jobRef), job=jobSnap.data();
+        if (guest) assertGuestRequest(actor,guestSession,job,input.requestId);
         if (!job || job.workflowVersion!==3) throw new BillingError('This request uses the previous billing flow.');
         if (input.action==='decide_estimate') {
           if (job.driverId!==actor.uid) throw new BillingError('Only the driver can approve this work.',403);
@@ -146,17 +157,17 @@ function approvedItemsCover(approved, items) {
   const caps=totals(approved);
   return [...totals(items)].every(([key,amount])=>amount<=(caps.get(key)??0));
 }
-function requireApproval(m,a,now) {
+export function requireApproval(m,a,now) {
   if (m?.status!=='active' || m?.verification!=='verified' || (m.validUntil?.toMillis()??0)<=now || !a || a.applicationStatus==='withdrawn' || a.revision!==m.verificationRevision) throw new BillingError('Current provider approval is required.',403);
 }
-function requireAvailable(d,now) {
+export function requireAvailable(d,now) {
   if (!d || !d.online || d.requestsPaused || d.activeRequestId || !d.locationUpdatedAt || now-d.locationUpdatedAt.toMillis()>120000 || d.locationUpdatedAt.toMillis()>now+30000) throw new BillingError('The provider is busy, offline or needs to refresh location.');
   if (!d.available24Hours && d.scheduleConfigured && (d.hoursOverrideUntil?.toMillis()??0)<=now) {
     const date=new Date(now+19800000), minute=date.getUTCHours()*60+date.getUTCMinutes(), start=d.workStartMinute,end=d.workEndMinute;
     if (!(start<end ? minute>=start&&minute<end : start>end && (minute>=start||minute<end))) throw new BillingError('The provider is outside working hours.');
   }
 }
-async function defaultAdmin() {
+export async function defaultAdmin() {
   const [{cert,getApps,initializeApp},{getAuth},{getFirestore,FieldValue,Timestamp}]=await Promise.all([import('firebase-admin/app'),import('firebase-admin/auth'),import('firebase-admin/firestore')]);
   if (!getApps().length) initializeApp({credential:cert({projectId:process.env.FIREBASE_PROJECT_ID,clientEmail:process.env.FIREBASE_CLIENT_EMAIL,privateKey:process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g,'\n')})});
   return {auth:getAuth(),db:getFirestore(),FieldValue,Timestamp};

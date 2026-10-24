@@ -873,6 +873,20 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         }).toList();
 
         if (active.isEmpty) {
+          final pending = snapshot.data!.docs.where(
+            (request) => needsProviderReceiptConfirmation(request.data()),
+          );
+          if (pending.isNotEmpty) {
+            final request = pending.first;
+            return _DriverHomeMessageCard(
+              icon: Icons.receipt_long_outlined,
+              title: 'Payment receipt pending',
+              message:
+                  'You reported payment. Do not pay again; your provider still needs to confirm receipt.',
+              action: 'View payment status',
+              onTap: () => push(context, InvoiceScreen(requestId: request.id)),
+            );
+          }
           return _buildNoActiveAssistance(context);
         }
 
@@ -1298,8 +1312,6 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             ),
           ),
           const SizedBox(height: 22),
-          _buildAssistanceHero(context),
-          const SizedBox(height: 24),
           _DriverHomeSectionHeader(
             title: 'Active assistance',
             subtitle: 'Follow your current roadside request',
@@ -1308,6 +1320,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
           const SizedBox(height: 10),
           _buildMyRequests(context),
+          const SizedBox(height: 24),
+          _buildAssistanceHero(context),
           const SizedBox(height: 24),
           _DriverHomeSectionHeader(
             title: 'Nearby assistance',

@@ -261,7 +261,7 @@ class EmergencyScreen extends StatelessWidget {
           const SizedBox(height: 12),
           const _EmergencyLiveLocation(),
           const SizedBox(height: 18),
-          if (signedIn)
+          if (signedIn && !GuestAssistanceService.hasGuestIdentity)
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: AuthService().watchCurrentProfile(),
               builder: (context, snapshot) {

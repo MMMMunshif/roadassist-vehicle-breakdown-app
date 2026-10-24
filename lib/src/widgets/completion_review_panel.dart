@@ -5,82 +5,375 @@ const demoPaymentsEnabled = bool.fromEnvironment(
   defaultValue: false,
 );
 
+/// A reported manual payment is not a receipt until the provider confirms it.
+bool needsProviderReceiptConfirmation(Map<String, dynamic> data) =>
+    data['status'] == 'completed' &&
+    data['driverReportedPayment'] == true &&
+    data['providerConfirmedPayment'] != true &&
+    data['paymentMethod'] != 'demo_card' &&
+    !(data['demoPayment'] is Map &&
+        data['demoPayment']['status'] == 'simulated');
+
 Future<String?> requestCheckout(
   BuildContext context,
   int amount, {
   bool confirmService = true,
-}) {
-  String selected = 'cash';
-  return showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setSheetState) => SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+  bool showDemoCard = demoPaymentsEnabled,
+}) => Navigator.of(context).push<String>(
+  MaterialPageRoute(
+    fullscreenDialog: true,
+    builder: (_) => _PaymentWallet(
+      amount: amount,
+      confirmService: confirmService,
+      showDemoCard: showDemoCard,
+    ),
+  ),
+);
+
+class _PaymentWallet extends StatefulWidget {
+  const _PaymentWallet({
+    required this.amount,
+    required this.confirmService,
+    required this.showDemoCard,
+  });
+  final int amount;
+  final bool confirmService;
+  final bool showDemoCard;
+  @override
+  State<_PaymentWallet> createState() => _PaymentWalletState();
+}
+
+class _PaymentWalletState extends State<_PaymentWallet> {
+  String? method;
+
+  Future<void> confirm() async {
+    if (method == 'cash') {
+      Navigator.pop(context, 'cash');
+      return;
+    }
+    if (method != 'card') return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Card checkout · Demo'),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text('SANDBOX / NO REAL CHARGE'),
+            const SizedBox(height: 16),
             Text(
-              confirmService ? 'Accept Bill & Pay' : 'Payment',
+              'LKR ${ServiceInvoice.money(widget.amount)}.00',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Final total: Rs. ${ServiceInvoice.money(amount)}',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
             const SizedBox(height: 16),
-            for (final option in const [
-              ('cash', 'Cash', Icons.payments_outlined),
-              ('external', 'Bank transfer', Icons.account_balance_outlined),
-              if (demoPaymentsEnabled)
-                ('demo_card', 'Demo card', Icons.credit_card),
-            ])
-              ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                selected: selected == option.$1,
-                leading: Icon(option.$3),
-                title: Text(option.$2),
-                trailing: Icon(
-                  selected == option.$1
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                ),
-                onTap: () => setSheetState(() => selected = option.$1),
-              ),
-            const SizedBox(height: 14),
-            Text(
-              selected == 'demo_card'
-                  ? 'DEMO - NO MONEY CHARGED. This simulates a card payment for demonstration only.'
-                  : 'Pay the provider directly. Confirm only after paying; the provider will confirm receipt.',
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(sheetContext, selected),
-              icon: const Icon(Icons.check_circle_outline),
-              label: Text(
-                selected == 'demo_card'
-                    ? (confirmService
-                          ? 'Confirm service & simulate payment'
-                          : 'Simulate card payment')
-                    : (confirmService
-                          ? 'Confirm service & paid ${selected == 'cash' ? 'cash' : 'by transfer'}'
-                          : 'I paid ${selected == 'cash' ? 'cash' : 'by transfer'}'),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(sheetContext),
-              child: const Text('Cancel'),
+            const Text(
+              'Live card checkout requires a payment gateway and merchant approval. '
+              'No card details or money are collected. Your bill and payment status stay unchanged.',
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Back to payment'),
+          ),
+        ],
       ),
-    ),
-  );
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final reduced =
+        MediaQuery.of(context).disableAnimations ||
+        MediaQuery.of(context).accessibleNavigation;
+    final duration = Duration(milliseconds: reduced ? 0 : 350);
+    final card = method == 'card';
+    return RaScaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 12, 0),
+                  child: Row(
+                    children: [
+                      Image.asset(
+                        'assets/images/roadassist_mark.png',
+                        width: 32,
+                        height: 36,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'RoadAssist',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close payment',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'FINAL SERVICE BILL',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'LKR ${ServiceInvoice.money(widget.amount)}.00',
+                          style: theme.textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Choose how to pay your provider.'),
+                        const SizedBox(height: 28),
+                        LayoutBuilder(
+                          builder: (context, constraints) => Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: .06),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: colors.outline.withValues(alpha: .25),
+                              ),
+                            ),
+                            child: Stack(
+                              children: [
+                                AnimatedAlign(
+                                  duration: duration,
+                                  curve: Curves.easeOutCubic,
+                                  alignment: card
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: AnimatedOpacity(
+                                    duration: duration,
+                                    opacity: method == null ? 0 : 1,
+                                    child: Container(
+                                      width:
+                                          (constraints.maxWidth - 10) /
+                                          (widget.showDemoCard ? 2 : 1),
+                                      height: 64,
+                                      decoration: BoxDecoration(
+                                        color: colors.primary.withValues(
+                                          alpha: .18,
+                                        ),
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    for (final option in [
+                                      ('cash', 'Cash', Icons.payments_outlined),
+                                      if (widget.showDemoCard)
+                                        (
+                                          'card',
+                                          'Pay by card',
+                                          Icons.credit_card_rounded,
+                                        ),
+                                    ])
+                                      Expanded(
+                                        child: Semantics(
+                                          selected: method == option.$1,
+                                          child: TextButton(
+                                            style: TextButton.styleFrom(
+                                              minimumSize: const Size(0, 64),
+                                            ),
+                                            onPressed: () => setState(
+                                              () => method = option.$1,
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(option.$3, size: 20),
+                                                Text(
+                                                  option.$2,
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        AnimatedSwitcher(
+                          duration: duration,
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(
+                                    begin: .94,
+                                    end: 1,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              ),
+                          child: SizedBox(
+                            key: ValueKey(method),
+                            height: 170,
+                            child: Center(
+                              child: Transform.rotate(
+                                angle: reduced ? 0 : -.07,
+                                child: Container(
+                                  width: 240,
+                                  height: 138,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        colors.primary.withValues(alpha: .75),
+                                        colors.primary.withValues(alpha: .25),
+                                      ],
+                                    ),
+                                    border: Border.all(
+                                      color: colors.primary.withValues(
+                                        alpha: .4,
+                                      ),
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        card
+                                            ? Icons.credit_card
+                                            : Icons.payments_outlined,
+                                        size: 38,
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        method == null
+                                            ? 'Choose your method'
+                                            : card
+                                            ? '••••  ••••  ••••'
+                                            : 'Pay your provider directly',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      if (card)
+                                        const Text(
+                                          'DEMO · NO REAL CHARGE',
+                                          style: TextStyle(fontSize: 10),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          method == null
+                              ? 'Your payment. Your choice.'
+                              : card
+                              ? 'Secure card checkout · Demo'
+                              : 'A simple handover.',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          method == null
+                              ? (widget.showDemoCard
+                                    ? 'Select cash or explore the card checkout demo. Your total stays the same.'
+                                    : 'Choose cash, then confirm only after paying your provider.')
+                              : card
+                              ? 'Demo only. No real card details or money are collected.'
+                              : 'Hand the cash to your provider. Confirm below only after paying.',
+                        ),
+                        const SizedBox(height: 28),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                card
+                                    ? 'Live card payments will require verified gateway confirmation.'
+                                    : 'Your provider confirms receipt after you report cash payment.',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.confirmService) ...[
+                        Text(
+                          card
+                              ? 'The demo does not approve your bill.'
+                              : 'Confirming cash payment also approves this final bill.',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      FilledButton.icon(
+                        onPressed: method == null ? null : confirm,
+                        icon: Icon(
+                          card ? Icons.credit_card : Icons.arrow_forward,
+                        ),
+                        label: Text(
+                          method == null
+                              ? 'Choose payment method'
+                              : card
+                              ? 'Try demo checkout'
+                              : 'Confirm cash paid',
+                        ),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class CompletionReviewPanel extends StatefulWidget {
@@ -381,7 +674,7 @@ class _CompletionReviewPanelState extends State<CompletionReviewPanel> {
             Text(
               widget.isProvider
                   ? 'The driver must agree to the final total before the job closes. Payment is confirmed separately.'
-                  : 'Review the charges, then pay the provider directly by cash or bank transfer. Use Question this bill if something needs attention.',
+                  : 'Review the charges, then choose payment. Cash receipt is confirmed by your provider. Use Question this bill if something needs attention.',
               style: _providerText(context, size: 13, muted: true),
             ),
             if (busy) const LinearProgressIndicator(),

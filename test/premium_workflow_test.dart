@@ -74,7 +74,7 @@ void main() {
       isNull,
     );
   });
-  testWidgets('normal checkout offers real manual payment methods only', (
+  testWidgets('checkout offers cash and clearly labelled card demo', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -82,7 +82,8 @@ void main() {
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
-              onPressed: () => requestCheckout(context, 1900),
+              onPressed: () =>
+                  requestCheckout(context, 1900, showDemoCard: true),
               child: const Text('Pay'),
             ),
           ),
@@ -92,7 +93,11 @@ void main() {
     await tester.tap(find.text('Pay'));
     await tester.pumpAndSettle();
     expect(find.text('Cash'), findsOneWidget);
-    expect(find.text('Bank transfer'), findsOneWidget);
+    expect(find.text('Bank transfer'), findsNothing);
+    expect(find.text('Pay by card'), findsOneWidget);
+    await tester.tap(find.text('Pay by card'));
+    await tester.pumpAndSettle();
+    expect(find.text('Secure card checkout · Demo'), findsOneWidget);
     expect(find.text('Demo card'), findsNothing);
   });
   for (final brightness in Brightness.values) {

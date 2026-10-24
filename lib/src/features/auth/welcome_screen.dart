@@ -4,7 +4,7 @@ class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   void _continue(BuildContext context) {
-    push(context, const LoginScreen());
+    push(context, const RoleSelectionScreen());
   }
 
   @override

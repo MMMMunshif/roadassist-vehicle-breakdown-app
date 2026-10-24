@@ -5,33 +5,43 @@ import 'package:road_assist/src/screens.dart';
 import 'package:road_assist/src/widgets/auth_journey_scene.dart';
 
 void main() {
-  testWidgets(
-    'Get Started opens common login and role choice is only in signup',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildRoadAssistTheme(Brightness.dark),
-          home: const WelcomeScreen(),
-        ),
-      );
-      await tester.ensureVisible(find.text('Get Started'));
-      await tester.tap(find.text('Get Started'));
-      await tester.pumpAndSettle();
-      expect(find.byType(RoleSelectionScreen), findsNothing);
-      expect(find.byType(LoginScreen), findsOneWidget);
-      expect(find.text('Good to see you.'), findsOneWidget);
-      expect(find.text('FULL NAME'), findsNothing);
-      await tester.ensureVisible(find.text('New here? Create account'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('New here? Create account'));
-      await tester.pumpAndSettle();
-      expect(find.text('How will you use RoadAssist?'), findsOneWidget);
-      await tester.tap(find.text("I'm a driver"));
-      await tester.pumpAndSettle();
-      expect(find.text('FULL NAME'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+  for (final provider in [false, true]) {
+    testWidgets(
+      'Welcome role choice opens matching login and vehicle: $provider',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildRoadAssistTheme(Brightness.dark),
+            home: const WelcomeScreen(),
+          ),
+        );
+        await tester.ensureVisible(find.text('Get Started'));
+        await tester.tap(find.text('Get Started'));
+        await tester.pumpAndSettle();
+        expect(find.byType(RoleSelectionScreen), findsOneWidget);
+        expect(find.byType(LoginScreen), findsNothing);
+        final choice = find.text(
+          provider ? 'Continue as Provider' : 'Continue as Driver',
+        );
+        await tester.scrollUntilVisible(choice, 250, scrollable: find.byType(Scrollable).first);
+        await tester.pumpAndSettle();
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<LoginScreen>(find.byType(LoginScreen)).isProvider,
+          provider,
+        );
+        expect(
+          tester
+              .widget<AuthJourneyScene>(find.byType(AuthJourneyScene))
+              .provider,
+          provider,
+        );
+        expect(find.text('Good to see you.'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets('password focus and eye control the privacy state', (
     tester,
   ) async {

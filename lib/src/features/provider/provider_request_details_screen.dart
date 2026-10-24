@@ -449,9 +449,14 @@ class _RaProviderCaseHero extends StatelessWidget {
             ),
         ],
       ),
-      footer: Text(
-        'JOB $requestId',
-        style: _providerText(context, size: 12, muted: true),
+      footer: RaDetailsDisclosure(
+        storageKey: 'provider-request-reference',
+        title: 'Request reference',
+        icon: Icons.tag,
+        child: SelectableText(
+          'JOB $requestId',
+          style: _providerText(context, size: 12, muted: true),
+        ),
       ),
     );
   }

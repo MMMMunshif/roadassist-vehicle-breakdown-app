@@ -45,6 +45,9 @@ class _SplashScreenState extends State<SplashScreen>
     try {
       final user = FirebaseAuth.instance.currentUser;
 
+      if (user != null && GuestAssistanceService.hasGuestIdentity) {
+        return const GuestAccessScreen();
+      }
       if (user != null) {
         final profile = await AuthService().getCurrentProfile();
 

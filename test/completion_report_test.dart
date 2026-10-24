@@ -91,13 +91,22 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
+        String? checkoutResult;
+        var checkoutClosed = false;
         await tester.pumpWidget(
           MaterialApp(
             theme: buildRoadAssistTheme(brightness),
             home: Scaffold(
               body: Builder(
                 builder: (context) => TextButton(
-                  onPressed: () => requestCheckout(context, 1800),
+                  onPressed: () async {
+                    checkoutResult = await requestCheckout(
+                      context,
+                      1800,
+                      showDemoCard: true,
+                    );
+                    checkoutClosed = true;
+                  },
                   child: const Text('Report'),
                 ),
               ),
@@ -106,14 +115,32 @@ void main() {
         );
         await tester.tap(find.text('Report'));
         await tester.pumpAndSettle();
-        expect(find.text('Final total: Rs. 1,800'), findsOneWidget);
-        expect(find.text('Demo card'), findsNothing);
-        await tester.tap(find.text('Bank transfer'));
+        expect(find.text('LKR 1,800.00'), findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Choose payment method'),
+              )
+              .onPressed,
+          isNull,
+        );
+        await tester.tap(find.text('Pay by card'));
         await tester.pumpAndSettle();
-        expect(find.text('Confirm service & paid by transfer'), findsOneWidget);
+        await tester.tap(find.text('Try demo checkout'));
+        await tester.pumpAndSettle();
+        expect(find.text('SANDBOX / NO REAL CHARGE'), findsOneWidget);
+        expect(checkoutClosed, isFalse);
+        expect(checkoutResult, isNull);
+        await tester.tap(find.text('Back to payment'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cash'));
+        await tester.pumpAndSettle();
+        expect(find.text('Confirm cash paid'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        await tester.tap(find.text('Cancel'));
+        await tester.tap(find.text('Confirm cash paid'));
         await tester.pumpAndSettle();
+        expect(checkoutClosed, isTrue);
+        expect(checkoutResult, 'cash');
       },
     );
   }

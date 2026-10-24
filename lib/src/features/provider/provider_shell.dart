@@ -69,7 +69,7 @@ class _ApprovedProviderShellState extends State<ApprovedProviderShell> {
           onSelected: _changeTab,
           child: SafeArea(
             top: false,
-            child: IndexedStack(index: index, children: pages),
+            child: RaMemberTabStack(index: index, children: pages),
           ),
         ),
         bottomNavigationBar: _ProviderBottomNavigation(
