@@ -27,6 +27,46 @@ void main() {
     await Firebase.initializeApp();
     FirebaseAuthPlatform.instance = _SignedOutAuth();
   });
+  for (final login in [true, false]) {
+    testWidgets(
+      'guest entry opens emergency help without verification: login=$login',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildRoadAssistTheme(Brightness.light),
+            home: login ? const LoginScreen() : const RoleSelectionScreen(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final entry = find.text(
+          login
+              ? 'Need urgent help? Continue as guest'
+              : 'Emergency Guest Access',
+        );
+        await tester.scrollUntilVisible(
+          entry,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await Scrollable.ensureVisible(tester.element(entry), alignment: .5);
+        await tester.pumpAndSettle();
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        expect(find.byType(GuestAccessScreen), findsOneWidget);
+        await tester.scrollUntilVisible(find.text('Emergency help'), 150);
+        await tester.tap(find.text('Emergency help'));
+        await tester.pumpAndSettle();
+        expect(find.byType(EmergencyScreen), findsOneWidget);
+        expect(find.byType(EmailVerificationScreen), findsNothing);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.byType(EmergencyScreen), findsNothing);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   for (final brightness in Brightness.values) {
     testWidgets('emergency numbers available signed out in $brightness', (
       tester,

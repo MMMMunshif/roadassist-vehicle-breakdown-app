@@ -34,8 +34,6 @@ migrate_working_dir/
 /build/
 **/build/
 /coverage/
-.env
-.env.*
 !.env.example
 .vercel/
 
@@ -57,4 +55,4 @@ replay_pid*
 node_modules/
 firestore-debug.log
 firebase-debug.log
-.env*
+config.bat

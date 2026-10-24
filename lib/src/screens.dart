@@ -1,3 +1,4 @@
+import 'services/guest_assistance_service.dart';
 import 'widgets/splash_rescue_scene.dart';
 import 'widgets/premium_style.dart';
 import 'widgets/auth_journey_scene.dart';
@@ -82,6 +83,7 @@ part 'features/auth/legacy_welcome_screen.dart';
 part 'features/auth/welcome_screen.dart';
 part 'features/auth/role_selection_screen.dart';
 part 'features/auth/login_screen.dart';
+part 'features/auth/guest_access_screen.dart';
 part 'features/auth/email_verification_screen.dart';
 part 'features/settings/account_security_screen.dart';
 part 'features/admin/admin_portal_screen.dart';

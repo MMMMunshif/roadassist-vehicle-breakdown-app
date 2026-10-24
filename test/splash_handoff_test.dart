@@ -39,7 +39,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Get Started'));
       await tester.pumpAndSettle();
-      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(RoleSelectionScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

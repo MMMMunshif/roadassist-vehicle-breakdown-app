@@ -89,7 +89,7 @@ class _DriverShellState extends State<DriverShell> {
             : const Color(0xFFF4F8FC),
         body: SafeArea(
           top: false,
-          child: IndexedStack(index: index, children: pages),
+          child: RaMemberTabStack(index: index, children: pages),
         ),
         bottomNavigationBar: _DriverBottomNavigation(
           selectedIndex: index,

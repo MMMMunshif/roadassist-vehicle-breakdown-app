@@ -1587,18 +1587,29 @@ class EmptyState extends StatelessWidget {
       vertical: RaSpace.xxxl,
       horizontal: RaSpace.xl,
     ),
-    decoration: BoxDecoration(
+    decoration: RaPremiumDecoration(
+      context,
       color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(RaRadius.md),
+      borderRadius: BorderRadius.circular(24),
       border: Border.all(color: Theme.of(context).dividerColor),
     ),
     child: Column(
       children: [
-        IconBadge(icon, size: 52, color: raMuted),
+        IconBadge(icon, size: 52, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: RaSpace.md),
-        Text(title, style: RaText.title, textAlign: TextAlign.center),
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: RaSpace.xs),
-        Text(message, textAlign: TextAlign.center, style: RaText.bodyMuted),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.5),
+        ),
       ],
     ),
   );

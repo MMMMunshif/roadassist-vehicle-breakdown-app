@@ -23,6 +23,9 @@
     },
     "api/visit-billing.mjs": {
       "maxDuration": 30
+    },
+    "api/guest-assistance.mjs": {
+      "maxDuration": 30
     }
   }
 }

@@ -238,3 +238,138 @@ IconData raServiceIconForLabel(String label) {
     return Icons.fire_truck_outlined;
   return Icons.car_repair_outlined;
 }
+
+/// Secondary information shares one accessible disclosure across member screens.
+/// Children stay mounted so collapsing never loses an in-progress form.
+class RaDetailsDisclosure extends StatelessWidget {
+  const RaDetailsDisclosure({
+    super.key,
+    required this.storageKey,
+    required this.title,
+    required this.child,
+    this.subtitle,
+    this.icon = Icons.info_outline,
+    this.initiallyExpanded = false,
+  });
+  final String storageKey;
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final Widget child;
+  final bool initiallyExpanded;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reduced =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      clipBehavior: Clip.antiAlias,
+      decoration: RaPremiumDecoration(
+        context,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: .35),
+        ),
+      ),
+      child: ExpansionTile(
+        key: PageStorageKey(storageKey),
+        maintainState: true,
+        initiallyExpanded: initiallyExpanded,
+        expansionAnimationStyle: AnimationStyle(
+          duration: reduced ? Duration.zero : const Duration(milliseconds: 280),
+          reverseDuration: reduced
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        ),
+        shape: const Border(),
+        collapsedShape: const Border(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        leading: Icon(icon, size: 22, color: theme.colorScheme.primary),
+        title: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: subtitle == null
+            ? null
+            : Text(subtitle!, style: theme.textTheme.bodySmall),
+        children: [child],
+      ),
+    );
+  }
+}
+
+/// Keeps tab subtrees, scroll and forms alive while animating the visible tab.
+class RaMemberTabStack extends StatefulWidget {
+  const RaMemberTabStack({
+    super.key,
+    required this.index,
+    required this.children,
+  });
+  final int index;
+  final List<Widget> children;
+  @override
+  State<RaMemberTabStack> createState() => _RaMemberTabStackState();
+}
+
+class _RaMemberTabStackState extends State<RaMemberTabStack>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController motion = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+    value: 1,
+  );
+  bool get reduced =>
+      MediaQuery.disableAnimationsOf(context) ||
+      MediaQuery.accessibleNavigationOf(context);
+  @override
+  void didUpdateWidget(covariant RaMemberTabStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      if (reduced) {
+        motion.value = 1;
+      } else {
+        motion.forward(from: 0);
+      }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (reduced) motion.value = 1;
+  }
+
+  @override
+  void dispose() {
+    motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final child = IndexedStack(
+      index: widget.index,
+      children: [
+        for (var i = 0; i < widget.children.length; i++)
+          TickerMode(enabled: i == widget.index, child: widget.children[i]),
+      ],
+    );
+    final curve = motion.drive(CurveTween(curve: Curves.easeOutCubic));
+    return FadeTransition(
+      opacity: Tween<double>(begin: .7, end: 1).animate(curve),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, .012),
+          end: Offset.zero,
+        ).animate(curve),
+        child: child,
+      ),
+    );
+  }
+}

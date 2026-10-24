@@ -251,8 +251,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
               const _RaInvoiceSectionHeading(
                 title: 'Payment status',
-                subtitle:
-                    'Review payment to your provider by cash or bank transfer.',
+                subtitle: 'Cash needs provider receipt confirmation.',
               ),
 
               const SizedBox(height: 10),
@@ -480,7 +479,7 @@ class _RaInvoicePaymentCard extends StatelessWidget {
       icon = Icons.hourglass_top_rounded;
       title = 'Awaiting provider confirmation';
       message =
-          'The driver reported payment${paymentMethod == null ? '' : ' by ${paymentMethod!.replaceAll('_', ' ')}'}.';
+          'Payment reported${paymentMethod == null ? '' : ' by ${paymentMethod!.replaceAll('_', ' ')}'}. Do not pay again. The provider must confirm receipt.';
     } else {
       tone = colors.primary;
       icon = Icons.payments_outlined;

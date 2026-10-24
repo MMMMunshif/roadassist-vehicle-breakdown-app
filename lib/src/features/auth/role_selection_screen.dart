@@ -192,7 +192,7 @@ class RoleSelectionScreen extends StatelessWidget {
                             ),
                           ),
                           onPressed: () {
-                            replace(context, const DriverShell());
+                            push(context, const GuestAccessScreen());
                           },
                           icon: const Icon(Icons.emergency_outlined),
                           label: const Text('Emergency Guest Access'),

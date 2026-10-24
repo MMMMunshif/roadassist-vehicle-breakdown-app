@@ -943,7 +943,7 @@ class _AuthFormState extends State<_AuthForm> {
                 AuthJourneyScene(
                   controller: journey,
                   registration: registerMode,
-                  provider: registerMode && isProvider,
+                  provider: isProvider,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -1314,7 +1314,7 @@ class _AuthFormState extends State<_AuthForm> {
                 if (!registerMode) ...[
                   const SizedBox(height: 16),
                   _EmergencyGuestButton(
-                    onTap: () => replace(context, const DriverShell()),
+                    onTap: () => push(context, const GuestAccessScreen()),
                   ),
                 ],
               ],

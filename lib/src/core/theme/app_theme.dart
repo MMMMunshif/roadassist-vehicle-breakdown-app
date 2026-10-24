@@ -100,13 +100,13 @@ ThemeData buildRoadAssistTheme(Brightness brightness) {
         shape: shape,
         side: BorderSide(color: colors.outlineVariant),
         textStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-      ),
+      ).copyWith(foregroundBuilder: raPremiumButtonFeedback),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         minimumSize: const Size(48, 48),
         textStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-      ),
+      ).copyWith(foregroundBuilder: raPremiumButtonFeedback),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -137,6 +137,45 @@ ThemeData buildRoadAssistTheme(Brightness brightness) {
       elevation: 0,
       height: 76,
       labelTextStyle: WidgetStatePropertyAll(text.labelSmall),
+    ),
+    expansionTileTheme: ExpansionTileThemeData(
+      iconColor: colors.primary,
+      collapsedIconColor: colors.onSurfaceVariant,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      shape: const Border(),
+      collapsedShape: const Border(),
+    ),
+    listTileTheme: ListTileThemeData(
+      iconColor: colors.primary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      minVerticalPadding: 10,
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: dark ? const Color(0xFF10283E) : const Color(0xFFFAFDFF),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .4)),
+      ),
+      textStyle: text.bodyMedium,
+      elevation: 6,
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: const Color(0xFF087FF0),
+      foregroundColor: Colors.white,
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      extendedTextStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: colors.primary,
+      unselectedLabelColor: colors.onSurfaceVariant,
+      labelStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+      unselectedLabelStyle: text.labelLarge,
+      dividerColor: colors.outlineVariant.withValues(alpha: .3),
+      indicatorSize: TabBarIndicatorSize.label,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: dark ? const Color(0xFF10283E) : const Color(0xFFFAFDFF),

@@ -199,6 +199,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
   bool updatingStatus = false;
   bool offline = false;
   DateTime? lastSynced;
+  bool showingSavedRequest = false;
   StreamSubscription<List<ConnectivityResult>>? connectionSubscription;
 
   void onConnection(List<ConnectivityResult> results) {
@@ -288,6 +289,7 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
 
     setState(() {
       requestData = data;
+      showingSavedRequest = snapshot.metadata.isFromCache;
       if (!snapshot.metadata.isFromCache) lastSynced = DateTime.now();
 
       requestCancelled = data['status'] == 'cancelled';
@@ -998,12 +1000,26 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                     ),
                     const SizedBox(height: 14),
                   ],
+                  if (!offline)
+                    RequestSyncStatus(
+                      showingSavedData: showingSavedRequest,
+                      lastSynced: lastSynced,
+                    ),
                   _RaProviderActiveStatusCard(
                     title: _statusTitle(),
                     description: _statusDescription(),
                     status: status,
                     cancelled: requestCancelled,
+                    completionPending: completionPending,
                   ),
+                  const SizedBox(height: 14),
+                  _RaProviderActiveDriverCard(
+                    name: driverName,
+                    phone: driverPhone,
+                    requestId: widget.requestId,
+                  ),
+
+                  const SizedBox(height: 14),
 
                   if (widget.requestId != null &&
                       data['workflowVersion'] != 3 &&
@@ -1019,50 +1035,85 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
 
                   const SizedBox(height: 14),
 
-                  if (hasDriverLocation)
-                    _RaProviderActiveMap(
-                      onNavigate: offline || updatingStatus || requestCancelled
-                          ? null
-                          : navigateToDriver,
-                      latitude: latitude,
-                      longitude: longitude,
-                      providerPosition: currentProviderPosition,
-                      roadRoute: roadRoute,
-                      locationMessage: locationMessage,
-                      location: location,
+                  if (status >= 2 || requestCancelled)
+                    RaDetailsDisclosure(
+                      storageKey: 'provider-job-map',
+                      title: 'Driver location',
+                      icon: Icons.map_outlined,
+                      child: Column(
+                        children: [
+                          if (hasDriverLocation)
+                            _RaProviderActiveMap(
+                              onNavigate:
+                                  offline || updatingStatus || requestCancelled
+                                  ? null
+                                  : navigateToDriver,
+                              latitude: latitude,
+                              longitude: longitude,
+                              providerPosition: currentProviderPosition,
+                              roadRoute: roadRoute,
+                              locationMessage: locationMessage,
+                              location: location,
+                            )
+                          else
+                            _RaProviderActiveNotice(
+                              icon: Icons.location_off_outlined,
+                              title: 'Driver coordinates unavailable',
+                              message: location,
+                              tone: colors.error,
+                            ),
+
+                          const SizedBox(height: 14),
+                        ],
+                      ),
                     )
-                  else
-                    _RaProviderActiveNotice(
-                      icon: Icons.location_off_outlined,
-                      title: 'Driver coordinates unavailable',
-                      message: location,
-                      tone: colors.error,
-                    ),
+                  else ...[
+                    if (hasDriverLocation)
+                      _RaProviderActiveMap(
+                        onNavigate:
+                            offline || updatingStatus || requestCancelled
+                            ? null
+                            : navigateToDriver,
+                        latitude: latitude,
+                        longitude: longitude,
+                        providerPosition: currentProviderPosition,
+                        roadRoute: roadRoute,
+                        locationMessage: locationMessage,
+                        location: location,
+                      )
+                    else
+                      _RaProviderActiveNotice(
+                        icon: Icons.location_off_outlined,
+                        title: 'Driver coordinates unavailable',
+                        message: location,
+                        tone: colors.error,
+                      ),
 
-                  const SizedBox(height: 14),
-
-                  _RaProviderActiveDriverCard(
-                    name: driverName,
-                    phone: driverPhone,
-                    requestId: widget.requestId,
-                  ),
-
-                  const SizedBox(height: 14),
-
+                    const SizedBox(height: 14),
+                  ],
                   if (data['billCorrectionReason'] is String)
                     InlineMessage(
                       icon: Icons.edit_note,
                       text:
                           'Bill correction requested: ${data['billCorrectionReason']}',
                     ),
-                  _RaProviderActiveSummary(
-                    issue: requestIssueLabel(data),
-                    vehicle: vehicle,
-                    location: location,
-                    approvedTotal: (data['estimatedCost'] as num?)?.toInt(),
-                    visitBilling: data['workflowVersion'] == 3,
+                  RaDetailsDisclosure(
+                    storageKey: 'provider-job-details',
+                    title: 'Job details & charges',
+                    icon: Icons.receipt_long_outlined,
+                    child: Column(
+                      children: [
+                        _RaProviderActiveSummary(
+                          issue: requestIssueLabel(data),
+                          vehicle: vehicle,
+                          location: location,
+                          approvedTotal: (data['estimatedCost'] as num?)
+                              ?.toInt(),
+                          visitBilling: data['workflowVersion'] == 3,
+                        ),
+                      ],
+                    ),
                   ),
-
                   if (waitingForArrivalConfirmation) ...[
                     const SizedBox(height: 14),
 
@@ -1084,7 +1135,9 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
                       onPrepare: prepareWorkEstimate,
                     ),
 
-                  if (status == 2 && !requestCancelled) ...[
+                  if (status == 2 &&
+                      !requestCancelled &&
+                      !completionPending) ...[
                     const SizedBox(height: 24),
 
                     const _RaProviderActiveHeading(
@@ -1153,34 +1206,35 @@ class _ProviderActiveJobScreenState extends State<ProviderActiveJobScreen>
               ),
             ),
 
-            _RaProviderActiveBottomBar(
-              label: requestCancelled
-                  ? 'Back to Dashboard'
-                  : completionPending
-                  ? 'Waiting for Driver Confirmation'
-                  : status == 3
-                  ? 'Finish Job'
-                  : status == 2
-                  ? (data['workflowVersion'] == 3
-                        ? 'Finish service & bill'
-                        : 'Finish Service')
-                  : 'Mark as ${statuses[status + 1]}',
-              enabled:
-                  !offline &&
-                  !updatingStatus &&
-                  !completionPending &&
-                  data['workEstimate']?['status'] != 'pending' &&
-                  widget.requestId != null &&
-                  (requestCancelled ||
-                      (!waitingForArrivalConfirmation &&
-                          (status != 2 || repairReady))),
-              busy: updatingStatus,
-              onTap: requestCancelled
-                  ? () {
-                      replace(context, const ProviderShell());
-                    }
-                  : advanceStatus,
-            ),
+            if (!completionPending)
+              _RaProviderActiveBottomBar(
+                label: requestCancelled
+                    ? 'Back to Dashboard'
+                    : completionPending
+                    ? 'Waiting for Driver Confirmation'
+                    : status == 3
+                    ? 'Finish Job'
+                    : status == 2
+                    ? (data['workflowVersion'] == 3
+                          ? 'Finish service & bill'
+                          : 'Finish Service')
+                    : 'Mark as ${statuses[status + 1]}',
+                enabled:
+                    !offline &&
+                    !updatingStatus &&
+                    !completionPending &&
+                    data['workEstimate']?['status'] != 'pending' &&
+                    widget.requestId != null &&
+                    (requestCancelled ||
+                        (!waitingForArrivalConfirmation &&
+                            (status != 2 || repairReady))),
+                busy: updatingStatus,
+                onTap: requestCancelled
+                    ? () {
+                        replace(context, const ProviderShell());
+                      }
+                    : advanceStatus,
+              ),
           ],
         ),
       ),
@@ -1194,20 +1248,23 @@ class _RaProviderActiveStatusCard extends StatelessWidget {
     required this.description,
     required this.status,
     required this.cancelled,
+    required this.completionPending,
   });
 
   final String title;
   final String description;
   final int status;
   final bool cancelled;
+  final bool completionPending;
 
   @override
   Widget build(BuildContext context) {
-    return RaProviderSummaryCard(
+    return ActiveAssistanceStatusCard(
       title: title,
-      message: description,
-      icon: cancelled ? Icons.cancel_outlined : Icons.route_outlined,
-      footer: cancelled ? null : RaProviderJobProgress(current: status),
+      description: description,
+      status: status,
+      cancelled: cancelled,
+      completionPending: completionPending,
     );
   }
 }

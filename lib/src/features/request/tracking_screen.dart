@@ -37,6 +37,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   String? recoveryReason;
   String? requestError;
+  bool showingSavedRequest = false;
+  DateTime? lastServerSync;
 
   RoadRoute? roadRoute;
 
@@ -157,6 +159,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     setState(() {
       status = nextStatus;
+      showingSavedRequest = snapshot.metadata.isFromCache;
+      if (!showingSavedRequest) lastServerSync = DateTime.now();
       visitBilling = data['workflowVersion'] == 3;
       jobStartCodeRequired = data['jobStartCodeRequired'] == true;
       providerLocationUpdatedAt =
@@ -697,87 +701,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget buildStatusCard(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final tone = cancelled
-        ? colors.error
-        : status == 3
-        ? raSuccess
-        : colors.primary;
-
-    final icon = cancelled
-        ? Icons.close_rounded
-        : switch (status) {
-            0 => Icons.handshake_outlined,
-            1 => Icons.navigation_outlined,
-            2 => Icons.location_on_outlined,
-            _ => Icons.task_alt_rounded,
-          };
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: .07),
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: tone.withValues(alpha: .17)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 47,
-                height: 47,
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: .11),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(icon, color: tone),
-              ),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      statusTitle,
-                      style: roadAssistTextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      statusDescription,
-                      style: roadAssistTextStyle(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          if (!cancelled) ...[
-            const SizedBox(height: 17),
-
-            StatusTimeline(statuses: statuses, current: status),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget buildStatusCard(BuildContext context) => ActiveAssistanceStatusCard(
+    status: status,
+    cancelled: cancelled,
+    title: statusTitle,
+    description: statusDescription,
+    completionPending: completionPending,
+  );
 
   Widget buildRequestSummary(BuildContext context) {
     final theme = Theme.of(context);
@@ -1182,22 +1112,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     const SizedBox(height: 13),
                   ],
 
-                  buildMap(context),
-                  const SizedBox(height: 10),
-                  LiveLocationStatus(
-                    updatedAt: providerLocationUpdatedAt,
-                    hasPosition: providerPosition != null,
-                    distanceKm: providerPosition == null
-                        ? null
-                        : Geolocator.distanceBetween(
-                                providerPosition!.latitude,
-                                providerPosition!.longitude,
-                                widget.draft.latitude,
-                                widget.draft.longitude,
-                              ) /
-                              1000,
-                  ),
-
                   if (requestError != null) ...[
                     const SizedBox(height: 11),
 
@@ -1233,7 +1147,54 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                   const SizedBox(height: 14),
 
+                  RequestSyncStatus(
+                    showingSavedData: showingSavedRequest,
+                    lastSynced: lastServerSync,
+                  ),
+                  buildStatusCard(context),
+                  const SizedBox(height: 14),
                   buildProviderCard(context),
+                  const SizedBox(height: 14),
+                  if (!cancelled && status < 2) ...[
+                    buildMap(context),
+                    const SizedBox(height: 10),
+                    LiveLocationStatus(
+                      updatedAt: providerLocationUpdatedAt,
+                      hasPosition: providerPosition != null,
+                      distanceKm: providerPosition == null
+                          ? null
+                          : Geolocator.distanceBetween(
+                                  providerPosition!.latitude,
+                                  providerPosition!.longitude,
+                                  widget.draft.latitude,
+                                  widget.draft.longitude,
+                                ) /
+                                1000,
+                    ),
+                  ] else
+                    ExpansionTile(
+                      key: const PageStorageKey('assistance-map'),
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                      leading: const Icon(Icons.map_outlined),
+                      title: const Text('Provider location'),
+                      children: [
+                        buildMap(context),
+                        const SizedBox(height: 10),
+                        LiveLocationStatus(
+                          updatedAt: providerLocationUpdatedAt,
+                          hasPosition: providerPosition != null,
+                          distanceKm: providerPosition == null
+                              ? null
+                              : Geolocator.distanceBetween(
+                                      providerPosition!.latitude,
+                                      providerPosition!.longitude,
+                                      widget.draft.latitude,
+                                      widget.draft.longitude,
+                                    ) /
+                                    1000,
+                        ),
+                      ],
+                    ),
                   if (!cancelled && status < 2 && widget.requestId != null) ...[
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
@@ -1247,15 +1208,36 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  buildStatusCard(context),
+                  if (!cancelled &&
+                      status == 2 &&
+                      arrivalNeedsConfirmation) ...[
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 13),
+                    buildArrivalConfirmation(context),
+                  ],
+
+                  if (completionPending && widget.requestId != null) ...[
+                    const SizedBox(height: 16),
+
+                    buildCompletionReview(context),
+                  ],
 
                   if (visitBilling && widget.requestId != null)
                     WorkApprovalPanel(requestId: widget.requestId!),
-                  buildRequestSummary(context),
+                  ExpansionTile(
+                    key: const PageStorageKey('assistance-details'),
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('Request details & charges'),
+                    subtitle: Text(
+                      estimatedCost > 0
+                          ? money(estimatedCost)
+                          : 'Price pending',
+                    ),
+                    children: [buildRequestSummary(context)],
+                  ),
 
                   if (!cancelled &&
                       status == 0 &&
@@ -1290,20 +1272,6 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   ],
 
-                  if (!cancelled &&
-                      status == 2 &&
-                      arrivalNeedsConfirmation) ...[
-                    const SizedBox(height: 16),
-
-                    buildArrivalConfirmation(context),
-                  ],
-
-                  if (completionPending && widget.requestId != null) ...[
-                    const SizedBox(height: 16),
-
-                    buildCompletionReview(context),
-                  ],
-
                   if (cancelled && recoveryReason != null) ...[
                     const SizedBox(height: 16),
 
@@ -1331,26 +1299,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
               ),
             ),
 
-            _RaTrackingBottomBar(
-              cancelled: cancelled,
-              completed: status == 3,
-              canFindAnother: cancelled && recoveryReason != null,
-              onPressed: () {
-                if (cancelled && recoveryReason != null) {
-                  replace(
-                    context,
-                    ReviewScreen(
-                      draft: widget.draft.copyWith(
-                        provider: '',
-                        preferredProviderId: '',
+            if (cancelled || status == 3)
+              _RaTrackingBottomBar(
+                cancelled: cancelled,
+                completed: status == 3,
+                canFindAnother: cancelled && recoveryReason != null,
+                onPressed: () {
+                  if (cancelled && recoveryReason != null) {
+                    replace(
+                      context,
+                      ReviewScreen(
+                        draft: widget.draft.copyWith(
+                          provider: '',
+                          preferredProviderId: '',
+                        ),
                       ),
-                    ),
-                  );
-                } else {
-                  replace(context, const DriverShell());
-                }
-              },
-            ),
+                    );
+                  } else {
+                    replace(context, const DriverShell());
+                  }
+                },
+              ),
           ],
         ),
       ),
@@ -1486,6 +1455,149 @@ class _RaTrackingBottomBar extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Presentation follows server state; GPS refreshes never restart stage motion.
+class ActiveAssistanceStatusCard extends StatelessWidget {
+  const ActiveAssistanceStatusCard({
+    super.key,
+    required this.status,
+    required this.title,
+    required this.description,
+    this.cancelled = false,
+    this.completionPending = false,
+  });
+  final int status;
+  final String title;
+  final String description;
+  final bool cancelled;
+  final bool completionPending;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tone = cancelled
+        ? colors.error
+        : status >= 3
+        ? raSuccess
+        : colors.primary;
+    final reduced =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    final duration = reduced
+        ? Duration.zero
+        : const Duration(milliseconds: 420);
+    final icon = cancelled
+        ? Icons.close_rounded
+        : completionPending
+        ? Icons.receipt_long_outlined
+        : switch (status) {
+            0 => Icons.handshake_outlined,
+            1 => Icons.navigation_outlined,
+            2 => Icons.car_repair_outlined,
+            _ => Icons.task_alt_rounded,
+          };
+    return AnimatedContainer(
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tone.withValues(alpha: .18), tone.withValues(alpha: .04)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: tone.withValues(alpha: .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: tone.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: tone, size: 23),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  cancelled
+                      ? 'REQUEST CLOSED'
+                      : status >= 3
+                      ? 'SERVICE COMPLETED'
+                      : 'ACTIVE ASSISTANCE',
+                  style: roadAssistTextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w800,
+                    color: tone,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Semantics(
+            liveRegion: true,
+            child: AnimatedSwitcher(
+              duration: duration,
+              switchInCurve: Curves.easeOutCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, .08),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: Align(
+                key: ValueKey('$status/$cancelled/$completionPending/$title'),
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: roadAssistTextStyle(
+                        fontSize: 24,
+                        height: 1.2,
+                        letterSpacing: -.7,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      description,
+                      style: roadAssistTextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!cancelled) ...[
+            const SizedBox(height: 24),
+            StatusTimeline(
+              statuses: const ['Accepted', 'En route', 'Arrived', 'Completed'],
+              current: status.clamp(0, 3),
+            ),
+          ],
+        ],
       ),
     );
   }
