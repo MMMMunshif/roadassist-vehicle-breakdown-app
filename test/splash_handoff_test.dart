@@ -6,43 +6,55 @@ import 'package:road_assist/src/screens.dart';
 import 'package:road_assist/src/widgets/splash_rescue_scene.dart';
 
 void main() {
-  testWidgets(
-    'handshake scene has no loading indicator and shares heroes with Welcome',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: buildRoadAssistTheme(Brightness.dark),
-          home: SplashScreen(
-            destinationLoader: () async => const WelcomeScreen(),
-          ),
+  testWidgets('ready destination waits 2.5 seconds before the 650ms handoff', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SplashScreen(
+          destinationLoader: () async =>
+              const Scaffold(body: Text('Next screen')),
         ),
-      );
-      expect(find.byType(LinearProgressIndicator), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsNothing);
-      await tester.pump(const Duration(milliseconds: 2800));
-      expect(
-        tester
-            .widget<SplashRescueScene>(find.byType(SplashRescueScene))
-            .progress,
-        closeTo(2800 / 4200, .01),
-      );
-      await tester.pump(const Duration(milliseconds: 1400));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump();
-      expect(find.byType(WelcomeScreen), findsOneWidget);
-      expect(find.byType(Hero), findsWidgets);
-      expect(tester.takeException(), isNull);
-      await tester.pumpAndSettle();
-      expect(find.byType(SplashScreen), findsNothing);
-      await tester.ensureVisible(find.text('Get Started'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Get Started'));
-      await tester.pumpAndSettle();
-      expect(find.byType(RoleSelectionScreen), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 2400));
+    expect(find.byType(SplashScreen), findsOneWidget);
+    expect(find.text('Next screen'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('Next screen'), findsOneWidget);
+    expect(find.byType(SplashScreen), findsNothing);
+  });
+  testWidgets('static brand hands off with a fade after the minimum display', (
+    tester,
+  ) async {
+    final ready = Completer<Widget>();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildRoadAssistTheme(Brightness.dark),
+        home: SplashScreen(destinationLoader: () => ready.future),
+      ),
+    );
+    expect(find.text('Roadside help. Within reach.'), findsOneWidget);
+    expect(find.byType(SplashRescueScene), findsNothing);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.binding.transientCallbackCount, 0);
+    ready.complete(const WelcomeScreen());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 175));
+    expect(find.byType(FadeTransition), findsWidgets);
+    await tester.pumpAndSettle();
+    expect(find.byType(SplashScreen), findsNothing);
+    expect(find.byType(WelcomeScreen), findsOneWidget);
+    await tester.ensureVisible(find.text('Get Started'));
+    await tester.tap(find.text('Get Started'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RoleSelectionScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'slow destination resolution stays static and does not invent progress',
     (tester) async {
@@ -52,12 +64,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 4400));
       expect(find.byType(SplashScreen), findsOneWidget);
-      expect(
-        tester
-            .widget<SplashRescueScene>(find.byType(SplashRescueScene))
-            .progress,
-        1,
-      );
+      expect(find.byType(SplashRescueScene), findsNothing);
       expect(find.byType(LinearProgressIndicator), findsNothing);
       ready.complete(const Scaffold(body: Text('Protected destination')));
       await tester.pumpAndSettle();
@@ -94,6 +101,7 @@ void main() {
           ),
         ),
       );
+      await tester.pump(const Duration(milliseconds: 2500));
       await tester.pumpAndSettle();
       expect(find.text('Verification destination'), findsOneWidget);
       expect(find.byType(WelcomeScreen), findsNothing);

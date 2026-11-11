@@ -73,6 +73,12 @@ void main() {
       }
 
       await render(const RoleSelectionScreen());
+      await tester.runAsync(() async {
+        for (final asset in ['assets/images/role_roadside_scene.png', 'assets/images/roadassist_mark.png']) {
+          await precacheImage(AssetImage(asset), key.currentContext!);
+        }
+      });
+      await tester.pumpAndSettle();
       await capture('role-top');
       await tester.drag(find.byType(ListView).first, const Offset(0, -320));
       await tester.pumpAndSettle();
