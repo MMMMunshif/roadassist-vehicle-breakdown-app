@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:road_assist/src/app.dart';
@@ -8,6 +9,7 @@ void main() {
     for (final width in [320.0, 430.0]) {
       final pages = <String, Widget>{
         'welcome': const WelcomeScreen(),
+        'role selection': const RoleSelectionScreen(),
         'login': const LoginScreen(isProvider: false),
         'driver signup': const RegistrationScreen(isProvider: false),
         'provider signup': const RegistrationScreen(isProvider: true),
@@ -55,9 +57,9 @@ void main() {
         ),
       );
       expect(find.byType(LinearProgressIndicator), findsNothing);
-      await tester.pump(const Duration(milliseconds: 800));
-      expect(find.byType(SplashScreen), findsOneWidget);
-      expect(find.byType(WelcomeScreen), findsNothing);
+      await tester.pump(const Duration(milliseconds: 2500));
+      await tester.pumpAndSettle();
+      expect(find.byType(WelcomeScreen), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 3500));
       await tester.pumpAndSettle();
       expect(find.byType(WelcomeScreen), findsOneWidget);
@@ -73,6 +75,7 @@ void main() {
           tester.view.devicePixelRatio = 1;
           addTearDown(tester.view.resetPhysicalSize);
           addTearDown(tester.view.resetDevicePixelRatio);
+          final ready = Completer<Widget>();
           await tester.pumpWidget(
             MaterialApp(
               theme: buildRoadAssistTheme(brightness),
@@ -83,16 +86,14 @@ void main() {
                 ),
                 child: child!,
               ),
-              home: const SplashScreen(),
+              home: SplashScreen(destinationLoader: () => ready.future),
             ),
           );
           await tester.pump(const Duration(milliseconds: 1600));
-          expect(
-            find.byType(reduced ? WelcomeScreen : SplashScreen),
-            findsOneWidget,
-          );
+          expect(find.byType(SplashScreen), findsOneWidget);
           expect(tester.takeException(), isNull);
-          await tester.pump(const Duration(milliseconds: 2700));
+          await tester.pump(const Duration(milliseconds: 1000));
+          ready.complete(const WelcomeScreen());
           await tester.pumpAndSettle();
           expect(find.byType(WelcomeScreen), findsOneWidget);
           expect(tester.takeException(), isNull);

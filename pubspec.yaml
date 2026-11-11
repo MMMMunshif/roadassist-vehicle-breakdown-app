@@ -86,6 +86,7 @@ flutter:
     - assets/fonts/
     - assets/images/.gitkeep
     - assets/images/premium_service_icons.png
+    - assets/images/role_roadside_scene.png
     - assets/images/auth_journey_car.png
     - assets/images/app_icon.png
     - assets/images/google_g.png

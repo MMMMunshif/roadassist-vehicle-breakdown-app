@@ -5,24 +5,21 @@ class RoleSelectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final dark = theme.brightness == Brightness.dark;
-
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: dark ? const Color(0xFF041426) : const Color(0xFFF3FAFF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Text(
-          'Choose Account Type',
-          style: roadAssistTextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => push(context, const EmergencyScreen()),
+            icon: const Icon(Icons.help_outline, size: 18),
+            label: const Text('Help'),
+          ),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -30,185 +27,134 @@ class RoleSelectionScreen extends StatelessWidget {
           IgnorePointer(
             child: CustomPaint(painter: _RoleRoadPattern(dark: dark)),
           ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 330,
+            child: ExcludeSemantics(
+              child: ShaderMask(
+                shaderCallback: (rect) => const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.white, Colors.transparent],
+                ).createShader(rect),
+                blendMode: BlendMode.dstIn,
+                child: Opacity(
+                  opacity: dark ? .4 : .16,
+                  child: Image.asset(
+                    'assets/images/role_roadside_scene.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+          ),
           SafeArea(
             child: ListView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(18, 6, 18, 30),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
               children: [
+                const Center(child: _WelcomeBrandLogo(size: 64)),
+                const SizedBox(height: 6),
                 Center(
-                  child: Column(
-                    children: [
-                      const BrandMark(size: 86),
-                      Text.rich(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
                         TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Road',
-                              style: TextStyle(color: colors.onSurface),
-                            ),
-                            const TextSpan(
-                              text: 'Assist',
-                              style: TextStyle(color: Color(0xFF129FEF)),
-                            ),
-                          ],
+                          text: 'Road',
+                          style: TextStyle(color: colors.onSurface),
                         ),
-                        style: roadAssistTextStyle(
-                          fontSize: 27,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -.8,
+                        const TextSpan(
+                          text: 'Assist',
+                          style: TextStyle(color: Color(0xFF129FEF)),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 21),
-
-                const _RoleSelectionHero(),
-
-                const SizedBox(height: 22),
-
-                _AuthRoleCard(
-                  icon: Icons.directions_car_filled_outlined,
-                  title: 'Driver',
-                  eyebrow: 'NEED ROADSIDE HELP',
-                  description:
-                      'Request roadside assistance, manage your vehicles and follow your active service.',
-                  highlights: const [
-                    'Save and manage vehicles',
-                    'Review the visit fee',
-                    'Track roadside assistance',
-                  ],
-                  buttonLabel: 'Continue as Driver',
-                  tone: const Color(0xFF087BF5),
-                  onTap: () {
-                    push(context, const LoginScreen(isProvider: false));
-                  },
-                ),
-
-                const SizedBox(height: 12),
-
-                _AuthRoleCard(
-                  icon: Icons.home_repair_service_outlined,
-                  title: 'Service Provider',
-                  eyebrow: 'PROFESSIONAL PORTAL',
-                  description:
-                      'Receive matching roadside requests, accept requests and manage active service jobs.',
-                  highlights: const [
-                    'Provider verification',
-                    'Manage matching requests',
-                    'Track active jobs',
-                  ],
-                  buttonLabel: 'Continue as Provider',
-                  tone: const Color(0xFF008F86),
-                  onTap: () {
-                    push(context, const LoginScreen(isProvider: true));
-                  },
-                ),
-
-                const SizedBox(height: 26),
-
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: colors.outlineVariant)),
-                    const SizedBox(width: 10),
-                    Text(
-                      'EMERGENCY ACCESS',
-                      style: roadAssistTextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: .8,
-                        color: colors.onSurfaceVariant,
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(child: Divider(color: colors.outlineVariant)),
-                  ],
-                ),
-
-                const SizedBox(height: 13),
-
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: colors.error.withValues(alpha: .055),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: colors.error.withValues(alpha: .17),
+                    style: roadAssistTextStyle(
+                      fontSize: 27,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1,
                     ),
                   ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 43,
-                            height: 43,
-                            decoration: BoxDecoration(
-                              color: colors.error.withValues(alpha: .09),
-                              borderRadius: BorderRadius.circular(13),
-                            ),
-                            child: Icon(
-                              Icons.emergency_outlined,
-                              color: colors.error,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Need urgent access?',
-                                  style: roadAssistTextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Continue to limited driver emergency access without signing in.',
-                                  style: roadAssistTextStyle(
-                                    fontSize: 11,
-                                    height: 1.4,
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: colors.error,
-                            side: BorderSide(
-                              color: colors.error.withValues(alpha: .35),
-                            ),
-                          ),
-                          onPressed: () {
-                            push(context, const GuestAccessScreen());
-                          },
-                          icon: const Icon(Icons.emergency_outlined),
-                          label: const Text('Emergency Guest Access'),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-
-                const SizedBox(height: 18),
-
+                const SizedBox(height: 24),
                 Text(
-                  'Choose the account type that matches how you use RoadAssist.',
+                  'Choose Account Type',
                   textAlign: TextAlign.center,
                   style: roadAssistTextStyle(
-                    fontSize: 10.5,
+                    fontSize: 26,
+                    height: 1.2,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -.8,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'How would you like to use RoadAssist?',
+                  textAlign: TextAlign.center,
+                  style: roadAssistTextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 23),
+                _PhotoRoleCard(
+                  provider: false,
+                  onTap: () =>
+                      push(context, const LoginScreen(isProvider: false)),
+                ),
+                const SizedBox(height: 14),
+                _PhotoRoleCard(
+                  provider: true,
+                  onTap: () =>
+                      push(context, const LoginScreen(isProvider: true)),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  decoration: BoxDecoration(
+                    color: colors.error.withValues(alpha: .07),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: colors.error.withValues(alpha: .25),
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      leading: Icon(
+                        Icons.emergency_outlined,
+                        color: colors.error,
+                      ),
+                      title: Text(
+                        'Need urgent help?',
+                        style: roadAssistTextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      subtitle: const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text('Emergency Guest Access'),
+                      ),
+                      trailing: Icon(Icons.arrow_forward, color: colors.error),
+                      onTap: () => push(context, const GuestAccessScreen()),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Sign in or create an account on the next screen.',
+                  textAlign: TextAlign.center,
+                  style: roadAssistTextStyle(
+                    fontSize: 10,
+                    height: 1.6,
                     color: colors.onSurfaceVariant,
                   ),
                 ),
@@ -221,158 +167,154 @@ class RoleSelectionScreen extends StatelessWidget {
   }
 }
 
-class _RoleSelectionHero extends StatelessWidget {
-  const _RoleSelectionHero();
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF07508B), Color(0xFF076864)]
-              : const [Color(0xFF075BA8), Color(0xFF078F80)],
-        ),
-        borderRadius: BorderRadius.circular(23),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .13),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.account_circle_outlined,
-              color: dark ? Colors.white : const Color(0xFF102E4D),
-              size: 27,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'How will you use RoadAssist?',
-                  style: roadAssistTextStyle(
-                    color: dark ? Colors.white : const Color(0xFF102E4D),
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'Select a driver or provider account to continue.',
-                  style: roadAssistTextStyle(
-                    color: dark
-                        ? Colors.white.withValues(alpha: .85)
-                        : const Color(0xFF34516B),
-                    fontSize: 11.5,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthRoleCard extends StatelessWidget {
-  const _AuthRoleCard({
-    required this.icon,
-    required this.title,
-    required this.eyebrow,
-    required this.description,
-    required this.highlights,
-    required this.buttonLabel,
-    required this.tone,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String eyebrow;
-  final String description;
-  final List<String> highlights;
-  final String buttonLabel;
-  final Color tone;
+class _PhotoRoleCard extends StatelessWidget {
+  const _PhotoRoleCard({required this.provider, required this.onTap});
+  final bool provider;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final tone = provider ? const Color(0xFF00C1B4) : const Color(0xFF168FFF);
+    final title = provider ? 'Service Provider' : 'Driver';
+    final label = provider ? 'Continue as Provider' : 'Continue as Driver';
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: RaPremiumDecoration(
-        context,
-        color: theme.brightness == Brightness.dark
-            ? const Color(0xFF0B2035).withValues(alpha: .95)
-            : Colors.white.withValues(alpha: .97),
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(
-          color: tone.withValues(
-            alpha: theme.brightness == Brightness.dark ? .42 : .14,
-          ),
-        ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: tone.withValues(alpha: dark ? .75 : .45)),
         boxShadow: [
           BoxShadow(
-            color: tone.withValues(alpha: .07),
-            blurRadius: 18,
-            offset: const Offset(0, 5),
+            color: tone.withValues(alpha: .08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: dark
+            ? (provider ? const Color(0xFF07383F) : const Color(0xFF0A2E55))
+            : (provider ? const Color(0xFFE3F7F4) : const Color(0xFFE5F2FF)),
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(icon, color: tone, size: 25),
-              ),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      eyebrow,
-                      style: roadAssistTextStyle(
-                        fontSize: 10,
-                        letterSpacing: .65,
-                        fontWeight: FontWeight.w700,
-                        color: tone,
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 60,
+                width: 145,
+                child: ExcludeSemantics(
+                  child: ShaderMask(
+                    shaderCallback: (rect) => const LinearGradient(
+                      colors: [Colors.transparent, Colors.white],
+                      stops: [0, .48],
+                    ).createShader(rect),
+                    blendMode: BlendMode.dstIn,
+                    child: Opacity(
+                      opacity: dark ? .85 : .8,
+                      child: Image.asset(
+                        'assets/images/role_roadside_scene.png',
+                        fit: BoxFit.cover,
+                        alignment: provider
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      title,
-                      style: roadAssistTextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: tone.withValues(alpha: .18),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Icon(
+                            provider
+                                ? Icons.home_repair_service_outlined
+                                : Icons.person_outline,
+                            color: dark
+                                ? tone
+                                : (provider
+                                      ? const Color(0xFF007F76)
+                                      : const Color(0xFF0871C9)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                provider ? 'PROFESSIONAL' : 'NEED HELP?',
+                                style: roadAssistTextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                  color: dark ? tone : const Color(0xFF286386),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                title,
+                                style: roadAssistTextStyle(
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 84),
+                      child: Text(
+                        provider
+                            ? 'Receive nearby requests and manage your service jobs.'
+                            : 'Request help and track your roadside service.',
+                        style: roadAssistTextStyle(fontSize: 12, height: 1.6),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: onTap,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: provider
+                            ? const Color(0xFF008E86)
+                            : const Color(0xFF087BF5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: roadAssistTextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_rounded, size: 20),
+                        ],
                       ),
                     ),
                   ],
@@ -380,69 +322,7 @@ class _AuthRoleCard extends StatelessWidget {
               ),
             ],
           ),
-
-          const SizedBox(height: 13),
-
-          Text(
-            description,
-            style: roadAssistTextStyle(
-              fontSize: 12,
-              height: 1.5,
-              color: colors.onSurfaceVariant,
-            ),
-          ),
-
-          const SizedBox(height: 13),
-
-          for (final item in highlights)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Row(
-                children: [
-                  Container(
-                    width: 23,
-                    height: 23,
-                    decoration: BoxDecoration(
-                      color: tone.withValues(alpha: .14),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Icon(Icons.check_rounded, color: tone, size: 14),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: roadAssistTextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 9),
-
-          SizedBox(
-            // Allow the button label to grow with accessibility text size.
-
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(49),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 14,
-                ),
-                backgroundColor: tone,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: onTap,
-              icon: const Icon(Icons.arrow_forward_rounded),
-              label: Text(buttonLabel),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
