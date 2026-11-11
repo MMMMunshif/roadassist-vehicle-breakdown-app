@@ -19,6 +19,9 @@ class _SearchingScreenState extends State<SearchingScreen>
   late final AnimationController pulseController;
 
   String requestStatus = 'searching';
+  bool visitBilling = true;
+  bool providerResponseExpired = false;
+  String? cancellationReason;
 
   String? requestError;
 
@@ -51,7 +54,7 @@ class _SearchingScreenState extends State<SearchingScreen>
     pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+    );
 
     if (widget.requestId == null) {
       requestStatus = 'not_submitted';
@@ -75,6 +78,24 @@ class _SearchingScreenState extends State<SearchingScreen>
             });
           },
         );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    updateSearchMotion();
+  }
+
+  void updateSearchMotion() {
+    final reduced =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    if (reduced || !activelySearching || requestError != null) {
+      pulseController.stop();
+      if (reduced) pulseController.value = 1;
+    } else if (!pulseController.isAnimating) {
+      pulseController.repeat(reverse: true);
+    }
   }
 
   @override
@@ -109,7 +130,11 @@ class _SearchingScreenState extends State<SearchingScreen>
     final preferredProviderId = data['preferredProviderId'] as String? ?? '';
 
     if (status == 'searching' && preferredProviderId.isNotEmpty) {
-      scheduleProviderTimeout(data);
+      if (data['workflowVersion'] == 3) {
+        scheduleVisitTimeout(data);
+      } else {
+        scheduleProviderTimeout(data);
+      }
     } else {
       providerResponseTimer?.cancel();
 
@@ -148,6 +173,8 @@ class _SearchingScreenState extends State<SearchingScreen>
 
     setState(() {
       requestStatus = status;
+      visitBilling = data['workflowVersion'] == 3;
+      cancellationReason = data['cancellationReason'] as String?;
 
       currentLocationLabel = locationLabel;
 
@@ -169,6 +196,58 @@ class _SearchingScreenState extends State<SearchingScreen>
           widget.draft.preferredProviderId.isNotEmpty &&
           preferredProviderId.isEmpty;
     });
+    updateSearchMotion();
+  }
+
+  void scheduleVisitTimeout(Map<String, dynamic> data) {
+    if (providerResponseTimer != null || providerResponseExpired) return;
+    final created = (data['createdAt'] as Timestamp?)?.toDate();
+    final elapsed = created == null
+        ? Duration.zero
+        : DateTime.now().difference(created);
+    final remaining = const Duration(seconds: 90) - elapsed;
+    providerResponseTimer = Timer(
+      remaining.isNegative ? Duration.zero : remaining,
+      () {
+        providerResponseTimer = null;
+        if (mounted && activelySearching)
+          setState(() => providerResponseExpired = true);
+      },
+    );
+  }
+
+  Future<void> chooseAnotherProvider() async {
+    if (cancelling || widget.requestId == null) return;
+    if (activelySearching) {
+      final reason = await requestCancellationReason(
+        context,
+        changingProvider: true,
+      );
+      if (reason == null || !mounted) return;
+      setState(() => cancelling = true);
+      try {
+        await RequestService().cancelRequest(widget.requestId!, reason: reason);
+      } catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _workflowError(
+                  error,
+                  'Unable to change provider. Check the current request status.',
+                ),
+              ),
+            ),
+          );
+        if (mounted) setState(() => cancelling = false);
+        return;
+      }
+    }
+    if (!mounted) return;
+    final draft = editableDraft.copyWith(provider: '', preferredProviderId: '');
+    await RequestDraftStore().clear();
+    await RequestDraftStore().save(draft);
+    if (mounted) replace(context, ProvidersScreen(draft: draft));
   }
 
   void scheduleProviderTimeout(Map<String, dynamic> data) {
@@ -382,7 +461,8 @@ class _SearchingScreenState extends State<SearchingScreen>
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.sizeOf(sheetContext).height * .92,
                 ),
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: dark ? const Color(0xFF0D2237) : colors.surface,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(28),
@@ -432,7 +512,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                                   children: [
                                     Text(
                                       'Edit pending request',
-                                      style: GoogleFonts.plusJakartaSans(
+                                      style: roadAssistTextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w800,
                                       ),
@@ -440,7 +520,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                                     const SizedBox(height: 3),
                                     Text(
                                       'You can update these details until a provider accepts.',
-                                      style: GoogleFonts.plusJakartaSans(
+                                      style: roadAssistTextStyle(
                                         fontSize: 12,
                                         color: colors.onSurfaceVariant,
                                       ),
@@ -529,7 +609,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                                 Expanded(
                                   child: Text(
                                     'Photo evidence',
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: roadAssistTextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -537,7 +617,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                                 ),
                                 Text(
                                   '${photos.length}/3',
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: roadAssistTextStyle(
                                     fontSize: 12,
                                     color: colors.primary,
                                     fontWeight: FontWeight.w700,
@@ -724,55 +804,7 @@ class _SearchingScreenState extends State<SearchingScreen>
   Future<void> cancelRequest() async {
     if (cancelling) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        final colors = Theme.of(dialogContext).colorScheme;
-
-        return AlertDialog(
-          icon: Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: colors.error.withValues(alpha: .09),
-              borderRadius: BorderRadius.circular(17),
-            ),
-            child: Icon(Icons.close_rounded, color: colors.error),
-          ),
-          title: const Text('Cancel assistance request?'),
-          content: const Text(
-            'Provider searching will stop and this request will move to cancelled request history.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, false);
-              },
-              child: const Text('Keep Searching'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.error,
-                foregroundColor: colors.onError,
-              ),
-              onPressed: () {
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Cancel Request'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !mounted) {
-      return;
-    }
-
-    final reason = await _adminReason(
-      context,
-      'Reason for cancelling assistance',
-    );
+    final reason = await requestCancellationReason(context);
     if (reason == null || !mounted) return;
 
     setState(() {
@@ -832,7 +864,8 @@ class _SearchingScreenState extends State<SearchingScreen>
     }
 
     if (requestStatus == 'cancelled') {
-      return 'This roadside assistance request is no longer active.';
+      return cancellationReason ??
+          'This roadside assistance request is no longer active.';
     }
 
     if (requestStatus == 'not_submitted') {
@@ -866,7 +899,7 @@ class _SearchingScreenState extends State<SearchingScreen>
         automaticallyImplyLeading: false,
         title: RaDriverAppBarTitle(
           'Finding Assistance',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -902,14 +935,51 @@ class _SearchingScreenState extends State<SearchingScreen>
 
                   const SizedBox(height: 17),
 
-                  if (preferredSearch && activelySearching)
+                  if (visitBilling &&
+                      (providerResponseExpired && activelySearching ||
+                          requestStatus == 'cancelled')) ...[
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              activelySearching
+                                  ? 'Still waiting for a response'
+                                  : 'Try another provider',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Keep your vehicle and location details. Review the new visit fee before requesting another provider.',
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: cancelling
+                                  ? null
+                                  : chooseAnotherProvider,
+                              icon: const Icon(Icons.person_search_outlined),
+                              label: Text(
+                                cancelling
+                                    ? 'Updating request...'
+                                    : 'Choose another provider',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (preferredSearch && activelySearching && !visitBilling)
                     _RaPreferredProviderSearch(
                       providerName: editableDraft.provider,
                       expanding: expandingSearch,
                       onExpand: expandSearchNow,
                     ),
 
-                  if (preferredSearch && activelySearching)
+                  if (preferredSearch && activelySearching && !visitBilling)
                     const SizedBox(height: 13),
 
                   _RaSearchRequestCard(
@@ -943,7 +1013,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                           Expanded(
                             child: Text(
                               requestError!,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 height: 1.4,
                               ),
@@ -964,8 +1034,10 @@ class _SearchingScreenState extends State<SearchingScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Provider offers',
-                                style: GoogleFonts.plusJakartaSans(
+                                visitBilling
+                                    ? 'Provider confirmation'
+                                    : 'Provider offers',
+                                style: roadAssistTextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: -.35,
@@ -975,8 +1047,10 @@ class _SearchingScreenState extends State<SearchingScreen>
                               const SizedBox(height: 3),
 
                               Text(
-                                'Offers appear here as providers respond.',
-                                style: GoogleFonts.plusJakartaSans(
+                                visitBilling
+                                    ? 'Your visit fee is fixed. No quote approval is required.'
+                                    : 'Offers appear here as providers respond.',
+                                style: roadAssistTextStyle(
                                   fontSize: 12,
                                   color: colors.onSurfaceVariant,
                                 ),
@@ -989,7 +1063,12 @@ class _SearchingScreenState extends State<SearchingScreen>
 
                     const SizedBox(height: 11),
 
-                    QuoteOffers(requestId: widget.requestId!),
+                    if (visitBilling)
+                      const Text(
+                        'Waiting for the selected provider to accept. Inspection and repair charges appear in the final bill after service.',
+                      )
+                    else
+                      QuoteOffers(requestId: widget.requestId!),
                   ],
 
                   const SizedBox(height: 20),
@@ -1014,7 +1093,7 @@ class _SearchingScreenState extends State<SearchingScreen>
                         Expanded(
                           child: Text(
                             'You can leave this screen. RoadAssist notifications and the Requests tab will continue showing request updates.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               height: 1.45,
                               color: colors.onSurfaceVariant,
@@ -1080,7 +1159,12 @@ class _RaSearchingHero extends StatelessWidget {
             child: AnimatedBuilder(
               animation: controller,
               builder: (context, child) {
-                final pulse = active ? .84 + controller.value * .16 : 1.0;
+                final pulse =
+                    active &&
+                        !MediaQuery.disableAnimationsOf(context) &&
+                        !MediaQuery.accessibleNavigationOf(context)
+                    ? .84 + controller.value * .16
+                    : 1.0;
 
                 return Transform.scale(
                   scale: pulse,
@@ -1135,7 +1219,7 @@ class _RaSearchingHero extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
               letterSpacing: -.4,
@@ -1147,7 +1231,7 @@ class _RaSearchingHero extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.45,
               color: colors.onSurfaceVariant,
@@ -1192,7 +1276,8 @@ class _RaPreferredProviderSearch extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -1213,7 +1298,7 @@ class _RaPreferredProviderSearch extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1223,7 +1308,7 @@ class _RaPreferredProviderSearch extends StatelessWidget {
 
                     Text(
                       'Waiting for this provider to respond.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -1278,7 +1363,8 @@ class _RaSearchRequestCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -1356,7 +1442,7 @@ class _RaSearchDetailRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1366,7 +1452,7 @@ class _RaSearchDetailRow extends StatelessWidget {
 
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.4,
                     fontWeight: FontWeight.w600,

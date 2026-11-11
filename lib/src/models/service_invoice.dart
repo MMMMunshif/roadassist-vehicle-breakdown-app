@@ -58,7 +58,11 @@ class ServiceInvoice {
     final serviceFee = amount('serviceFee');
     final travel = amount('dispatchFee') ?? amount('travelFee');
     final other = amount('extraFee');
-    final detailTotal = (serviceFee ?? 0) + (travel ?? 0) + (other ?? 0);
+    final detailTotal =
+        (serviceFee ?? 0) +
+        (travel ?? 0) +
+        (other ?? 0) +
+        (amount('inspectionFee') ?? 0);
     final subtotal = approved != null && approved >= total ? approved : total;
     final itemized =
         detailTotal == subtotal &&
@@ -72,6 +76,20 @@ class ServiceInvoice {
               InvoiceCharge('Parts / other approved charges', other),
           ]
         : <InvoiceCharge>[InvoiceCharge('Recorded service charge', subtotal)];
+    if (data['workflowVersion'] == 3) {
+      charges.clear();
+      charges.add(InvoiceCharge('Visit fee', travel ?? 0));
+      charges.add(InvoiceCharge('Inspection', amount('inspectionFee') ?? 0));
+      charges.add(InvoiceCharge('Labour / repair', serviceFee ?? 0));
+      for (final item in (data['billItems'] as List? ?? []).whereType<Map>()) {
+        charges.add(
+          InvoiceCharge(
+            '${item['label']} ? ${item['reason']}',
+            (item['amount'] as num).toInt(),
+          ),
+        );
+      }
+    }
     final offer = approvedOffer ?? data;
     final days = offer['warrantyDays'];
     final terms = _text(offer['warrantyTerms']);

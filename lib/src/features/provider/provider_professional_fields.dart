@@ -331,17 +331,14 @@ class _ProviderProfessionalFields extends StatelessWidget {
                   ),
                   title: Text(
                     'Available 24 hours',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   subtitle: Text(
                     'Disable this if you operate within specific working hours.',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
+                    style: roadAssistTextStyle(fontSize: 12, height: 1.4),
                   ),
                 ),
               ),
@@ -559,7 +556,7 @@ class _ProviderProfessionalSectionTitle extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w800,
             letterSpacing: -.2,
@@ -570,7 +567,7 @@ class _ProviderProfessionalSectionTitle extends StatelessWidget {
 
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -617,7 +614,7 @@ class _ProviderProfessionalHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -627,7 +624,7 @@ class _ProviderProfessionalHeader extends StatelessWidget {
 
               Text(
                 subtitle,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   height: 1.4,
                   color: colors.onSurfaceVariant,
@@ -655,7 +652,8 @@ class _ProviderProfessionalSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,

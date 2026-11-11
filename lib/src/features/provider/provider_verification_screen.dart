@@ -550,7 +550,7 @@ class _ProviderVerificationScreenState
             Expanded(
               child: Text(
                 'Provider Verification',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
@@ -1051,14 +1051,14 @@ class _ProviderVerificationScreenState
                               },
                         title: Text(
                           'Provider declaration',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         subtitle: Text(
                           'I confirm that these documents are mine, the information is accurate and I will request driver approval before additional work or charges.',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             height: 1.45,
                           ),
@@ -1295,7 +1295,7 @@ class _RaProviderVerificationSection extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1303,7 +1303,7 @@ class _RaProviderVerificationSection extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 subtitle,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   height: 1.4,
                   color: colors.onSurfaceVariant,
@@ -1331,7 +1331,8 @@ class _RaProviderVerificationSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -1383,7 +1384,7 @@ class _RaProviderVerificationNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1391,7 +1392,7 @@ class _RaProviderVerificationNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,
@@ -1443,15 +1444,12 @@ class _RaProviderVerificationStatusCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 11),
-          Text(
-            reason,
-            style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.5),
-          ),
+          Text(reason, style: roadAssistTextStyle(fontSize: 12, height: 1.5)),
           if (!editable) ...[
             const SizedBox(height: 6),
             Text(
               'Documents are locked while the current review is active.',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -1501,7 +1499,8 @@ class _RaProviderVerificationDocumentCard extends StatelessWidget {
       return Container(
         height: 80,
         alignment: Alignment.center,
-        decoration: BoxDecoration(
+        decoration: RaPremiumDecoration(
+          context,
           color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(13),
         ),
@@ -1559,7 +1558,7 @@ class _RaProviderVerificationDocumentCard extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -1567,7 +1566,7 @@ class _RaProviderVerificationDocumentCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           required ? 'Required' : 'Optional',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             color: required
                                 ? colors.primary

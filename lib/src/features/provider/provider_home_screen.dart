@@ -400,26 +400,28 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
 
                     const SizedBox(height: 14),
 
-                    _RaProviderStats(services: providerServices),
+                    const RaProviderDailySummary(),
 
                     const SizedBox(height: 20),
 
-                    _RaProviderSectionHeader(
-                      action: 'View all',
-                      onAction: () =>
-                          push(context, const _RaProviderActiveWorkScreen()),
-                      icon: Icons.route_outlined,
-                      title: 'Active work',
-                      subtitle:
-                          'Continue a roadside job already assigned to you.',
-                    ),
+                    if (_providerAvailabilityStatus(availability) ==
+                        'Busy') ...[
+                      _RaProviderSectionHeader(
+                        action: 'View all',
+                        onAction: () =>
+                            push(context, const _RaProviderActiveWorkScreen()),
+                        icon: Icons.route_outlined,
+                        title: 'Active work',
+                        subtitle:
+                            'Continue a roadside job already assigned to you.',
+                      ),
 
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    const _RaProviderActiveWork(),
+                      const _RaProviderActiveWork(),
 
-                    const SizedBox(height: 20),
-
+                      const SizedBox(height: 20),
+                    ],
                     _RaProviderSectionHeader(
                       icon: Icons.notifications_active_outlined,
                       title: 'New requests',
@@ -445,8 +447,34 @@ class _ProviderHomeScreenState extends State<ProviderHomeScreen>
                         message: _providerAvailabilityExplanation(availability),
                       )
                     else
-                      _RaProviderRequestPreviewList(services: providerServices),
+                      _RaProviderRequestPreviewList(
+                        services: providerServices,
+                        directory: availability,
+                      ),
 
+                    const SizedBox(height: 20),
+
+                    if (_providerAvailabilityStatus(availability) !=
+                        'Busy') ...[
+                      _RaProviderSectionHeader(
+                        action: 'View all',
+                        onAction: () =>
+                            push(context, const _RaProviderActiveWorkScreen()),
+                        icon: Icons.route_outlined,
+                        title: 'Active work',
+                        subtitle:
+                            'Continue a roadside job already assigned to you.',
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      const _RaProviderActiveWork(),
+
+                      const SizedBox(height: 20),
+                    ],
+                    const ProviderPaymentFollowUps(),
+                    const SizedBox(height: 14),
+                    _RaProviderStats(services: providerServices),
                     const SizedBox(height: 20),
 
                     const _RaProviderSectionHeader(
@@ -555,7 +583,7 @@ class _RaProviderHero extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Ready to help today?',
+            'Your workspace',
             style: _providerText(context, size: 24, weight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
@@ -609,11 +637,7 @@ class _RaProviderStats extends StatelessWidget {
             final assigned = assignedSnapshot.data?.docs ?? const [];
 
             final active = assigned.where((request) {
-              return const [
-                'accepted',
-                'en_route',
-                'arrived',
-              ].contains(request.data()['status']);
+              return ProviderAvailability.hasActiveService(request.data());
             }).length;
 
             final completed = assigned
@@ -679,7 +703,8 @@ class _RaProviderStatCard extends StatelessWidget {
         final iconWidget = Container(
           width: 28,
           height: 28,
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: tone.withValues(alpha: .10),
             borderRadius: BorderRadius.circular(10),
           ),
@@ -755,11 +780,7 @@ class _RaProviderActiveWork extends StatelessWidget {
         }
 
         final activeJobs = snapshot.data!.docs.where((request) {
-          return const [
-            'accepted',
-            'en_route',
-            'arrived',
-          ].contains(request.data()['status']);
+          return ProviderAvailability.hasActiveService(request.data());
         }).toList();
 
         if (activeJobs.isEmpty) {
@@ -865,7 +886,7 @@ class _RaProviderActiveJob extends StatelessWidget {
                           driver,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                           ),
@@ -875,7 +896,7 @@ class _RaProviderActiveJob extends StatelessWidget {
                           issue,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             color: colors.onSurfaceVariant,
                           ),
@@ -910,7 +931,7 @@ class _RaProviderActiveJob extends StatelessWidget {
                         location,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 13,
                           height: 1.4,
                           color: colors.onSurfaceVariant,
@@ -944,9 +965,13 @@ class _RaProviderActiveJob extends StatelessWidget {
 // ============================================================
 
 class _RaProviderRequestPreviewList extends StatelessWidget {
-  const _RaProviderRequestPreviewList({required this.services});
+  const _RaProviderRequestPreviewList({
+    required this.services,
+    required this.directory,
+  });
 
   final List<String> services;
+  final Map<String, dynamic> directory;
 
   @override
   Widget build(BuildContext context) {
@@ -989,7 +1014,12 @@ class _RaProviderRequestPreviewList extends StatelessWidget {
           children: [
             for (var index = 0; index < matches.length; index++) ...[
               if (index > 0) const SizedBox(height: 9),
-              _RaProviderRequestCard(request: matches[index]),
+              _RaProviderNotificationRequestCard(
+                key: ValueKey(matches[index].id),
+                request: matches[index],
+                directory: directory,
+                offerSent: false,
+              ),
             ],
           ],
         );
@@ -1006,134 +1036,6 @@ class _RaProviderRequestsEmpty extends StatelessWidget {
     title: 'No matching requests',
     message: 'New requests matching your services will appear here.',
   );
-}
-
-class _RaProviderRequestCard extends StatelessWidget {
-  const _RaProviderRequestCard({required this.request});
-
-  final QueryDocumentSnapshot<Map<String, dynamic>> request;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final data = request.data();
-
-    final driver = data['driverName']?.toString().trim() ?? '';
-
-    final driverName = driver.isEmpty ? 'Driver' : driver;
-
-    final priority = data['priority']?.toString() ?? 'normal';
-
-    final location =
-        data['locationLabel']?.toString().trim() ??
-        data['location']?.toString().trim() ??
-        '';
-
-    return Material(
-      color: _providerSurface(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(19),
-        side: BorderSide(
-          color: isHighPriority(priority)
-              ? raGold.withValues(alpha: .40)
-              : colors.outlineVariant.withValues(alpha: .45),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          push(
-            context,
-            ProviderRequestDetailsScreen(requestId: request.id, data: data),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ProfileInitials(name: driverName, radius: 22),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            driverName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (isHighPriority(priority))
-                          const StatusPill(
-                            label: 'Priority',
-                            tone: RaTone.warning,
-                          ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      requestIssueLabel(data),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colors.primary,
-                      ),
-                    ),
-
-                    if (location.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 15,
-                            color: colors.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              location,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 5),
-
-              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ============================================================
@@ -1213,7 +1115,8 @@ class _RaProviderPerformance extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: _providerSurface(context),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
@@ -1342,7 +1245,7 @@ class _RaProviderRevenueChart extends StatelessWidget {
         children: [
           Text(
             'LAST 7 DAYS',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: .8,
@@ -1387,7 +1290,7 @@ class _RaProviderRevenueChart extends StatelessWidget {
 
                           Text(
                             _dayLabel(now.subtract(Duration(days: 6 - index))),
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 13,
                               color: colors.onSurfaceVariant,
                             ),
@@ -1438,7 +1341,8 @@ class _RaProviderServices extends StatelessWidget {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(17),
-        decoration: BoxDecoration(
+        decoration: RaPremiumDecoration(
+          context,
           color: Theme.of(context).brightness == Brightness.dark
               ? const Color(0xFF0D2237)
               : Colors.white,
@@ -1470,7 +1374,7 @@ class _RaProviderServices extends StatelessWidget {
                 children: [
                   Text(
                     'Services not configured',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
@@ -1478,7 +1382,7 @@ class _RaProviderServices extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     'Add the roadside services you provide from your profile.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 13,
                       height: 1.4,
                       color: colors.onSurfaceVariant,
@@ -1529,7 +1433,11 @@ class _RaProviderServiceTile extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     child: Row(
       children: [
-        Icon(icon, size: 19, color: Theme.of(context).colorScheme.primary),
+        RaPremiumServiceIcon(
+          icon: icon,
+          size: 26,
+          color: Theme.of(context).colorScheme.primary,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -1553,7 +1461,8 @@ class _RaProviderLoadingCard extends StatelessWidget {
 
     return Container(
       height: height,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: _providerSurface(context),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(

@@ -16,10 +16,7 @@ class DriverRequestDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Request Details',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(
@@ -34,7 +31,8 @@ class DriverRequestDetailsScreen extends StatelessWidget {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
+                    decoration: RaPremiumDecoration(
+                      context,
                       color: dark ? const Color(0xFF0D2237) : colors.surface,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
@@ -69,7 +67,7 @@ class DriverRequestDetailsScreen extends StatelessWidget {
                         Text(
                           'Choose a request',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                           ),
@@ -80,7 +78,7 @@ class DriverRequestDetailsScreen extends StatelessWidget {
                         Text(
                           'Open one of your assistance requests to view live status, provider details, pricing, invoices and service options.',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 12,
                             height: 1.5,
                             color: colors.onSurfaceVariant,
@@ -201,7 +199,7 @@ class _RaRequestEntryFeature extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -209,7 +207,7 @@ class _RaRequestEntryFeature extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   description,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.35,
                     color: colors.onSurfaceVariant,

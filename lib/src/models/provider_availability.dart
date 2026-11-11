@@ -1,4 +1,8 @@
 class ProviderAvailability {
+  static bool hasActiveService(Map<String, dynamic> job) =>
+      const ['accepted', 'en_route', 'arrived'].contains(job['status']) &&
+      job['serviceCompletedAt'] == null;
+
   static const locationLifetime = Duration(minutes: 2);
 
   static bool hasFreshLocation(DateTime? updated, DateTime now) {
@@ -31,7 +35,7 @@ class ProviderAvailability {
     if (data['online'] != true) return 'Offline';
     // An assigned job stays busy while GPS refreshes or loses reception.
     if ((data['activeRequestId'] as String? ?? '').isNotEmpty) return 'Busy';
-    if (!hasFreshLocation(locationUpdatedAt, now)) return 'Offline';
+    if (!hasFreshLocation(locationUpdatedAt, now)) return 'Refresh location';
     if (data['requestsPaused'] == true) return 'Paused';
     if (overrideUntil?.isAfter(now) != true && !withinHours(data, now))
       return 'Outside working hours';

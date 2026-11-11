@@ -105,7 +105,7 @@ bool _providerMatchesDraft(Map<String, dynamic> data, RequestDraft draft) {
 class _ProvidersScreenState extends State<ProvidersScreen> {
   Timer? availabilityClock;
 
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> onlineProviders;
+  late Stream<QuerySnapshot<Map<String, dynamic>>> onlineProviders;
 
   String? selectedId;
   String? selectedName;
@@ -137,6 +137,12 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
   }
 
   Future<void> reviewRequest() async {
+    if (selectedId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select an available provider first.')),
+      );
+      return;
+    }
     final selectedDraft = widget.draft.copyWith(
       provider: selectedName ?? 'Available Provider',
       preferredProviderId: selectedId,
@@ -148,14 +154,15 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
       return;
     }
 
-    push(context, ReviewScreen(draft: selectedDraft));
-  }
-
-  void selectAllOffers() {
-    setState(() {
-      selectedId = null;
-      selectedName = null;
-    });
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .92,
+        child: ReviewScreen(draft: selectedDraft, compact: true),
+      ),
+    );
   }
 
   void resetSelectionIfMissing(
@@ -194,7 +201,7 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Choose Provider',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -214,84 +221,74 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
 
                   const SizedBox(height: 16),
 
-                  const _RaProvidersHero(),
-
-                  const SizedBox(height: 16),
-
-                  _RaProviderLocationSummary(draft: widget.draft),
-
-                  const SizedBox(height: 25),
-
                   Text(
-                    'How do you want to request help?',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
+                    'Choose who helps you.',
+                    style: roadAssistTextStyle(
+                      fontSize: 26,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: -.35,
-                      color: colors.onSurface,
+                      letterSpacing: -.7,
                     ),
                   ),
-
-                  const SizedBox(height: 4),
-
+                  const SizedBox(height: 8),
                   Text(
-                    'Compare offers from suitable providers, or direct the request to one specific provider.',
-                    style: GoogleFonts.plusJakartaSans(
+                    'Verified providers, ordered by distance. Review the visit fee before sending your request.',
+                    style: roadAssistTextStyle(
                       fontSize: 13,
-                      height: 1.4,
+                      height: 1.5,
                       color: colors.onSurfaceVariant,
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
-                  _RaAllProvidersCard(
-                    selected: selectedId == null,
-                    onTap: selectAllOffers,
+                  const SizedBox(height: 18),
+                  _RaProviderLocationSummary(draft: widget.draft),
+                  const SizedBox(height: 8),
+                  const RaDetailsDisclosure(
+                    storageKey: 'visit-fee-explanation',
+                    title: 'How visit fees work',
+                    icon: Icons.route_outlined,
+                    child: Text(
+                      'Rs. 100 within the first 1 km, then Rs. 20 per additional started km. '
+                      'Distance is estimated in a straight line. Inspection and repair are billed after service. '
+                      'The confirmed visit fee is shown before requesting help.',
+                    ),
                   ),
-
-                  const SizedBox(height: 26),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Available providers',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -.35,
-                              ),
-                            ),
-
-                            const SizedBox(height: 3),
-
-                            Text(
-                              'Only verified, online and suitable providers are shown.',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 12,
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 18),
+                  Text(
+                    'Available providers',
+                    style: roadAssistTextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-
+                  const SizedBox(height: 5),
+                  Text(
+                    'Verified, online and suitable for your vehicle.',
+                    style: roadAssistTextStyle(
+                      fontSize: 12,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 12),
-
                   StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: onlineProviders,
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
-                        return const EmptyState(
-                          icon: Icons.cloud_off_outlined,
-                          title: 'Unable to load providers',
-                          message: 'Check your connection and try again.',
+                        return Column(
+                          children: [
+                            const EmptyState(
+                              icon: Icons.cloud_off_outlined,
+                              title: 'Unable to load providers',
+                              message:
+                                  'Your selection is kept. Reconnect and retry.',
+                            ),
+                            TextButton.icon(
+                              onPressed: () => setState(() {
+                                onlineProviders = AuthService()
+                                    .watchOnlineProviders();
+                              }),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry providers'),
+                            ),
+                          ],
                         );
                       }
 
@@ -391,7 +388,7 @@ class _RaProvidersProgress extends StatelessWidget {
               ),
               child: Text(
                 'PROVIDER',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   letterSpacing: .8,
                   fontWeight: FontWeight.w700,
@@ -403,8 +400,8 @@ class _RaProvidersProgress extends StatelessWidget {
             const Spacer(),
 
             Text(
-              'Next: Review',
-              style: GoogleFonts.plusJakartaSans(
+              'STEP 3 OF 3',
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: colors.primary,
                 fontWeight: FontWeight.w700,
@@ -418,93 +415,12 @@ class _RaProvidersProgress extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
-            value: .88,
+            value: 1,
             minHeight: 5,
             backgroundColor: colors.surfaceContainerHighest,
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RaProvidersHero extends StatelessWidget {
-  const _RaProvidersHero();
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(19),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [Color(0xFF0B477D), Color(0xFF08645D)]
-              : const [Color(0xFF075BA8), Color(0xFF078C7E)],
-        ),
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -22,
-            bottom: -31,
-            child: Icon(
-              Icons.handyman_outlined,
-              size: 130,
-              color: Colors.white.withValues(alpha: .06),
-            ),
-          ),
-
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.person_search_outlined,
-                  color: Colors.white,
-                  size: 25,
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              Text(
-                'Choose how you get help',
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.5,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              SizedBox(
-                width: 295,
-                child: Text(
-                  'Let several suitable providers send offers, or request one provider directly.',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white.withValues(alpha: .80),
-                    fontSize: 13,
-                    height: 1.45,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -522,7 +438,8 @@ class _RaProviderLocationSummary extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -550,7 +467,7 @@ class _RaProviderLocationSummary extends StatelessWidget {
               children: [
                 Text(
                   'Provider search location',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -560,7 +477,7 @@ class _RaProviderLocationSummary extends StatelessWidget {
 
                 Text(
                   draft.location,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -571,7 +488,7 @@ class _RaProviderLocationSummary extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     'Landmark: ${draft.landmark}',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -581,125 +498,6 @@ class _RaProviderLocationSummary extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _RaAllProvidersCard extends StatelessWidget {
-  const _RaAllProvidersCard({required this.selected, required this.onTap});
-
-  final bool selected;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    return Material(
-      color: selected
-          ? colors.primary.withValues(alpha: .07)
-          : theme.brightness == Brightness.dark
-          ? const Color(0xFF0D2237)
-          : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected
-                  ? colors.primary.withValues(alpha: .48)
-                  : colors.outlineVariant.withValues(alpha: .45),
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 47,
-                height: 47,
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: .09),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.compare_arrows_rounded,
-                  color: colors.primary,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Receive provider offers',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-
-                        Icon(
-                          selected
-                              ? Icons.check_circle_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          color: selected ? colors.primary : colors.outline,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      'Suitable providers can review your request and submit offers for you to compare before selecting one.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-
-                    const SizedBox(height: 7),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: .08),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        'Compare before approval',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: colors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -744,208 +542,222 @@ class _RaProviderChoiceCard extends StatelessWidget {
         .whereType<String>()
         .toList();
 
-    return Material(
-      color: selected
-          ? colors.primary.withValues(alpha: .07)
-          : theme.brightness == Brightness.dark
-          ? const Color(0xFF0D2237)
-          : Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected
-                  ? colors.primary.withValues(alpha: .48)
-                  : colors.outlineVariant.withValues(alpha: .45),
-              width: selected ? 1.4 : 1,
+    return Semantics(
+      selected: selected,
+      child: Material(
+        color: selected
+            ? colors.primary.withValues(alpha: .07)
+            : theme.brightness == Brightness.dark
+            ? const Color(0xFF0D2237)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration:
+                MediaQuery.disableAnimationsOf(context) ||
+                    MediaQuery.accessibleNavigationOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.all(15),
+            decoration: RaPremiumDecoration(
+              context,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: selected
+                    ? colors.primary.withValues(alpha: .48)
+                    : colors.outlineVariant.withValues(alpha: .45),
+                width: selected ? 1.4 : 1,
+              ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ProfileInitials(name: name, radius: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    ProfileInitials(name: name, radius: 24),
 
-                  const SizedBox(width: 11),
+                    const SizedBox(width: 11),
 
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: roadAssistTextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
-                            ),
 
-                            Icon(
-                              selected
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked_rounded,
-                              color: selected ? colors.primary : colors.outline,
-                              size: 21,
+                              Icon(
+                                selected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                color: selected
+                                    ? colors.primary
+                                    : colors.outline,
+                                size: 21,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 5),
+
+                          const Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _RaProviderBadge(
+                                icon: Icons.verified_outlined,
+                                label: 'Verified',
+                              ),
+                              _RaProviderBadge(
+                                icon: Icons.circle,
+                                label: 'Online',
+                                success: true,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 13),
+
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 7,
+                  children: [
+                    _RaProviderFact(
+                      icon: Icons.location_on_outlined,
+                      value: stale
+                          ? 'Location needs confirmation'
+                          : distance == null
+                          ? 'Distance unavailable'
+                          : '${distance.toStringAsFixed(1)} km away',
+                    ),
+
+                    if (rating != null && rating > 0)
+                      _RaProviderFact(
+                        icon: Icons.star_outline_rounded,
+                        value: '${rating.toStringAsFixed(1)} rating',
+                      ),
+
+                    if (completedJobs != null && completedJobs > 0)
+                      _RaProviderFact(
+                        icon: Icons.task_alt_rounded,
+                        value: '$completedJobs completed',
+                      ),
+
+                    if (responseMinutes != null && responseMinutes > 0)
+                      _RaProviderFact(
+                        icon: Icons.schedule_outlined,
+                        value: '${responseMinutes.ceil()} min response',
+                      ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+                ProviderVisitFeeEstimate(distanceKm: stale ? null : distance),
+                if (services.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final service in services.take(3))
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerHighest.withValues(
+                              alpha: .45,
                             ),
-                          ],
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            service,
+                            style: roadAssistTextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
 
-                        const SizedBox(height: 5),
+                      if (services.length > 3)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.surfaceContainerHighest.withValues(
+                              alpha: .45,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '+${services.length - 3}',
+                            style: roadAssistTextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
 
-                        const Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _RaProviderBadge(
-                              icon: Icons.verified_outlined,
-                              label: 'Verified',
+                if (stale) ...[
+                  const SizedBox(height: 11),
+
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: raGold.withValues(alpha: .075),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_searching_rounded,
+                          size: 17,
+                          color: raGold,
+                        ),
+
+                        const SizedBox(width: 7),
+
+                        Expanded(
+                          child: Text(
+                            'Provider location may be outdated. Confirm their location after connecting.',
+                            style: roadAssistTextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: colors.onSurfaceVariant,
                             ),
-                            _RaProviderBadge(
-                              icon: Icons.circle,
-                              label: 'Online',
-                              success: true,
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ],
-              ),
-
-              const SizedBox(height: 13),
-
-              Wrap(
-                spacing: 12,
-                runSpacing: 7,
-                children: [
-                  _RaProviderFact(
-                    icon: Icons.location_on_outlined,
-                    value: stale
-                        ? 'Location needs confirmation'
-                        : distance == null
-                        ? 'Distance unavailable'
-                        : '${distance.toStringAsFixed(1)} km away',
-                  ),
-
-                  if (rating != null && rating > 0)
-                    _RaProviderFact(
-                      icon: Icons.star_outline_rounded,
-                      value: '${rating.toStringAsFixed(1)} rating',
-                    ),
-
-                  if (completedJobs != null && completedJobs > 0)
-                    _RaProviderFact(
-                      icon: Icons.task_alt_rounded,
-                      value: '$completedJobs completed',
-                    ),
-
-                  if (responseMinutes != null && responseMinutes > 0)
-                    _RaProviderFact(
-                      icon: Icons.schedule_outlined,
-                      value: '${responseMinutes.ceil()} min response',
-                    ),
-                ],
-              ),
-
-              if (services.isNotEmpty) ...[
-                const SizedBox(height: 12),
-
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final service in services.take(3))
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest.withValues(
-                            alpha: .45,
-                          ),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          service,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-
-                    if (services.length > 3)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainerHighest.withValues(
-                            alpha: .45,
-                          ),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '+${services.length - 3}',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
               ],
-
-              if (stale) ...[
-                const SizedBox(height: 11),
-
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: raGold.withValues(alpha: .075),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.location_searching_rounded,
-                        size: 17,
-                        color: raGold,
-                      ),
-
-                      const SizedBox(width: 7),
-
-                      Expanded(
-                        child: Text(
-                          'Provider location may be outdated. Confirm their location after connecting.',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            height: 1.4,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
@@ -985,7 +797,7 @@ class _RaProviderBadge extends StatelessWidget {
 
           Text(
             label,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: tone,
@@ -1016,7 +828,7 @@ class _RaProviderFact extends StatelessWidget {
 
         Text(
           value,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             color: colors.onSurfaceVariant,
           ),
@@ -1037,7 +849,8 @@ class _RaNoProviders extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -1065,7 +878,7 @@ class _RaNoProviders extends StatelessWidget {
           Text(
             'No matching provider online right now',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1074,9 +887,9 @@ class _RaNoProviders extends StatelessWidget {
           const SizedBox(height: 5),
 
           Text(
-            'You can still continue with provider offers. Suitable providers can respond when your request becomes available.',
+            'Please try again when a suitable provider is online.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.4,
               color: colors.onSurfaceVariant,
@@ -1154,11 +967,11 @@ class _RaProvidersBottomBar extends StatelessWidget {
                 Expanded(
                   child: Text(
                     selectedProvider == null
-                        ? 'Receive and compare provider offers'
+                        ? 'Select a provider to continue'
                         : 'Requesting $selectedProvider',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -1172,13 +985,60 @@ class _RaProvidersBottomBar extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: onContinue,
+                onPressed: selectedProvider == null ? null : onContinue,
                 icon: const Icon(Icons.arrow_forward_rounded),
-                label: const Text('Review Request'),
+                label: const Text('Review visit fee'),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Informational estimate only. ReviewScreen still obtains the signed server quote.
+int? estimateProviderVisitFee(double? distanceKm) {
+  if (distanceKm == null || !distanceKm.isFinite || distanceKm < 0) return null;
+  return 100 + (distanceKm > 1 ? (distanceKm - 1).ceil() * 20 : 0);
+}
+
+class ProviderVisitFeeEstimate extends StatelessWidget {
+  const ProviderVisitFeeEstimate({super.key, required this.distanceKm});
+  final double? distanceKm;
+  @override
+  Widget build(BuildContext context) {
+    final fee = estimateProviderVisitFee(distanceKm);
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: .07),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            fee == null
+                ? 'Visit fee available at review'
+                : 'Estimated visit fee · Rs. $fee',
+            style: roadAssistTextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Final fee confirmed before you request. Inspection billed after service.',
+            style: roadAssistTextStyle(
+              fontSize: 11,
+              height: 1.4,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

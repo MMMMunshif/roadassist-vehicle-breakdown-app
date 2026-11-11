@@ -114,7 +114,7 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
       title: Text(
         heading,
         textAlign: TextAlign.center,
-        style: GoogleFonts.plusJakartaSans(
+        style: roadAssistTextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w800,
           letterSpacing: -.3,
@@ -131,7 +131,7 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
               Text(
                 description,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   height: 1.5,
                   color: colors.onSurfaceVariant,
@@ -155,7 +155,7 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
                     children: [
                       Text(
                         'REQUIRED ID',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           letterSpacing: .6,
@@ -167,7 +167,7 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
 
                       SelectableText(
                         widget.expectedId!,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -226,7 +226,7 @@ class _AdminActionDialogState extends State<_AdminActionDialog> {
                     Expanded(
                       child: Text(
                         widget.title,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           height: 1.4,
                           color: colors.onSurfaceVariant,

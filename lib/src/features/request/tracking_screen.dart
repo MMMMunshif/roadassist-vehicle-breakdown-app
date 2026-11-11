@@ -19,6 +19,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   String providerPhone = '';
 
   int estimatedCost = 0;
+  bool visitBilling = false;
 
   bool cancelled = false;
 
@@ -36,6 +37,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   String? recoveryReason;
   String? requestError;
+  bool showingSavedRequest = false;
+  DateTime? lastServerSync;
 
   RoadRoute? roadRoute;
 
@@ -51,30 +54,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
   Future<void> cancelBeforeArrival() async {
     final id = widget.requestId;
     if (id == null || cancellingRequest || status >= 2 || cancelled) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel assistance?'),
-        content: const Text(
-          'Your provider will be notified and this job will move to cancelled history.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep request'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Cancel request'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    final reason = await _adminReason(
-      context,
-      'Reason for cancelling assistance',
-    );
+    final reason = await requestCancellationReason(context);
     if (reason == null || !mounted) return;
     setState(() {
       cancellingRequest = true;
@@ -179,6 +159,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     setState(() {
       status = nextStatus;
+      showingSavedRequest = snapshot.metadata.isFromCache;
+      if (!showingSavedRequest) lastServerSync = DateTime.now();
+      visitBilling = data['workflowVersion'] == 3;
       jobStartCodeRequired = data['jobStartCodeRequired'] == true;
       providerLocationUpdatedAt =
           (data['providerLocationUpdatedAt'] as Timestamp?)?.toDate();
@@ -264,14 +247,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
       return;
     }
 
-    final reason = await _adminReason(
-      context,
-      'Confirm you met the provider. Explain any missing or inaccurate GPS.',
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Provider is here'),
+        content: const Text(
+          'Confirm that you have physically met your assigned provider.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not yet'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Confirm arrival'),
+          ),
+        ],
+      ),
     );
-
-    if (reason == null || !mounted) {
-      return;
-    }
+    if (confirmed != true || !mounted) return;
+    const reason = 'Driver confirms physically meeting the assigned provider.';
 
     setState(() {
       confirmingArrival = true;
@@ -377,7 +373,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
     return switch (status) {
       0 => 'Provider accepted your request',
       1 => 'Provider is on the way',
-      2 => 'Provider has arrived',
+      2 =>
+        completionPending
+            ? 'Your bill is ready'
+            : arrivalNeedsConfirmation
+            ? 'Provider has arrived'
+            : 'Service in progress',
       _ => 'Assistance completed',
     };
   }
@@ -393,7 +394,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
       0 => 'Your provider accepted the job and is preparing to travel to you.',
       1 =>
         'Follow the live provider location while they travel to your breakdown point.',
-      2 => 'Confirm arrival only after you physically meet the provider.',
+      2 =>
+        completionPending
+            ? 'Review the final charges and choose how to pay.'
+            : arrivalNeedsConfirmation
+            ? 'Confirm arrival only after you physically meet the provider.'
+            : 'Your provider is helping you. Any replacement parts need your approval first.',
       _ => 'The roadside assistance workflow has been completed.',
     };
   }
@@ -506,7 +512,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           routeTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
@@ -522,7 +528,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           const SizedBox(height: 2),
                           Text(
                             '${roadRoute!.distanceKm.toStringAsFixed(1)} km • ${roadRoute!.durationMinutes} min',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -564,7 +570,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     Expanded(
                       child: Text(
                         'The provider has not shared a live GPS location yet.',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           color: colors.onSurfaceVariant,
                         ),
@@ -586,7 +592,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -609,7 +616,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                       providerName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -630,7 +637,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                         Flexible(
                           child: Text(
                             'Assigned RoadAssist provider',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -694,87 +701,13 @@ class _TrackingScreenState extends State<TrackingScreen> {
     );
   }
 
-  Widget buildStatusCard(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final colors = theme.colorScheme;
-
-    final tone = cancelled
-        ? colors.error
-        : status == 3
-        ? raSuccess
-        : colors.primary;
-
-    final icon = cancelled
-        ? Icons.close_rounded
-        : switch (status) {
-            0 => Icons.handshake_outlined,
-            1 => Icons.navigation_outlined,
-            2 => Icons.location_on_outlined,
-            _ => Icons.task_alt_rounded,
-          };
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tone.withValues(alpha: .07),
-        borderRadius: BorderRadius.circular(21),
-        border: Border.all(color: tone.withValues(alpha: .17)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 47,
-                height: 47,
-                decoration: BoxDecoration(
-                  color: tone.withValues(alpha: .11),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(icon, color: tone),
-              ),
-
-              const SizedBox(width: 11),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      statusTitle,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      statusDescription,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        height: 1.4,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          if (!cancelled) ...[
-            const SizedBox(height: 17),
-
-            StatusTimeline(statuses: statuses, current: status),
-          ],
-        ],
-      ),
-    );
-  }
+  Widget buildStatusCard(BuildContext context) => ActiveAssistanceStatusCard(
+    status: status,
+    cancelled: cancelled,
+    title: statusTitle,
+    description: statusDescription,
+    completionPending: completionPending,
+  );
 
   Widget buildRequestSummary(BuildContext context) {
     final theme = Theme.of(context);
@@ -788,7 +721,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -835,7 +769,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
           _RaTrackDetail(
             icon: Icons.request_quote_outlined,
-            label: 'Approved quote',
+            label: visitBilling ? 'Visit fee / current bill' : 'Approved quote',
             value: estimatedCost > 0 ? money(estimatedCost) : 'Price pending',
           ),
 
@@ -890,7 +824,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               Expanded(
                 child: Text(
                   'Confirm provider arrival',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
@@ -903,7 +837,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
           Text(
             arrivalLocationHint,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 12,
               height: 1.45,
               color: colors.onSurfaceVariant,
@@ -937,7 +871,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -956,7 +891,10 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   color: raSuccess.withValues(alpha: .10),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.task_alt_rounded, color: raSuccess),
+                child: const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: RaPremiumSuccessMark(size: 30, color: raSuccess),
+                ),
               ),
 
               const SizedBox(width: 10),
@@ -967,7 +905,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                   children: [
                     Text(
                       'Review completed work',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -977,7 +915,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                     Text(
                       'Confirm only after checking the agreed service.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -988,12 +926,12 @@ class _TrackingScreenState extends State<TrackingScreen> {
             ],
           ),
 
-          if (completionNotes.trim().isNotEmpty) ...[
+          if (completionNotes.trim().isNotEmpty && !visitBilling) ...[
             const SizedBox(height: 14),
 
             Text(
               'Provider notes',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -1003,7 +941,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
             Text(
               completionNotes,
-              style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.45),
+              style: roadAssistTextStyle(fontSize: 12, height: 1.45),
             ),
           ],
 
@@ -1030,21 +968,25 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   )
                 : const Icon(Icons.verified_outlined),
-            label: const Text('Confirm & Pay'),
+            label: const Text('Accept Bill & Pay'),
           ),
 
           const SizedBox(height: 7),
 
-          TextButton.icon(
-            style: TextButton.styleFrom(foregroundColor: colors.error),
-            onPressed: widget.requestId == null
-                ? null
-                : () {
-                    push(context, DisputeScreen(requestId: widget.requestId!));
-                  },
-            icon: const Icon(Icons.report_problem_outlined),
-            label: const Text('There Is a Problem'),
-          ),
+          if (!visitBilling)
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: colors.error),
+              onPressed: widget.requestId == null
+                  ? null
+                  : () {
+                      push(
+                        context,
+                        DisputeScreen(requestId: widget.requestId!),
+                      );
+                    },
+              icon: const Icon(Icons.report_problem_outlined),
+              label: const Text('There Is a Problem'),
+            ),
         ],
       ),
     );
@@ -1081,7 +1023,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
               children: [
                 Text(
                   'Provider unavailable',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1092,7 +1034,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 Text(
                   recoveryReason ??
                       'The assigned provider is no longer available.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -1103,7 +1045,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                 Text(
                   'Choose another provider and approve a new offer before continuing.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1127,7 +1069,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Active request',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -1164,27 +1106,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
                 children: [
-                  if (widget.requestId != null) ...[
+                  if (widget.requestId != null && !visitBilling) ...[
                     RepairQuotePanel(requestId: widget.requestId!),
 
                     const SizedBox(height: 13),
                   ],
-
-                  buildMap(context),
-                  const SizedBox(height: 10),
-                  LiveLocationStatus(
-                    updatedAt: providerLocationUpdatedAt,
-                    hasPosition: providerPosition != null,
-                    distanceKm: providerPosition == null
-                        ? null
-                        : Geolocator.distanceBetween(
-                                providerPosition!.latitude,
-                                providerPosition!.longitude,
-                                widget.draft.latitude,
-                                widget.draft.longitude,
-                              ) /
-                              1000,
-                  ),
 
                   if (requestError != null) ...[
                     const SizedBox(height: 11),
@@ -1208,7 +1134,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           Expanded(
                             child: Text(
                               requestError!,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -1221,7 +1147,54 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
                   const SizedBox(height: 14),
 
+                  RequestSyncStatus(
+                    showingSavedData: showingSavedRequest,
+                    lastSynced: lastServerSync,
+                  ),
+                  buildStatusCard(context),
+                  const SizedBox(height: 14),
                   buildProviderCard(context),
+                  const SizedBox(height: 14),
+                  if (!cancelled && status < 2) ...[
+                    buildMap(context),
+                    const SizedBox(height: 10),
+                    LiveLocationStatus(
+                      updatedAt: providerLocationUpdatedAt,
+                      hasPosition: providerPosition != null,
+                      distanceKm: providerPosition == null
+                          ? null
+                          : Geolocator.distanceBetween(
+                                  providerPosition!.latitude,
+                                  providerPosition!.longitude,
+                                  widget.draft.latitude,
+                                  widget.draft.longitude,
+                                ) /
+                                1000,
+                    ),
+                  ] else
+                    ExpansionTile(
+                      key: const PageStorageKey('assistance-map'),
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                      leading: const Icon(Icons.map_outlined),
+                      title: const Text('Provider location'),
+                      children: [
+                        buildMap(context),
+                        const SizedBox(height: 10),
+                        LiveLocationStatus(
+                          updatedAt: providerLocationUpdatedAt,
+                          hasPosition: providerPosition != null,
+                          distanceKm: providerPosition == null
+                              ? null
+                              : Geolocator.distanceBetween(
+                                      providerPosition!.latitude,
+                                      providerPosition!.longitude,
+                                      widget.draft.latitude,
+                                      widget.draft.longitude,
+                                    ) /
+                                    1000,
+                        ),
+                      ],
+                    ),
                   if (!cancelled && status < 2 && widget.requestId != null) ...[
                     const SizedBox(height: 10),
                     OutlinedButton.icon(
@@ -1235,16 +1208,40 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  buildStatusCard(context),
+                  if (!cancelled &&
+                      status == 2 &&
+                      arrivalNeedsConfirmation) ...[
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 13),
+                    buildArrivalConfirmation(context),
+                  ],
 
-                  buildRequestSummary(context),
+                  if (completionPending && widget.requestId != null) ...[
+                    const SizedBox(height: 16),
+
+                    buildCompletionReview(context),
+                  ],
+
+                  if (visitBilling && widget.requestId != null)
+                    WorkApprovalPanel(requestId: widget.requestId!),
+                  ExpansionTile(
+                    key: const PageStorageKey('assistance-details'),
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: const Text('Request details & charges'),
+                    subtitle: Text(
+                      estimatedCost > 0
+                          ? money(estimatedCost)
+                          : 'Price pending',
+                    ),
+                    children: [buildRequestSummary(context)],
+                  ),
 
                   if (!cancelled &&
                       status == 0 &&
+                      !visitBilling &&
                       widget.requestId != null) ...[
                     const SizedBox(height: 13),
 
@@ -1268,25 +1265,11 @@ class _TrackingScreenState extends State<TrackingScreen> {
                     Text(
                       'Use replacement only when the assigned provider has not departed after the expected waiting period.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
                     ),
-                  ],
-
-                  if (!cancelled &&
-                      status == 2 &&
-                      arrivalNeedsConfirmation) ...[
-                    const SizedBox(height: 16),
-
-                    buildArrivalConfirmation(context),
-                  ],
-
-                  if (completionPending && widget.requestId != null) ...[
-                    const SizedBox(height: 16),
-
-                    buildCompletionReview(context),
                   ],
 
                   if (cancelled && recoveryReason != null) ...[
@@ -1316,26 +1299,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
               ),
             ),
 
-            _RaTrackingBottomBar(
-              cancelled: cancelled,
-              completed: status == 3,
-              canFindAnother: cancelled && recoveryReason != null,
-              onPressed: () {
-                if (cancelled && recoveryReason != null) {
-                  replace(
-                    context,
-                    ReviewScreen(
-                      draft: widget.draft.copyWith(
-                        provider: '',
-                        preferredProviderId: '',
+            if (cancelled || status == 3)
+              _RaTrackingBottomBar(
+                cancelled: cancelled,
+                completed: status == 3,
+                canFindAnother: cancelled && recoveryReason != null,
+                onPressed: () {
+                  if (cancelled && recoveryReason != null) {
+                    replace(
+                      context,
+                      ReviewScreen(
+                        draft: widget.draft.copyWith(
+                          provider: '',
+                          preferredProviderId: '',
+                        ),
                       ),
-                    ),
-                  );
-                } else {
-                  replace(context, const DriverShell());
-                }
-              },
-            ),
+                    );
+                  } else {
+                    replace(context, const DriverShell());
+                  }
+                },
+              ),
           ],
         ),
       ),
@@ -1381,7 +1365,7 @@ class _RaTrackDetail extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -1391,7 +1375,7 @@ class _RaTrackDetail extends StatelessWidget {
 
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     height: 1.4,
                     fontWeight: FontWeight.w600,
@@ -1471,6 +1455,149 @@ class _RaTrackingBottomBar extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Presentation follows server state; GPS refreshes never restart stage motion.
+class ActiveAssistanceStatusCard extends StatelessWidget {
+  const ActiveAssistanceStatusCard({
+    super.key,
+    required this.status,
+    required this.title,
+    required this.description,
+    this.cancelled = false,
+    this.completionPending = false,
+  });
+  final int status;
+  final String title;
+  final String description;
+  final bool cancelled;
+  final bool completionPending;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tone = cancelled
+        ? colors.error
+        : status >= 3
+        ? raSuccess
+        : colors.primary;
+    final reduced =
+        MediaQuery.disableAnimationsOf(context) ||
+        MediaQuery.accessibleNavigationOf(context);
+    final duration = reduced
+        ? Duration.zero
+        : const Duration(milliseconds: 420);
+    final icon = cancelled
+        ? Icons.close_rounded
+        : completionPending
+        ? Icons.receipt_long_outlined
+        : switch (status) {
+            0 => Icons.handshake_outlined,
+            1 => Icons.navigation_outlined,
+            2 => Icons.car_repair_outlined,
+            _ => Icons.task_alt_rounded,
+          };
+    return AnimatedContainer(
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [tone.withValues(alpha: .18), tone.withValues(alpha: .04)],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: tone.withValues(alpha: .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: tone.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: tone, size: 23),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  cancelled
+                      ? 'REQUEST CLOSED'
+                      : status >= 3
+                      ? 'SERVICE COMPLETED'
+                      : 'ACTIVE ASSISTANCE',
+                  style: roadAssistTextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w800,
+                    color: tone,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Semantics(
+            liveRegion: true,
+            child: AnimatedSwitcher(
+              duration: duration,
+              switchInCurve: Curves.easeOutCubic,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, .08),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              child: Align(
+                key: ValueKey('$status/$cancelled/$completionPending/$title'),
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: roadAssistTextStyle(
+                        fontSize: 24,
+                        height: 1.2,
+                        letterSpacing: -.7,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      description,
+                      style: roadAssistTextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!cancelled) ...[
+            const SizedBox(height: 24),
+            StatusTimeline(
+              statuses: const ['Accepted', 'En route', 'Arrived', 'Completed'],
+              current: status.clamp(0, 3),
+            ),
+          ],
+        ],
       ),
     );
   }

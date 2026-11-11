@@ -1,0 +1,5 @@
+﻿from pathlib import Path
+p=Path('test/completion_report_test.dart');s=p.read_text(encoding='utf-8');s=s.replace("        await tester.pumpWidget(\n          MaterialApp(","        String? checkoutResult;\n        var checkoutClosed = false;\n        await tester.pumpWidget(\n          MaterialApp(",1);s=s.replace('onPressed: () => requestCheckout(context, 1800),', '''onPressed: () async {
+                    checkoutResult = await requestCheckout(context, 1800);
+                    checkoutClosed = true;
+                  },''');s=s.replace("        expect(find.text('SANDBOX / NO REAL CHARGE'), findsOneWidget);", "        expect(find.text('SANDBOX / NO REAL CHARGE'), findsOneWidget);\n        expect(checkoutClosed, isFalse);\n        expect(checkoutResult, isNull);");s=s.replace("        await tester.tap(find.byTooltip('Close payment'));\n        await tester.pumpAndSettle();", "        await tester.tap(find.text('Confirm cash paid'));\n        await tester.pumpAndSettle();\n        expect(checkoutClosed, isTrue);\n        expect(checkoutResult, 'cash');");p.write_text(s,encoding='utf-8')

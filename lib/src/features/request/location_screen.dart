@@ -219,7 +219,8 @@ class _LocationScreenState extends State<LocationScreen> {
           ),
           child: Container(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: dark ? const Color(0xFF0D2237) : colors.surface,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
@@ -265,7 +266,7 @@ class _LocationScreenState extends State<LocationScreen> {
                         children: [
                           Text(
                             'Enter location manually',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
@@ -275,7 +276,7 @@ class _LocationScreenState extends State<LocationScreen> {
 
                           Text(
                             'Use a street, building or recognizable landmark.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               color: colors.onSurfaceVariant,
                             ),
@@ -413,7 +414,7 @@ class _LocationScreenState extends State<LocationScreen> {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Breakdown Location',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -462,7 +463,8 @@ class _LocationScreenState extends State<LocationScreen> {
 
                   Container(
                     padding: const EdgeInsets.all(15),
-                    decoration: BoxDecoration(
+                    decoration: RaPremiumDecoration(
+                      context,
                       color: theme.brightness == Brightness.dark
                           ? const Color(0xFF0D2237)
                           : Colors.white,
@@ -498,7 +500,7 @@ class _LocationScreenState extends State<LocationScreen> {
                                 children: [
                                   Text(
                                     'Nearby landmark',
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: roadAssistTextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -506,7 +508,7 @@ class _LocationScreenState extends State<LocationScreen> {
                                   const SizedBox(height: 3),
                                   Text(
                                     'Optional, but useful when the exact roadside point is difficult to find.',
-                                    style: GoogleFonts.plusJakartaSans(
+                                    style: roadAssistTextStyle(
                                       fontSize: 12,
                                       color: colors.onSurfaceVariant,
                                     ),
@@ -556,7 +558,7 @@ class _LocationScreenState extends State<LocationScreen> {
                         Expanded(
                           child: Text(
                             'Tap the map to fine-tune the exact breakdown point. Providers use this location for distance and navigation.',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               height: 1.45,
                               color: colors.onSurfaceVariant,
@@ -618,8 +620,8 @@ class _RaLocationProgress extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                'STEP 3 OF 4',
-                style: GoogleFonts.plusJakartaSans(
+                'STEP 2 OF 3',
+                style: roadAssistTextStyle(
                   color: colors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -632,7 +634,7 @@ class _RaLocationProgress extends StatelessWidget {
 
             Text(
               'Location',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: colors.primary,
@@ -646,7 +648,7 @@ class _RaLocationProgress extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
-            value: .75,
+            value: 2 / 3,
             minHeight: 5,
             backgroundColor: colors.surfaceContainerHighest,
           ),
@@ -708,7 +710,7 @@ class _RaLocationHero extends StatelessWidget {
 
               Text(
                 'Where are you?',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -722,7 +724,7 @@ class _RaLocationHero extends StatelessWidget {
                 width: 295,
                 child: Text(
                   'Confirm the exact breakdown point so RoadAssist can find suitable providers and guide them to you.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white.withValues(alpha: .80),
                     fontSize: 13,
                     height: 1.45,
@@ -765,7 +767,8 @@ class _RaLocationCurrentCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -784,7 +787,8 @@ class _RaLocationCurrentCard extends StatelessWidget {
               Container(
                 width: 45,
                 height: 45,
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: confirmed
                       ? colors.primary.withValues(alpha: .09)
                       : raGold.withValues(alpha: .10),
@@ -806,7 +810,7 @@ class _RaLocationCurrentCard extends StatelessWidget {
                   children: [
                     Text(
                       confirmed ? 'Breakdown point' : 'Location required',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -816,7 +820,7 @@ class _RaLocationCurrentCard extends StatelessWidget {
 
                     Text(
                       location,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -827,7 +831,7 @@ class _RaLocationCurrentCard extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         'GPS accuracy ±${accuracy!.ceil()} m',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           color: accuracy! <= 50 ? raSuccess : raGold,
                           fontWeight: FontWeight.w600,
@@ -888,7 +892,8 @@ class _RaLocationMapCard extends StatelessWidget {
     return Container(
       height: 270,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: colors.outlineVariant.withValues(alpha: .48)),
       ),
@@ -973,7 +978,8 @@ class _RaLocationWaitingMap extends StatelessWidget {
 
     return Container(
       height: 215,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -1005,7 +1011,7 @@ class _RaLocationWaitingMap extends StatelessWidget {
               Text(
                 'Map appears after location confirmation',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1016,7 +1022,7 @@ class _RaLocationWaitingMap extends StatelessWidget {
               Text(
                 'Use GPS or enter a specific address first. RoadAssist will not assume a pickup point.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   height: 1.45,
                   color: colors.onSurfaceVariant,

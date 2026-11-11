@@ -78,7 +78,7 @@ class _NotificationSettingsScreenState
       appBar: AppBar(
         title: Text(
           'Notification Settings',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 19),
             fontWeight: FontWeight.w800,
           ),
@@ -177,7 +177,7 @@ class _NotificationSettingsScreenState
                 Expanded(
                   child: Text(
                     'If you use RoadAssist on multiple devices, notification permission may need to be enabled separately on each device.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: providerFontSize(context, 8.3),
                       height: 1.45,
                       color: colors.onSurfaceVariant,
@@ -243,7 +243,7 @@ class _RaNotificationHero extends StatelessWidget {
               children: [
                 Text(
                   'Stay informed',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: providerFontSize(context, 18),
                     fontWeight: FontWeight.w800,
@@ -252,7 +252,7 @@ class _RaNotificationHero extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Receive important RoadAssist activity while the app is in the background.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: providerFontSize(context, 8.5),
                     height: 1.4,
@@ -282,7 +282,7 @@ class _RaNotificationHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 14.5),
             fontWeight: FontWeight.w800,
           ),
@@ -290,7 +290,7 @@ class _RaNotificationHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 8.3),
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -320,7 +320,8 @@ class _RaNotificationFeatureCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D1D2B)
             : colors.surface,
@@ -332,7 +333,8 @@ class _RaNotificationFeatureCard extends StatelessWidget {
           Container(
             width: 39,
             height: 39,
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: colors.primary.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -345,7 +347,7 @@ class _RaNotificationFeatureCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 9.8),
                     fontWeight: FontWeight.w700,
                   ),
@@ -353,7 +355,7 @@ class _RaNotificationFeatureCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 7.8),
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -397,7 +399,8 @@ class _RaNotificationActionCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: tone.withValues(alpha: .055),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: tone.withValues(alpha: .15)),
@@ -423,7 +426,7 @@ class _RaNotificationActionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 10),
                         fontWeight: FontWeight.w700,
                       ),
@@ -431,7 +434,7 @@ class _RaNotificationActionCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 7.8),
                         height: 1.4,
                         color: colors.onSurfaceVariant,
@@ -503,7 +506,7 @@ class _RaNotificationResult extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 8.3),
                 height: 1.4,
                 color: colors.onSurfaceVariant,

@@ -2,10 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:road_assist/src/models/provider_availability.dart';
 
 void main() {
+  test('finished service never becomes busy again during directory sync', () {
+    for (final state in ['accepted', 'en_route', 'arrived']) {
+      expect(ProviderAvailability.hasActiveService({'status': state}), isTrue);
+      expect(
+        ProviderAvailability.hasActiveService({
+          'status': state,
+          'serviceCompletedAt': DateTime.now(),
+        }),
+        isFalse,
+      );
+    }
+    expect(
+      ProviderAvailability.hasActiveService({'status': 'completed'}),
+      isFalse,
+    );
+  });
+
   test('online flag requires a recent location heartbeat', () {
     final now = DateTime.utc(2026, 10, 8, 8);
     final data = <String, dynamic>{'online': true};
-    expect(ProviderAvailability.status(data, now), 'Offline');
+    expect(ProviderAvailability.status(data, now), 'Refresh location');
     expect(
       ProviderAvailability.status(
         data,
@@ -20,7 +37,7 @@ void main() {
         now,
         locationUpdatedAt: now.subtract(const Duration(minutes: 2)),
       ),
-      'Offline',
+      'Refresh location',
     );
     expect(
       ProviderAvailability.status(
@@ -36,7 +53,7 @@ void main() {
         now,
         locationUpdatedAt: now.add(const Duration(seconds: 31)),
       ),
-      'Offline',
+      'Refresh location',
     );
     expect(
       ProviderAvailability.status(
@@ -78,7 +95,7 @@ void main() {
     );
     expect(
       ProviderAvailability.status({...busy, 'activeRequestId': null}, now),
-      'Offline',
+      'Refresh location',
     );
   });
   test('Sri Lanka daytime schedule and end boundary', () {

@@ -189,26 +189,43 @@ class AdminNavigationBar extends StatelessWidget {
         ),
       ),
     );
-    return Material(
-      color: _providerSurface(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final d in primary)
-              item(
-                d.icon,
-                d.label,
-                selected == d.index,
-                () => onSelected(d.index),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Material(
+              color: Colors.transparent,
+              child: Ink(
+                decoration: RaPremiumDecoration(
+                  context,
+                  color: _providerSurface(context).withValues(alpha: .80),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final d in primary)
+                      item(
+                        d.icon,
+                        d.label,
+                        selected == d.index,
+                        () => onSelected(d.index),
+                      ),
+                    item(
+                      Icons.grid_view_rounded,
+                      'More',
+                      isMore,
+                      () => _more(context),
+                    ),
+                  ],
+                ),
               ),
-            item(Icons.grid_view_rounded, 'More', isMore, () => _more(context)),
-          ],
+            ),
+          ),
         ),
       ),
     );

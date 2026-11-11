@@ -127,7 +127,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
               children: [
                 Text(
                   'Profile photo',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
@@ -135,7 +135,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'Choose how you want to update your RoadAssist profile photo.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
@@ -281,7 +281,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                           children: [
                             Text(
                               'Edit profile',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -289,7 +289,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                             const SizedBox(height: 2),
                             Text(
                               'Keep your contact details accurate for roadside assistance.',
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 12,
                                 color: colors.onSurfaceVariant,
                               ),
@@ -349,7 +349,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
                   const SizedBox(height: 9),
                   Text(
                     'Saved vehicles are managed separately under My Vehicles.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -518,10 +518,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
         titleSpacing: 18,
         title: RaDriverAppBarTitle(
           'Profile',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
         actions: [
           IconButton(
@@ -724,7 +721,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             Center(
               child: Text(
                 'ROADASSIST',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   letterSpacing: .8,
                   fontWeight: FontWeight.w800,
@@ -857,15 +854,12 @@ class _RaDriverProfileHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -892,7 +886,8 @@ class _RaDriverProfileSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: padding,
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -930,7 +925,7 @@ class _RaDriverProfileInfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: colors.onSurfaceVariant,
               ),
@@ -943,7 +938,7 @@ class _RaDriverProfileInfoRow extends StatelessWidget {
               textAlign: TextAlign.right,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -993,7 +988,8 @@ class _RaDriverProfileQuickCard extends StatelessWidget {
               Container(
                 width: 39,
                 height: 39,
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: colors.primary.withValues(alpha: .075),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1002,7 +998,7 @@ class _RaDriverProfileQuickCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1012,7 +1008,7 @@ class _RaDriverProfileQuickCard extends StatelessWidget {
                 subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 12,
                   height: 1.35,
                   color: colors.onSurfaceVariant,
@@ -1056,16 +1052,13 @@ class _RaDriverProfileMenuTile extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        style: roadAssistTextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       subtitle: Text(
         subtitle,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: GoogleFonts.plusJakartaSans(
+        style: roadAssistTextStyle(
           fontSize: 12,
           color: colors.onSurfaceVariant,
         ),
@@ -1111,7 +1104,7 @@ class _RaDriverProfileSourceTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1119,7 +1112,7 @@ class _RaDriverProfileSourceTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -1169,7 +1162,7 @@ class _RaDriverProfileNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -1177,7 +1170,7 @@ class _RaDriverProfileNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(fontSize: 12, height: 1.4),
+                  style: roadAssistTextStyle(fontSize: 12, height: 1.4),
                 ),
               ],
             ),

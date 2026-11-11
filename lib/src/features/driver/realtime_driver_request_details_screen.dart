@@ -96,7 +96,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
 
                   Text(
                     'Rate your service',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                     ),
@@ -107,7 +107,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
                   Text(
                     'How was your roadside assistance experience?',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 12,
                       color: colors.onSurfaceVariant,
                     ),
@@ -138,7 +138,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
                   if (selectedRating > 0) ...[
                     Text(
                       '$selectedRating of 5',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: raGold,
@@ -202,10 +202,7 @@ class RealtimeDriverRequestDetailsScreen extends StatelessWidget {
       appBar: AppBar(
         title: RaDriverAppBarTitle(
           'Request Details',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -658,7 +655,7 @@ class _RaRealtimeHero extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -671,7 +668,7 @@ class _RaRealtimeHero extends StatelessWidget {
                       : cancelled
                       ? 'This roadside assistance request was cancelled.'
                       : 'Latest information for your roadside assistance request.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white70,
                     fontSize: 12,
                     height: 1.4,
@@ -707,7 +704,8 @@ class _RaRealtimeProviderCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : colors.surface,
@@ -726,7 +724,7 @@ class _RaRealtimeProviderCard extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                   ),
@@ -734,7 +732,7 @@ class _RaRealtimeProviderCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   'Assigned service provider',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -774,15 +772,12 @@ class _RaRealtimeHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -805,7 +800,8 @@ class _RaRealtimeSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -842,7 +838,7 @@ class _RaRealtimeRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: colors.onSurfaceVariant,
               ),
@@ -853,7 +849,7 @@ class _RaRealtimeRow extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: strong ? 10 : 8.8,
                 height: 1.4,
                 fontWeight: strong ? FontWeight.w800 : FontWeight.w700,
@@ -902,7 +898,7 @@ class _RaRealtimeNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -910,7 +906,7 @@ class _RaRealtimeNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.4,
                     color: colors.onSurfaceVariant,

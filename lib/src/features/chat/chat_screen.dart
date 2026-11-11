@@ -277,7 +277,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                                 revision
                                     ? 'Revise approved quote'
                                     : 'Create service offer',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: providerFontSize(context, 17),
                                   fontWeight: FontWeight.w800,
                                   color: colors.onSurface,
@@ -290,7 +290,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                                 revision
                                     ? 'Explain every change before asking for driver approval.'
                                     : 'Send a clear itemized offer before the driver selects you.',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: providerFontSize(context, 9.5),
                                   height: 1.4,
                                   color: colors.onSurfaceVariant,
@@ -597,7 +597,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                                           : inspectionOnly
                                           ? 'Inspection total'
                                           : 'Quoted total',
-                                      style: GoogleFonts.plusJakartaSans(
+                                      style: roadAssistTextStyle(
                                         fontSize: providerFontSize(context, 9),
                                         color: colors.onSurfaceVariant,
                                       ),
@@ -607,7 +607,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
                                       revision
                                           ? 'Replaces the previous approved amount'
                                           : 'Driver reviews this before selection',
-                                      style: GoogleFonts.plusJakartaSans(
+                                      style: roadAssistTextStyle(
                                         fontSize: providerFontSize(
                                           context,
                                           8.5,
@@ -623,7 +623,7 @@ Future<Map<String, dynamic>?> requestProviderQuote(
 
                               Text(
                                 'Rs. $total',
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: providerFontSize(context, 17),
                                   fontWeight: FontWeight.w800,
                                   color: colors.primary,
@@ -757,7 +757,7 @@ class _RaChatSectionTitle extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 12),
                   fontWeight: FontWeight.w700,
                   color: colors.onSurface,
@@ -766,7 +766,7 @@ class _RaChatSectionTitle extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 9),
                   height: 1.4,
                   color: colors.onSurfaceVariant,
@@ -816,7 +816,7 @@ class _RaChatQuoteSummary extends StatelessWidget {
               Expanded(
                 child: Text(
                   issue,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 13),
                     fontWeight: FontWeight.w800,
                   ),
@@ -835,7 +835,7 @@ class _RaChatQuoteSummary extends StatelessWidget {
                   ),
                   child: Text(
                     '${distanceKm.toStringAsFixed(1)} km',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: providerFontSize(context, 8),
                       fontWeight: FontWeight.w700,
                       color: colors.primary,
@@ -849,7 +849,7 @@ class _RaChatQuoteSummary extends StatelessWidget {
             const SizedBox(height: 7),
             Text(
               vehicle,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 9.5),
                 color: colors.onSurfaceVariant,
               ),
@@ -871,7 +871,7 @@ class _RaChatQuoteSummary extends StatelessWidget {
             const SizedBox(height: 11),
             Text(
               'DRIVER DESCRIPTION',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 8),
                 letterSpacing: .7,
                 fontWeight: FontWeight.w700,
@@ -881,7 +881,7 @@ class _RaChatQuoteSummary extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               description,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 10),
                 height: 1.4,
               ),
@@ -892,7 +892,7 @@ class _RaChatQuoteSummary extends StatelessWidget {
 
           Text(
             'Parts preference: ${partsPreference.replaceAll('_', ' ')}',
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: providerFontSize(context, 9),
               color: colors.onSurfaceVariant,
             ),
@@ -939,7 +939,7 @@ class _RaChatQuoteNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10.5),
                     fontWeight: FontWeight.w700,
                   ),
@@ -947,7 +947,7 @@ class _RaChatQuoteNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 9),
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -994,7 +994,7 @@ class _RaChatQuoteEvidence extends StatelessWidget {
             Expanded(
               child: Text(
                 'Photo evidence',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 11),
                   fontWeight: FontWeight.w700,
                 ),
@@ -1002,7 +1002,7 @@ class _RaChatQuoteEvidence extends StatelessWidget {
             ),
             Text(
               '${evidence.length}/2',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 8.5),
                 color: colors.primary,
                 fontWeight: FontWeight.w700,
@@ -1060,7 +1060,7 @@ class _RaChatQuoteEvidence extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             error!,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: providerFontSize(context, 9),
               color: colors.error,
             ),
@@ -1277,7 +1277,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
         return Container(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: dark ? const Color(0xFF0D1D2B) : colors.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -1300,7 +1301,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
               Text(
                 'Share with ${widget.peerName}',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 18),
                   fontWeight: FontWeight.w800,
                   color: colors.onSurface,
@@ -1311,7 +1312,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
               Text(
                 'Choose what you want to send in this roadside conversation.',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: providerFontSize(context, 9.5),
                   color: colors.onSurfaceVariant,
                 ),
@@ -1669,7 +1670,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     widget.peerName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: providerFontSize(context, 13),
                       fontWeight: FontWeight.w800,
                       color: colors.onSurface,
@@ -1682,7 +1683,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     'RoadAssist conversation',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: providerFontSize(context, 8.5),
                       color: colors.onSurfaceVariant,
                     ),
@@ -1804,7 +1805,8 @@ class _RaChatJobCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: colors.surface,
         border: Border(
           bottom: BorderSide(
@@ -1844,7 +1846,7 @@ class _RaChatJobCard extends StatelessWidget {
                     issue,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: providerFontSize(context, 10.5),
                       fontWeight: FontWeight.w700,
                     ),
@@ -1855,7 +1857,7 @@ class _RaChatJobCard extends StatelessWidget {
                       vehicle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 8.5),
                         color: colors.onSurfaceVariant,
                       ),
@@ -1920,7 +1922,7 @@ class _RaChatAttachmentTile extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 10.8),
                         fontWeight: FontWeight.w700,
                       ),
@@ -1928,7 +1930,7 @@ class _RaChatAttachmentTile extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 8.7),
                         color: colors.onSurfaceVariant,
                       ),
@@ -1966,7 +1968,7 @@ class _RaChatDateDivider extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 8.5),
                 fontWeight: FontWeight.w600,
                 color: colors.onSurfaceVariant,
@@ -2116,7 +2118,7 @@ class _RaChatBubble extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(13, 10, 13, 7),
                 child: Text(
                   text,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10.5),
                     height: 1.4,
                     color: mine ? colors.onPrimary : colors.onSurface,
@@ -2129,7 +2131,7 @@ class _RaChatBubble extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(13, 3, 13, 7),
                 child: Text(
                   time,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 7.5),
                     color: mine
                         ? colors.onPrimary.withValues(alpha: .68)
@@ -2215,7 +2217,7 @@ class _RaChatLocationMessage extends StatelessWidget {
               children: [
                 Text(
                   'Shared location',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10.5),
                     fontWeight: FontWeight.w700,
                     color: foreground,
@@ -2224,7 +2226,7 @@ class _RaChatLocationMessage extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   'Tap to open in Maps',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 8.5),
                     color: secondary,
                   ),
@@ -2273,7 +2275,7 @@ class _RaChatEmpty extends StatelessWidget {
             Text(
               'Start the conversation',
               textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 17),
                 fontWeight: FontWeight.w800,
                 color: colors.onSurface,
@@ -2285,7 +2287,7 @@ class _RaChatEmpty extends StatelessWidget {
             Text(
               'Message $peerName about this roadside assistance job. You can also share photos or your current location.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: providerFontSize(context, 10),
                 height: 1.5,
                 color: colors.onSurfaceVariant,

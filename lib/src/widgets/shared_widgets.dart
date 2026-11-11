@@ -1292,12 +1292,22 @@ class StatusTimeline extends StatelessWidget {
               children: [
                 if (index > 0)
                   Expanded(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration:
+                          MediaQuery.disableAnimationsOf(context) ||
+                              MediaQuery.accessibleNavigationOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 260),
                       height: 3,
                       color: index <= current ? raBlue : raLine,
                     ),
                   ),
-                Container(
+                AnimatedContainer(
+                  duration:
+                      MediaQuery.disableAnimationsOf(context) ||
+                          MediaQuery.accessibleNavigationOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 260),
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
@@ -1331,7 +1341,12 @@ class StatusTimeline extends StatelessWidget {
                 ),
                 if (index < statuses.length - 1)
                   Expanded(
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration:
+                          MediaQuery.disableAnimationsOf(context) ||
+                              MediaQuery.accessibleNavigationOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 260),
                       height: 3,
                       color: index < current ? raBlue : raLine,
                     ),
@@ -1572,18 +1587,29 @@ class EmptyState extends StatelessWidget {
       vertical: RaSpace.xxxl,
       horizontal: RaSpace.xl,
     ),
-    decoration: BoxDecoration(
+    decoration: RaPremiumDecoration(
+      context,
       color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(RaRadius.md),
+      borderRadius: BorderRadius.circular(24),
       border: Border.all(color: Theme.of(context).dividerColor),
     ),
     child: Column(
       children: [
-        IconBadge(icon, size: 52, color: raMuted),
+        IconBadge(icon, size: 52, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: RaSpace.md),
-        Text(title, style: RaText.title, textAlign: TextAlign.center),
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: RaSpace.xs),
-        Text(message, textAlign: TextAlign.center, style: RaText.bodyMuted),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.5),
+        ),
       ],
     ),
   );
@@ -2604,7 +2630,8 @@ class IconBadge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: size,
     height: size,
-    decoration: BoxDecoration(
+    decoration: RaPremiumDecoration(
+      context,
       color:
           background ??
           (Theme.of(context).brightness == Brightness.dark
@@ -2612,7 +2639,13 @@ class IconBadge extends StatelessWidget {
               : raPale),
       borderRadius: BorderRadius.circular(size * 0.3),
     ),
-    child: Icon(icon, color: color, size: iconSize ?? size * 0.5),
+    child: RaPremiumServiceIcon(
+      icon: icon,
+      color: color,
+      size:
+          iconSize ??
+          size * (RaPremiumServiceIcon.quadrant(icon) == null ? .5 : .9),
+    ),
   );
 }
 

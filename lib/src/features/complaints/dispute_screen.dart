@@ -282,7 +282,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
       appBar: AppBar(
         title: Text(
           widget.sameProblem ? 'Warranty Review' : 'Service Problem',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -410,7 +410,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
                   Expanded(
                     child: Text(
                       'Photo evidence',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: colors.onSurface,
@@ -419,7 +419,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
                   ),
                   Text(
                     '${photos.length}/2',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       color: colors.primary,
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
@@ -465,7 +465,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
 
                 Text(
                   'A photo is required for a repeated-problem / warranty review.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 9.5,
                     color: raGold,
                     fontWeight: FontWeight.w600,
@@ -538,7 +538,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
 
               Text(
                 report['description'] as String? ?? '',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 10.5,
                   height: 1.5,
                   color: colors.onSurface,
@@ -586,10 +586,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
                 const SizedBox(height: 10),
                 Text(
                   providerResponse,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 10.5,
-                    height: 1.5,
-                  ),
+                  style: roadAssistTextStyle(fontSize: 10.5, height: 1.5),
                 ),
               ],
             ),
@@ -669,7 +666,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
                   ),
                   child: Text(
                     'Do not add charges to the completed invoice. Any paid follow-up requires a separate request and driver-approved quote.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 9.5,
                       height: 1.4,
                       color: colors.onSurfaceVariant,
@@ -718,10 +715,7 @@ class _DisputeScreenState extends State<DisputeScreen> {
                   child: Text(
                     report['resolution'] as String? ??
                         'The driver confirmed that this report was resolved.',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 10,
-                      height: 1.45,
-                    ),
+                    style: roadAssistTextStyle(fontSize: 10, height: 1.45),
                   ),
                 ),
               ],
@@ -795,7 +789,7 @@ class _RaDisputeHero extends StatelessWidget {
                       : sameProblem
                       ? 'Warranty review'
                       : 'Report a service problem',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white,
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
@@ -809,7 +803,7 @@ class _RaDisputeHero extends StatelessWidget {
                   existing
                       ? 'Follow the report and provider response until the driver confirms resolution.'
                       : 'Your report records the problem, evidence and service total at the time it is submitted.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: Colors.white.withValues(alpha: .80),
                     fontSize: 10,
                     height: 1.4,
@@ -839,7 +833,7 @@ class _RaDisputeHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
             letterSpacing: -.35,
@@ -849,7 +843,7 @@ class _RaDisputeHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 10,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -873,7 +867,8 @@ class _RaDisputeCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D1D2B)
             : Colors.white,
@@ -902,7 +897,8 @@ class _RaDisputeStatusCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: tone.withValues(alpha: .07),
         borderRadius: BorderRadius.circular(19),
         border: Border.all(color: tone.withValues(alpha: .20)),
@@ -934,7 +930,7 @@ class _RaDisputeStatusCard extends StatelessWidget {
               children: [
                 Text(
                   status.replaceAll('_', ' ').toUpperCase(),
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: tone,
                     fontSize: 8.5,
                     letterSpacing: .8,
@@ -944,7 +940,7 @@ class _RaDisputeStatusCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   reason,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     color: colors.onSurface,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
@@ -975,10 +971,7 @@ class _RaDisputeMiniHeading extends StatelessWidget {
         const SizedBox(width: 7),
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+          style: roadAssistTextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -1007,7 +1000,7 @@ class _RaDisputeMoneyRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 9.5,
                 color: colors.onSurfaceVariant,
               ),
@@ -1016,7 +1009,7 @@ class _RaDisputeMoneyRow extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             value,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: 10.5,
               fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
               color: strong ? colors.primary : colors.onSurface,

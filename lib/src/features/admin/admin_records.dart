@@ -426,14 +426,14 @@ class _AdminRecordsState extends State<_AdminRecords> {
                         ),
                         title: Text(
                           attentionTitle,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         subtitle: Text(
                           attentionDescription,
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 14,
                             color: colors.onSurfaceVariant,
                           ),
@@ -596,7 +596,7 @@ class _AdminRecordsHeader extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                 ),
@@ -604,7 +604,7 @@ class _AdminRecordsHeader extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 description,
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 14,
                   height: 1.4,
                   color: colors.onSurfaceVariant,
@@ -648,7 +648,7 @@ class _AdminRecordsSummary extends StatelessWidget {
               filtered
                   ? '$loaded loaded • $matches match current search/filter'
                   : '$loaded records loaded',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -722,7 +722,8 @@ class _AdminRecordCard extends StatelessWidget {
               Container(
                 width: 43,
                 height: 43,
-                decoration: BoxDecoration(
+                decoration: RaPremiumDecoration(
+                  context,
                   color: tone.withValues(alpha: .08),
                   borderRadius: BorderRadius.circular(13),
                 ),
@@ -741,7 +742,7 @@ class _AdminRecordCard extends StatelessWidget {
                             title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
@@ -751,7 +752,7 @@ class _AdminRecordCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             time!,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 14,
                               color: colors.onSurfaceVariant,
                             ),
@@ -769,7 +770,7 @@ class _AdminRecordCard extends StatelessWidget {
                             ? 3
                             : 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 14,
                           height: 1.4,
                           color: colors.onSurfaceVariant,
@@ -796,7 +797,7 @@ class _AdminRecordCard extends StatelessWidget {
                             ),
                             child: Text(
                               status.replaceAll('_', ' ').toUpperCase(),
-                              style: GoogleFonts.plusJakartaSans(
+                              style: roadAssistTextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
                                 color: tone,
@@ -810,7 +811,7 @@ class _AdminRecordCard extends StatelessWidget {
                               : kind == 'complaints'
                               ? 'Review'
                               : 'Details',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: colors.primary,

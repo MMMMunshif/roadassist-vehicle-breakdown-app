@@ -59,7 +59,7 @@ async function notifyProviders(request, eventId, requestId) {
   const providers = await db.collection('providerDirectory').where('online','==',true).get();
   const matching = providers.docs.filter(d => providerMatches(request,d.data(),d.id));
   for (let offset=0;offset<matching.length;offset+=10) {
-    await Promise.all(matching.slice(offset,offset+10).map(d => sendTo(d.id,{type:'request',title:'New roadside assistance request',body:'A driver needs a service you offer. Open RoadAssist to review and quote.'},eventId,requestId)));
+    await Promise.all(matching.slice(offset,offset+10).map(d => sendTo(d.id,{type:'request',title:'New roadside assistance request',body:'A driver needs your help. Open RoadAssist to review the request.'},eventId,requestId)));
   }
 }
 export const notifyNewRequest = onDocumentCreated({document:'requests/{requestId}',retry:true}, async event => {

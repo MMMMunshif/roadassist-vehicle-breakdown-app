@@ -11,10 +11,16 @@ void main() {
     (tester) async {
       await tester.pumpWidget(testApp(const LoginScreen(isProvider: false)));
       expect(find.text('Driver photo'), findsNothing);
-      await tester.tap(find.text('Create Account'));
+      await tester.ensureVisible(find.text('New here? Create account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('New here? Create account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("I'm a driver"));
       await tester.pumpAndSettle();
       expect(find.text('Driver photo'), findsOneWidget);
-      await tester.tap(find.text('Sign In').first);
+      await tester.ensureVisible(find.text('Already have an account? Sign in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Already have an account? Sign in'));
       await tester.pumpAndSettle();
       expect(find.text('Driver photo'), findsNothing);
       expect(find.byTooltip('Add profile photo'), findsNothing);
@@ -85,7 +91,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('Confirm Location'), findsOneWidget);
+    expect(find.text('Breakdown Location'), findsOneWidget);
     expect(find.byType(LocationScreen), findsOneWidget);
   });
 
@@ -122,24 +128,11 @@ void main() {
     expect(find.byTooltip('Edit profile'), findsNothing);
   });
 
-  testWidgets('provider can update availability settings', (tester) async {
+  testWidgets('signed-out providers cannot change availability settings', (
+    tester,
+  ) async {
     await tester.pumpWidget(testApp(const ProviderProfileScreen()));
-
-    await tester.tap(find.byTooltip('Availability settings'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Weekdays · 8 AM–6 PM'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('24 hours · Every day').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save Settings'));
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-      find.text('24 hours, 7 days a week'),
-      250,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('24 hours, 7 days a week'), findsOneWidget);
-    expect(find.text('Availability settings updated.'), findsOneWidget);
+    expect(find.text('Sign in required'), findsOneWidget);
+    expect(find.byTooltip('Availability settings'), findsNothing);
   });
 }

@@ -69,7 +69,7 @@ class _ApprovedProviderShellState extends State<ApprovedProviderShell> {
           onSelected: _changeTab,
           child: SafeArea(
             top: false,
-            child: IndexedStack(index: index, children: pages),
+            child: RaMemberTabStack(index: index, children: pages),
           ),
         ),
         bottomNavigationBar: _ProviderBottomNavigation(
@@ -187,10 +187,7 @@ class _ProviderMessageBadge extends StatelessWidget {
       textColor: Colors.white,
       label: Text(
         unread > 99 ? '99+' : '$unread',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
+        style: roadAssistTextStyle(fontSize: 12, fontWeight: FontWeight.w700),
       ),
       child: Icon(
         selected

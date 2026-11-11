@@ -32,3 +32,14 @@ test('moderation blocks both matching role and Google principal',async()=>{
  for(const uid of ['google','existing']){const f=fixture();const email=roleAddress('same@example.com','driver');f.users.set(email,{uid:'existing',email,emailVerified:true});f.docs.set('users/existing',{role:'driver',authIdentity:'role-v1',email:'same@example.com'});f.docs.set(`accountModeration/${uid}`,{status:'suspended'});assert.equal((await f.request()).code,403);}
 });
 test('disabled internal identity cannot be replaced',async()=>{const f=fixture(),email=roleAddress('same@example.com','driver');f.users.set(email,{uid:'disabled',email,disabled:true});assert.equal((await f.request('driver',details)).code,409);assert.equal(f.users.size,1);});
+
+test('common Google login never registers an implicit role',async()=>{
+ const f=fixture();const empty=await f.request('auto');assert.equal(empty.body.code,'profile-details-required');assert.equal(f.users.size,0);
+ await f.request('provider',details);const p=await f.request('auto');assert.equal(p.code,200);assert.equal(p.body.role,'provider');
+ await f.request('driver',details);const both=await f.request('auto');assert.deepEqual(both.body.roles,['driver','provider']);assert.equal(both.body.customToken,undefined);
+});
+test('common Google excludes moderated role accounts',async()=>{
+ const f=fixture();await f.request('driver',details);await f.request('provider',details);
+ const u=f.users.get(roleAddress('same@example.com','provider'));f.docs.set(`accountModeration/${u.uid}`,{status:'suspended'});
+ const result=await f.request('auto');assert.equal(result.code,200);assert.equal(result.body.role,'driver');
+});

@@ -131,7 +131,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       appBar: AppBar(
         title: Text(
           'Service Invoice',
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 19),
             fontWeight: FontWeight.w800,
             letterSpacing: -.45,
@@ -251,8 +251,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
               const _RaInvoiceSectionHeading(
                 title: 'Payment status',
-                subtitle:
-                    'Cash / bank transfer confirmation, or clearly marked demo card payment.',
+                subtitle: 'Cash needs provider receipt confirmation.',
               ),
 
               const SizedBox(height: 10),
@@ -395,7 +394,7 @@ class _RaInvoiceSectionHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 16.5),
             fontWeight: FontWeight.w800,
             letterSpacing: -.3,
@@ -404,7 +403,7 @@ class _RaInvoiceSectionHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: providerFontSize(context, 9),
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -429,7 +428,8 @@ class _RaInvoiceSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D1D2B)
             : Colors.white,
@@ -479,7 +479,7 @@ class _RaInvoicePaymentCard extends StatelessWidget {
       icon = Icons.hourglass_top_rounded;
       title = 'Awaiting provider confirmation';
       message =
-          'The driver reported payment${paymentMethod == null ? '' : ' by ${paymentMethod!.replaceAll('_', ' ')}'}.';
+          'Payment reported${paymentMethod == null ? '' : ' by ${paymentMethod!.replaceAll('_', ' ')}'}. Do not pay again. The provider must confirm receipt.';
     } else {
       tone = colors.primary;
       icon = Icons.payments_outlined;
@@ -489,7 +489,8 @@ class _RaInvoicePaymentCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: tone.withValues(alpha: .07),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: tone.withValues(alpha: .18)),
@@ -505,7 +506,7 @@ class _RaInvoicePaymentCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 10.5),
                     fontWeight: FontWeight.w700,
                   ),
@@ -513,7 +514,7 @@ class _RaInvoicePaymentCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 8.6),
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -522,7 +523,7 @@ class _RaInvoicePaymentCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'RoadAssist does not process an online payment for this record.',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 7.8),
                     height: 1.4,
                     color: colors.onSurfaceVariant,
@@ -664,7 +665,7 @@ class _InvoiceApprovalHistoryState extends State<_InvoiceApprovalHistory> {
                   if (entries.isEmpty) {
                     return Text(
                       'No repair revisions were proposed.',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: providerFontSize(context, 8.8),
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -730,7 +731,7 @@ class _RaInvoiceApprovalEntry extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 9.5),
                     fontWeight: FontWeight.w700,
                   ),
@@ -738,7 +739,7 @@ class _RaInvoiceApprovalEntry extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   amount,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 12),
                     fontWeight: FontWeight.w800,
                   ),
@@ -746,7 +747,7 @@ class _RaInvoiceApprovalEntry extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: providerFontSize(context, 8.2),
                     height: 1.4,
                     color: colors.onSurfaceVariant,

@@ -1,4 +1,5 @@
 import 'job_start_service.dart';
+import 'visit_billing_service.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/completion_report.dart';
@@ -39,17 +40,19 @@ class RequestService {
   }
 
   Future<String?> findSubmittedRequest(String id) async {
+    // Keep this query scoped by owner. Adding a document-ID filter makes an
+    // absent request evaluate resource-based read rules and denies first submit.
     final matches = await _requests
         .where('driverId', isEqualTo: _userId)
-        .where(FieldPath.documentId, isEqualTo: id)
         .get(const GetOptions(source: Source.server))
         .timeout(const Duration(seconds: 12));
-    return matches.docs.isEmpty ? null : matches.docs.first.id;
+    return matches.docs.any((document) => document.id == id) ? id : null;
   }
 
   Future<String> createRequest(
     RequestDraft draft, {
     String? submissionId,
+    Map<String, dynamic>? visitQuote,
   }) async {
     await _requireConnection();
     final document = _requests.doc(submissionId);
@@ -89,6 +92,11 @@ class RequestService {
     if (hasActiveRequest) {
       throw StateError('Complete or cancel your active request first.');
     }
+    if (draft.preferredProviderId.isEmpty || visitQuote == null) {
+      throw StateError(
+        'Choose a provider and review the automatic visit fee first.',
+      );
+    }
     final profileReference = _firestore.collection('users').doc(_userId);
     await _firestore.runTransaction((transaction) async {
       final profile = await transaction.get(profileReference);
@@ -117,7 +125,10 @@ class RequestService {
         'preferredProviderName': draft.provider,
         'rejectedBy': <String>[],
         'status': 'searching',
-        'workflowVersion': 2,
+        'workflowVersion': 3,
+        'workApprovalRequired': true,
+        'visitFeeQuoteId': visitQuote['quoteId'],
+        'providerDistanceKm': visitQuote['distanceKm'],
         'arrivalVerificationRequired': true,
         if (JobStartService.enabled) 'jobStartCodeRequired': true,
         'issue': draft.primaryIssue,
@@ -142,8 +153,8 @@ class RequestService {
         'latitude': draft.latitude,
         'longitude': draft.longitude,
         'serviceFee': 0,
-        'dispatchFee': 0,
-        'estimatedCost': 0,
+        'dispatchFee': visitQuote['visitFee'],
+        'estimatedCost': visitQuote['visitFee'],
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -166,6 +177,13 @@ class RequestService {
       if (data?['status'] != 'searching' || data?['providerId'] != null) {
         throw StateError('The provider has already accepted this request.');
       }
+      if (data?['workflowVersion'] == 3 &&
+          (data?['latitude'] != draft.latitude ||
+              data?['longitude'] != draft.longitude)) {
+        throw StateError(
+          'Cancel and create a new request to recalculate the visit fee for another location.',
+        );
+      }
       transaction.update(reference, {
         'description': draft.description,
         'notes': draft.notes,
@@ -184,7 +202,7 @@ class RequestService {
   }
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> watchRequest(String id) =>
-      _requests.doc(id).snapshots();
+      _requests.doc(id).snapshots(includeMetadataChanges: true);
 
   Stream<QuerySnapshot<Map<String, dynamic>>> watchOpenRequests() => _requests
       .where('status', isEqualTo: 'searching')
@@ -499,12 +517,20 @@ class RequestService {
   }
 
   Future<void> rejectRequest(String id) async {
+    final current = await _requests.doc(id).get();
+    if (current.data()?['workflowVersion'] == 3) {
+      await VisitBillingService().send('dismiss', {'requestId': id});
+      return;
+    }
     await _firestore.runTransaction((transaction) async {
       final reference = _requests.doc(id);
       final request = await transaction.get(reference);
       final data = request.data();
       if (!request.exists || data?['status'] != 'searching') {
         throw StateError('This request is no longer available.');
+      }
+      if (data?['workflowVersion'] == 3) {
+        throw StateError('Use the visit request dismiss action.');
       }
       final preferredProviderId = data?['preferredProviderId'] as String? ?? '';
       if (preferredProviderId.isNotEmpty && preferredProviderId != _userId) {
@@ -740,6 +766,15 @@ class RequestService {
         !const ['cash', 'external', 'demo_card'].contains(checkoutMethod)) {
       throw ArgumentError('Unsupported payment method.');
     }
+    final current = (await _requests.doc(id).get()).data();
+    if (current?['workflowVersion'] == 3) {
+      await VisitBillingService().send('checkout', {
+        'requestId': id,
+        'expectedFinalCost': expectedFinalCost ?? current?['finalCost'],
+        'checkoutMethod': checkoutMethod ?? 'cash',
+      });
+      return;
+    }
     await _firestore.runTransaction((tx) async {
       final ref = _requests.doc(id);
       final data = (await tx.get(ref)).data();
@@ -844,7 +879,8 @@ class RequestService {
       final status = data?['status'] as String?;
       if (status == 'completed' ||
           status == 'cancelled' ||
-          data?['completionState'] == 'pending') {
+          data?['completionState'] == 'pending' ||
+          data?['serviceCompletedAt'] != null) {
         throw StateError('This request can no longer be cancelled.');
       }
       final providerId = data?['providerId'] as String?;

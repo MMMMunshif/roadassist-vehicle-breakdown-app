@@ -204,7 +204,8 @@ class _AdminOverviewMetricCard extends StatelessWidget {
           return Container(
             constraints: const BoxConstraints(minHeight: 132),
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
+            decoration: RaPremiumDecoration(
+              context,
               color: theme.brightness == Brightness.dark
                   ? const Color(0xFF0D2237)
                   : colors.surface,
@@ -223,7 +224,8 @@ class _AdminOverviewMetricCard extends StatelessWidget {
                     Container(
                       width: 42,
                       height: 42,
-                      decoration: BoxDecoration(
+                      decoration: RaPremiumDecoration(
+                        context,
                         color: tone.withValues(alpha: .08),
                         borderRadius: BorderRadius.circular(13),
                       ),
@@ -251,7 +253,7 @@ class _AdminOverviewMetricCard extends StatelessWidget {
 
                 Text(
                   snapshot.hasError ? '—' : '${value ?? '…'}',
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: snapshot.hasError ? colors.onSurfaceVariant : tone,
@@ -262,7 +264,7 @@ class _AdminOverviewMetricCard extends StatelessWidget {
 
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -276,7 +278,7 @@ class _AdminOverviewMetricCard extends StatelessWidget {
                       : subtitle,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.35,
                     color: colors.onSurfaceVariant,
@@ -361,7 +363,7 @@ class _RaAdminOverviewRequestSummary extends StatelessWidget {
                   Expanded(
                     child: Text(
                       '${docs.length} recent requests loaded',
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
                       ),
@@ -456,7 +458,7 @@ class _RaAdminOverviewMiniMetric extends StatelessWidget {
           children: [
             Text(
               '$value',
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
                 color: tone,
@@ -467,7 +469,7 @@ class _RaAdminOverviewMiniMetric extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -491,7 +493,8 @@ class _RaAdminOverviewSurface extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : theme.colorScheme.surface,
@@ -520,15 +523,12 @@ class _RaAdminOverviewHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
-            fontWeight: FontWeight.w800,
-          ),
+          style: roadAssistTextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -574,7 +574,7 @@ class _RaAdminOverviewNotice extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -582,7 +582,7 @@ class _RaAdminOverviewNotice extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     height: 1.45,
                     color: colors.onSurfaceVariant,

@@ -10,13 +10,28 @@ class ProviderHistoryScreen extends StatefulWidget {
 class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
   int filter = 0;
 
-  static const filters = <String>['All', 'Completed', 'Cancelled'];
+  static const filters = <String>[
+    'All',
+    'Completed',
+    'Cancelled',
+    'Payment pending',
+  ];
 
-  bool _matchesFilter(String status) {
+  bool _matchesFilter(Map<String, dynamic> data) {
+    final status = data['status'];
+    final awaiting =
+        data['status'] != 'cancelled' &&
+        (data['serviceCompletedAt'] != null || status == 'completed') &&
+        data['providerConfirmedPayment'] != true &&
+        data['demoPayment'] == null;
     return switch (filter) {
       1 => status == 'completed',
       2 => status == 'cancelled',
-      _ => status == 'completed' || status == 'cancelled',
+      3 => awaiting,
+      _ =>
+        status == 'completed' ||
+            status == 'cancelled' ||
+            data['serviceCompletedAt'] != null,
     };
   }
 
@@ -68,7 +83,7 @@ class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
             Expanded(
               child: Text(
                 'Job history',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
@@ -108,7 +123,9 @@ class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
                 final history = snapshot.data!.docs.where((request) {
                   final status = request.data()['status'] as String? ?? '';
 
-                  return status == 'completed' || status == 'cancelled';
+                  return status == 'completed' ||
+                      status == 'cancelled' ||
+                      request.data()['serviceCompletedAt'] != null;
                 }).toList();
 
                 history.sort((first, second) {
@@ -150,11 +167,9 @@ class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
                   return total + amount;
                 });
 
-                final filtered = history.where((request) {
-                  final status = request.data()['status'] as String? ?? '';
-
-                  return _matchesFilter(status);
-                }).toList();
+                final filtered = history
+                    .where((request) => _matchesFilter(request.data()))
+                    .toList();
 
                 return ListView(
                   physics: const BouncingScrollPhysics(),
@@ -187,7 +202,7 @@ class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
                             filter == 0
                                 ? 'Completed & cancelled jobs'
                                 : '${filters[filter]} jobs',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -.25,
@@ -196,7 +211,7 @@ class _ProviderHistoryScreenState extends State<ProviderHistoryScreen> {
                         ),
                         Text(
                           '${filtered.length}',
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: Theme.of(
@@ -306,7 +321,7 @@ class _ProviderHistoryFilters extends StatelessWidget {
                       child: Text(
                         labels[index],
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: selected == index
@@ -376,7 +391,9 @@ class _ProviderHistoryCard extends StatelessWidget {
         0;
     void view() => push(
       context,
-      ProviderRequestDetailsScreen(requestId: requestId, data: data),
+      status == 'arrived'
+          ? ProviderActiveJobScreen(requestId: requestId, requestData: data)
+          : ProviderRequestDetailsScreen(requestId: requestId, data: data),
     );
     return RaProviderCard(
       child: Column(
@@ -416,8 +433,18 @@ class _ProviderHistoryCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               StatusPill(
-                label: completed ? 'Completed' : 'Cancelled',
-                tone: completed ? RaTone.success : RaTone.danger,
+                label: status == 'arrived'
+                    ? 'Awaiting payment'
+                    : completed
+                    ? (data['providerConfirmedPayment'] == true
+                          ? 'Paid'
+                          : 'Service completed')
+                    : 'Cancelled',
+                tone: status == 'arrived'
+                    ? RaTone.warning
+                    : completed
+                    ? RaTone.success
+                    : RaTone.danger,
               ),
               Text(
                 _date(),
@@ -485,7 +512,7 @@ class _ProviderHistoryInfo extends StatelessWidget {
               value,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 height: 1.35,
                 color: colors.onSurfaceVariant,

@@ -77,7 +77,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                 Expanded(
                   child: Text(
                     'Could not load account review.',
-                    style: GoogleFonts.plusJakartaSans(
+                    style: roadAssistTextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
@@ -194,7 +194,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                                 resolvedName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.plusJakartaSans(
+                                style: roadAssistTextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -220,7 +220,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                             email,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 14,
                               color: colors.onSurfaceVariant,
                             ),
@@ -264,7 +264,7 @@ class _AdminUserRowState extends State<_AdminUserRow> {
                                   '${validUntil.year}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.plusJakartaSans(
+                                  style: roadAssistTextStyle(
                                     fontSize: 14,
                                     color: colors.onSurfaceVariant,
                                   ),

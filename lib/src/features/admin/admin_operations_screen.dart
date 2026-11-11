@@ -23,7 +23,8 @@ class AdminOperationsScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
             child: Container(
               padding: const EdgeInsets.all(17),
-              decoration: BoxDecoration(
+              decoration: RaPremiumDecoration(
+                context,
                 color: theme.brightness == Brightness.dark
                     ? const Color(0xFF0D2237)
                     : colors.surface,
@@ -41,7 +42,7 @@ class AdminOperationsScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Operations',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
                           letterSpacing: -.35,
@@ -50,7 +51,7 @@ class AdminOperationsScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Monitor current requests, delayed jobs, completed services and payment confirmation.',
-                        style: GoogleFonts.plusJakartaSans(
+                        style: roadAssistTextStyle(
                           fontSize: 12,
                           height: 1.45,
                           color: colors.onSurfaceVariant,
@@ -80,7 +81,7 @@ class AdminOperationsScreen extends StatelessWidget {
                         Flexible(
                           child: Text(
                             'LIVE DATA',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: roadAssistTextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               letterSpacing: .55,

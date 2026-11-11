@@ -180,7 +180,7 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
             Expanded(
               child: Text(
                 'Request Details',
-                style: GoogleFonts.plusJakartaSans(
+                style: roadAssistTextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -.45,
@@ -332,10 +332,11 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
 
           const SizedBox(height: 22),
 
-          const _RaProviderDetailHeading(
+          _RaProviderDetailHeading(
             title: 'Pricing',
-            subtitle:
-                'Only approved charges should form part of the final bill.',
+            subtitle: data['workflowVersion'] == 3
+                ? 'Visit fee is fixed. Add inspection, labour and parts to the final bill after work.'
+                : 'Only approved charges should form part of the final bill.',
           ),
 
           const SizedBox(height: 10),
@@ -347,6 +348,7 @@ class _ProviderRequestDetailsContent extends StatelessWidget {
             estimatedCost: estimatedCost,
             finalCost: finalCost,
             money: money,
+            billingData: data['workflowVersion'] == 3 ? data : null,
           ),
 
           if (data['workflowVersion'] == 2) ...[
@@ -447,9 +449,14 @@ class _RaProviderCaseHero extends StatelessWidget {
             ),
         ],
       ),
-      footer: Text(
-        'JOB $requestId',
-        style: _providerText(context, size: 12, muted: true),
+      footer: RaDetailsDisclosure(
+        storageKey: 'provider-request-reference',
+        title: 'Request reference',
+        icon: Icons.tag,
+        child: SelectableText(
+          'JOB $requestId',
+          style: _providerText(context, size: 12, muted: true),
+        ),
       ),
     );
   }
@@ -470,7 +477,7 @@ class _RaProviderDetailHeading extends StatelessWidget {
       children: [
         Text(
           title,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             letterSpacing: -.3,
@@ -479,7 +486,7 @@ class _RaProviderDetailHeading extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           subtitle,
-          style: GoogleFonts.plusJakartaSans(
+          style: roadAssistTextStyle(
             fontSize: 12,
             height: 1.4,
             color: colors.onSurfaceVariant,
@@ -508,7 +515,8 @@ class _RaProviderDriverCard extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
+      decoration: RaPremiumDecoration(
+        context,
         color: theme.brightness == Brightness.dark
             ? const Color(0xFF0D2237)
             : Colors.white,
@@ -527,7 +535,7 @@ class _RaProviderDriverCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),
@@ -535,7 +543,7 @@ class _RaProviderDriverCard extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       phone.trim().isEmpty ? 'Phone unavailable' : phone,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: roadAssistTextStyle(
                         fontSize: 12,
                         color: colors.onSurfaceVariant,
                       ),
@@ -637,7 +645,7 @@ class _RaProviderDetailRow extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 12,
                     color: colors.onSurfaceVariant,
                   ),
@@ -645,7 +653,7 @@ class _RaProviderDetailRow extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   value,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: roadAssistTextStyle(
                     fontSize: 14,
                     height: 1.4,
                     fontWeight: FontWeight.w600,
@@ -787,6 +795,7 @@ class _RaProviderPricingCard extends StatelessWidget {
     required this.travelFee,
     required this.extraFee,
     required this.estimatedCost,
+    this.billingData,
     required this.finalCost,
     required this.money,
   });
@@ -795,6 +804,7 @@ class _RaProviderPricingCard extends StatelessWidget {
   final int travelFee;
   final int extraFee;
   final int estimatedCost;
+  final Map<String, dynamic>? billingData;
   final int? finalCost;
 
   final String Function(int) money;
@@ -804,15 +814,21 @@ class _RaProviderPricingCard extends StatelessWidget {
     return _RaProviderDetailsSurface(
       child: Column(
         children: [
-          _RaProviderMoneyRow(label: 'Service', amount: money(serviceFee)),
-          _RaProviderMoneyRow(
-            label: 'Travel / dispatch',
-            amount: money(travelFee),
-          ),
-          _RaProviderMoneyRow(label: 'Additional', amount: money(extraFee)),
+          if (billingData != null) FinalBillBreakdown(data: billingData!),
+          if (billingData == null)
+            _RaProviderMoneyRow(label: 'Service', amount: money(serviceFee)),
+          if (billingData == null)
+            _RaProviderMoneyRow(
+              label: 'Travel / dispatch',
+              amount: money(travelFee),
+            ),
+          if (billingData == null)
+            _RaProviderMoneyRow(label: 'Additional', amount: money(extraFee)),
           const Divider(),
           _RaProviderMoneyRow(
-            label: finalCost == null ? 'Approved total' : 'Final total',
+            label: finalCost == null
+                ? (billingData == null ? 'Approved total' : 'Visit fee')
+                : 'Final total',
             amount: money(finalCost ?? estimatedCost),
             strong: true,
           ),
@@ -844,7 +860,7 @@ class _RaProviderMoneyRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: GoogleFonts.plusJakartaSans(
+              style: roadAssistTextStyle(
                 fontSize: 12,
                 color: strong ? colors.onSurface : colors.onSurfaceVariant,
                 fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
@@ -853,7 +869,7 @@ class _RaProviderMoneyRow extends StatelessWidget {
           ),
           Text(
             amount,
-            style: GoogleFonts.plusJakartaSans(
+            style: roadAssistTextStyle(
               fontSize: strong ? 16 : 14,
               fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
             ),
@@ -886,7 +902,13 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
     });
 
     try {
-      await RequestService().rejectRequest(widget.requestId);
+      if (widget.data['workflowVersion'] == 3) {
+        await VisitBillingService().send('dismiss', {
+          'requestId': widget.requestId,
+        });
+      } else {
+        await RequestService().rejectRequest(widget.requestId);
+      }
 
       if (mounted) {
         Navigator.maybePop(context);
@@ -913,6 +935,34 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
   Future<void> _quote() async {
     if (busy) return;
 
+    if (widget.data['workflowVersion'] == 3) {
+      setState(() => busy = true);
+      try {
+        await VisitBillingService().send('accept', {
+          'requestId': widget.requestId,
+        });
+        if (!mounted) return;
+        replace(
+          context,
+          ProviderActiveJobScreen(
+            requestId: widget.requestId,
+            requestData: widget.data,
+          ),
+        );
+      } catch (error) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _workflowError(error, 'Unable to accept this request.'),
+              ),
+            ),
+          );
+      } finally {
+        if (mounted) setState(() => busy = false);
+      }
+      return;
+    }
     final quote = await requestProviderQuote(context, widget.data);
 
     if (quote == null || !mounted) {
@@ -1009,7 +1059,11 @@ class _RaProviderQuoteActionsState extends State<_RaProviderQuoteActions> {
                     ),
                   )
                 : const Icon(Icons.request_quote_outlined),
-            label: const Text('Review & Quote'),
+            label: Text(
+              widget.data['workflowVersion'] == 3
+                  ? 'Accept Request'
+                  : 'Review & Quote',
+            ),
           ),
         ),
       ],
@@ -1076,7 +1130,7 @@ class _RaProviderVehicleHistory extends StatelessWidget {
                         ),
                         title: Text(
                           requestIssueLabel(previous[index].data()),
-                          style: GoogleFonts.plusJakartaSans(
+                          style: roadAssistTextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),

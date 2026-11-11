@@ -931,3 +931,124 @@ test('provider can load an empty own-quote query before submitting an offer',asy
   const own=await assertSucceeds(getDocs(query(collection(db,'requests/r1/quotes'),where(documentId(),'==','provider'))));
   if(!own.empty)throw Error('Expected an empty own quote list');
 });
+
+function visitRequest(overrides={}) {
+  return {driverId:'driver',driverName:'Driver',driverPhone:'',providerId:null,preferredProviderId:'provider',preferredProviderName:'Mechanic',rejectedBy:[],status:'searching',workflowVersion:3,workApprovalRequired:true,arrivalVerificationRequired:true,
+    issue:'General Mechanic',issues:['General Mechanic'],vehicleType:'Sedan / Hatchback',modelYear:'Toyota 2020',registration:'CAB-1234',description:'',notes:'',priority:'normal',vehiclePhotoUrls:[],photoAnnotations:[],locationLabel:'Test point',landmark:'',locationAccuracyMeters:null,
+    latitude:7.4,longitude:81.84,serviceFee:0,dispatchFee:120,estimatedCost:120,providerDistanceKm:1.2,visitFeeQuoteId:'fee',createdAt:serverTimestamp(),updatedAt:serverTimestamp(),...overrides};
+}
+async function seedVisitQuote(overrides={}) {
+  await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'visitFeeQuotes/fee'),{driverId:'driver',providerId:'provider',latitude:7.4,longitude:81.84,distanceKm:1.2,visitFee:120,expiresAt:Timestamp.fromMillis(Date.now()+60000),...overrides}));
+}
+test('visit request uses only a current server fee quote bound to driver provider and coordinates',async()=>{
+  await seedVisitQuote(); const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(setDoc(doc(db,'requests/visit'),visitRequest()));
+  for(const change of [{dispatchFee:1,estimatedCost:1},{preferredProviderId:'other'},{latitude:0},{providerDistanceKm:1},{visitFeeQuoteId:'missing'}]) await assertFails(setDoc(doc(db,'requests/invalid'),visitRequest(change)));
+  await seedVisitQuote({expiresAt:Timestamp.fromMillis(Date.now()-1000)});
+  await assertFails(setDoc(doc(db,'requests/expired'),visitRequest()));
+  await assertFails(setDoc(doc(db,'visitFeeQuotes/forged'),{driverId:'driver',visitFee:1}));
+});
+test('visit assignment and fee fields cannot be forged by clients',async()=>{
+  await seedVisitQuote(); const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(setDoc(doc(driver,'requests/visit'),visitRequest()));
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(provider,'requests/visit'),{providerId:'provider',status:'accepted',serviceFee:0,dispatchFee:120,extraFee:0,estimatedCost:120,providerDistanceKm:1.2,quoteNotes:'',quotedAt:serverTimestamp(),acceptedAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(driver,'requests/visit'),{latitude:0,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(driver,'requests/visit'),{preferredProviderId:'',preferredProviderName:'',updatedAt:serverTimestamp()}));
+});
+test('visit final bill is server-only and driver approval preserves itemized charges',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore(); await setDoc(doc(db,'requests/visit'),{...visitRequest(),providerId:'provider',status:'arrived',arrivalConfirmedBy:'driver',completionState:'pending',serviceNotes:'Replaced failed battery and tested.',servicePhotoData:[],serviceFee:500,inspectionFee:200,extraFee:8000,estimatedCost:8820,finalCost:8820,billItems:[{label:'Battery',reason:'Failed load test',amount:8000}],billRevision:1});
+    await updateDoc(doc(db,'providerDirectory/provider'),{activeRequestId:'visit'});
+  });
+  const provider=env.authenticatedContext('provider',{email_verified:true}).firestore(), driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(provider,'requests/visit'),{finalCost:9999,estimatedCost:9999}));
+  await assertFails(updateDoc(doc(provider,'requests/visit'),{billItems:[]}));
+  await assertFails(updateDoc(doc(driver,'requests/visit'),{inspectionFee:0}));
+  const batch=writeBatch(driver);batch.update(doc(driver,'requests/visit'),{status:'completed',completionState:'confirmed',driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp(),driverReportedPayment:true,paymentMethod:'cash',paymentReportedAt:serverTimestamp()});batch.update(doc(driver,'providerDirectory/provider'),{activeRequestId:null});
+  await assertSucceeds(batch.commit());
+  const saved=(await getDoc(doc(driver,'requests/visit'))).data();assert.equal(saved.finalCost,8820);assert.equal(saved.providerConfirmedPayment,undefined);assert.equal(saved.billItems[0].amount,8000);
+});
+test('visit provider cannot bypass server bill submission with the old completion path',async()=>{
+  await env.withSecurityRulesDisabled(c=>setDoc(doc(c.firestore(),'requests/visit'),{...visitRequest(),providerId:'provider',status:'arrived',arrivalConfirmedBy:'driver',serviceNotes:'Inspection complete and tested.',servicePhotoData:[]}));
+  const db=env.authenticatedContext('provider',{email_verified:true}).firestore();
+  await assertFails(updateDoc(doc(db,'requests/visit'),{completionState:'pending',completionReport:{summary:'Inspection complete and tested.'},completionSubmittedAt:serverTimestamp(),finalCost:120,updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(db,'requests/visit'),{serviceNotes:'Updated service summary for final bill.',servicePhotoData:[],documentationUpdatedAt:serverTimestamp()}));
+});
+
+test('cash checkout performs every application transaction read before confirming the bill',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore();await setDoc(doc(db,'requests/cash-checkout'),{...visitRequest(),providerId:'provider',status:'arrived',arrivalConfirmedBy:'driver',completionState:'pending',inspectionFee:300,serviceFee:1500,extraFee:0,dispatchFee:100,estimatedCost:1900,finalCost:1900,billItems:[],billRevision:1,serviceNotes:'Work completed and some parts modified',servicePhotoData:['photo']});
+    await updateDoc(doc(db,'providerDirectory/provider'),{activeRequestId:'cash-checkout'});
+  });
+  const db=env.authenticatedContext('driver',{email_verified:true}).firestore();
+  await assertSucceeds(runTransaction(db,async tx=>{
+    const ref=doc(db,'requests/cash-checkout');const job=await tx.get(ref);
+    const dispute=await tx.get(doc(db,'requests/cash-checkout/disputes/case'));
+    const review=await tx.get(doc(db,'complaintReviews/cash-checkout'));
+    assert.equal(dispute.exists(),false);assert.equal(review.exists(),false);
+    const directoryRef=doc(db,'providerDirectory/provider');const directory=await tx.get(directoryRef);
+    assert.equal(job.data().finalCost,1900);
+    tx.update(ref,{status:'completed',completionState:'confirmed',driverReportedPayment:true,paymentMethod:'cash',paymentReportedAt:serverTimestamp(),driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    if(directory.data().activeRequestId==='cash-checkout')tx.update(directoryRef,{activeRequestId:null});
+  }));
+});
+
+test('cash checkout also supports a verified legacy provider with a driver role',async()=>{
+  await env.withSecurityRulesDisabled(async c=>{
+    const db=c.firestore();await setDoc(doc(db,'users/driver'),{role:'provider',roles:['driver','provider'],roleEmailRequired:['driver'],email:'driver@example.com'}); await setDoc(doc(db,'roleEmailVerifications/driver'),{driver:{email:'driver@example.com'}}); await setDoc(doc(db,'accountModeration/driver'),{status:'active',verification:'pending'}); await setDoc(doc(db,'requests/cash-checkout'),{...visitRequest(),providerId:'provider',status:'arrived',arrivalConfirmedBy:'driver',completionState:'pending',inspectionFee:300,serviceFee:1500,extraFee:0,dispatchFee:100,estimatedCost:1900,finalCost:1900,billItems:[],billRevision:1,serviceNotes:'Work completed and some parts modified',servicePhotoData:['photo']});
+    await updateDoc(doc(db,'providerDirectory/provider'),{activeRequestId:'cash-checkout'});
+  });
+  const db=env.authenticatedContext('driver',{email_verified:true,email:'driver@example.com'}).firestore();
+  await assertSucceeds(runTransaction(db,async tx=>{
+    const ref=doc(db,'requests/cash-checkout');const job=await tx.get(ref);
+    const dispute=await tx.get(doc(db,'requests/cash-checkout/disputes/case'));
+    const review=await tx.get(doc(db,'complaintReviews/cash-checkout'));
+    assert.equal(dispute.exists(),false);assert.equal(review.exists(),false);
+    const directoryRef=doc(db,'providerDirectory/provider');const directory=await tx.get(directoryRef);
+    assert.equal(job.data().finalCost,1900);
+    tx.update(ref,{status:'completed',completionState:'confirmed',driverReportedPayment:true,paymentMethod:'cash',paymentReportedAt:serverTimestamp(),driverCompletedAt:serverTimestamp(),completedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    if(directory.data().activeRequestId==='cash-checkout')tx.update(directoryRef,{activeRequestId:null});
+  }));
+});
+
+test('visit creation matches the app transaction including saved vehicle and driver lock',async()=>{
+ await seedVisitQuote();await env.withSecurityRulesDisabled(async c=>{
+ const db=c.firestore();await setDoc(doc(db,'users/driver'),{role:'driver',roles:['driver'],lastRole:'driver',authIdentity:'role-v1',online:false,email:'driver@example.com',activeRequestId:'finished'});
+ await setDoc(doc(db,'requests/finished'),{driverId:'driver',status:'completed'});
+ await setDoc(doc(db,'users/driver/vehicles/car'),{make:'Rolls-Royce',model:'Ghost',year:2022,vehicleType:'Sedan / Hatchback',registration:'CAB-3223',fuelType:'Petrol',transmission:'Automatic',photoData:''});
+ });
+ const db=env.authenticatedContext('driver',{email_verified:true,email:'driver@example.com'}).firestore();
+ // A document-ID constrained query for a missing request fails resource-based read rules.
+ await assertFails(getDocs(query(collection(db,'requests'),where('driverId','==','driver'),where(documentId(),'==','create-full'))));
+ const matches=await assertSucceeds(getDocs(query(collection(db,'requests'),where('driverId','==','driver'))));assert.equal(matches.docs.some(d=>d.id==='create-full'),false);
+ await assertSucceeds(runTransaction(db,async tx=>{
+ const profile=await tx.get(doc(db,'users/driver'));await tx.get(doc(db,'requests/'+profile.data().activeRequestId));
+ tx.set(doc(db,'requests/create-full'),visitRequest({vehicleId:'car',vehicleSnapshot:{make:'Rolls-Royce',model:'Ghost',year:2022,vehicleType:'Sedan / Hatchback',registration:'CAB-3223',fuelType:'Petrol',transmission:'Automatic',modelYear:'Rolls-Royce Ghost 2022',photoData:''}}));
+ tx.set(doc(db,'users/driver'),{activeRequestId:'create-full',updatedAt:serverTimestamp()},{merge:true});
+ }));
+});
+
+test('work approval and service-finished state are server-only and survive bill correction',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{
+ const db=c.firestore();await setDoc(doc(db,'requests/protected-work'),{...visitRequest(),providerId:'provider',status:'arrived',arrivalConfirmedBy:'driver',completionState:'revision_requested',serviceCompletedAt:Timestamp.now(),finalCost:1900});
+ });
+ const driver=env.authenticatedContext('driver',{email_verified:true}).firestore();
+ const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+ for(const db of [driver,provider]) {
+  await assertFails(updateDoc(doc(db,'requests/protected-work'),{workEstimate:{status:'approved',finalCost:999999},updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(db,'requests/protected-work'),{workApprovalRequired:false,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(db,'requests/protected-work/workEstimates/1'),{status:'approved'}));
+ }
+ await assertSucceeds(getDoc(doc(driver,'requests/protected-work/workEstimates/1')));
+ await assertFails(updateDoc(doc(driver,'requests/protected-work'),{status:'cancelled',cancelledAt:serverTimestamp(),updatedAt:serverTimestamp()}));
+});
+
+test('directory sync cannot restore a finished visit as an active provider lock',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{
+ const db=c.firestore();await setDoc(doc(db,'requests/finished-visit'),{...visitRequest(),providerId:'provider',status:'arrived',serviceCompletedAt:Timestamp.now(),completionState:'pending'});
+ await updateDoc(doc(db,'providerDirectory/provider'),{activeRequestId:null});
+ });
+ const provider=env.authenticatedContext('provider',{email_verified:true}).firestore();
+ await assertFails(updateDoc(doc(provider,'providerDirectory/provider'),{activeRequestId:'finished-visit'}));
+});

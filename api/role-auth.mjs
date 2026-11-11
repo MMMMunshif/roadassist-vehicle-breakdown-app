@@ -35,13 +35,15 @@ return async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({code:'method-not-allowed'});
   if (!enabled()) return res.status(503).json({code:'role-auth-unavailable'});
   const {email:input, role, password, action, displayName, phone} = req.body ?? {};
+  const automatic = role === 'auto' && action === 'login';
   let email, identity;
   try {
     email = String(input ?? '').trim().toLowerCase();
     if (testEmail() && email !== testEmail().trim().toLowerCase()) {
       return res.status(503).json({code:'role-auth-unavailable'});
     }
-    identity = roleAddress(email, role);
+    identity = roleAddress(email, automatic ? 'driver' : role);
+    if (automatic) identity = `common:${email}`;
     if (!['register','login'].includes(action) || typeof password !== 'string' || password.length > 4096) throw Error();
     if (action === 'register' && (password.length < 8 || !/[a-z]/i.test(password) || !/\d/.test(password) ||
       typeof displayName !== 'string' || displayName.trim().length < 2 || displayName.trim().length > 100 ||
@@ -86,6 +88,20 @@ return async function handler(req, res) {
         throw error;
       }
       return res.status(201).json({authEmail:user.email});
+    }
+    if (automatic) {
+      // Reveal only roles whose own password was validated.
+      const matches = [];
+      for (const candidate of ['driver', 'provider']) {
+        const account = await resolveRoleUser(auth, db, email, candidate);
+        if (!account || account.user.disabled) continue;
+        const moderation = (await db.doc(`accountModeration/${account.user.uid}`).get()).data();
+        if (['suspended','deleted','disabled'].includes(moderation?.status)) continue;
+        if (await passwordSignIn(account.user.email, password) === account.user.uid) matches.push({role:candidate,authEmail:account.user.email});
+      }
+      if (!matches.length) return res.status(401).json({code:'invalid-credential'});
+      if (matches.length > 1) return res.status(200).json({roles:matches.map(x=>x.role)});
+      return res.status(200).json(matches[0]);
     }
     const account = await resolveRoleUser(auth, db, email, role);
     if (!account) return res.status(401).json({code:'invalid-credential'});

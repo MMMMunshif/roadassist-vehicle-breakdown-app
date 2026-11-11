@@ -18,8 +18,11 @@ export function requestAlerts(before, after) {
   const alerts = [];
   const add = (uid, type, title, body) => { if (uid) alerts.push({uid,type,title,body}); };
   if (before.status !== after.status) {
-    if (after.status === 'accepted') add(after.providerId,'selected','Driver selected your offer','Open RoadAssist to review the job and begin your journey.');
-    const status = {en_route:['Provider on the way','Your provider has started travelling to you.'],arrived:['Provider arrived','Your provider has arrived. Review proposed work before approving.'],completed:['Service completed','Your service invoice is ready.'],cancelled:['Request cancelled','This assistance request was cancelled.']}[after.status];
+    if (after.status === 'accepted') {
+      if (after.workflowVersion === 3) add(after.driverId,'provider_accepted','Provider accepted your request','Your provider is preparing to travel to you.');
+      else add(after.providerId,'selected','Driver selected your offer','Open RoadAssist to review the job and begin your journey.');
+    }
+    const status = {en_route:['Provider on the way','Your provider has started travelling to you.'],arrived:['Provider arrived','Meet your provider and confirm arrival in RoadAssist.'],completed:['Service completed','Your service invoice is ready.'],cancelled:['Request cancelled','This assistance request was cancelled.']}[after.status];
     if (status) add(after.driverId,after.status,...status);
     if (after.status === 'cancelled') add(after.providerId,'cancelled',...status);
   }
@@ -31,6 +34,9 @@ export function requestAlerts(before, after) {
   if (!before.arrivalConfirmedBy && after.arrivalConfirmedBy) add(after.providerId,'job_started','Job start confirmed','The driver confirmed your arrival. Begin only the approved work.');
   if (after.pendingDiscountId && before.pendingDiscountId !== after.pendingDiscountId) add(after.providerId,'discount','Driver requested a revised final amount','Review the requested discount before confirming the final bill.');
   if (before.pendingDiscountId && !after.pendingDiscountId) add(after.driverId,'discount_decision','Provider reviewed your discount request','Open the final bill to review the agreed amount.');
+  if (after.workEstimate?.status === 'pending' && (before.workEstimate?.revision !== after.workEstimate.revision || before.workEstimate?.status !== 'pending')) add(after.driverId,'work_approval','Review proposed work','Review parts, work and charges before the provider starts.');
+  if (before.workEstimate?.status === 'pending' && ['approved','declined'].includes(after.workEstimate?.status)) add(after.providerId,'work_decision',after.workEstimate.status === 'approved' ? 'Extra work approved' : 'Extra work declined','Open the job to review the driver decision.');
+  if (after.completionState === 'revision_requested' && before.completionState !== 'revision_requested') add(after.providerId,'bill_correction','Bill correction requested','The driver asked you to review a charge on the final bill.');
   return alerts;
 }
 export function quoteChanged(before, after) {

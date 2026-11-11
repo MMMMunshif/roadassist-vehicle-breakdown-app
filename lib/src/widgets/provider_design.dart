@@ -2,15 +2,15 @@ part of '../screens.dart';
 
 Color _providerSurface(BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
-    ? const Color(0xFF0D2237)
-    : Colors.white;
+    ? const Color(0xF20D2237)
+    : const Color(0xF7FFFFFF);
 
 TextStyle _providerText(
   BuildContext context, {
   double size = 14,
   FontWeight weight = FontWeight.w500,
   bool muted = false,
-}) => GoogleFonts.plusJakartaSans(
+}) => roadAssistTextStyle(
   fontSize: size,
   height: 1.4,
   fontWeight: weight,
@@ -30,7 +30,8 @@ class RaProviderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: padding,
-    decoration: BoxDecoration(
+    decoration: RaPremiumDecoration(
+      context,
       color: _providerSurface(context),
       borderRadius: BorderRadius.circular(20),
       border: Border.all(
@@ -149,7 +150,8 @@ class RaProviderEmptyCard extends StatelessWidget {
         Container(
           width: 46,
           height: 46,
-          decoration: BoxDecoration(
+          decoration: RaPremiumDecoration(
+            context,
             color: Theme.of(context).colorScheme.primary.withValues(alpha: .09),
             borderRadius: BorderRadius.circular(15),
           ),
@@ -336,6 +338,7 @@ class RaProviderRequestTile extends StatelessWidget {
     required this.time,
     required this.onView,
     this.distance,
+    this.visitFee,
     this.priority,
     this.onDismiss,
     this.offerSent = false,
@@ -343,6 +346,7 @@ class RaProviderRequestTile extends StatelessWidget {
   });
   final String driver, issue, location, time;
   final String? distance, priority;
+  final num? visitFee;
   final VoidCallback onView;
   final VoidCallback? onDismiss;
   final bool offerSent, busy;
@@ -380,7 +384,7 @@ class RaProviderRequestTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    driver,
+                    issue,
                     style: _providerText(
                       context,
                       size: 15,
@@ -389,7 +393,7 @@ class RaProviderRequestTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    issue,
+                    driver,
                     style: _providerText(context, size: 13, muted: true),
                   ),
                 ],
@@ -398,18 +402,6 @@ class RaProviderRequestTile extends StatelessWidget {
             if (priority != null)
               Flexible(
                 child: StatusPill(label: priority!, tone: RaTone.warning),
-              ),
-            if (onDismiss != null)
-              PopupMenuButton<String>(
-                tooltip: 'Request options',
-                enabled: !busy,
-                onSelected: (_) => onDismiss!(),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'dismiss',
-                    child: Text('Dismiss request'),
-                  ),
-                ],
               ),
           ],
         ),
@@ -420,27 +412,43 @@ class RaProviderRequestTile extends StatelessWidget {
         if (distance != null) _meta(context, Icons.near_me_outlined, distance!),
         _meta(context, Icons.location_on_outlined, location),
         _meta(context, Icons.schedule_outlined, time),
+        if (visitFee != null)
+          _meta(
+            context,
+            Icons.receipt_long_outlined,
+            'Visit fee: Rs. ${visitFee!.round()}',
+          ),
         if (offerSent)
           _meta(context, Icons.request_quote_outlined, 'Offer sent'),
         const SizedBox(height: 14),
-        FilledButton(
-          onPressed: busy ? null : onView,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(46),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text('View request', textAlign: TextAlign.center),
-              ),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_forward_rounded, size: 18),
-            ],
-          ),
+        LayoutBuilder(
+          builder: (context, box) {
+            final stacked =
+                box.maxWidth < 280 ||
+                MediaQuery.textScalerOf(context).scale(14) > 21;
+            final view = FilledButton.icon(
+              onPressed: busy ? null : onView,
+              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+              label: const Text('View request'),
+            );
+            final dismiss = OutlinedButton(
+              onPressed: busy ? null : onDismiss,
+              child: const Text('Dismiss'),
+            );
+            if (onDismiss == null) return view;
+            return stacked
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [view, const SizedBox(height: 8), dismiss],
+                  )
+                : Row(
+                    children: [
+                      Expanded(flex: 2, child: dismiss),
+                      const SizedBox(width: 10),
+                      Expanded(flex: 3, child: view),
+                    ],
+                  );
+          },
         ),
       ],
     ),
@@ -489,7 +497,7 @@ class RaProviderTheme extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = Theme.of(context);
-    final text = GoogleFonts.plusJakartaSansTextTheme(base.textTheme).copyWith(
+    final text = roadAssistTextTheme(base.textTheme).copyWith(
       headlineSmall: _providerText(context, size: 22, weight: FontWeight.w700),
       titleLarge: _providerText(context, size: 22, weight: FontWeight.w700),
       titleMedium: _providerText(context, size: 16, weight: FontWeight.w600),
@@ -501,7 +509,7 @@ class RaProviderTheme extends StatelessWidget {
       labelMedium: _providerText(context, size: 13),
       labelSmall: _providerText(context, size: 12),
     );
-    final buttonText = GoogleFonts.plusJakartaSans(
+    final buttonText = roadAssistTextStyle(
       fontSize: 15,
       fontWeight: FontWeight.w600,
     );
@@ -626,13 +634,20 @@ class RaProviderSummaryCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+              decoration: RaPremiumDecoration(
+                context,
                 color: Theme.of(
                   context,
                 ).colorScheme.primary.withValues(alpha: .09),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+              child: icon == Icons.task_alt_rounded
+                  ? const RaPremiumSuccessMark(size: 32)
+                  : RaPremiumServiceIcon(
+                      icon: icon,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
             ),
             ?status,
           ],

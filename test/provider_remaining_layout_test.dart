@@ -49,7 +49,7 @@ void main() {
               expect(find.byTooltip('Message driver'), findsNothing);
               if (arrived) {
                 await tester.scrollUntilVisible(
-                  find.text('Service notes'),
+                  find.text('Service summary'),
                   250,
                   scrollable: find.byType(Scrollable).first,
                 );
